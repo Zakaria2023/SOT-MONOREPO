@@ -127,7 +127,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   ```tsx
   // ❌ Bad
-  <a href="/products">Products</a>
+  <a href="/products">Products</a>;
 
   // ✅ Good
   import Link from "next/link";
@@ -296,7 +296,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   ```ts
   // ✅ Good — company-role.labels.ts
-  import type { CompanyRole } from "./company-role";
+  import { CompanyRole } from "./company-role";
 
   export const COMPANY_ROLE_LABELS: Record<CompanyRole, string> = {
     customer: "Customer",
@@ -323,7 +323,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     products/
       page.tsx
       actions.ts
-      schema.ts
+      validation.ts (zod schema)
       hooks.ts
 
   components/
