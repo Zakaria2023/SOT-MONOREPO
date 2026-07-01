@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository (`apps/admin` and `apps/client`).
 
+## Package Manager
+
+- Always use `pnpm` for installing dependencies and running scripts in this repo — never `npm` or `yarn`. (`npm install <pkg>` → `pnpm add <pkg>`, `npm run <script>` → `pnpm <script>`.)
+
 ## React
 
 - Never use namespace-qualified React types like `React.ReactNode`, `React.FC`, `React.MouseEvent`, etc.
@@ -115,6 +119,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   // ✅ Good
   import { Layers } from "lucide-react";
   <Layers size={24} />;
+  ```
+
+## Navigation
+
+- Never use a plain `<a>` tag for in-app navigation. Always use `Link` from `next/link` instead.
+
+  ```tsx
+  // ❌ Bad
+  <a href="/products">Products</a>
+
+  // ✅ Good
+  import Link from "next/link";
+  <Link href="/products">Products</Link>;
   ```
 
 ## Tailwind CSS
