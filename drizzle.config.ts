@@ -12,7 +12,7 @@ if (!host || !port || !user || !password || !database) {
 
 export default defineConfig({
   dialect: "mysql",
-  schema: "./src/db/schema/index.ts",
+  schema: "./db/schema/index.ts",
   out: "./drizzle",
   dbCredentials: {
     host,
