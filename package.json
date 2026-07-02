@@ -14,7 +14,11 @@
     "type-check": "pnpm -r type-check"
   },
   "devDependencies": {
+    "drizzle-kit": "^0.31.10",
     "turbo": "^2.5.0",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2"
   }
 }
