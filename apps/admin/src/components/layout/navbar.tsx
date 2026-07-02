@@ -1,6 +1,7 @@
-import { Bell, Plus } from "lucide-react";
-import type { ChangeEventHandler } from "react";
 import { Input } from "@/components/ui/input";
+import { Bell, Plus } from "lucide-react";
+import Link from "next/link";
+import { ChangeEventHandler } from "react";
 
 type NavbarProps = {
   title: string;
@@ -9,7 +10,7 @@ type NavbarProps = {
   onSearchChange: ChangeEventHandler<HTMLInputElement>;
   searchPlaceholder?: string;
   actionLabel?: string;
-  onAction?: () => void;
+  actionHref?: string;
 };
 
 export const Navbar = ({
@@ -19,13 +20,11 @@ export const Navbar = ({
   onSearchChange,
   searchPlaceholder = "Search...",
   actionLabel,
-  onAction,
+  actionHref,
 }: NavbarProps) => (
   <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-hairline bg-surface/80 px-7.5 py-4 backdrop-blur">
     <div className="flex flex-col">
-      <h1 className="font-heading text-2xl font-extrabold text-ink">
-        {title}
-      </h1>
+      <h1 className="font-heading text-2xl font-extrabold text-ink">{title}</h1>
       {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
     </div>
 
@@ -44,15 +43,14 @@ export const Navbar = ({
         <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-danger" />
       </button>
 
-      {actionLabel && (
-        <button
-          type="button"
-          onClick={onAction}
+      {actionLabel && actionHref && (
+        <Link
+          href={actionHref}
           className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
         >
           <Plus size={16} />
           {actionLabel}
-        </button>
+        </Link>
       )}
     </div>
   </header>

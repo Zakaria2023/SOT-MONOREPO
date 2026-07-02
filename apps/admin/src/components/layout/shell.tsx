@@ -10,7 +10,7 @@ type ShellProps = {
   subtitle?: string;
   searchPlaceholder?: string;
   actionLabel?: string;
-  onAction?: () => void;
+  actionHref?: string;
   children: ReactNode;
 };
 
@@ -23,7 +23,7 @@ export const Shell = ({
   subtitle,
   searchPlaceholder,
   actionLabel,
-  onAction,
+  actionHref,
   children,
 }: ShellProps) => {
   const [search, setSearch] = useState("");
@@ -41,7 +41,7 @@ export const Shell = ({
             onSearchChange={(event) => setSearch(event.target.value)}
             searchPlaceholder={searchPlaceholder}
             actionLabel={actionLabel}
-            onAction={onAction}
+            actionHref={actionHref}
           />
 
           <main className="flex-1 px-7.5 py-6.5">{children}</main>
