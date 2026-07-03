@@ -13,7 +13,6 @@ const columns: TableColumn<CategoryListItem>[] = [
   {
     key: "image",
     header: "Image",
-    width: "72px",
     render: (category) =>
       category.image ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -52,7 +51,6 @@ const columns: TableColumn<CategoryListItem>[] = [
     key: "order",
     header: "Order",
     align: "right",
-    width: "80px",
     render: (category) => category.order,
   },
 ];
