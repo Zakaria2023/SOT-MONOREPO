@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   experimental: {
     externalDir: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.r2.cloudflarestorage.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

@@ -1,5 +1,6 @@
 "use server";
 
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { db } from "@/db";
 import {
   Categories,
@@ -7,14 +8,27 @@ import {
   SelectCategories,
 } from "@/db/schema/categories";
 import { generateUuid } from "@/lib/helpers";
+import {
+  cloudflareR2,
+  CLOUDFLARE_R2_BUCKET_NAME,
+} from "@/lib/server/cloudflare-r2";
+import {
+  createDocumentDownloadUrl,
+  createDocumentObjectKey,
+  isAllowedImageType,
+  MAX_IMAGE_SIZE_BYTES,
+} from "@/lib/server/document-storage";
 import { alias } from "drizzle-orm/mysql-core";
-import { asc, eq, getTableColumns } from "drizzle-orm";
+import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export type CategoryFields = Omit<
   InsertCategories,
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
+
+export type CategoryCreateFields = Omit<CategoryFields, "order">;
 
 export type CategoryActionResult = {
   categoryUuid?: string;
@@ -24,13 +38,18 @@ export type CategoryActionResult = {
 
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
+  imageUrl: string | null;
 };
+
+export type UploadCategoryImageResult =
+  | { documentId: string; fileName: string }
+  | { error: string };
 
 const ParentCategories = alias(Categories, "parent_categories");
 
 export const getCategories = async (): Promise<CategoryListItem[]> => {
   try {
-    return await db
+    const rows = await db
       .select({
         ...getTableColumns(Categories),
         parentName: ParentCategories.name,
@@ -38,6 +57,18 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
       .from(Categories)
       .leftJoin(ParentCategories, eq(Categories.parentUuid, ParentCategories.uuid))
       .orderBy(asc(Categories.order));
+
+    return await Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        imageUrl: row.image
+          ? await createDocumentDownloadUrl({
+              documentId: row.image,
+              fileName: row.name,
+            })
+          : null,
+      })),
+    );
   } catch {
     throw new Error("Failed to fetch categories");
   }
@@ -57,20 +88,61 @@ export const getCategory = async (
   }
 };
 
+export const uploadCategoryImage = async (
+  formData: FormData,
+): Promise<UploadCategoryImageResult> => {
+  const file = formData.get("file");
+
+  if (!(file instanceof File)) {
+    return { error: "No file provided" };
+  }
+
+  if (!isAllowedImageType(file.type)) {
+    return { error: "File type not allowed" };
+  }
+
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return { error: "File too large" };
+  }
+
+  const documentId = generateUuid();
+
+  try {
+    const buffer = await file.arrayBuffer();
+    await cloudflareR2.send(
+      new PutObjectCommand({
+        Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+        Key: createDocumentObjectKey(documentId),
+        Body: Buffer.from(buffer),
+        ContentType: file.type,
+      }),
+    );
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to upload image",
+    };
+  }
+
+  return { documentId, fileName: file.name };
+};
+
 export const createCategory = async (
-  fields: CategoryFields,
+  _prevState: CategoryActionResult,
+  fields: CategoryCreateFields,
 ): Promise<CategoryActionResult> => {
   const uuid = generateUuid();
   try {
-    await db.insert(Categories).values({ ...fields, uuid });
-    revalidatePath("/categories");
-    return { success: true, categoryUuid: uuid };
+    const [{ total }] = await db.select({ total: count() }).from(Categories);
+    await db.insert(Categories).values({ ...fields, uuid, order: total });
   } catch (error) {
     return {
       error:
         error instanceof Error ? error.message : "Failed to create category",
     };
   }
+
+  revalidatePath("/categories");
+  redirect("/categories");
 };
 
 export const updateCategory = async (

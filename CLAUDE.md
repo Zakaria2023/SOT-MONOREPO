@@ -140,6 +140,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   />;
   ```
 
+## Dropdowns
+
+- Never use a native `<select>` element. Always use the `Dropdown` component from `@/components/ui/dropdown` instead.
+
+  ```tsx
+  // ❌ Bad
+  <select {...register("parentUuid")}>
+    <option value="">No parent</option>
+  </select>;
+
+  // ✅ Good
+  import { Dropdown } from "@/components/ui/dropdown";
+
+  <Controller
+    control={control}
+    name="parentUuid"
+    render={({ field }) => (
+      <Dropdown
+        value={field.value}
+        onChange={field.onChange}
+        placeholder="No parent"
+        options={[{ value: "", label: "No parent" }]}
+      />
+    )}
+  />;
+  ```
+
 ## Navigation
 
 - Never use a plain `<a>` tag for in-app navigation. Always use `Link` from `next/link` instead.
