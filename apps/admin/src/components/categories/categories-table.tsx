@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageOff } from "lucide-react";
+import Image from "next/image";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
 import type { CategoryListItem } from "@/app/(dashboard)/categories/action";
@@ -15,10 +16,11 @@ const columns: TableColumn<CategoryListItem>[] = [
     header: "Image",
     render: (category) =>
       category.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={category.image}
           alt={category.name}
+          width={40}
+          height={40}
           className="h-10 w-10 rounded-control object-cover"
         />
       ) : (

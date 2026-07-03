@@ -121,6 +121,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   <Layers size={24} />;
   ```
 
+## Images
+
+- Never use a plain `<img>` tag. Always use `Image` from `next/image` instead.
+
+  ```tsx
+  // ❌ Bad
+  <img src={category.image} alt={category.name} className="h-10 w-10" />;
+
+  // ✅ Good
+  import Image from "next/image";
+  <Image
+    src={category.image}
+    alt={category.name}
+    width={40}
+    height={40}
+    className="h-10 w-10"
+  />;
+  ```
+
 ## Navigation
 
 - Never use a plain `<a>` tag for in-app navigation. Always use `Link` from `next/link` instead.
@@ -132,6 +151,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   // ✅ Good
   import Link from "next/link";
   <Link href="/products">Products</Link>;
+  ```
+
+## Linting
+
+- Never disable a lint rule (`eslint-disable`, `eslint-disable-next-line`, etc.) to make a warning or error go away. Fix the underlying code so it satisfies the rule instead.
+
+  ```tsx
+  // ❌ Bad
+  // eslint-disable-next-line @next/next/no-img-element
+  <img src={category.image} alt={category.name} />;
+
+  // ✅ Good — use the tool the rule is steering you toward
+  import Image from "next/image";
+  <Image src={category.image} alt={category.name} width={40} height={40} />;
   ```
 
 ## Tailwind CSS
