@@ -1,7 +1,8 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
+import { ImageOff, Pencil } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
 import { PRODUCT_STATUS_LABELS } from "@/lib/label";
@@ -78,6 +79,19 @@ const columns: TableColumn<ProductListItem>[] = [
     header: "Order",
     align: "right",
     render: (product) => product.order,
+  },
+  {
+    key: "actions",
+    header: "Action",
+    align: "right",
+    render: (product) => (
+      <Link
+        href={`/products/${product.uuid}/edit`}
+        className="flex h-9 w-9 items-center justify-center rounded-control border border-hairline text-secondary hover:bg-hover"
+      >
+        <Pencil size={16} />
+      </Link>
+    ),
   },
 ];
 

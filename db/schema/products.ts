@@ -14,6 +14,16 @@ import {
 } from "drizzle-orm/mysql-core";
 import { productStatuses } from "../../apps/admin/src/lib/enum";
 
+export type ProductHighlight = {
+  k: string;
+  v: string;
+};
+
+export type ProductSpecGroup = {
+  title: string;
+  rows: { k: string; v: string }[];
+};
+
 export const Products = mysqlTable(
   "Products",
   {
@@ -49,8 +59,8 @@ export const Products = mysqlTable(
     // Inventory
     stock: int("stock").default(0).notNull(),
 
-    highlights: json("highlights"), // [{ v: "10 Gbps", k: "Throughput" }, ...]
-    specGroups: json("spec_groups"), // [{ title, rows: [{ k, v }] }, ...]
+    highlights: json("highlights").$type<ProductHighlight[]>(), // [{ k: "Throughput", v: "10 Gbps" }, ...]
+    specGroups: json("spec_groups").$type<ProductSpecGroup[]>(), // [{ title, rows: [{ k, v }] }, ...]
 
     // State & ordering
     status: mysqlEnum("status", productStatuses).default("draft").notNull(),
