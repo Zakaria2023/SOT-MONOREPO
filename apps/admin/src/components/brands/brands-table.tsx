@@ -2,6 +2,7 @@
 
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
+import { BrandRowActions } from "@/components/brands/brand-row-actions";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
 import type { SelectBrands } from "@/db/schema/brands";
@@ -14,7 +15,6 @@ const columns: TableColumn<SelectBrands>[] = [
   {
     key: "image",
     header: "Image",
-    width: "72px",
     render: (brand) =>
       brand.image ? (
         <Image
@@ -48,8 +48,15 @@ const columns: TableColumn<SelectBrands>[] = [
     key: "order",
     header: "Order",
     align: "right",
-    width: "80px",
     render: (brand) => brand.order,
+  },
+  {
+    key: "actions",
+    header: "Action",
+    align: "right",
+    render: (brand) => (
+      <BrandRowActions uuid={brand.uuid} name={brand.name} />
+    ),
   },
 ];
 

@@ -7,7 +7,6 @@ export type TableColumn<T> = {
   key: string;
   header: string;
   align?: "left" | "right";
-  width?: string;
   render: (row: T) => ReactNode;
 };
 
@@ -34,48 +33,47 @@ export const Table = <T,>({
     );
   });
 
-  const gridTemplateColumns = columns
-    .map((column) => column.width ?? "1fr")
-    .join(" ");
-
   return (
-    <div className="overflow-hidden rounded-card border border-hairline bg-surface">
-      <div
-        className="grid gap-4 border-b border-hairline px-5 py-3 text-xs font-semibold tracking-wide text-faint uppercase"
-        style={{ gridTemplateColumns }}
-      >
-        {columns.map((column) => (
-          <span
-            key={column.key}
-            className={column.align === "right" ? "text-right" : ""}
-          >
-            {column.header}
-          </span>
-        ))}
-      </div>
+    <div className="rounded-card border border-hairline bg-surface">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-hairline">
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                className={`px-5 py-3 text-xs font-semibold text-faint uppercase ${
+                  column.align === "right" ? "text-right" : "text-left"
+                }`}
+              >
+                {column.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
 
-      {filteredData.length === 0 ? (
+        {filteredData.length > 0 && (
+          <tbody className="divide-y divide-hairline">
+            {filteredData.map((row, index) => (
+              <tr key={index} className="hover:bg-hover">
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={`px-5 py-3.5 text-sm text-ink ${
+                      column.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        )}
+      </table>
+
+      {filteredData.length === 0 && (
         <div className="px-5 py-16 text-center text-sm text-muted">
           {emptyMessage}
-        </div>
-      ) : (
-        <div className="divide-y divide-hairline">
-          {filteredData.map((row, index) => (
-            <div
-              key={index}
-              className="grid items-center gap-4 px-5 py-3.5 hover:bg-hover"
-              style={{ gridTemplateColumns }}
-            >
-              {columns.map((column) => (
-                <div
-                  key={column.key}
-                  className={column.align === "right" ? "text-right" : ""}
-                >
-                  {column.render(row)}
-                </div>
-              ))}
-            </div>
-          ))}
         </div>
       )}
     </div>
