@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { uploadCategoryImage } from "@/app/(dashboard)/categories/action";
+import { useRef, useState } from "react";
 import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { Button } from "@/components/ui/button";
@@ -30,10 +29,14 @@ export const CategoryForm = (props: CategoryFormProps) => {
   } = form;
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const hasSubmittedRef = useRef(false);
 
   return (
     <form
-      onSubmit={onSubmit}
+      onSubmit={(event) => {
+        hasSubmittedRef.current = true;
+        onSubmit(event);
+      }}
       className="flex max-w-xl flex-col gap-5 rounded-card border border-hairline bg-surface p-6"
     >
       <Input
@@ -59,9 +62,9 @@ export const CategoryForm = (props: CategoryFormProps) => {
       <ImageUpload
         label="Image"
         register={register("image")}
-        upload={uploadCategoryImage}
         onUploaded={(documentId) => setValue("image", documentId)}
         onUploadingChange={setIsUploadingImage}
+        submittedRef={hasSubmittedRef}
         previewUrl={
           mode === "edit" && props.category.image
             ? `/api/documents/${props.category.image}/download`

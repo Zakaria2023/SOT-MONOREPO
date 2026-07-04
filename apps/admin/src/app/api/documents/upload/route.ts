@@ -7,6 +7,7 @@ import {
 import {
   createDocumentObjectKey,
   isAllowedDocumentType,
+  isAllowedImageType,
   MAX_DOCUMENT_SIZE_BYTES,
 } from "@/lib/server/document-storage";
 
@@ -19,7 +20,7 @@ export const POST = async (req: Request) => {
       return Response.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (!isAllowedDocumentType(file.type)) {
+    if (!isAllowedDocumentType(file.type) && !isAllowedImageType(file.type)) {
       return Response.json({ error: "File type not allowed" }, { status: 400 });
     }
 

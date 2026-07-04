@@ -1,19 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { uploadBrandImage } from "@/app/(dashboard)/brands/action";
-import type { BrandDetail } from "@/app/(dashboard)/brands/action";
+import { useRef, useState } from "react";
 import { useBrandForm } from "@/app/(dashboard)/brands/use-brand-form";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { SelectBrands } from "@/db/schema/brands";
 
 type BrandFormProps =
   | { mode: "add" }
-  | { mode: "edit"; brand: BrandDetail };
+  | { mode: "edit"; brand: SelectBrands };
 
 export const BrandForm = (props: BrandFormProps) => {
   const { mode } = props;
@@ -28,10 +27,14 @@ export const BrandForm = (props: BrandFormProps) => {
   } = form;
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const hasSubmittedRef = useRef(false);
 
   return (
     <form
-      onSubmit={onSubmit}
+      onSubmit={(event) => {
+        hasSubmittedRef.current = true;
+        onSubmit(event);
+      }}
       className="flex max-w-xl flex-col gap-5 rounded-card border border-hairline bg-surface p-6"
     >
       <Input
@@ -55,10 +58,14 @@ export const BrandForm = (props: BrandFormProps) => {
       <ImageUpload
         label="Image"
         register={register("image")}
-        upload={uploadBrandImage}
         onUploaded={(documentId) => setValue("image", documentId)}
         onUploadingChange={setIsUploadingImage}
-        previewUrl={mode === "edit" ? props.brand.imageUrl : null}
+        submittedRef={hasSubmittedRef}
+        previewUrl={
+          mode === "edit" && props.brand.image
+            ? `/api/documents/${props.brand.image}/download`
+            : null
+        }
       />
 
       <FormError message={state.error} />

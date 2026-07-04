@@ -22,6 +22,7 @@ const columns: TableColumn<CategoryListItem>[] = [
           alt={category.name}
           width={40}
           height={40}
+          unoptimized
           className="h-10 w-10 rounded-control object-cover"
         />
       ) : (

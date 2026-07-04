@@ -258,7 +258,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Next.js Server Actions
 
-- Always use Next.js Server Actions for data mutations and queries. Never create Next.js route handlers (route.ts files in the app directory).
+- Always use Next.js Server Actions for data mutations and queries. Never create a new route handler (route.ts) to duplicate something a Server Action could do.
+- If a route handler already exists for an operation (e.g. file upload/download), reuse it from the client (`fetch`) instead of writing a parallel Server Action that does the same thing.
 - Server Actions should be defined in `actions.ts` files within feature directories.
 - All Server Actions must have the `"use server"` directive at the top of the file.
 - Always perform redirects on the server, inside the Server Action itself, using `redirect` from `next/navigation`. Never redirect on the client (e.g. via `router.push` after checking `state.success`).
@@ -281,6 +282,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   ): Promise<ActionResult> => {
     // ...
   };
+  ```
+
+  ```ts
+  // ❌ Bad — a new Server Action that duplicates an existing route handler
+  // app/(dashboard)/categories/action.ts
+  ("use server");
+
+  export const uploadCategoryImage = async (formData: FormData) => {
+    // ... same upload logic app/api/documents/upload/route.ts already does
+  };
+
+  // ✅ Good — reuse the existing route handler from the client
+  // app/api/documents/upload/route.ts already exists, so call it directly
+  const response = await fetch("/api/documents/upload", {
+    method: "POST",
+    body: formData,
+  });
   ```
 
   ```ts
