@@ -36,7 +36,6 @@ export type CategoryActionResult = {
 
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
-  imageUrl: string | null;
 };
 
 export type CategoryDetail = SelectCategories & {
@@ -51,7 +50,7 @@ const ParentCategories = alias(Categories, "parent_categories");
 
 export const getCategories = async (): Promise<CategoryListItem[]> => {
   try {
-    const rows = await db
+    return await db
       .select({
         ...getTableColumns(Categories),
         parentName: ParentCategories.name,
@@ -59,18 +58,6 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
       .from(Categories)
       .leftJoin(ParentCategories, eq(Categories.parentUuid, ParentCategories.uuid))
       .orderBy(asc(Categories.order));
-
-    return await Promise.all(
-      rows.map(async (row) => ({
-        ...row,
-        imageUrl: row.image
-          ? await createDocumentDownloadUrl({
-              documentId: row.image,
-              fileName: row.name,
-            })
-          : null,
-      })),
-    );
   } catch {
     throw new Error("Failed to fetch categories");
   }

@@ -16,9 +16,9 @@ const columns: TableColumn<CategoryListItem>[] = [
     key: "image",
     header: "Image",
     render: (category) =>
-      category.imageUrl ? (
+      category.image ? (
         <Image
-          src={category.imageUrl}
+          src={`/api/documents/${category.image}/download`}
           alt={category.name}
           width={40}
           height={40}
