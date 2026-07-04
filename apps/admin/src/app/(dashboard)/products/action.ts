@@ -93,3 +93,18 @@ export const updateProduct = async (
   revalidatePath("/products");
   redirect("/products");
 };
+
+export const deleteProduct = async (
+  uuid: string,
+): Promise<ProductActionResult> => {
+  try {
+    await db.delete(Products).where(eq(Products.uuid, uuid));
+    revalidatePath("/products");
+    return { success: true, productUuid: uuid };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to delete product",
+    };
+  }
+};
