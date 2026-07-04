@@ -1,5 +1,6 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bell, Plus } from "lucide-react";
+import { Bell, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { ChangeEventHandler } from "react";
 
@@ -33,15 +34,14 @@ export const Navbar = ({
         value={search}
         onChange={onSearchChange}
         placeholder={searchPlaceholder}
+        icon={<Search size={16} />}
+        wrapperClassName="w-60"
       />
 
-      <button
-        type="button"
-        className="relative flex h-10 w-10 items-center justify-center rounded-control border border-hairline text-secondary hover:bg-hover"
-      >
+      <Button type="button" variant="icon" className="relative justify-center">
         <Bell size={18} />
         <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-danger" />
-      </button>
+      </Button>
 
       {actionLabel && actionHref && (
         <Link

@@ -7,11 +7,21 @@ import { cloudflareR2, CLOUDFLARE_R2_BUCKET_NAME } from "./cloudflare-r2";
 /** Maximum permitted upload size (20 MB). */
 export const MAX_DOCUMENT_SIZE_BYTES = 20 * 1024 * 1024;
 
+/** Maximum permitted image upload size (5 MB). */
+export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
 /** MIME types accepted for document uploads. */
 export const ALLOWED_DOCUMENT_TYPES = [
   "application/pdf",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+] as const;
+
+/** MIME types accepted for image uploads. */
+export const ALLOWED_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
 ] as const;
 
 type CreateDocumentUploadUrlParams = {
@@ -27,6 +37,10 @@ type CreateDocumentDownloadUrlParams = {
 /** Returns true when `contentType` is in the allowed document types list. */
 export const isAllowedDocumentType = (contentType: string): boolean =>
   (ALLOWED_DOCUMENT_TYPES as readonly string[]).includes(contentType);
+
+/** Returns true when `contentType` is in the allowed image types list. */
+export const isAllowedImageType = (contentType: string): boolean =>
+  (ALLOWED_IMAGE_TYPES as readonly string[]).includes(contentType);
 
 /** Replaces any character that is not alphanumeric, `.`, `-`, or `_` with `_`. */
 export const sanitizeFileName = (fileName: string): string =>

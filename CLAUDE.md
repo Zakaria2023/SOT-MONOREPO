@@ -121,6 +121,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   <Layers size={24} />;
   ```
 
+## Images
+
+- Never use a plain `<img>` tag. Always use `Image` from `next/image` instead.
+
+  ```tsx
+  // ❌ Bad
+  <img src={category.image} alt={category.name} className="h-10 w-10" />;
+
+  // ✅ Good
+  import Image from "next/image";
+  <Image
+    src={category.image}
+    alt={category.name}
+    width={40}
+    height={40}
+    className="h-10 w-10"
+  />;
+  ```
+
+## Dropdowns
+
+- Never use a native `<select>` element. Always use the `Dropdown` component from `@/components/ui/dropdown` instead.
+
+  ```tsx
+  // ❌ Bad
+  <select {...register("parentUuid")}>
+    <option value="">No parent</option>
+  </select>;
+
+  // ✅ Good
+  import { Dropdown } from "@/components/ui/dropdown";
+
+  <Controller
+    control={control}
+    name="parentUuid"
+    render={({ field }) => (
+      <Dropdown
+        value={field.value}
+        onChange={field.onChange}
+        placeholder="No parent"
+        options={[{ value: "", label: "No parent" }]}
+      />
+    )}
+  />;
+  ```
+
 ## Navigation
 
 - Never use a plain `<a>` tag for in-app navigation. Always use `Link` from `next/link` instead.
@@ -132,6 +178,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   // ✅ Good
   import Link from "next/link";
   <Link href="/products">Products</Link>;
+  ```
+
+## Linting
+
+- Never disable a lint rule (`eslint-disable`, `eslint-disable-next-line`, etc.) to make a warning or error go away. Fix the underlying code so it satisfies the rule instead.
+
+  ```tsx
+  // ❌ Bad
+  // eslint-disable-next-line @next/next/no-img-element
+  <img src={category.image} alt={category.name} />;
+
+  // ✅ Good — use the tool the rule is steering you toward
+  import Image from "next/image";
+  <Image src={category.image} alt={category.name} width={40} height={40} />;
   ```
 
 ## Tailwind CSS
@@ -243,6 +303,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   ): Promise<ActionResult> => {
     // ... perform mutation
     redirect("/addresses");
+  };
+  ```
+
+## Dynamic Route Params
+
+- Page components for dynamic routes always type `params` as a `Promise` and `await` it to read the route values — never destructure `params` directly as a plain object.
+
+  ```tsx
+  // ❌ Bad
+  type Props = {
+    params: { uuid: string };
+  };
+
+  const CategoryEditPage = ({ params }: Props) => {
+    const { uuid } = params;
+    // ...
+  };
+
+  // ✅ Good
+  type Props = {
+    params: Promise<{ uuid: string }>;
+  };
+
+  const CategoryEditPage = async ({ params }: Props) => {
+    const { uuid } = await params;
+    // ...
   };
   ```
 
