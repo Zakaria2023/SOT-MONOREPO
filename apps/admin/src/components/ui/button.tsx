@@ -14,7 +14,7 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     "gap-1.5 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-hover",
   ghost:
     "gap-1.5 rounded-control px-4 py-2 text-sm font-semibold text-secondary hover:bg-hover",
-  icon: "h-10 w-10 rounded-control border border-hairline text-secondary hover:bg-hover",
+  icon: "h-10 w-10 justify-center rounded-control border border-hairline text-secondary hover:bg-hover",
   danger:
     "gap-1.5 rounded-control bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90",
 };

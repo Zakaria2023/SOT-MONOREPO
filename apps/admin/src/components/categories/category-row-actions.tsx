@@ -45,7 +45,7 @@ export const CategoryRowActions = ({ uuid, name }: CategoryRowActionsProps) => {
       <Button
         type="button"
         variant="icon"
-        className="h-9 w-9 justify-center"
+        className="h-9 w-9"
         onClick={() => {
           setError(undefined);
           setIsConfirmOpen(true);

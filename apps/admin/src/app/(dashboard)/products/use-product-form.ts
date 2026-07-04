@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { createProduct, updateProduct } from "./action";
-import type { ProductActionResult, ProductFields } from "./action";
+import type { ProductActionResult, ProductClientFields } from "./action";
 import { productFormSchema } from "./validation";
 import type { ProductFormValues } from "./validation";
 import type { SelectProducts } from "@/db/schema/products";
@@ -16,7 +16,7 @@ type UseProductFormArgs =
 export const useProductForm = (args: UseProductFormArgs) => {
   const action =
     args.mode === "edit"
-      ? (prevState: ProductActionResult, fields: ProductFields) =>
+      ? (prevState: ProductActionResult, fields: ProductClientFields) =>
           updateProduct(args.product.uuid, prevState, fields)
       : createProduct;
 
@@ -30,7 +30,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
       categoryUuid: product?.categoryUuid ?? "",
       brandUuid: product?.brandUuid ?? "",
       name: product?.name ?? "",
-      slug: product?.slug ?? "",
       sku: product?.sku ?? "",
       model: product?.model ?? "",
       blurb: product?.blurb ?? "",
@@ -56,7 +55,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
         categoryUuid: values.categoryUuid,
         brandUuid: values.brandUuid,
         name: values.name,
-        slug: values.slug,
         sku: values.sku || null,
         model: values.model || null,
         blurb: values.blurb || null,

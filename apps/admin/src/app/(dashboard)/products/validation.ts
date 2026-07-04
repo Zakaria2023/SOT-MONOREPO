@@ -20,7 +20,6 @@ export const productFormSchema = z.object({
   categoryUuid: z.string().min(1, "Category is required"),
   brandUuid: z.string().min(1, "Brand is required"),
   name: z.string().min(1, "Name is required").max(255),
-  slug: z.string().min(1, "Slug is required").max(255),
   sku: z.string().optional(),
   model: z.string().optional(),
   blurb: z.string().optional(),

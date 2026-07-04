@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
-import { generateUuid } from "@/lib/helpers";
+import { generateUuid, slugify } from "@/lib/helpers";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -13,6 +13,8 @@ export type ProductFields = Omit<
   InsertProducts,
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
+
+export type ProductClientFields = Omit<ProductFields, "slug">;
 
 export type ProductActionResult = {
   productUuid?: string;
@@ -59,12 +61,17 @@ export const getProduct = async (
 
 export const createProduct = async (
   _prevState: ProductActionResult,
-  fields: ProductFields,
+  fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
   const uuid = generateUuid();
   try {
     const [{ total }] = await db.select({ total: count() }).from(Products);
-    await db.insert(Products).values({ ...fields, uuid, order: total });
+    await db.insert(Products).values({
+      ...fields,
+      uuid,
+      order: total,
+      slug: slugify(fields.name),
+    });
   } catch (error) {
     return {
       error:
@@ -79,10 +86,13 @@ export const createProduct = async (
 export const updateProduct = async (
   uuid: string,
   _prevState: ProductActionResult,
-  fields: ProductFields,
+  fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
   try {
-    await db.update(Products).set(fields).where(eq(Products.uuid, uuid));
+    await db
+      .update(Products)
+      .set({ ...fields, slug: slugify(fields.name) })
+      .where(eq(Products.uuid, uuid));
   } catch (error) {
     return {
       error:

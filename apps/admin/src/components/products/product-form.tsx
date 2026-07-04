@@ -58,23 +58,20 @@ export const ProductForm = (props: ProductFormProps) => {
           hasSubmittedRef.current = true;
           onSubmit(event);
         }}
-        className="flex max-w-3xl flex-col gap-5 rounded-card border border-hairline bg-surface p-6"
+        className="flex flex-col gap-5 rounded-card border border-hairline bg-surface p-6"
       >
-        <Input
-          label="Name"
-          type="text"
-          {...register("name")}
-          error={errors.name?.message}
-        />
+        <div className="grid grid-cols-3 gap-4">
+          <Input
+            label="Name"
+            type="text"
+            {...register("name")}
+            error={errors.name?.message}
+          />
+          <Input label="SKU" type="text" {...register("sku")} />
+          <Input label="Model" type="text" {...register("model")} />
+        </div>
 
-        <Input
-          label="Slug"
-          type="text"
-          {...register("slug")}
-          error={errors.slug?.message}
-        />
-
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <CategoryDropdown
             control={control}
             name="categoryUuid"
@@ -91,40 +88,6 @@ export const ProductForm = (props: ProductFormProps) => {
             brands={brands}
             error={errors.brandUuid?.message}
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="SKU" type="text" {...register("sku")} />
-          <Input label="Model" type="text" {...register("model")} />
-        </div>
-
-        <Input label="Blurb" type="text" {...register("blurb")} />
-        <Textarea label="Description" rows={4} {...register("description")} />
-        <Input label="Role" type="text" {...register("role")} />
-
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Price"
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            {...register("price")}
-            error={errors.price?.message}
-          />
-          <Input
-            label="Currency"
-            type="text"
-            {...register("currency")}
-            error={errors.currency?.message}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Stock"
-            type="number"
-            {...register("stock", { valueAsNumber: true })}
-          />
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-ink">Status</label>
@@ -140,23 +103,49 @@ export const ProductForm = (props: ProductFormProps) => {
               )}
             />
           </div>
+
+          <Input
+            label="Currency"
+            type="text"
+            {...register("currency")}
+            error={errors.currency?.message}
+          />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <Input label="Blurb" type="text" {...register("blurb")} />
+        <Textarea label="Description" rows={4} {...register("description")} />
+        <Input label="Role" type="text" {...register("role")} />
+
+        <div className="grid grid-cols-4 gap-4">
+          <Input
+            label="Price"
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            {...register("price")}
+            error={errors.price?.message}
+          />
+          <Input
+            label="Stock"
+            type="number"
+            {...register("stock", { valueAsNumber: true })}
+          />
           <Input label="Ribbon" type="text" {...register("ribbon")} />
           <Input label="Icon Key" type="text" {...register("iconKey")} />
         </div>
 
-        <Checkbox label="Featured product" {...register("isFeatured")} />
-
         {mode === "edit" && (
-          <Input
-            label="Order"
-            type="number"
-            {...register("order", { valueAsNumber: true })}
-            error={errors.order?.message}
-          />
+          <div className="grid grid-cols-4 gap-4">
+            <Input
+              label="Order"
+              type="number"
+              {...register("order", { valueAsNumber: true })}
+              error={errors.order?.message}
+            />
+          </div>
         )}
+
+        <Checkbox label="Featured product" {...register("isFeatured")} />
 
         <ImageUpload
           label="Image"
