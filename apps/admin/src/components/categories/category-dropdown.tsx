@@ -5,11 +5,17 @@ import { Controller } from "react-hook-form";
 import type { Control, FieldValues, Path } from "react-hook-form";
 import { Dropdown } from "@/components/ui/dropdown";
 import type { DropdownOption } from "@/components/ui/dropdown";
+import { FormError } from "@/components/ui/form-error";
 import type { SelectCategories } from "@/db/schema/categories";
 
 type CategoryDropdownProps<TFieldValues extends FieldValues> = {
   control: Control<TFieldValues>;
+  name: Path<TFieldValues>;
   categories: SelectCategories[];
+  label?: string;
+  placeholder?: string;
+  allowEmpty?: boolean;
+  error?: string;
 };
 
 const buildCategoryTreeOptions = (
@@ -40,7 +46,12 @@ const buildCategoryTreeOptions = (
 
 export const CategoryDropdown = <TFieldValues extends FieldValues>({
   control,
+  name,
   categories,
+  label = "Parent Category",
+  placeholder = "No parent",
+  allowEmpty = true,
+  error,
 }: CategoryDropdownProps<TFieldValues>) => {
   const options = useMemo(
     () => buildCategoryTreeOptions(categories),
@@ -49,21 +60,24 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-semibold text-ink">
-        Parent Category
-      </label>
+      <label className="text-sm font-semibold text-ink">{label}</label>
       <Controller
         control={control}
-        name={"parentUuid" as Path<TFieldValues>}
+        name={name}
         render={({ field }) => (
           <Dropdown
             value={typeof field.value === "string" ? field.value : ""}
             onChange={field.onChange}
-            placeholder="No parent"
-            options={[{ value: "", label: "No parent" }, ...options]}
+            placeholder={placeholder}
+            options={
+              allowEmpty
+                ? [{ value: "", label: placeholder }, ...options]
+                : options
+            }
           />
         )}
       />
+      <FormError message={error} />
     </div>
   );
 };

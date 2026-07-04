@@ -38,7 +38,7 @@ export const Navbar = ({
         wrapperClassName="w-60"
       />
 
-      <Button type="button" variant="icon" className="relative justify-center">
+      <Button type="button" variant="icon" className="relative">
         <Bell size={18} />
         <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-danger" />
       </Button>

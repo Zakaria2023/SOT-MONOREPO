@@ -48,7 +48,11 @@ export const CategoryForm = (props: CategoryFormProps) => {
 
       <Textarea label="Description" rows={3} {...register("description")} />
 
-      <CategoryDropdown control={control} categories={categories} />
+      <CategoryDropdown
+        control={control}
+        name="parentUuid"
+        categories={categories}
+      />
 
       {mode === "edit" && (
         <Input

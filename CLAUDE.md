@@ -378,41 +378,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Enums
 
 - Never use TypeScript's `enum`. Always define enums as a `const` array typed with `as const satisfies readonly string[]`, and derive the union type from it with `(typeof arr)[number]`.
-- Each enum lives in its own file (e.g. `company-role.ts`), exporting the const array and the derived type.
-- Labels for rendering (the human-readable string per value) never live in the enum file. They live in a separate, co-located labels file (e.g. `company-role.labels.ts`), exported as a `Record<EnumType, string>`.
+- Never define an enum inline inside a database schema file (e.g. inline in the array argument to `mysqlEnum(...)`). Define it in `apps/admin/src/lib/enum.ts` and import the const array into the schema file instead.
+- All enums for the app live together in the single `apps/admin/src/lib/enum.ts` file — not scattered across one-file-per-enum.
+- Labels never live in `enum.ts`. All label maps live together in the single `apps/admin/src/lib/label.ts` file instead, each exported as a `Record<EnumType, string>`.
 
   ```ts
-  // ✅ Good — company-role.ts
-  export const companyRoles = [
-    "customer",
-    "prospect",
-    "supplier",
-    "processor",
-    "transporter",
-    "agent",
-    "purchasing_org",
-    "other",
-    "internal",
+  // ✅ Good — apps/admin/src/lib/enum.ts
+  export const productStatuses = [
+    "draft",
+    "published",
+    "archived",
   ] as const satisfies readonly string[];
 
-  export type CompanyRole = (typeof companyRoles)[number];
+  export type ProductStatus = (typeof productStatuses)[number];
   ```
 
   ```ts
-  // ✅ Good — company-role.labels.ts
-  import { CompanyRole } from "./company-role";
+  // ✅ Good — apps/admin/src/lib/label.ts
+  import { ProductStatus } from "./enum";
 
-  export const COMPANY_ROLE_LABELS: Record<CompanyRole, string> = {
-    customer: "Customer",
-    prospect: "Prospect",
-    supplier: "Supplier",
-    processor: "Processor",
-    transporter: "Transporter",
-    agent: "Agent",
-    purchasing_org: "Purchasing Org.",
-    other: "Other",
-    internal: "Internal",
+  export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
+    draft: "Draft",
+    published: "Published",
+    archived: "Archived",
   };
+  ```
+
+  ```ts
+  // ❌ Bad — enum defined inline in the schema file
+  // db/schema/products.ts
+  status: mysqlEnum("status", ["draft", "published", "archived"]);
+
+  // ✅ Good — import the const array from apps/admin/src/lib/enum.ts
+  // db/schema/products.ts
+  import { productStatuses } from "../../apps/admin/src/lib/enum";
+
+  status: mysqlEnum("status", productStatuses);
   ```
 
 ## Folder Structure

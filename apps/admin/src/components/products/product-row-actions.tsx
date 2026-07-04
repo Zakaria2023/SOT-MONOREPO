@@ -4,16 +4,16 @@ import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { deleteCategory } from "@/app/(dashboard)/categories/action";
+import { deleteProduct } from "@/app/(dashboard)/products/action";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-type CategoryRowActionsProps = {
+type ProductRowActionsProps = {
   uuid: string;
   name: string;
 };
 
-export const CategoryRowActions = ({ uuid, name }: CategoryRowActionsProps) => {
+export const ProductRowActions = ({ uuid, name }: ProductRowActionsProps) => {
   const router = useRouter();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -21,7 +21,7 @@ export const CategoryRowActions = ({ uuid, name }: CategoryRowActionsProps) => {
 
   const handleConfirmDelete = () => {
     startTransition(async () => {
-      const result = await deleteCategory(uuid);
+      const result = await deleteProduct(uuid);
 
       if (result.error) {
         setError(result.error);
@@ -36,7 +36,7 @@ export const CategoryRowActions = ({ uuid, name }: CategoryRowActionsProps) => {
   return (
     <div className="flex items-center justify-end gap-2">
       <Link
-        href={`/categories/${uuid}/edit`}
+        href={`/products/${uuid}/edit`}
         className="flex h-9 w-9 items-center justify-center rounded-control border border-hairline text-secondary hover:bg-hover"
       >
         <Pencil size={16} />
@@ -56,7 +56,7 @@ export const CategoryRowActions = ({ uuid, name }: CategoryRowActionsProps) => {
 
       <ConfirmDialog
         open={isConfirmOpen}
-        title="Delete category"
+        title="Delete product"
         description={`Are you sure you want to delete "${name}"? This cannot be undone.`}
         confirmLabel="Delete"
         isConfirming={isDeleting}

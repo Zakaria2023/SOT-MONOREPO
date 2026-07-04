@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { Award, Layers, LayoutDashboard, Tags } from "lucide-react";
+import { Award, Layers, LayoutDashboard, Package, Tags } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -15,6 +15,7 @@ const MENU_LINKS: NavLink[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Award, label: "Brands", href: "/brands" },
   { icon: Tags, label: "Categories", href: "/categories" },
+  { icon: Package, label: "Products", href: "/products" },
 ];
 
 export const Sidebar = () => {
