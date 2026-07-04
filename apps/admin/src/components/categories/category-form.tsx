@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { uploadCategoryImage } from "@/app/(dashboard)/categories/action";
-import type { CategoryDetail } from "@/app/(dashboard)/categories/action";
 import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import type { SelectCategories } from "@/db/schema/categories";
 
 type CategoryFormProps =
   | { mode: "add"; categories: SelectCategories[] }
-  | { mode: "edit"; categories: SelectCategories[]; category: CategoryDetail };
+  | { mode: "edit"; categories: SelectCategories[]; category: SelectCategories };
 
 export const CategoryForm = (props: CategoryFormProps) => {
   const { mode, categories } = props;
@@ -63,7 +62,11 @@ export const CategoryForm = (props: CategoryFormProps) => {
         upload={uploadCategoryImage}
         onUploaded={(documentId) => setValue("image", documentId)}
         onUploadingChange={setIsUploadingImage}
-        previewUrl={mode === "edit" ? props.category.imageUrl : null}
+        previewUrl={
+          mode === "edit" && props.category.image
+            ? `/api/documents/${props.category.image}/download`
+            : null
+        }
       />
 
       <FormError message={state.error} />

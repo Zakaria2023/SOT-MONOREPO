@@ -13,7 +13,6 @@ import {
   CLOUDFLARE_R2_BUCKET_NAME,
 } from "@/lib/server/cloudflare-r2";
 import {
-  createDocumentDownloadUrl,
   createDocumentObjectKey,
   isAllowedImageType,
   MAX_IMAGE_SIZE_BYTES,
@@ -36,10 +35,6 @@ export type CategoryActionResult = {
 
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
-};
-
-export type CategoryDetail = SelectCategories & {
-  imageUrl: string | null;
 };
 
 export type UploadCategoryImageResult =
@@ -65,24 +60,14 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
 
 export const getCategory = async (
   uuid: string,
-): Promise<CategoryDetail | null> => {
+): Promise<SelectCategories | null> => {
   try {
     const [category] = await db
       .select()
       .from(Categories)
       .where(eq(Categories.uuid, uuid));
 
-    if (!category) return null;
-
-    return {
-      ...category,
-      imageUrl: category.image
-        ? await createDocumentDownloadUrl({
-            documentId: category.image,
-            fileName: category.name,
-          })
-        : null,
-    };
+    return category ?? null;
   } catch {
     throw new Error("Failed to fetch category");
   }
