@@ -11,9 +11,11 @@
     "dev:client": "pnpm --filter client dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "type-check": "pnpm -r type-check"
+    "type-check": "pnpm -r type-check",
+    "db:push": "dotenv -e .env.local -- drizzle-kit push"
   },
   "devDependencies": {
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
     "turbo": "^2.5.0",
     "typescript": "^5.7.0"
