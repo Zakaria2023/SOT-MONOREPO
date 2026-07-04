@@ -2,6 +2,7 @@
 
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
+import { CategoryRowActions } from "@/components/categories/category-row-actions";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
 import type { CategoryListItem } from "@/app/(dashboard)/categories/action";
@@ -54,6 +55,14 @@ const columns: TableColumn<CategoryListItem>[] = [
     header: "Order",
     align: "right",
     render: (category) => category.order,
+  },
+  {
+    key: "actions",
+    header: "Action",
+    align: "right",
+    render: (category) => (
+      <CategoryRowActions uuid={category.uuid} name={category.name} />
+    ),
   },
 ];
 

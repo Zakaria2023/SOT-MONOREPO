@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CornerDownRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -66,12 +66,15 @@ export const Dropdown = ({
                   setIsOpen(false);
                 }}
                 style={{ paddingLeft: 12 + (option.depth ?? 0) * 16 }}
-                className={`block w-full cursor-pointer py-2 pr-3 text-left text-sm hover:bg-hover ${
+                className={`flex w-full cursor-pointer items-center gap-1.5 py-2 pr-3 text-left text-sm hover:bg-hover ${
                   option.value === value
                     ? "bg-primary-tint font-semibold text-primary"
                     : "text-ink"
                 }`}
               >
+                {(option.depth ?? 0) > 0 && (
+                  <CornerDownRight size={14} className="shrink-0 text-faint" />
+                )}
                 {option.label}
               </button>
             </li>

@@ -28,8 +28,6 @@ export type CategoryFields = Omit<
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
 
-export type CategoryCreateFields = Omit<CategoryFields, "order">;
-
 export type CategoryActionResult = {
   categoryUuid?: string;
   error?: string;
@@ -38,6 +36,10 @@ export type CategoryActionResult = {
 
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
+  imageUrl: string | null;
+};
+
+export type CategoryDetail = SelectCategories & {
   imageUrl: string | null;
 };
 
@@ -76,13 +78,24 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
 
 export const getCategory = async (
   uuid: string,
-): Promise<SelectCategories | null> => {
+): Promise<CategoryDetail | null> => {
   try {
     const [category] = await db
       .select()
       .from(Categories)
       .where(eq(Categories.uuid, uuid));
-    return category ?? null;
+
+    if (!category) return null;
+
+    return {
+      ...category,
+      imageUrl: category.image
+        ? await createDocumentDownloadUrl({
+            documentId: category.image,
+            fileName: category.name,
+          })
+        : null,
+    };
   } catch {
     throw new Error("Failed to fetch category");
   }
@@ -128,7 +141,7 @@ export const uploadCategoryImage = async (
 
 export const createCategory = async (
   _prevState: CategoryActionResult,
-  fields: CategoryCreateFields,
+  fields: CategoryFields,
 ): Promise<CategoryActionResult> => {
   const uuid = generateUuid();
   try {
@@ -147,18 +160,20 @@ export const createCategory = async (
 
 export const updateCategory = async (
   uuid: string,
+  _prevState: CategoryActionResult,
   fields: CategoryFields,
 ): Promise<CategoryActionResult> => {
   try {
     await db.update(Categories).set(fields).where(eq(Categories.uuid, uuid));
-    revalidatePath("/categories");
-    return { success: true, categoryUuid: uuid };
   } catch (error) {
     return {
       error:
         error instanceof Error ? error.message : "Failed to update category",
     };
   }
+
+  revalidatePath("/categories");
+  redirect("/categories");
 };
 
 export const deleteCategory = async (

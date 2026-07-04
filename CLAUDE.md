@@ -306,6 +306,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   };
   ```
 
+## Dynamic Route Params
+
+- Page components for dynamic routes always type `params` as a `Promise` and `await` it to read the route values — never destructure `params` directly as a plain object.
+
+  ```tsx
+  // ❌ Bad
+  type Props = {
+    params: { uuid: string };
+  };
+
+  const CategoryEditPage = ({ params }: Props) => {
+    const { uuid } = params;
+    // ...
+  };
+
+  // ✅ Good
+  type Props = {
+    params: Promise<{ uuid: string }>;
+  };
+
+  const CategoryEditPage = async ({ params }: Props) => {
+    const { uuid } = await params;
+    // ...
+  };
+  ```
+
 ## Form Submissions
 
 - Always use `useActionState` from `react` when a form submits to a server action.

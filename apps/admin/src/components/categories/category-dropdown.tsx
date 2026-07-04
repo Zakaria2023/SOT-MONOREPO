@@ -2,14 +2,13 @@
 
 import { useMemo } from "react";
 import { Controller } from "react-hook-form";
-import type { Control } from "react-hook-form";
-import type { CategoryFormValues } from "@/app/(dashboard)/categories/new/validation";
+import type { Control, FieldValues, Path } from "react-hook-form";
 import { Dropdown } from "@/components/ui/dropdown";
 import type { DropdownOption } from "@/components/ui/dropdown";
 import type { SelectCategories } from "@/db/schema/categories";
 
-type CategoryDropdownProps = {
-  control: Control<CategoryFormValues>;
+type CategoryDropdownProps<TFieldValues extends FieldValues> = {
+  control: Control<TFieldValues>;
   categories: SelectCategories[];
 };
 
@@ -39,10 +38,10 @@ const buildCategoryTreeOptions = (
   return options;
 };
 
-export const CategoryDropdown = ({
+export const CategoryDropdown = <TFieldValues extends FieldValues>({
   control,
   categories,
-}: CategoryDropdownProps) => {
+}: CategoryDropdownProps<TFieldValues>) => {
   const options = useMemo(
     () => buildCategoryTreeOptions(categories),
     [categories],
@@ -55,10 +54,10 @@ export const CategoryDropdown = ({
       </label>
       <Controller
         control={control}
-        name="parentUuid"
+        name={"parentUuid" as Path<TFieldValues>}
         render={({ field }) => (
           <Dropdown
-            value={field.value ?? ""}
+            value={typeof field.value === "string" ? field.value : ""}
             onChange={field.onChange}
             placeholder="No parent"
             options={[{ value: "", label: "No parent" }, ...options]}
