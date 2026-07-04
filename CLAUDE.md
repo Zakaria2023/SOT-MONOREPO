@@ -127,16 +127,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   ```tsx
   // ❌ Bad
-  <img src={brand.image} alt={brand.name} className="h-10 w-10" />;
+  <img src={category.image} alt={category.name} className="h-10 w-10" />;
 
   // ✅ Good
   import Image from "next/image";
   <Image
-    src={brand.image}
-    alt={brand.name}
+    src={category.image}
+    alt={category.name}
     width={40}
     height={40}
     className="h-10 w-10"
+  />;
+  ```
+
+## Dropdowns
+
+- Never use a native `<select>` element. Always use the `Dropdown` component from `@/components/ui/dropdown` instead.
+
+  ```tsx
+  // ❌ Bad
+  <select {...register("parentUuid")}>
+    <option value="">No parent</option>
+  </select>;
+
+  // ✅ Good
+  import { Dropdown } from "@/components/ui/dropdown";
+
+  <Controller
+    control={control}
+    name="parentUuid"
+    render={({ field }) => (
+      <Dropdown
+        value={field.value}
+        onChange={field.onChange}
+        placeholder="No parent"
+        options={[{ value: "", label: "No parent" }]}
+      />
+    )}
   />;
   ```
 
@@ -160,11 +187,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   ```tsx
   // ❌ Bad
   // eslint-disable-next-line @next/next/no-img-element
-  <img src={brand.image} alt={brand.name} />;
+  <img src={category.image} alt={category.name} />;
 
   // ✅ Good — use the tool the rule is steering you toward
   import Image from "next/image";
-  <Image src={brand.image} alt={brand.name} width={40} height={40} />;
+  <Image src={category.image} alt={category.name} width={40} height={40} />;
   ```
 
 ## Tailwind CSS
@@ -289,7 +316,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     params: { uuid: string };
   };
 
-  const BrandEditPage = ({ params }: Props) => {
+  const CategoryEditPage = ({ params }: Props) => {
     const { uuid } = params;
     // ...
   };
@@ -299,7 +326,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     params: Promise<{ uuid: string }>;
   };
 
-  const BrandEditPage = async ({ params }: Props) => {
+  const CategoryEditPage = async ({ params }: Props) => {
     const { uuid } = await params;
     // ...
   };
