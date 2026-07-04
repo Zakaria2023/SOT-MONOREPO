@@ -2,28 +2,26 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
-import { CategoryDropdown } from "@/components/categories/category-dropdown";
+import { useBrandForm } from "@/app/(dashboard)/brands/use-brand-form";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { SelectCategories } from "@/db/schema/categories";
+import type { SelectBrands } from "@/db/schema/brands";
 
-type CategoryFormProps =
-  | { mode: "add"; categories: SelectCategories[] }
-  | { mode: "edit"; categories: SelectCategories[]; category: SelectCategories };
+type BrandFormProps =
+  | { mode: "add" }
+  | { mode: "edit"; brand: SelectBrands };
 
-export const CategoryForm = (props: CategoryFormProps) => {
-  const { mode, categories } = props;
+export const BrandForm = (props: BrandFormProps) => {
+  const { mode } = props;
 
-  const { form, state, isPending, onSubmit } = useCategoryForm(
-    mode === "edit" ? { mode: "edit", category: props.category } : { mode: "add" },
+  const { form, state, isPending, onSubmit } = useBrandForm(
+    mode === "edit" ? { mode: "edit", brand: props.brand } : { mode: "add" },
   );
   const {
     register,
-    control,
     setValue,
     formState: { errors },
   } = form;
@@ -48,8 +46,6 @@ export const CategoryForm = (props: CategoryFormProps) => {
 
       <Textarea label="Description" rows={3} {...register("description")} />
 
-      <CategoryDropdown control={control} categories={categories} />
-
       {mode === "edit" && (
         <Input
           label="Order"
@@ -66,8 +62,8 @@ export const CategoryForm = (props: CategoryFormProps) => {
         onUploadingChange={setIsUploadingImage}
         submittedRef={hasSubmittedRef}
         previewUrl={
-          mode === "edit" && props.category.image
-            ? `/api/documents/${props.category.image}/download`
+          mode === "edit" && props.brand.image
+            ? `/api/documents/${props.brand.image}/download`
             : null
         }
       />
@@ -82,10 +78,10 @@ export const CategoryForm = (props: CategoryFormProps) => {
               : "Save Changes"
             : isPending
               ? "Creating..."
-              : "Create Category"}
+              : "Create Brand"}
         </Button>
         <Link
-          href="/categories"
+          href="/brands"
           className="text-sm text-secondary hover:underline"
         >
           Cancel

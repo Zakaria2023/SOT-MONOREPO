@@ -1,6 +1,5 @@
 "use server";
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { db } from "@/db";
 import {
   Categories,
@@ -8,15 +7,6 @@ import {
   SelectCategories,
 } from "@/db/schema/categories";
 import { generateUuid } from "@/lib/helpers";
-import {
-  cloudflareR2,
-  CLOUDFLARE_R2_BUCKET_NAME,
-} from "@/lib/server/cloudflare-r2";
-import {
-  createDocumentObjectKey,
-  isAllowedImageType,
-  MAX_IMAGE_SIZE_BYTES,
-} from "@/lib/server/document-storage";
 import { alias } from "drizzle-orm/mysql-core";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -36,10 +26,6 @@ export type CategoryActionResult = {
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
 };
-
-export type UploadCategoryImageResult =
-  | { documentId: string; fileName: string }
-  | { error: string };
 
 const ParentCategories = alias(Categories, "parent_categories");
 
@@ -71,44 +57,6 @@ export const getCategory = async (
   } catch {
     throw new Error("Failed to fetch category");
   }
-};
-
-export const uploadCategoryImage = async (
-  formData: FormData,
-): Promise<UploadCategoryImageResult> => {
-  const file = formData.get("file");
-
-  if (!(file instanceof File)) {
-    return { error: "No file provided" };
-  }
-
-  if (!isAllowedImageType(file.type)) {
-    return { error: "File type not allowed" };
-  }
-
-  if (file.size > MAX_IMAGE_SIZE_BYTES) {
-    return { error: "File too large" };
-  }
-
-  const documentId = generateUuid();
-
-  try {
-    const buffer = await file.arrayBuffer();
-    await cloudflareR2.send(
-      new PutObjectCommand({
-        Bucket: CLOUDFLARE_R2_BUCKET_NAME,
-        Key: createDocumentObjectKey(documentId),
-        Body: Buffer.from(buffer),
-        ContentType: file.type,
-      }),
-    );
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to upload image",
-    };
-  }
-
-  return { documentId, fileName: file.name };
 };
 
 export const createCategory = async (
