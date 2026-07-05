@@ -2,6 +2,45 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository (`apps/admin` and `apps/client`).
 
+## Monorepo Architecture
+
+This is a pnpm + Turborepo monorepo built on Next.js 16.
+
+**Apps**
+
+- `apps/admin` — Next.js app for internal staff, protected by Clerk.
+- `apps/client` — Next.js app for end customers (web), with its own login system.
+- `apps/api` — Next.js app exposing ONLY Route Handlers, versioned under `/api/v1`. This is the sole interface the external mobile app (React Native) is allowed to talk to.
+
+**Packages**
+
+- `packages/services` — all business logic lives here as plain, framework-agnostic async functions. No `"use server"`, no request/response objects, no auth checks inside these functions. Every operation (create user, place order, etc.) exists as exactly one function here, called by both Server Actions and Route Handlers.
+- `packages/database` — the only place Drizzle is imported and the only place a DB connection is opened. Nothing outside this package — not the client browser code, not the mobile app — ever talks to the database directly.
+- `packages/validators` — zod schemas shared between Server Actions and Route Handlers so input validation never drifts between the two.
+- `packages/auth` — one shared identity-verification module used by both transports.
+- `packages/types` — shared TypeScript types/DTOs.
+
+**Calling convention**
+
+- Server Actions (`"use server"`) are the only way admin and client call into services. They must stay thin: check the caller's identity, validate input, call exactly one `packages/services` function, return the result. No business logic inside an action.
+- Route Handlers in `apps/api` exist solely for the mobile app (and any future external consumers). Same rule: thin, and they call the same `packages/services` functions — never a duplicate implementation.
+- `admin` and `client` never call each other over HTTP — they each import `packages/services` directly, since they're server-rendered apps in the same repo.
+
+**Auth**
+
+- `apps/admin` uses Clerk. Do not change this or add a second identity table for it.
+- `apps/client` and the mobile app share one custom identity system backed by a `users` table and a `sessions` table (for refresh tokens) in `packages/database` via Drizzle. Do not use Clerk for these.
+- On login, issue a short-lived JWT access token plus a longer-lived refresh token (stored hashed in the sessions table).
+- The web client receives tokens as httpOnly, secure cookies. Server Actions read the cookie automatically — a token is never passed manually from client-side JS.
+- The mobile app receives tokens in the JSON response body, stores them in secure device storage, and sends the access token as an `Authorization: Bearer` header on every request to `apps/api`.
+- Both transports resolve to the same verify function in `packages/auth` before any service function runs.
+
+**Hard rules**
+
+- No business logic inside a Server Action or Route Handler — only in `packages/services`.
+- No direct database access from client components, the mobile app, or anywhere outside `packages/database`.
+- Mobile never touches Drizzle or the database — only the versioned REST API.
+
 ## Package Manager
 
 - Always use `pnpm` for installing dependencies and running scripts in this repo — never `npm` or `yarn`. (`npm install <pkg>` → `pnpm add <pkg>`, `npm run <script>` → `pnpm <script>`.)
