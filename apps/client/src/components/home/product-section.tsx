@@ -82,7 +82,7 @@ const formatQuantity = (quantity: number) =>
 
 const formatPrice = (price: number) => `SAR ${price.toLocaleString("en-US")}`;
 
-export const DeploymentHardware = () => {
+export const ProductSection = () => {
   const addToCart = (event: MouseEvent, product: Product) => {
     // The Add button sits above the stretched Link, so it never triggers a
     // navigation; preventDefault guards against any bubbling regardless.
