@@ -1,26 +1,65 @@
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: "Hanken Grotesk", sans-serif;
+  --font-heading: "Newsreader", serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-tint: #f4f1fb;
+  --color-primary-tint-border: #ece6fb;
+
+  --color-ink: #14161b;
+  --color-muted: #8a8f98;
+  --color-faint: #a7a2b4;
+  --color-secondary: #5a6068;
+
+  --color-page: #f5f4fa;
+  --color-surface: #ffffff;
+  --color-hairline: #eceaf2;
+  --color-hairline-soft: #f0eef5;
+  --color-hover: #faf9fd;
+  --color-search-border: #e7e2f2;
+
+  --color-success: #127a4e;
+  --color-success-tint: #e9f7f0;
+  --color-warning: #9a6b00;
+  --color-warning-tint: #fdf4e3;
+  --color-danger: #b23a28;
+  --color-danger-tint: #fceae8;
+  --color-info: #2a6fdb;
+  --color-info-tint: #eaf1fc;
+
+  --radius-card: 18px;
+  --radius-control: 11px;
+
+  --animate-fade-in: fade-in 0.15s ease-out;
+  --animate-scale-in: scale-in 0.15s ease-out;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-page);
+  color: var(--color-ink);
 }
