@@ -18,6 +18,8 @@
 
   --radius-card: 16px;
 
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   --animate-spotlight-sweep: spotlight-sweep 2.6s ease-out both;
   --animate-orb-pulse: orb-pulse 6s ease-in-out infinite;
   --animate-spotlight: spotlight 2s ease 0.75s 1 forwards;
