@@ -219,6 +219,26 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   <Link href="/products">Products</Link>;
   ```
 
+- Never navigate imperatively with `useRouter().push()` inside an `onClick` for what is really just a link. Use `Link`. Reserve `useRouter().push()` for navigation that can't be expressed as a link (e.g. after some async work). For a whole clickable element (like a card) that also contains its own buttons, use a stretched `Link` overlay (`absolute inset-0`) plus `relative z-10` on the inner buttons — don't nest a `<button>` inside the `Link`.
+
+  ```tsx
+  // ❌ Bad — imperative navigation for a plain link
+  const openProduct = (slug: string) => router.push(`/products/${slug}`);
+  <article role="button" onClick={() => openProduct(slug)}>...</article>;
+
+  // ✅ Good — stretched Link overlay, buttons sit above it
+  <article className="relative">
+    <Link
+      href={`/products/${slug}`}
+      aria-label={`View ${name}`}
+      className="absolute inset-0"
+    />
+    <button type="button" onClick={addToCart} className="relative z-10">
+      Add
+    </button>
+  </article>;
+  ```
+
 ## Linting
 
 - Never disable a lint rule (`eslint-disable`, `eslint-disable-next-line`, etc.) to make a warning or error go away. Fix the underlying code so it satisfies the rule instead.
