@@ -50,21 +50,21 @@ export const Products = mysqlTable(
 
     // Merchandising
     ribbon: varchar("ribbon", { length: 100 }), // "Recommended", "New" badge
-    isFeatured: boolean("is_featured").default(false).notNull(),
+    isFeatured: boolean("is_featured").default(false),
 
     // Pricing
     price: decimal("price", { precision: 12, scale: 2 }).notNull(),
-    currency: char("currency", { length: 3 }).default("SAR").notNull(),
+    currency: char("currency", { length: 3 }).default("SAR"),
 
     // Inventory
-    stock: int("stock").default(0).notNull(),
+    stock: int("stock").default(0),
 
     highlights: json("highlights").$type<ProductHighlight[]>(), // [{ k: "Throughput", v: "10 Gbps" }, ...]
     specGroups: json("spec_groups").$type<ProductSpecGroup[]>(), // [{ title, rows: [{ k, v }] }, ...]
 
     // State & ordering
-    status: mysqlEnum("status", productStatuses).default("draft").notNull(),
-    order: int("order").default(0).notNull(),
+    status: mysqlEnum("status", productStatuses).default("draft"),
+    order: int("order").default(0),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
