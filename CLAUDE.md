@@ -532,6 +532,32 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
     use-products.ts
   ```
 
+## Helpers
+
+- Reusable helper/utility functions (formatters, parsers, URL builders, etc.) must live in a dedicated helpers file — `src/lib/helpers.ts` (or another focused `src/lib/*.ts` module) — never defined inline at the top of a component file. Import them into the component.
+
+  ```tsx
+  // ❌ Bad — helper defined inline in the component file
+  const formatPrice = (price: string, currency: string | null) =>
+    `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+
+  export const ProductCard = ({ product }: ProductCardProps) => (
+    <span>{formatPrice(product.price, product.currency)}</span>
+  );
+
+  // ✅ Good — helper lives in src/lib/helpers.ts
+  // src/lib/helpers.ts
+  export const formatPrice = (price: string, currency: string | null): string =>
+    `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+
+  // product-card.tsx
+  import { formatPrice } from "@/lib/helpers";
+
+  export const ProductCard = ({ product }: ProductCardProps) => (
+    <span>{formatPrice(product.price, product.currency)}</span>
+  );
+  ```
+
 ## File Naming
 
 - All file names are always kebab-case, regardless of what's exported from them (components, hooks, schemas, etc.) — never PascalCase or camelCase file names.

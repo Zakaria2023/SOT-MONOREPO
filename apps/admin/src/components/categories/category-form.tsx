@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { documentDownloadUrl } from "@/lib/documents";
 import type { SelectCategories } from "@/db/schema/categories";
 
 type CategoryFormProps =
@@ -71,7 +72,7 @@ export const CategoryForm = (props: CategoryFormProps) => {
         submittedRef={hasSubmittedRef}
         previewUrl={
           mode === "edit" && props.category.image
-            ? `/api/documents/${props.category.image}/download`
+            ? documentDownloadUrl(props.category.image)
             : null
         }
       />

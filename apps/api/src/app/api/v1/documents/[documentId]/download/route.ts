@@ -1,4 +1,4 @@
-import { createDocumentDownloadUrl } from "@/lib/server/document-storage";
+import { createDocumentDownloadUrl } from "storage";
 
 export const GET = async (
   req: Request,
