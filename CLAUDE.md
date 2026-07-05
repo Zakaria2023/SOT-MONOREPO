@@ -245,6 +245,26 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   <p className="text-2xl mt-3 w-72" />
   ```
 
+- Never use arbitrary letter-spacing values like `tracking-[-0.012em]`. Always use the built-in `tracking-*` scale (`tracking-tighter`, `tracking-tight`, `tracking-normal`, `tracking-wide`, etc.).
+
+  ```tsx
+  // ❌ Bad
+  <h1 className="tracking-[-0.012em]" />
+
+  // ✅ Good
+  <h1 className="tracking-tight" />
+  ```
+
+- Never use the `truncate` class. Handle overflowing text another way (e.g. `line-clamp-*`, or let it wrap).
+
+  ```tsx
+  // ❌ Bad
+  <p className="truncate" />
+
+  // ✅ Good
+  <p className="line-clamp-1" />
+  ```
+
 ## Exports
 
 - Regular components use **named exports** — inline on the declaration is fine, just never `export default`.
