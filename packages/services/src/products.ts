@@ -26,6 +26,26 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
   }
 };
 
+export const getProductsByCategory = async (
+  categoryUuid: string,
+): Promise<ProductListItem[]> => {
+  try {
+    return await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(Products.categoryUuid, categoryUuid))
+      .orderBy(asc(Products.order));
+  } catch {
+    throw new Error("Failed to fetch products for category");
+  }
+};
+
 export const getProduct = async (
   uuid: string,
 ): Promise<SelectProducts | null> => {
