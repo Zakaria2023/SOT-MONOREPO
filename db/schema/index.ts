@@ -1,3 +1,4 @@
+export * from "./boqs";
 export * from "./brands";
 export * from "./carts";
 export * from "./categories";

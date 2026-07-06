@@ -1,5 +1,7 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { SignOutButton } from "@clerk/nextjs";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 const DashboardPage = async () => {
   const user = await requirePreSeller();
@@ -28,6 +30,21 @@ const DashboardPage = async () => {
           </button>
         </SignOutButton>
       </div>
+
+      <Link
+        href="/boqs"
+        className="mt-10 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 p-6 transition-colors hover:border-primary/40"
+      >
+        <div>
+          <h2 className="font-heading text-xl font-bold text-ink">
+            Review queue
+          </h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            See BOQs customers have submitted for review.
+          </p>
+        </div>
+        <ArrowRight size={20} className="text-primary" />
+      </Link>
     </main>
   );
 };

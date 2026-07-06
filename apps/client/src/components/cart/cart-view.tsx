@@ -1,6 +1,6 @@
 "use client";
 
-import { removeItem, updateQuantity } from "@/app/cart/actions";
+import { checkout, removeItem, updateQuantity } from "@/app/cart/actions";
 import { documentDownloadUrl } from "@/lib/documents";
 import { formatMoney } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
@@ -187,13 +187,16 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
               </span>
             </div>
 
-            <button
-              type="button"
-              className="font-grotesk mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
-            >
-              Checkout
-              <ArrowRight size={18} />
-            </button>
+            <form action={checkout} className="mt-6">
+              <button
+                type="submit"
+                disabled={items.length === 0}
+                className="font-grotesk inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+              >
+                Checkout
+                <ArrowRight size={18} />
+              </button>
+            </form>
 
             <Link
               href="/"
