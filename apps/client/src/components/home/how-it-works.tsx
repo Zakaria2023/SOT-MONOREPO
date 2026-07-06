@@ -156,8 +156,8 @@ export const HowItWorks = () => {
                 className={cn(
                   "transition-all duration-700 motion-safe:ease-out",
                   isLeft
-                    ? "md:col-start-1 md:justify-self-end md:text-right"
-                    : "md:col-start-2 md:justify-self-start md:text-left",
+                    ? "md:col-start-1 md:justify-self-end"
+                    : "md:col-start-2 md:justify-self-start",
                   isVisible
                     ? ""
                     : "motion-safe:translate-y-11 motion-safe:opacity-0",
