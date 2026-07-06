@@ -10,3 +10,11 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().email("Enter a valid email address").max(255),
+  password: z.string().min(1, "Password is required"),
+  keepSignedIn: z.boolean().optional(),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
