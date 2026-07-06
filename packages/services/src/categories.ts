@@ -1,10 +1,12 @@
-import { asc, eq, getTableColumns } from "drizzle-orm";
+import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { db } from "../../../db";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
+import { Products } from "../../../db/schema/products";
 
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
+  productCount: number;
 };
 
 const ParentCategories = alias(Categories, "parent_categories");
@@ -15,9 +17,15 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
       .select({
         ...getTableColumns(Categories),
         parentName: ParentCategories.name,
+        productCount: count(Products.id),
       })
       .from(Categories)
-      .leftJoin(ParentCategories, eq(Categories.parentUuid, ParentCategories.uuid))
+      .leftJoin(
+        ParentCategories,
+        eq(Categories.parentUuid, ParentCategories.uuid),
+      )
+      .leftJoin(Products, eq(Products.categoryUuid, Categories.uuid))
+      .groupBy(Categories.id)
       .orderBy(asc(Categories.order));
   } catch {
     throw new Error("Failed to fetch categories");

@@ -15,6 +15,7 @@ import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { documentDownloadUrl } from "@/lib/documents";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
@@ -155,7 +156,7 @@ export const ProductForm = (props: ProductFormProps) => {
           submittedRef={hasSubmittedRef}
           previewUrl={
             mode === "edit" && props.product.image
-              ? `/api/documents/${props.product.image}/download`
+              ? documentDownloadUrl(props.product.image)
               : null
           }
         />

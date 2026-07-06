@@ -2,6 +2,8 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 
+export type { SelectBrands };
+
 export const getBrands = async (): Promise<SelectBrands[]> => {
   try {
     return await db.select().from(Brands).orderBy(asc(Brands.order));

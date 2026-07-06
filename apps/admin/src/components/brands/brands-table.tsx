@@ -2,6 +2,7 @@
 
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
+import { documentDownloadUrl } from "@/lib/documents";
 import { BrandRowActions } from "@/components/brands/brand-row-actions";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
@@ -18,7 +19,7 @@ const columns: TableColumn<SelectBrands>[] = [
     render: (brand) =>
       brand.image ? (
         <Image
-          src={`/api/documents/${brand.image}/download`}
+          src={documentDownloadUrl(brand.image)}
           alt={brand.name}
           width={40}
           height={40}

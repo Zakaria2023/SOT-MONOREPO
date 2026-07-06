@@ -219,6 +219,26 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   <Link href="/products">Products</Link>;
   ```
 
+- Never navigate imperatively with `useRouter().push()` inside an `onClick` for what is really just a link. Use `Link`. Reserve `useRouter().push()` for navigation that can't be expressed as a link (e.g. after some async work). For a whole clickable element (like a card) that also contains its own buttons, use a stretched `Link` overlay (`absolute inset-0`) plus `relative z-10` on the inner buttons — don't nest a `<button>` inside the `Link`.
+
+  ```tsx
+  // ❌ Bad — imperative navigation for a plain link
+  const openProduct = (slug: string) => router.push(`/products/${slug}`);
+  <article role="button" onClick={() => openProduct(slug)}>...</article>;
+
+  // ✅ Good — stretched Link overlay, buttons sit above it
+  <article className="relative">
+    <Link
+      href={`/products/${slug}`}
+      aria-label={`View ${name}`}
+      className="absolute inset-0"
+    />
+    <button type="button" onClick={addToCart} className="relative z-10">
+      Add
+    </button>
+  </article>;
+  ```
+
 ## Linting
 
 - Never disable a lint rule (`eslint-disable`, `eslint-disable-next-line`, etc.) to make a warning or error go away. Fix the underlying code so it satisfies the rule instead.
@@ -243,6 +263,26 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
   // ✅ Good
   <p className="text-2xl mt-3 w-72" />
+  ```
+
+- Never use arbitrary letter-spacing values like `tracking-[-0.012em]`. Always use the built-in `tracking-*` scale (`tracking-tighter`, `tracking-tight`, `tracking-normal`, `tracking-wide`, etc.).
+
+  ```tsx
+  // ❌ Bad
+  <h1 className="tracking-[-0.012em]" />
+
+  // ✅ Good
+  <h1 className="tracking-tight" />
+  ```
+
+- Never use the `truncate` class. Handle overflowing text another way (e.g. `line-clamp-*`, or let it wrap).
+
+  ```tsx
+  // ❌ Bad
+  <p className="truncate" />
+
+  // ✅ Good
+  <p className="line-clamp-1" />
   ```
 
 ## Exports
@@ -490,6 +530,32 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
   hooks/
     use-products.ts
+  ```
+
+## Helpers
+
+- Reusable helper/utility functions (formatters, parsers, URL builders, etc.) must live in a dedicated helpers file — `src/lib/helpers.ts` (or another focused `src/lib/*.ts` module) — never defined inline at the top of a component file. Import them into the component.
+
+  ```tsx
+  // ❌ Bad — helper defined inline in the component file
+  const formatPrice = (price: string, currency: string | null) =>
+    `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+
+  export const ProductCard = ({ product }: ProductCardProps) => (
+    <span>{formatPrice(product.price, product.currency)}</span>
+  );
+
+  // ✅ Good — helper lives in src/lib/helpers.ts
+  // src/lib/helpers.ts
+  export const formatPrice = (price: string, currency: string | null): string =>
+    `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+
+  // product-card.tsx
+  import { formatPrice } from "@/lib/helpers";
+
+  export const ProductCard = ({ product }: ProductCardProps) => (
+    <span>{formatPrice(product.price, product.currency)}</span>
+  );
   ```
 
 ## File Naming
