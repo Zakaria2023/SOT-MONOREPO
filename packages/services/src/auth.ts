@@ -10,7 +10,9 @@ import {
 export {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
+  verifyAccessToken,
 } from "auth";
+export type { AccessTokenPayload } from "auth";
 import { and, eq, gt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
@@ -40,6 +42,14 @@ const toAuthUser = (user: SelectUsers): AuthUser => {
   const { password: _password, ...rest } = user;
   void _password;
   return rest;
+};
+
+/** Looks up a user by uuid, returning them without the password hash. */
+export const getUserByUuid = async (
+  uuid: string,
+): Promise<AuthUser | null> => {
+  const [user] = await db.select().from(Users).where(eq(Users.uuid, uuid));
+  return user ? toAuthUser(user) : null;
 };
 
 /**

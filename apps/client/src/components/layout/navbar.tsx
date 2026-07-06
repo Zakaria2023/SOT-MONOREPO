@@ -1,9 +1,16 @@
+import { getCurrentUser } from "@/lib/auth";
 import { getCachedCategories } from "@/lib/data";
-import { Menu } from "lucide-react";
+import { getInitials } from "@/lib/helpers";
+import { Menu, ShoppingCart } from "lucide-react";
 import Link from "next/link";
+import { getCartItemCount } from "services";
 
 export const Navbar = async () => {
-  const categories = await getCachedCategories();
+  const user = await getCurrentUser();
+  const [categories, cartCount] = await Promise.all([
+    getCachedCategories(),
+    user ? getCartItemCount(user.uuid) : Promise.resolve(0),
+  ]);
   const topLevel = categories.filter((category) => category.parentUuid === null);
 
   return (
@@ -30,20 +37,56 @@ export const Navbar = async () => {
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            href="/sign-in"
-            className="font-grotesk rounded-[10px] border border-[#E3E4E9] px-4 py-2.5 text-sm font-medium text-[#3C3F46] transition-colors hover:bg-[#F5F3FB] hover:text-primary"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/sign-up"
-            className="font-grotesk rounded-[10px] bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
-          >
-            Sign up
-          </Link>
-        </div>
+        {user ? (
+          <div className="flex items-center gap-3">
+            <Link
+              href="/support"
+              className="font-grotesk hidden text-sm font-medium text-[#3C3F46] transition-colors hover:text-primary sm:block"
+            >
+              Support
+            </Link>
+            <Link
+              href="/offers"
+              className="font-grotesk rounded-[10px] bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+            >
+              Accept offer
+            </Link>
+            <Link
+              href="/cart"
+              aria-label="Cart"
+              className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#E3E4E9] text-[#3C3F46] transition-colors hover:text-primary"
+            >
+              <ShoppingCart size={18} />
+              {cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 font-grotesk text-xs font-bold text-white">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/account"
+              aria-label="Account"
+              className="font-grotesk flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white"
+            >
+              {getInitials(user.fullName)}
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Link
+              href="/sign-in"
+              className="font-grotesk rounded-[10px] border border-[#E3E4E9] px-4 py-2.5 text-sm font-medium text-[#3C3F46] transition-colors hover:bg-[#F5F3FB] hover:text-primary"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/sign-up"
+              className="font-grotesk rounded-[10px] bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+            >
+              Sign up
+            </Link>
+          </div>
+        )}
       </nav>
     </header>
   );

@@ -18,6 +18,7 @@ import { useState } from "react";
 
 export const SignUpForm = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const {
     form: {
       register,
@@ -108,6 +109,28 @@ export const SignUpForm = () => {
             </button>
           }
           {...register("password")}
+        />
+
+        <Input
+          label="Confirm password"
+          type={showConfirmPassword ? "text" : "password"}
+          placeholder="Re-enter your password"
+          icon={Lock}
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((value) => !value)}
+              aria-label={
+                showConfirmPassword ? "Hide password" : "Show password"
+              }
+              className="text-[#8A8F98] transition-colors hover:text-ink"
+            >
+              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+          {...register("confirmPassword")}
         />
 
         {state.error && (

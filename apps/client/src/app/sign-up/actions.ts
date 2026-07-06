@@ -23,9 +23,13 @@ export const signUp = async (
     return { error: "Please check the form and try again." };
   }
 
+  // confirmPassword is validation-only — never sent to the service.
+  const { confirmPassword: _confirmPassword, ...userInput } = parsed.data;
+  void _confirmPassword;
+
   let session: AuthResult;
   try {
-    session = await registerUser(parsed.data);
+    session = await registerUser(userInput);
   } catch (error) {
     return {
       error:

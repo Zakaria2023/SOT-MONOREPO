@@ -21,6 +21,7 @@ export const useSignUpForm = () => {
       companyName: "",
       location: "",
       password: "",
+      confirmPassword: "",
     },
   });
 

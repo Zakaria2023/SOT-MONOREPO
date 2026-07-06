@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -16,6 +16,21 @@ export type AddToCartInput = {
   userUuid: string;
   productUuid: string;
   quantity?: number;
+};
+
+/** Total quantity of items in the user's cart (0 if they have no cart yet). */
+export const getCartItemCount = async (userUuid: string): Promise<number> => {
+  const [cart] = await db
+    .select({ uuid: Carts.uuid })
+    .from(Carts)
+    .where(eq(Carts.userUuid, userUuid));
+  if (!cart) return 0;
+
+  const [row] = await db
+    .select({ total: sum(CartItems.quantity) })
+    .from(CartItems)
+    .where(eq(CartItems.cartUuid, cart.uuid));
+  return Number(row?.total ?? 0);
 };
 
 /** Returns the user's cart, creating it on first use. */

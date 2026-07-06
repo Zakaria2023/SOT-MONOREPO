@@ -1,3 +1,4 @@
+import { Navbar } from "@/components/layout/navbar";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -13,7 +14,10 @@ type Props = {
 
 const RootLayout = ({ children }: Props) => (
   <html lang="en" className="h-full antialiased">
-    <body className="min-h-full flex flex-col font-sans">{children}</body>
+    <body className="min-h-full flex flex-col font-sans">
+      <Navbar />
+      {children}
+    </body>
   </html>
 );
 
