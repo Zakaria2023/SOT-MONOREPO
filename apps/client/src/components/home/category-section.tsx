@@ -3,10 +3,13 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, ImageOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getCategories } from "services";
+import type { CategoryListItem } from "services";
 
-export const CategorySection = async () => {
-  const categories = await getCategories();
+type CategorySectionProps = {
+  categories: CategoryListItem[];
+};
+
+export const CategorySection = ({ categories }: CategorySectionProps) => {
   const featured = categories.slice(0, 5);
 
   return (

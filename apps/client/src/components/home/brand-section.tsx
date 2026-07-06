@@ -2,12 +2,13 @@ import { documentDownloadUrl } from "@/lib/documents";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getBrands } from "services";
+import type { SelectBrands } from "services";
 
-export const BrandSection = async () => {
-  const brands = await getBrands();
+type BrandSectionProps = {
+  brands: SelectBrands[];
+};
 
-  return (
+export const BrandSection = ({ brands }: BrandSectionProps) => (
     <section className="w-full bg-white py-24">
       <div className="mx-auto max-w-6xl px-8">
         <header className="mx-auto max-w-2xl text-center">
@@ -73,4 +74,3 @@ export const BrandSection = async () => {
       </div>
     </section>
   );
-};
