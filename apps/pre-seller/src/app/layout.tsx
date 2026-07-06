@@ -1,0 +1,25 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Stratum Pre-seller",
+  description: "Stratum pre-seller dashboard",
+};
+
+type Props = {
+  children: ReactNode;
+};
+
+const RootLayout = ({ children }: Props) => (
+  <ClerkProvider>
+    <html lang="en" className="h-full antialiased">
+      <body className="min-h-full flex flex-col bg-white text-ink font-sans">
+        {children}
+      </body>
+    </html>
+  </ClerkProvider>
+);
+
+export default RootLayout;
