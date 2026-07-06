@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   experimental: {
     externalDir: true,
   },
-  transpilePackages: ["services", "storage"],
+  transpilePackages: ["services", "storage", "auth"],
 };
 
 export default nextConfig;
