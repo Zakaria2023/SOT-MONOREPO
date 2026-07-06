@@ -1,5 +1,7 @@
+import { CategoryMenu } from "@/components/layout/category-menu";
 import { getCurrentUser } from "@/lib/auth";
-import { getCachedCategories } from "@/lib/data";
+import { buildCategoryTree } from "@/lib/categories";
+import { getCachedCategories, getCachedProducts } from "@/lib/data";
 import { getInitials } from "@/lib/helpers";
 import { Menu, ShoppingCart } from "lucide-react";
 import Link from "next/link";
@@ -7,11 +9,12 @@ import { getCartItemCount } from "services";
 
 export const Navbar = async () => {
   const user = await getCurrentUser();
-  const [categories, cartCount] = await Promise.all([
+  const [categories, products, cartCount] = await Promise.all([
     getCachedCategories(),
+    getCachedProducts(),
     user ? getCartItemCount(user.uuid) : Promise.resolve(0),
   ]);
-  const topLevel = categories.filter((category) => category.parentUuid === null);
+  const tree = buildCategoryTree(categories, products);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#ECEEF1] bg-white shadow-[0_1px_3px_rgba(20,22,27,0.06)]">
@@ -25,17 +28,7 @@ export const Navbar = async () => {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-9 md:flex">
-          {topLevel.map((category) => (
-            <Link
-              key={category.uuid}
-              href={`/categories/${category.uuid}`}
-              className="font-grotesk text-sm font-medium text-[#3C3F46] transition-colors hover:text-primary"
-            >
-              {category.name}
-            </Link>
-          ))}
-        </div>
+        <CategoryMenu categories={tree.slice(0, 3)} />
 
         {user ? (
           <div className="flex items-center gap-3">
