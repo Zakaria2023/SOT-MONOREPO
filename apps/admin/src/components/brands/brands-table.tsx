@@ -3,16 +3,16 @@
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
 import { documentDownloadUrl } from "@/lib/documents";
+import type { BrandListItem } from "@/app/(dashboard)/brands/action";
 import { BrandRowActions } from "@/components/brands/brand-row-actions";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
-import type { SelectBrands } from "@/db/schema/brands";
 
 type BrandsTableProps = {
-  brands: SelectBrands[];
+  brands: BrandListItem[];
 };
 
-const columns: TableColumn<SelectBrands>[] = [
+const columns: TableColumn<BrandListItem>[] = [
   {
     key: "image",
     header: "Image",
@@ -45,6 +45,12 @@ const columns: TableColumn<SelectBrands>[] = [
     render: (brand) => (
       <span className="text-muted">{brand.description ?? "—"}</span>
     ),
+  },
+  {
+    key: "parent",
+    header: "Parent",
+    render: (brand) =>
+      brand.parentName ?? <span className="text-faint">—</span>,
   },
   {
     key: "order",

@@ -18,6 +18,30 @@ type BrandDropdownProps<TFieldValues extends FieldValues> = {
   error?: string;
 };
 
+const buildBrandTreeOptions = (brands: SelectBrands[]): DropdownOption[] => {
+  const childrenByParent = new Map<string | null, SelectBrands[]>();
+
+  for (const brand of brands) {
+    const parentUuid = brand.parentUuid ?? null;
+    const siblings = childrenByParent.get(parentUuid) ?? [];
+    siblings.push(brand);
+    childrenByParent.set(parentUuid, siblings);
+  }
+
+  const options: DropdownOption[] = [];
+
+  const walk = (parentUuid: string | null, depth: number) => {
+    for (const brand of childrenByParent.get(parentUuid) ?? []) {
+      options.push({ value: brand.uuid, label: brand.name, depth });
+      walk(brand.uuid, depth + 1);
+    }
+  };
+
+  walk(null, 0);
+
+  return options;
+};
+
 export const BrandDropdown = <TFieldValues extends FieldValues>({
   control,
   name,
@@ -27,10 +51,7 @@ export const BrandDropdown = <TFieldValues extends FieldValues>({
   allowEmpty = false,
   error,
 }: BrandDropdownProps<TFieldValues>) => {
-  const options = useMemo<DropdownOption[]>(
-    () => brands.map((brand) => ({ value: brand.uuid, label: brand.name })),
-    [brands],
-  );
+  const options = useMemo(() => buildBrandTreeOptions(brands), [brands]);
 
   return (
     <div className="flex flex-col gap-1.5">

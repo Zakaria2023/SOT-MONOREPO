@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useBrandForm } from "@/app/(dashboard)/brands/use-brand-form";
+import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
@@ -12,17 +13,18 @@ import { documentDownloadUrl } from "@/lib/documents";
 import type { SelectBrands } from "@/db/schema/brands";
 
 type BrandFormProps =
-  | { mode: "add" }
-  | { mode: "edit"; brand: SelectBrands };
+  | { mode: "add"; brands: SelectBrands[] }
+  | { mode: "edit"; brands: SelectBrands[]; brand: SelectBrands };
 
 export const BrandForm = (props: BrandFormProps) => {
-  const { mode } = props;
+  const { mode, brands } = props;
 
   const { form, state, isPending, onSubmit } = useBrandForm(
     mode === "edit" ? { mode: "edit", brand: props.brand } : { mode: "add" },
   );
   const {
     register,
+    control,
     setValue,
     formState: { errors },
   } = form;
@@ -46,6 +48,15 @@ export const BrandForm = (props: BrandFormProps) => {
       />
 
       <Textarea label="Description" rows={3} {...register("description")} />
+
+      <BrandDropdown
+        control={control}
+        name="parentUuid"
+        brands={brands}
+        label="Parent Brand"
+        placeholder="No parent"
+        allowEmpty
+      />
 
       {mode === "edit" && (
         <Input

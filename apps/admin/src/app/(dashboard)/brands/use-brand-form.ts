@@ -29,6 +29,7 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
     defaultValues: {
       name: brand?.name ?? "",
       description: brand?.description ?? "",
+      parentUuid: brand?.parentUuid ?? "",
       order: brand?.order ?? 0,
       image: brand?.image ?? "",
     },
@@ -39,6 +40,7 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
       dispatch({
         name: values.name,
         description: values.description || null,
+        parentUuid: values.parentUuid || null,
         order: values.order,
         image: values.image || null,
       });
