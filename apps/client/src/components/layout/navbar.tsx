@@ -8,7 +8,7 @@ export const Navbar = async () => {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#ECEEF1] bg-white shadow-[0_1px_3px_rgba(20,22,27,0.06)]">
-      <nav className="mx-auto flex h-18 max-w-6xl items-center justify-between px-6">
+      <nav className="mx-auto flex h-18 max-w-7xl items-center justify-between px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
             <Menu size={20} strokeWidth={2.5} />
