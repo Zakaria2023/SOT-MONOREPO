@@ -6,6 +6,11 @@ import {
   signAccessToken,
   verifyPassword,
 } from "auth";
+
+export {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+} from "auth";
 import { and, eq, gt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
