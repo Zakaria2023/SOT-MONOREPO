@@ -40,13 +40,16 @@ export const Products = mysqlTable(
     sku: varchar("sku", { length: 100 }).unique(), // e.g. model / part number
     model: varchar("model", { length: 255 }), // "Meridian Gateway Pro X"
 
+    partNumber: varchar("part_number", { length: 255 }), // PN
+    modelNumber: varchar("model_number", { length: 255 }), // MN
+    bom: text("bom"), // BOM — Bill of Materials
+
     blurb: varchar("blurb", { length: 500 }), // short line on the card
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"
 
     // Media
     image: varchar("image", { length: 255 }),
-    iconKey: varchar("icon_key", { length: 100 }), // lucide/glyph key used in UI
 
     // Merchandising
     ribbon: varchar("ribbon", { length: 100 }), // "Recommended", "New" badge

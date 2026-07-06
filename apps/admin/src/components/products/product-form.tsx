@@ -72,6 +72,25 @@ export const ProductForm = (props: ProductFormProps) => {
           <Input label="Model" type="text" {...register("model")} />
         </div>
 
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Part Number (PN)"
+            type="text"
+            {...register("partNumber")}
+          />
+          <Input
+            label="Model Number (MN)"
+            type="text"
+            {...register("modelNumber")}
+          />
+        </div>
+
+        <Textarea
+          label="Bill of Materials (BOM)"
+          rows={4}
+          {...register("bom")}
+        />
+
         <div className="grid grid-cols-4 gap-4">
           <CategoryDropdown
             control={control}
@@ -117,7 +136,7 @@ export const ProductForm = (props: ProductFormProps) => {
         <Textarea label="Description" rows={4} {...register("description")} />
         <Input label="Role" type="text" {...register("role")} />
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Input
             label="Price"
             type="text"
@@ -132,7 +151,6 @@ export const ProductForm = (props: ProductFormProps) => {
             {...register("stock", { valueAsNumber: true })}
           />
           <Input label="Ribbon" type="text" {...register("ribbon")} />
-          <Input label="Icon Key" type="text" {...register("iconKey")} />
         </div>
 
         {mode === "edit" && (
