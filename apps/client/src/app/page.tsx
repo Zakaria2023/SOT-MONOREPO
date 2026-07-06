@@ -1,3 +1,4 @@
+import { BrandSection } from "@/components/home/brand-section";
 import { CategorySection } from "@/components/home/category-section";
 import { HeroSection } from "@/components/home/hero-section";
 import { HowItWorks } from "@/components/home/how-it-works";
@@ -13,6 +14,7 @@ const HomePage = async () => {
       <HowItWorks />
       <CategorySection />
       <ProductSection products={products} />
+      <BrandSection />
     </>
   );
 };
