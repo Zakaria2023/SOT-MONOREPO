@@ -2,6 +2,10 @@
 export const formatPrice = (price: string, currency: string | null): string =>
   `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
 
+/** Formats a numeric amount as whole-unit currency, e.g. "SAR 17,768". */
+export const formatMoney = (amount: number, currency: string | null): string =>
+  `${currency ?? "SAR"} ${Math.round(amount).toLocaleString("en-US")}`;
+
 /** Two-letter initials from a full name, e.g. "Zakaria Asad" -> "ZA". */
 export const getInitials = (fullName: string): string => {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
