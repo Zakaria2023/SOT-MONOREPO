@@ -9,10 +9,7 @@ const ProductsPage = async () => {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <h1 className="font-heading text-2xl text-ink">Products</h1>
-          <p className="text-sm text-muted">Manage your product catalog.</p>
-        </div>
+        <h1 className="font-heading text-2xl text-ink">Products</h1>
 
         <Link
           href="/products/new"
