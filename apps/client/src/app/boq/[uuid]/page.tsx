@@ -1,8 +1,9 @@
 import { BoqView } from "@/components/boq/boq-view";
+import { OffersSection } from "@/components/boq/offers-section";
 import { getCurrentUser } from "@/lib/auth";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getBoq } from "services";
+import { getApprovedOffersForUser, getBoq } from "services";
 
 export const metadata: Metadata = {
   title: "Your BOQ · Stratum",
@@ -25,7 +26,20 @@ const BoqPage = async ({ params }: Props) => {
     notFound();
   }
 
-  return <BoqView boq={detail.boq} items={detail.items} />;
+  const offers = await getApprovedOffersForUser(user.uuid, uuid);
+  const currency = detail.items[0]?.currency ?? "SAR";
+
+  return (
+    <>
+      <BoqView boq={detail.boq} items={detail.items} />
+      <OffersSection
+        boqUuid={detail.boq.uuid}
+        offers={offers}
+        currency={currency}
+        awaiting={detail.boq.status !== "draft"}
+      />
+    </>
+  );
 };
 
 export default BoqPage;

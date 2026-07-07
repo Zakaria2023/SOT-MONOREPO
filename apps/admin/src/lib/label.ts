@@ -1,5 +1,10 @@
 import type { PartnerServiceScope } from "validators";
-import { BoqStatus, PartnerRequestStatus, ProductStatus } from "./enum";
+import {
+  BoqStatus,
+  OfferStatus,
+  PartnerRequestStatus,
+  ProductStatus,
+} from "./enum";
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
   draft: "Draft",
@@ -27,3 +32,10 @@ export const PARTNER_SERVICE_SCOPE_LABELS: Record<PartnerServiceScope, string> =
     installation: "Installation only",
     "install-program": "Install + program",
   };
+
+export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
+  pending: "Pending review",
+  approved: "Approved",
+  rejected: "Rejected",
+  selected: "Selected by customer",
+};

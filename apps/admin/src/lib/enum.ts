@@ -21,3 +21,12 @@ export const partnerRequestStatuses = [
 ] as const satisfies readonly string[];
 
 export type PartnerRequestStatus = (typeof partnerRequestStatuses)[number];
+
+export const offerStatuses = [
+  "pending",
+  "approved",
+  "rejected",
+  "selected",
+] as const satisfies readonly string[];
+
+export type OfferStatus = (typeof offerStatuses)[number];

@@ -1,18 +1,48 @@
+import { OfferForm } from "@/components/offers/offer-form";
 import { formatMoney } from "@/lib/helpers";
 import { requirePartner } from "@/lib/server/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPartnerBoq } from "services";
+import {
+  getApprovedPartnerByClerkId,
+  getPartnerBoq,
+  getPartnerOffer,
+  type SelectOffers,
+} from "services";
+import type { OfferInput } from "validators";
 
 type Props = {
   params: Promise<{ uuid: string }>;
 };
 
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-50 text-amber-700",
+  approved: "bg-green-50 text-green-700",
+  rejected: "bg-red-50 text-red-700",
+  selected: "bg-primary/10 text-primary",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending admin review",
+  approved: "Approved — awaiting the customer",
+  rejected: "Rejected",
+  selected: "Selected by the customer",
+};
+
+const offerTotal = (offer: SelectOffers): number =>
+  Number(offer.productPrice) +
+  Number(offer.installPrice) +
+  Number(offer.programmingPrice ?? 0);
+
 const BoqDetailPage = async ({ params }: Props) => {
   const user = await requirePartner();
 
   const { uuid } = await params;
-  const detail = await getPartnerBoq(user.id, uuid);
+  const [detail, partner, offer] = await Promise.all([
+    getPartnerBoq(user.id, uuid),
+    getApprovedPartnerByClerkId(user.id),
+    getPartnerOffer(user.id, uuid),
+  ]);
   if (!detail) {
     notFound();
   }
@@ -23,8 +53,16 @@ const BoqDetailPage = async ({ params }: Props) => {
     (sum, item) => sum + Number(item.unitPrice) * item.quantity,
     0,
   );
-  const vat = subtotal * 0.15;
-  const total = subtotal + vat;
+  const showProgramming = partner?.serviceScope === "install-program";
+  const editable =
+    !offer || offer.status === "pending" || offer.status === "rejected";
+
+  const defaultValues: OfferInput = {
+    productPrice: offer?.productPrice ?? "",
+    installPrice: offer?.installPrice ?? "",
+    programmingPrice: offer?.programmingPrice ?? "",
+    description: offer?.description ?? "",
+  };
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-16">
@@ -41,47 +79,108 @@ const BoqDetailPage = async ({ params }: Props) => {
       </p>
 
       <div className="mt-8 overflow-hidden rounded-2xl border border-neutral-200">
-        {items.length === 0 ? (
-          <p className="p-8 text-center text-neutral-500">
-            This BOQ has no items.
-          </p>
-        ) : (
-          items.map((item, index) => (
-            <div
-              key={item.uuid}
-              className={`flex items-center justify-between gap-4 p-5 ${
-                index > 0 ? "border-t border-neutral-100" : ""
-              }`}
-            >
-              <div>
-                {item.categoryName && (
-                  <p className="text-xs text-neutral-400">{item.categoryName}</p>
-                )}
-                <p className="font-heading text-base font-semibold text-ink">
-                  {item.name}
-                </p>
-                <p className="text-xs text-neutral-500">
-                  {formatMoney(Number(item.unitPrice), currency)} each
-                </p>
-              </div>
-              <div className="flex items-center gap-6">
-                <p className="text-sm text-neutral-500">Qty {item.quantity}</p>
-                <p className="w-28 text-right font-semibold tabular-nums text-ink">
-                  {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
-                </p>
-              </div>
+        {items.map((item, index) => (
+          <div
+            key={item.uuid}
+            className={`flex items-center justify-between gap-4 p-5 ${
+              index > 0 ? "border-t border-neutral-100" : ""
+            }`}
+          >
+            <div>
+              {item.categoryName && (
+                <p className="text-xs text-neutral-400">{item.categoryName}</p>
+              )}
+              <p className="font-heading text-base font-semibold text-ink">
+                {item.name}
+              </p>
+              <p className="text-xs text-neutral-500">
+                {formatMoney(Number(item.unitPrice), currency)} each
+              </p>
             </div>
-          ))
-        )}
+            <div className="flex items-center gap-6">
+              <p className="text-sm text-neutral-500">Qty {item.quantity}</p>
+              <p className="w-28 text-right font-semibold tabular-nums text-ink">
+                {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-6 flex flex-col items-end gap-1 text-sm text-neutral-600">
-        <div>Subtotal: {formatMoney(subtotal, currency)}</div>
-        <div>VAT (15%): {formatMoney(vat, currency)}</div>
-        <div className="mt-1 text-lg text-ink">
-          Total: {formatMoney(total, currency)}
-        </div>
-      </div>
+      <p className="mt-3 text-right text-sm text-neutral-600">
+        Catalog subtotal: {formatMoney(subtotal, currency)}
+      </p>
+
+      <section className="mt-10 rounded-2xl border border-neutral-200 p-6">
+        <h2 className="font-heading text-2xl text-ink">Your offer</h2>
+        <p className="mt-1 text-sm text-neutral-500">
+          Price the product, installation
+          {showProgramming ? " and programming" : ""}, and describe what you
+          deliver. The admin reviews it before the customer sees it.
+        </p>
+
+        {offer && (
+          <div className="mt-5 flex flex-col gap-3">
+            <span
+              className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                STATUS_STYLES[offer.status] ?? "bg-neutral-100 text-neutral-600"
+              }`}
+            >
+              {STATUS_LABELS[offer.status] ?? offer.status}
+            </span>
+            {offer.status === "rejected" && offer.rejectionReason && (
+              <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                {offer.rejectionReason}
+              </p>
+            )}
+            <p className="text-sm text-neutral-600">
+              Current total:{" "}
+              <span className="font-semibold text-ink">
+                {formatMoney(offerTotal(offer), currency)}
+              </span>
+            </p>
+          </div>
+        )}
+
+        {editable ? (
+          <div className="mt-6">
+            <OfferForm
+              boqUuid={boq.uuid}
+              showProgramming={showProgramming}
+              submitLabel={offer ? "Update offer" : "Send offer"}
+              defaultValues={defaultValues}
+            />
+          </div>
+        ) : (
+          <div className="mt-5 flex flex-col gap-2 rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600">
+            <div className="flex justify-between">
+              <span>Product</span>
+              <span className="font-medium text-ink">
+                {formatMoney(Number(offer?.productPrice ?? 0), currency)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Installation</span>
+              <span className="font-medium text-ink">
+                {formatMoney(Number(offer?.installPrice ?? 0), currency)}
+              </span>
+            </div>
+            {offer?.programmingPrice && (
+              <div className="flex justify-between">
+                <span>Programming</span>
+                <span className="font-medium text-ink">
+                  {formatMoney(Number(offer.programmingPrice), currency)}
+                </span>
+              </div>
+            )}
+            {offer?.description && (
+              <p className="mt-2 whitespace-pre-wrap text-neutral-600">
+                {offer.description}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
     </main>
   );
 };

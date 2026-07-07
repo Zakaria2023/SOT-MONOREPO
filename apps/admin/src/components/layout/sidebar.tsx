@@ -10,6 +10,7 @@ import {
   Package,
   Search,
   Tags,
+  Ticket,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -44,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: FileText, label: "BOQs", href: "/boqs" },
       { icon: Network, label: "Partners", href: "/partners" },
+      { icon: Ticket, label: "Offers", href: "/offers" },
     ],
   },
 ];

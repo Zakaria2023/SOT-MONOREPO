@@ -3,5 +3,6 @@ export * from "./boq";
 export * from "./brands";
 export * from "./cart";
 export * from "./categories";
+export * from "./offers";
 export * from "./partners";
 export * from "./products";
