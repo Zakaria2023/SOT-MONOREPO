@@ -285,6 +285,18 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   <p className="line-clamp-1" />
   ```
 
+- Never use extra-bold or heavier font weights (`font-bold`, `font-extrabold`, `font-black`). Keep text at `font-normal`, `font-medium`, or at most `font-semibold` for emphasis.
+
+  ```tsx
+  // ❌ Bad
+  <h3 className="font-bold" />
+  <span className="font-extrabold" />
+
+  // ✅ Good
+  <h3 className="font-semibold" />
+  <span className="font-medium" />
+  ```
+
 ## Exports
 
 - Regular components use **named exports** — inline on the declaration is fine, just never `export default`.
