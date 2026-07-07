@@ -14,15 +14,15 @@ export const requireAuth = async () => {
 
 /**
  * Ensures the signed-in user has the pre-seller role
- * ({ role: "pre-seller" } in Clerk publicMetadata); otherwise redirects to the
- * unauthorized page.
+ * ({ role: "pre-seller" } in Clerk publicMetadata); otherwise sends them back to
+ * sign-in (where a wrong-role session is offered a sign-out).
  */
 export const requirePreSeller = async () => {
   await requireAuth();
   const user = await currentUser();
 
   if (!user || user.publicMetadata?.role !== "pre-seller") {
-    redirect("/unauthorized");
+    redirect("/sign-in");
   }
 
   return user;

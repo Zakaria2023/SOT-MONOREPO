@@ -53,6 +53,29 @@ export const getUserByUuid = async (
 };
 
 /**
+ * Resolves the user behind a still-valid refresh token *without* rotating it.
+ * The web client uses this to keep a session alive after the short-lived access
+ * token expires: identity survives for the refresh token's lifetime even while
+ * idle. Returns null if the token is unknown or its session has lapsed. Token
+ * rotation stays in `refreshSession` (used by the mobile refresh endpoint).
+ */
+export const getUserByRefreshToken = async (
+  refreshToken: string,
+): Promise<AuthUser | null> => {
+  const tokenHash = hashRefreshToken(refreshToken);
+
+  const [session] = await db
+    .select({ userUuid: Sessions.userUuid })
+    .from(Sessions)
+    .where(
+      and(eq(Sessions.tokenHash, tokenHash), gt(Sessions.expiresAt, new Date())),
+    );
+  if (!session) return null;
+
+  return getUserByUuid(session.userUuid);
+};
+
+/**
  * Issues a session for a user: generates a refresh token, stores its hash in
  * the Sessions table, and signs a short-lived access token.
  */

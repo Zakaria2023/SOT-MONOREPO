@@ -1,5 +1,5 @@
 import { OfferForm } from "@/components/offers/offer-form";
-import { formatMoney } from "@/lib/helpers";
+import { formatMoney, offerTotal } from "@/lib/helpers";
 import { requirePartner } from "@/lib/server/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,7 +7,6 @@ import {
   getApprovedPartnerByClerkId,
   getPartnerBoq,
   getPartnerOffer,
-  type SelectOffers,
 } from "services";
 import type { OfferInput } from "validators";
 
@@ -28,11 +27,6 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
   selected: "Selected by the customer",
 };
-
-const offerTotal = (offer: SelectOffers): number =>
-  Number(offer.productPrice) +
-  Number(offer.installPrice) +
-  Number(offer.programmingPrice ?? 0);
 
 const BoqDetailPage = async ({ params }: Props) => {
   const user = await requirePartner();

@@ -14,15 +14,15 @@ export const requireAuth = async () => {
 
 /**
  * Ensures the signed-in user has the partner role
- * ({ role: "partner" } in Clerk publicMetadata); otherwise redirects to the
- * unauthorized page.
+ * ({ role: "partner" } in Clerk publicMetadata); otherwise sends them back to
+ * sign-in (where a wrong-role session is offered a sign-out).
  */
 export const requirePartner = async () => {
   await requireAuth();
   const user = await currentUser();
 
   if (!user || user.publicMetadata?.role !== "partner") {
-    redirect("/unauthorized");
+    redirect("/sign-in");
   }
 
   return user;
