@@ -2,6 +2,8 @@
 
 import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
+import { HighlightsEditor } from "@/components/specs/highlights-editor";
+import { SpecGroupsEditor } from "@/components/specs/spec-groups-editor";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
@@ -12,6 +14,7 @@ import { documentDownloadUrl } from "@/lib/documents";
 import { ArrowUpDown, Tags } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { FormProvider } from "react-hook-form";
 
 type CategoryFormProps =
   | { mode: "add"; categories: SelectCategories[] }
@@ -40,13 +43,14 @@ export const CategoryForm = (props: CategoryFormProps) => {
   const hasSubmittedRef = useRef(false);
 
   return (
-    <form
-      onSubmit={(event) => {
-        hasSubmittedRef.current = true;
-        onSubmit(event);
-      }}
-      className="flex flex-col gap-6 rounded-card border border-hairline bg-surface p-7 shadow-[0_1px_2px_rgba(27,35,51,0.04)]"
-    >
+    <FormProvider {...form}>
+      <form
+        onSubmit={(event) => {
+          hasSubmittedRef.current = true;
+          onSubmit(event);
+        }}
+        className="flex flex-col gap-6 rounded-card border border-hairline bg-surface p-7 shadow-[0_1px_2px_rgba(27,35,51,0.04)]"
+      >
       <div className="flex items-center gap-3 border-b border-hairline pb-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-tint text-primary">
           <Tags size={20} />
@@ -97,6 +101,16 @@ export const CategoryForm = (props: CategoryFormProps) => {
         }
       />
 
+      <div className="border-t border-hairline pt-6">
+        <p className="text-sm text-muted">
+          Highlights and spec groups defined here are inherited by default when a
+          product is assigned to this category.
+        </p>
+      </div>
+
+      <HighlightsEditor />
+      <SpecGroupsEditor />
+
       <FormError message={state.error} />
 
       <div className="flex items-center gap-3 border-t border-hairline pt-5">
@@ -116,6 +130,7 @@ export const CategoryForm = (props: CategoryFormProps) => {
           Cancel
         </Link>
       </div>
-    </form>
+      </form>
+    </FormProvider>
   );
 };

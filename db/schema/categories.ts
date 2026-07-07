@@ -3,11 +3,22 @@ import {
   char,
   index,
   int,
+  json,
   mysqlTable,
   text,
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
+
+export type CategoryHighlight = {
+  k: string;
+  v: string;
+};
+
+export type CategorySpecGroup = {
+  title: string;
+  rows: { k: string; v: string }[];
+};
 
 export const Categories = mysqlTable(
   "Categories",
@@ -22,6 +33,10 @@ export const Categories = mysqlTable(
     order: int("order").default(0).notNull(),
 
     image: varchar("image", { length: 255 }),
+
+    // Default spec structure inherited by products assigned to this category.
+    highlights: json("highlights").$type<CategoryHighlight[]>(),
+    specGroups: json("spec_groups").$type<CategorySpecGroup[]>(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

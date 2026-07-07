@@ -3,8 +3,7 @@
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
-import { HighlightsEditor } from "@/components/products/highlights-editor";
-import { SpecGroupsEditor } from "@/components/products/spec-groups-editor";
+import { SpecsPreview } from "@/components/specs/specs-preview";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dropdown } from "@/components/ui/dropdown";
@@ -63,6 +62,12 @@ export const ProductForm = (props: ProductFormProps) => {
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const hasSubmittedRef = useRef(false);
+
+  const inheritCategorySpecs = (categoryUuid: string) => {
+    const category = categories.find((item) => item.uuid === categoryUuid);
+    setValue("highlights", category?.highlights ?? []);
+    setValue("specGroups", category?.specGroups ?? []);
+  };
 
   return (
     <FormProvider {...form}>
@@ -123,6 +128,7 @@ export const ProductForm = (props: ProductFormProps) => {
             placeholder="Select a category"
             allowEmpty={false}
             error={errors.categoryUuid?.message}
+            onValueChange={inheritCategorySpecs}
           />
           <BrandDropdown
             control={control}
@@ -207,8 +213,7 @@ export const ProductForm = (props: ProductFormProps) => {
           }
         />
 
-        <HighlightsEditor />
-        <SpecGroupsEditor />
+        <SpecsPreview />
 
         <FormError message={state.error} />
 

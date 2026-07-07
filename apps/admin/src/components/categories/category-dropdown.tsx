@@ -16,6 +16,7 @@ type CategoryDropdownProps<TFieldValues extends FieldValues> = {
   placeholder?: string;
   allowEmpty?: boolean;
   error?: string;
+  onValueChange?: (value: string) => void;
 };
 
 const buildCategoryTreeOptions = (
@@ -52,6 +53,7 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
   placeholder = "No parent",
   allowEmpty = true,
   error,
+  onValueChange,
 }: CategoryDropdownProps<TFieldValues>) => {
   const options = useMemo(
     () => buildCategoryTreeOptions(categories),
@@ -67,7 +69,10 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
         render={({ field }) => (
           <Dropdown
             value={typeof field.value === "string" ? field.value : ""}
-            onChange={field.onChange}
+            onChange={(value) => {
+              field.onChange(value);
+              onValueChange?.(value);
+            }}
             placeholder={placeholder}
             options={
               allowEmpty

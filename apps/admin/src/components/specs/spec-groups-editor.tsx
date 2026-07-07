@@ -1,17 +1,17 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
-import { useFieldArray, useFormContext } from "react-hook-form";
-import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { SpecFormValues } from "@/lib/specs";
+import { Plus, Trash2 } from "lucide-react";
+import { useFieldArray, useFormContext } from "react-hook-form";
 
 type SpecGroupRowsProps = {
   groupIndex: number;
 };
 
 const SpecGroupRows = ({ groupIndex }: SpecGroupRowsProps) => {
-  const { control, register } = useFormContext<ProductFormValues>();
+  const { control, register } = useFormContext<SpecFormValues>();
   const { fields, append, remove } = useFieldArray({
     control,
     name: `specGroups.${groupIndex}.rows`,
@@ -54,7 +54,7 @@ const SpecGroupRows = ({ groupIndex }: SpecGroupRowsProps) => {
 };
 
 export const SpecGroupsEditor = () => {
-  const { control, register } = useFormContext<ProductFormValues>();
+  const { control, register } = useFormContext<SpecFormValues>();
   const { fields, append, remove } = useFieldArray({
     control,
     name: "specGroups",

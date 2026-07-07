@@ -1,20 +1,6 @@
 import { z } from "zod";
 import { productStatuses } from "@/lib/enum";
-
-const highlightSchema = z.object({
-  k: z.string().min(1, "Required"),
-  v: z.string().min(1, "Required"),
-});
-
-const specRowSchema = z.object({
-  k: z.string().min(1, "Required"),
-  v: z.string().min(1, "Required"),
-});
-
-const specGroupSchema = z.object({
-  title: z.string().min(1, "Required"),
-  rows: z.array(specRowSchema),
-});
+import { highlightSchema, specGroupSchema } from "@/lib/specs";
 
 export const productFormSchema = z.object({
   categoryUuid: z.string().min(1, "Category is required"),
