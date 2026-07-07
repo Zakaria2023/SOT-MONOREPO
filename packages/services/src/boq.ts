@@ -100,33 +100,56 @@ export const getUserBoqs = async (userUuid: string): Promise<SelectBoqs[]> =>
     .where(eq(Boqs.userUuid, userUuid))
     .orderBy(desc(Boqs.createdAt));
 
-/** Submits a draft BOQ for review (verifies ownership and draft status). */
-export const submitBoq = async (
-  userUuid: string,
-  boqUuid: string,
-): Promise<void> => {
-  const [boq] = await db
-    .select()
-    .from(Boqs)
-    .where(and(eq(Boqs.uuid, boqUuid), eq(Boqs.userUuid, userUuid)));
-  if (!boq) throw new Error("BOQ not found");
-  if (boq.status !== "draft") {
-    throw new Error("This BOQ has already been submitted");
+// Verifies a BOQ item belongs to a draft BOQ assigned to the given
+// pre-seller, returning its numeric id.
+const findAssignedDraftItemId = async (
+  preSellerId: string,
+  boqItemUuid: string,
+): Promise<number> => {
+  const [row] = await db
+    .select({ id: BoqItems.id, status: Boqs.status })
+    .from(BoqItems)
+    .innerJoin(Boqs, eq(BoqItems.boqUuid, Boqs.uuid))
+    .where(
+      and(
+        eq(BoqItems.uuid, boqItemUuid),
+        eq(Boqs.assignedPreSellerId, preSellerId),
+      ),
+    );
+  if (!row) throw new Error("BOQ item not found");
+  if (row.status !== "draft") {
+    throw new Error("Only draft BOQs can be edited");
   }
-
-  await db
-    .update(Boqs)
-    .set({ status: "submitted", submittedAt: new Date() })
-    .where(eq(Boqs.id, boq.id));
+  return row.id;
 };
 
-/** All submitted BOQs (for the pre-seller review queue), newest first. */
-export const getSubmittedBoqs = async (): Promise<SelectBoqs[]> =>
-  db
-    .select()
-    .from(Boqs)
-    .where(eq(Boqs.status, "submitted"))
-    .orderBy(desc(Boqs.submittedAt));
+/** Updates a line's quantity on a draft BOQ assigned to the pre-seller. */
+export const updateBoqItemQuantity = async ({
+  preSellerId,
+  boqItemUuid,
+  quantity,
+}: {
+  preSellerId: string;
+  boqItemUuid: string;
+  quantity: number;
+}): Promise<void> => {
+  if (quantity < 1) throw new Error("Quantity must be at least 1");
+
+  const id = await findAssignedDraftItemId(preSellerId, boqItemUuid);
+  await db.update(BoqItems).set({ quantity }).where(eq(BoqItems.id, id));
+};
+
+/** Removes a line from a draft BOQ assigned to the pre-seller. */
+export const removeBoqItem = async ({
+  preSellerId,
+  boqItemUuid,
+}: {
+  preSellerId: string;
+  boqItemUuid: string;
+}): Promise<void> => {
+  const id = await findAssignedDraftItemId(preSellerId, boqItemUuid);
+  await db.delete(BoqItems).where(eq(BoqItems.id, id));
+};
 
 /** Every BOQ with its customer, item count and subtotal (admin oversight). */
 export const getAllBoqs = async (): Promise<BoqListItem[]> => {
@@ -182,4 +205,4 @@ export const getAssignedBoqs = async (
     .select()
     .from(Boqs)
     .where(eq(Boqs.assignedPreSellerId, preSellerId))
-    .orderBy(desc(Boqs.submittedAt));
+    .orderBy(desc(Boqs.createdAt));

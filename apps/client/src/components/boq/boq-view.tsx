@@ -1,7 +1,6 @@
-import { submitForReview } from "@/app/boq/[uuid]/actions";
 import { formatMoney } from "@/lib/helpers";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, ArrowRight, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Package } from "lucide-react";
 import Link from "next/link";
 import type { SelectBoqItems, SelectBoqs } from "services";
 
@@ -128,30 +127,14 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
               </span>
             </div>
 
-            {isDraft ? (
-              <>
-                <form action={submitForReview} className="mt-6">
-                  <input type="hidden" name="boqUuid" value={boq.uuid} />
-                  <button
-                    type="submit"
-                    className="font-grotesk inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
-                  >
-                    Send to review
-                    <ArrowRight size={18} />
-                  </button>
-                </form>
-                <p className="font-grotesk mt-4 text-center text-xs text-[#9CA0A8]">
-                  Send this BOQ to a pre-seller for review before payment.
-                </p>
-              </>
-            ) : (
-              <div className="mt-6 flex items-start gap-2 rounded-xl bg-green-50 p-4 text-sm text-green-700">
-                <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
-                <span className="font-grotesk">
-                  Submitted for review. A pre-seller will get back to you.
-                </span>
-              </div>
-            )}
+            <div className="mt-6 flex items-start gap-2 rounded-xl bg-green-50 p-4 text-sm text-green-700">
+              <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+              <span className="font-grotesk">
+                {isDraft
+                  ? "Your BOQ has been sent to our team. A pre-seller will review it and get back to you."
+                  : "Submitted for review. A pre-seller will get back to you."}
+              </span>
+            </div>
           </div>
         </div>
       </div>

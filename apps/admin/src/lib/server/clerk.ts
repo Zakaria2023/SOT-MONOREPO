@@ -64,3 +64,10 @@ export const getClerkAdminUsers = async (): Promise<DashboardUserOption[]> => {
   const users = await getClerkUsers();
   return users.filter((user) => user.role === "admin");
 };
+
+export const getClerkPreSellerUsers = async (): Promise<
+  DashboardUserOption[]
+> => {
+  const users = await getClerkUsers();
+  return users.filter((user) => user.role === "pre-seller");
+};

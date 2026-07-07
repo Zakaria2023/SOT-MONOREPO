@@ -1,7 +1,7 @@
 "use server";
 
 import { requireAdmin } from "@/lib/server/auth";
-import { clerkClient } from "@clerk/nextjs/server";
+import { getClerkPreSellerUsers } from "@/lib/server/clerk";
 import { revalidatePath } from "next/cache";
 import { assignBoq } from "services";
 
@@ -14,28 +14,18 @@ export type AssignResult = {
   error?: string;
 };
 
-type ClerkUser = Awaited<
-  ReturnType<Awaited<ReturnType<typeof clerkClient>>["users"]["getUser"]>
->;
-
-const displayName = (user: ClerkUser): string => {
-  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
-  if (fullName) return fullName;
-  return user.emailAddresses[0]?.emailAddress ?? "Pre-seller";
-};
-
 /** Clerk users whose publicMetadata role is "pre-seller". */
 export const listPreSellers = async (): Promise<PreSellerOption[]> => {
   await requireAdmin();
-  const client = await clerkClient();
-  const { data } = await client.users.getUserList({ limit: 100 });
-
-  return data
-    .filter((user) => user.publicMetadata?.role === "pre-seller")
-    .map((user) => ({ id: user.id, name: displayName(user) }));
+  const users = await getClerkPreSellerUsers();
+  return users.map((user) => ({ id: user.id, name: user.label }));
 };
 
-/** Assigns a pre-seller to a BOQ, or clears it when `preSellerId` is empty. */
+/**
+ * Assigns a pre-seller to a draft BOQ, or clears the assignment when
+ * `preSellerId` is empty. The assigned pre-seller then sees the draft in
+ * their queue to edit and submit.
+ */
 export const assignBoqAction = async (
   boqUuid: string,
   preSellerId: string,
@@ -46,9 +36,12 @@ export const assignBoqAction = async (
     if (!preSellerId) {
       await assignBoq(boqUuid, null);
     } else {
-      const client = await clerkClient();
-      const user = await client.users.getUser(preSellerId);
-      await assignBoq(boqUuid, { id: user.id, name: displayName(user) });
+      const preSellers = await getClerkPreSellerUsers();
+      const preSeller = preSellers.find((user) => user.id === preSellerId);
+      if (!preSeller) {
+        throw new Error("Selected user does not have the pre-seller role");
+      }
+      await assignBoq(boqUuid, { id: preSeller.id, name: preSeller.label });
     }
   } catch (error) {
     return {

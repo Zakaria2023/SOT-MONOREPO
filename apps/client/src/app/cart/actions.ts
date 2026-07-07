@@ -22,7 +22,8 @@ export const removeItem = async (cartItemUuid: string) => {
   await removeCartItem({ userUuid: user.uuid, cartItemUuid });
 };
 
-// Checkout turns the cart into a draft BOQ, then opens it for review.
+// Checkout turns the cart into a draft BOQ. The draft lands in the admin
+// dashboard, where an admin assigns a pre-seller to edit and submit it.
 export const checkout = async () => {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");

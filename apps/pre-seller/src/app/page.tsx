@@ -36,11 +36,11 @@ const DashboardPage = async () => {
         className="mt-10 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 p-6 transition-colors hover:border-primary/40"
       >
         <div>
-          <h2 className="font-heading text-xl font-bold text-ink">
-            Review queue
+          <h2 className="font-heading text-xl font-semibold text-ink">
+            Assigned BOQs
           </h2>
           <p className="mt-1 text-sm text-neutral-500">
-            See BOQs customers have submitted for review.
+            Draft BOQs an admin has assigned to you to edit and submit.
           </p>
         </div>
         <ArrowRight size={20} className="text-primary" />
