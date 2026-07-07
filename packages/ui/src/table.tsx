@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearch } from "@/components/layout/shell";
 import { ReactNode } from "react";
+import { useSearch } from "./search-context";
 
 export type TableColumn<T> = {
   key: string;

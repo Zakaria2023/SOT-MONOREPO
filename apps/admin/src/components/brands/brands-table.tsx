@@ -5,8 +5,8 @@ import Image from "next/image";
 import { documentDownloadUrl } from "@/lib/documents";
 import type { BrandListItem } from "@/app/(dashboard)/brands/action";
 import { BrandRowActions } from "@/components/brands/brand-row-actions";
-import { Table } from "@/components/ui/table";
-import type { TableColumn } from "@/components/ui/table";
+import { Table } from "ui";
+import type { TableColumn } from "ui";
 
 type BrandsTableProps = {
   brands: BrandListItem[];

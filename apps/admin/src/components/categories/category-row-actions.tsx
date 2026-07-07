@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteCategory } from "@/app/(dashboard)/categories/action";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "ui";
+import { ConfirmDialog } from "ui";
 
 type CategoryRowActionsProps = {
   uuid: string;

@@ -2,11 +2,11 @@
 
 import { useBrandForm } from "@/app/(dashboard)/brands/use-brand-form";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
-import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/form-error";
-import { ImageUpload } from "@/components/ui/image-upload";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "ui";
+import { FormError } from "ui";
+import { ImageUpload } from "ui";
+import { Input } from "ui";
+import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import { documentDownloadUrl } from "@/lib/documents";
 import { ArrowUpDown, Award } from "lucide-react";

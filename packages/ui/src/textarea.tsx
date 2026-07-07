@@ -1,6 +1,6 @@
 import type { ReactNode, TextareaHTMLAttributes } from "react";
 import { forwardRef } from "react";
-import { FormError } from "@/components/ui/form-error";
+import { FormError } from "./form-error";
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label?: string;

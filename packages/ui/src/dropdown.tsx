@@ -2,7 +2,7 @@
 
 import { ChevronDown, CornerDownRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "./button";
 
 export type DropdownOption = {
   value: string;

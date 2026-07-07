@@ -2,8 +2,8 @@
 
 import type { PreSellerOption } from "@/app/(dashboard)/boqs/action";
 import { AssignPreSeller } from "@/components/boqs/assign-pre-seller";
-import { Table } from "@/components/ui/table";
-import type { TableColumn } from "@/components/ui/table";
+import { Table } from "ui";
+import type { TableColumn } from "ui";
 import type { BoqStatus } from "@/lib/enum";
 import { formatSar } from "@/lib/helpers";
 import { BOQ_STATUS_LABELS } from "@/lib/label";

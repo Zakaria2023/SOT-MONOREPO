@@ -66,6 +66,9 @@ importers:
       storage:
         specifier: workspace:*
         version: link:../../packages/storage
+      ui:
+        specifier: workspace:*
+        version: link:../../packages/ui
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -219,9 +222,15 @@ importers:
       react-dom:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
+      react-hook-form:
+        specifier: ^7.80.0
+        version: 7.80.0(react@19.2.4)
       services:
         specifier: workspace:*
         version: link:../../packages/services
+      ui:
+        specifier: workspace:*
+        version: link:../../packages/ui
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4
@@ -290,6 +299,33 @@ importers:
         version: 20.19.43
       typescript:
         specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/ui:
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.17)
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.4)
+      next:
+        specifier: 16.2.9
+        version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      react-hook-form:
+        specifier: ^7.80.0
+        version: 7.80.0(react@19.2.4)
+      typescript:
+        specifier: ^5
         version: 5.9.3
 
   packages/validators:

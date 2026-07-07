@@ -4,11 +4,11 @@ import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form"
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { HighlightsEditor } from "@/components/specs/highlights-editor";
 import { SpecGroupsEditor } from "@/components/specs/spec-groups-editor";
-import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/form-error";
-import { ImageUpload } from "@/components/ui/image-upload";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "ui";
+import { FormError } from "ui";
+import { ImageUpload } from "ui";
+import { Input } from "ui";
+import { Textarea } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
 import { documentDownloadUrl } from "@/lib/documents";
 import { ArrowUpDown, Tags } from "lucide-react";

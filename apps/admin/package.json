@@ -22,6 +22,7 @@
     "server-only": "^0.0.1",
     "services": "workspace:*",
     "storage": "workspace:*",
+    "ui": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

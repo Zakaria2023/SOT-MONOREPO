@@ -1,6 +1,6 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
-import { FormError } from "@/components/ui/form-error";
+import { FormError } from "./form-error";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;

@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import { Controller } from "react-hook-form";
 import type { Control, FieldValues, Path } from "react-hook-form";
-import { Dropdown } from "@/components/ui/dropdown";
-import type { DropdownOption } from "@/components/ui/dropdown";
-import { FormError } from "@/components/ui/form-error";
+import { Dropdown } from "ui";
+import type { DropdownOption } from "ui";
+import { FormError } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 
 type BrandDropdownProps<TFieldValues extends FieldValues> = {

@@ -5,8 +5,8 @@ import Image from "next/image";
 import type { ChangeEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/form-error";
+import { Button } from "./button";
+import { FormError } from "./form-error";
 
 type ImageUploadProps = {
   label?: string;

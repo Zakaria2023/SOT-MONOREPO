@@ -1,8 +1,8 @@
 "use client";
 
 import { Trash2, TriangleAlert, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { FormError } from "@/components/ui/form-error";
+import { Button } from "./button";
+import { FormError } from "./form-error";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -36,7 +36,7 @@ export const ConfirmDialog = ({
           </div>
 
           <div className="flex flex-col gap-1 text-left">
-            <h2 className="font-heading text-lg font-bold text-ink">
+            <h2 className="font-heading text-lg font-semibold text-ink">
               {title}
             </h2>
             <p className="text-sm text-muted">{description}</p>

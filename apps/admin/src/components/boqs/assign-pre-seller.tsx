@@ -2,7 +2,7 @@
 
 import type { PreSellerOption } from "@/app/(dashboard)/boqs/action";
 import { assignBoqAction } from "@/app/(dashboard)/boqs/action";
-import { Dropdown } from "@/components/ui/dropdown";
+import { Dropdown } from "ui";
 import { useMemo, useTransition } from "react";
 
 type AssignPreSellerProps = {
