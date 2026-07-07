@@ -1,9 +1,11 @@
 import { BoqItemControls } from "@/components/boqs/boq-item-controls";
+import { SubmitBoqButton } from "@/components/boqs/submit-boq-button";
 import { formatMoney } from "@/lib/helpers";
 import { requirePreSeller } from "@/lib/server/auth";
+import { MapPin } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBoq } from "services";
+import { getBoq, getBoqPartners } from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;
@@ -27,6 +29,7 @@ const BoqDetailPage = async ({ params }: Props) => {
   const vat = subtotal * 0.15;
   const total = subtotal + vat;
   const isDraft = boq.status === "draft";
+  const partners = isDraft ? [] : await getBoqPartners(uuid);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-16">
@@ -98,18 +101,40 @@ const BoqDetailPage = async ({ params }: Props) => {
         </div>
       </div>
 
-      {isDraft && (
-        <div className="mt-8 flex flex-col items-end gap-2">
-          <button
-            type="button"
-            disabled
-            className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white opacity-40"
-          >
-            Submit BOQ
-          </button>
-          <p className="text-xs text-neutral-400">
-            Submission is coming next — for now you can edit the draft.
+      {isDraft ? (
+        <div className="mt-8">
+          <SubmitBoqButton boqUuid={boq.uuid} />
+        </div>
+      ) : (
+        <div className="mt-8 rounded-2xl border border-neutral-200 p-5">
+          <h2 className="font-heading text-lg font-semibold text-ink">
+            Sent to {partners.length}{" "}
+            {partners.length === 1 ? "partner" : "partners"}
+          </h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Matched to the customer&apos;s location, closest first.
           </p>
+          <ul className="mt-4 flex flex-col gap-2">
+            {partners.map((partner) => (
+              <li
+                key={partner.uuid}
+                className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-4 py-3"
+              >
+                <div>
+                  <p className="font-medium text-ink">{partner.partnerName}</p>
+                  {partner.partnerLocation && (
+                    <p className="flex items-center gap-1 text-xs text-neutral-500">
+                      <MapPin size={12} />
+                      {partner.partnerLocation}
+                    </p>
+                  )}
+                </div>
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  #{partner.matchRank}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </main>

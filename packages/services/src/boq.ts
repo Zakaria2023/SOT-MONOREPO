@@ -2,6 +2,10 @@ import { and, asc, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
+  BoqPartners,
+  SelectBoqPartners,
+} from "../../../db/schema/boq-partners";
+import {
   BoqItems,
   Boqs,
   SelectBoqItems,
@@ -13,6 +17,7 @@ import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
 import { Users } from "../../../db/schema/users";
+import { findNearestApprovedPartners, type MatchedPartner } from "./partners";
 
 export type BoqDetail = {
   boq: SelectBoqs;
@@ -206,3 +211,127 @@ export const getAssignedBoqs = async (
     .from(Boqs)
     .where(eq(Boqs.assignedPreSellerId, preSellerId))
     .orderBy(desc(Boqs.createdAt));
+
+export type SubmitBoqResult = {
+  boq: SelectBoqs;
+  partners: MatchedPartner[];
+};
+
+/**
+ * Submits a draft BOQ the pre-seller has reviewed: marks it submitted and
+ * dispatches it to the three approved partners closest to the customer's
+ * location. Re-runnable dispatch is idempotent (prior matches are replaced).
+ */
+export const submitReviewedBoq = async ({
+  preSellerId,
+  boqUuid,
+}: {
+  preSellerId: string;
+  boqUuid: string;
+}): Promise<SubmitBoqResult> => {
+  const [boq] = await db
+    .select()
+    .from(Boqs)
+    .where(
+      and(eq(Boqs.uuid, boqUuid), eq(Boqs.assignedPreSellerId, preSellerId)),
+    );
+  if (!boq) throw new Error("BOQ not found");
+  if (boq.status !== "draft") {
+    throw new Error("This BOQ has already been submitted");
+  }
+
+  const items = await db
+    .select({ id: BoqItems.id })
+    .from(BoqItems)
+    .where(eq(BoqItems.boqUuid, boqUuid));
+  if (items.length === 0) {
+    throw new Error("Add at least one item before submitting");
+  }
+
+  const [customer] = await db
+    .select({ location: Users.location })
+    .from(Users)
+    .where(eq(Users.uuid, boq.userUuid));
+
+  const partners = await findNearestApprovedPartners(
+    customer?.location ?? null,
+    3,
+  );
+  if (partners.length === 0) {
+    throw new Error(
+      "No approved partners are available to receive this BOQ yet",
+    );
+  }
+
+  await db
+    .update(Boqs)
+    .set({ status: "submitted", submittedAt: new Date() })
+    .where(eq(Boqs.id, boq.id));
+
+  await db.delete(BoqPartners).where(eq(BoqPartners.boqUuid, boqUuid));
+  await db.insert(BoqPartners).values(
+    partners.map((partner) => ({
+      uuid: randomUUID(),
+      boqUuid,
+      partnerClerkUserId: partner.clerkUserId,
+      partnerRequestUuid: partner.partnerRequestUuid,
+      partnerName: partner.name,
+      partnerLocation: partner.location,
+      matchRank: partner.rank,
+    })),
+  );
+
+  const [updated] = await db.select().from(Boqs).where(eq(Boqs.id, boq.id));
+  if (!updated) throw new Error("Failed to submit BOQ");
+  return { boq: updated, partners };
+};
+
+/** The partners a BOQ was dispatched to (closest first). */
+export const getBoqPartners = async (
+  boqUuid: string,
+): Promise<SelectBoqPartners[]> =>
+  db
+    .select()
+    .from(BoqPartners)
+    .where(eq(BoqPartners.boqUuid, boqUuid))
+    .orderBy(asc(BoqPartners.matchRank));
+
+/** A BOQ enriched with the match rank/dispatch time for a partner's list. */
+export type PartnerBoqListItem = SelectBoqs & {
+  matchRank: number;
+  dispatchedAt: Date;
+};
+
+/** BOQs dispatched to a given partner (Clerk user id), newest first. */
+export const getPartnerBoqs = async (
+  partnerClerkUserId: string,
+): Promise<PartnerBoqListItem[]> =>
+  db
+    .select({
+      ...getTableColumns(Boqs),
+      matchRank: BoqPartners.matchRank,
+      dispatchedAt: BoqPartners.createdAt,
+    })
+    .from(BoqPartners)
+    .innerJoin(Boqs, eq(BoqPartners.boqUuid, Boqs.uuid))
+    .where(eq(BoqPartners.partnerClerkUserId, partnerClerkUserId))
+    .orderBy(desc(BoqPartners.createdAt));
+
+/** A dispatched BOQ with its items, only if it was sent to this partner. */
+export const getPartnerBoq = async (
+  partnerClerkUserId: string,
+  boqUuid: string,
+): Promise<BoqDetail | null> => {
+  const [link] = await db
+    .select({ id: BoqPartners.id })
+    .from(BoqPartners)
+    .where(
+      and(
+        eq(BoqPartners.boqUuid, boqUuid),
+        eq(BoqPartners.partnerClerkUserId, partnerClerkUserId),
+      ),
+    );
+  if (!link) return null;
+
+  return getBoq(boqUuid);
+};

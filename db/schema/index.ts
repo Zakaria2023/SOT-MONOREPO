@@ -1,3 +1,4 @@
+export * from "./boq-partners";
 export * from "./boqs";
 export * from "./brands";
 export * from "./carts";

@@ -1,0 +1,89 @@
+import { formatMoney } from "@/lib/helpers";
+import { requirePartner } from "@/lib/server/auth";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getPartnerBoq } from "services";
+
+type Props = {
+  params: Promise<{ uuid: string }>;
+};
+
+const BoqDetailPage = async ({ params }: Props) => {
+  const user = await requirePartner();
+
+  const { uuid } = await params;
+  const detail = await getPartnerBoq(user.id, uuid);
+  if (!detail) {
+    notFound();
+  }
+
+  const { boq, items } = detail;
+  const currency = items[0]?.currency ?? "SAR";
+  const subtotal = items.reduce(
+    (sum, item) => sum + Number(item.unitPrice) * item.quantity,
+    0,
+  );
+  const vat = subtotal * 0.15;
+  const total = subtotal + vat;
+
+  return (
+    <main className="mx-auto w-full max-w-3xl px-6 py-16">
+      <Link
+        href="/boqs"
+        className="text-sm font-medium text-neutral-500 transition-colors hover:text-primary"
+      >
+        ← Incoming BOQs
+      </Link>
+
+      <h1 className="font-heading mt-4 text-4xl text-ink">{boq.reference}</h1>
+      <p className="mt-1 text-sm text-neutral-500">
+        {items.length} {items.length === 1 ? "item" : "items"}
+      </p>
+
+      <div className="mt-8 overflow-hidden rounded-2xl border border-neutral-200">
+        {items.length === 0 ? (
+          <p className="p-8 text-center text-neutral-500">
+            This BOQ has no items.
+          </p>
+        ) : (
+          items.map((item, index) => (
+            <div
+              key={item.uuid}
+              className={`flex items-center justify-between gap-4 p-5 ${
+                index > 0 ? "border-t border-neutral-100" : ""
+              }`}
+            >
+              <div>
+                {item.categoryName && (
+                  <p className="text-xs text-neutral-400">{item.categoryName}</p>
+                )}
+                <p className="font-heading text-base font-semibold text-ink">
+                  {item.name}
+                </p>
+                <p className="text-xs text-neutral-500">
+                  {formatMoney(Number(item.unitPrice), currency)} each
+                </p>
+              </div>
+              <div className="flex items-center gap-6">
+                <p className="text-sm text-neutral-500">Qty {item.quantity}</p>
+                <p className="w-28 text-right font-semibold tabular-nums text-ink">
+                  {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mt-6 flex flex-col items-end gap-1 text-sm text-neutral-600">
+        <div>Subtotal: {formatMoney(subtotal, currency)}</div>
+        <div>VAT (15%): {formatMoney(vat, currency)}</div>
+        <div className="mt-1 text-lg text-ink">
+          Total: {formatMoney(total, currency)}
+        </div>
+      </div>
+    </main>
+  );
+};
+
+export default BoqDetailPage;

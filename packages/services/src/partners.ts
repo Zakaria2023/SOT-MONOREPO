@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -164,4 +164,92 @@ export const rejectPartnerRequest = async ({
       rejectedAt: new Date(),
     })
     .where(eq(PartnerRequests.uuid, partnerRequestUuid));
+};
+
+/** An approved partner matched to a BOQ, closest first (rank 1 = closest). */
+export type MatchedPartner = {
+  partnerRequestUuid: string;
+  clerkUserId: string;
+  name: string;
+  location: string | null;
+  rank: number;
+};
+
+// Splits a free-text location ("Riyadh, Saudi Arabia") into comparable tokens.
+const locationTokens = (value: string | null | undefined): string[] =>
+  (value ?? "")
+    .toLowerCase()
+    .split(/[,\s]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+// Heuristic closeness score for two free-text locations (higher = closer).
+// A shared city (the first token) dominates; other shared tokens (region,
+// country) add smaller amounts. Locations have no coordinates, so this is a
+// token-overlap approximation rather than true geographic distance.
+const scoreLocationCloseness = (
+  userLocation: string | null,
+  partnerLocation: string | null,
+): number => {
+  const userParts = locationTokens(userLocation);
+  const partnerParts = locationTokens(partnerLocation);
+  if (userParts.length === 0 || partnerParts.length === 0) return 0;
+
+  const partnerSet = new Set(partnerParts);
+  const shared = userParts.filter((token) => partnerSet.has(token)).length;
+  const cityMatch = userParts[0] === partnerParts[0] ? 1 : 0;
+
+  return cityMatch * 100 + shared * 10;
+};
+
+/**
+ * Returns up to `limit` approved partners closest to the customer's location.
+ * Partners with no location (or when the customer has none) still qualify, but
+ * rank below any location match; ties break toward the most recently approved.
+ */
+export const findNearestApprovedPartners = async (
+  userLocation: string | null,
+  limit = 3,
+): Promise<MatchedPartner[]> => {
+  const partners = await db
+    .select({
+      partnerRequestUuid: PartnerRequests.uuid,
+      clerkUserId: PartnerRequests.approvedClerkUserId,
+      fullName: PartnerRequests.fullName,
+      companyName: PartnerRequests.companyName,
+      location: PartnerRequests.location,
+      createdAt: PartnerRequests.createdAt,
+    })
+    .from(PartnerRequests)
+    .where(
+      and(
+        eq(PartnerRequests.status, "approved"),
+        isNotNull(PartnerRequests.approvedClerkUserId),
+      ),
+    );
+
+  return partners
+    .flatMap((partner) =>
+      partner.clerkUserId
+        ? [{ partner, clerkUserId: partner.clerkUserId }]
+        : [],
+    )
+    .map(({ partner, clerkUserId }) => ({
+      partner,
+      clerkUserId,
+      score: scoreLocationCloseness(userLocation, partner.location),
+    }))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.partner.createdAt.getTime() - a.partner.createdAt.getTime(),
+    )
+    .slice(0, limit)
+    .map(({ partner, clerkUserId }, index) => ({
+      partnerRequestUuid: partner.partnerRequestUuid,
+      clerkUserId,
+      name: partner.companyName || partner.fullName,
+      location: partner.location,
+      rank: index + 1,
+    }));
 };

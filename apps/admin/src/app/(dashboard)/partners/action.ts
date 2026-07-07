@@ -69,7 +69,7 @@ export const approvePartnerRequestAction = async (
       password: parsed.data.password,
       firstName,
       lastName,
-      publicMetadata: { role: "pre-seller" },
+      publicMetadata: { role: "partner" },
       privateMetadata: { partnerRequestUuid },
     });
 
