@@ -13,3 +13,11 @@ export const boqStatuses = [
 ] as const satisfies readonly string[];
 
 export type BoqStatus = (typeof boqStatuses)[number];
+
+export const partnerRequestStatuses = [
+  "pending",
+  "approved",
+  "rejected",
+] as const satisfies readonly string[];
+
+export type PartnerRequestStatus = (typeof partnerRequestStatuses)[number];

@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@source "../../../../packages/ui/src";
 
 @theme {
   --font-sans: "Cairo", sans-serif;
@@ -12,11 +13,14 @@
 
   --color-ink: #14161b;
   --color-muted: #5a6068;
+  --color-faint: #8a8f98;
   --color-page: #f5f4fa;
   --color-surface: #ffffff;
   --color-hairline: #eceaf2;
+  --color-search-border: #e3e4e9;
 
   --radius-card: 16px;
+  --radius-control: 12px;
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 

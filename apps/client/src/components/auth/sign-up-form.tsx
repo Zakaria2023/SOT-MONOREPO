@@ -1,7 +1,6 @@
 "use client";
 
 import { useSignUpForm } from "@/app/sign-up/use-sign-up-form";
-import { Input } from "@/components/ui/input";
 import {
   ArrowRight,
   Building2,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { Input } from "ui";
 
 export const SignUpForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -41,11 +41,15 @@ export const SignUpForm = () => {
         </p>
       </div>
 
-      <form onSubmit={onSubmit} noValidate className="mt-6 flex flex-col gap-4">
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="font-grotesk mt-6 flex flex-col gap-4"
+      >
         <Input
           label="Full name"
           placeholder="Jane Doe"
-          icon={User}
+          icon={<User size={16} />}
           autoComplete="name"
           error={errors.fullName?.message}
           {...register("fullName")}
@@ -55,7 +59,7 @@ export const SignUpForm = () => {
           label="Work email"
           type="email"
           placeholder="you@company.com"
-          icon={Mail}
+          icon={<Mail size={16} />}
           autoComplete="email"
           error={errors.email?.message}
           {...register("email")}
@@ -65,7 +69,7 @@ export const SignUpForm = () => {
           label="Phone"
           type="tel"
           placeholder="+966 5X XXX XXXX"
-          icon={Phone}
+          icon={<Phone size={16} />}
           autoComplete="tel"
           error={errors.phone?.message}
           {...register("phone")}
@@ -74,7 +78,7 @@ export const SignUpForm = () => {
         <Input
           label="Company name"
           placeholder="Acme Corp"
-          icon={Building2}
+          icon={<Building2 size={16} />}
           autoComplete="organization"
           error={errors.companyName?.message}
           {...register("companyName")}
@@ -83,7 +87,7 @@ export const SignUpForm = () => {
         <Input
           label="Location"
           placeholder="Riyadh, Saudi Arabia"
-          icon={MapPin}
+          icon={<MapPin size={16} />}
           autoComplete="address-level2"
           error={errors.location?.message}
           {...register("location")}
@@ -93,7 +97,7 @@ export const SignUpForm = () => {
           label="Password"
           type={showPassword ? "text" : "password"}
           placeholder="Create a password"
-          icon={Lock}
+          icon={<Lock size={16} />}
           autoComplete="new-password"
           error={errors.password?.message}
           rightSlot={
@@ -113,7 +117,7 @@ export const SignUpForm = () => {
           label="Confirm password"
           type={showConfirmPassword ? "text" : "password"}
           placeholder="Re-enter your password"
-          icon={Lock}
+          icon={<Lock size={16} />}
           autoComplete="new-password"
           error={errors.confirmPassword?.message}
           rightSlot={

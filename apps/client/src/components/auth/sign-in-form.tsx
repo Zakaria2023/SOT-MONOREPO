@@ -1,11 +1,11 @@
 "use client";
 
 import { useSignInForm } from "@/app/sign-in/use-sign-in-form";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Check, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { Input } from "ui";
 
 export const SignInForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -34,12 +34,16 @@ export const SignInForm = () => {
         </p>
       </div>
 
-      <form onSubmit={onSubmit} noValidate className="mt-6 flex flex-col gap-4">
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="font-grotesk mt-6 flex flex-col gap-4"
+      >
         <Input
           label="Work email"
           type="email"
           placeholder="you@company.com"
-          icon={Mail}
+          icon={<Mail size={16} />}
           autoComplete="email"
           error={errors.email?.message}
           {...register("email")}
@@ -49,7 +53,7 @@ export const SignInForm = () => {
           label="Password"
           type={showPassword ? "text" : "password"}
           placeholder="Enter your password"
-          icon={Lock}
+          icon={<Lock size={16} />}
           autoComplete="current-password"
           error={errors.password?.message}
           labelAccessory={

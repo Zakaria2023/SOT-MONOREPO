@@ -9,7 +9,10 @@ type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 };
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, labelIcon, error, id, name, className = "", ...props }, ref) => {
+  (
+    { label, labelIcon, error, id, name, required, className = "", ...props },
+    ref,
+  ) => {
     const textareaId = id ?? name;
 
     return (
@@ -21,6 +24,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           >
             {labelIcon && <span className="text-primary">{labelIcon}</span>}
             {label}
+            {required && <span className="text-primary">*</span>}
           </label>
         )}
 
@@ -28,6 +32,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           name={name}
+          required={required}
           className={`w-full rounded-control border border-search-border bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary-tint ${className}`}
           {...props}
         />

@@ -2,6 +2,7 @@ export * from "./boqs";
 export * from "./brands";
 export * from "./carts";
 export * from "./categories";
+export * from "./partner-requests";
 export * from "./products";
 export * from "./sessions";
 export * from "./users";

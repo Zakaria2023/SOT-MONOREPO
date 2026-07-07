@@ -1,12 +1,13 @@
 import { cn } from "@/lib/utils";
 import type { ComponentType } from "react";
+import type { PartnerRequestInput } from "validators";
 
 type IconType = ComponentType<{ size?: number; className?: string }>;
 
 type PartnerScopeCardProps = {
-  value: string;
+  value: PartnerRequestInput["serviceScope"];
   selected: boolean;
-  onSelect: (value: string) => void;
+  onSelect: (value: PartnerRequestInput["serviceScope"]) => void;
   icon: IconType;
   title: string;
   description: string;

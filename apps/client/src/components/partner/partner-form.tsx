@@ -1,6 +1,6 @@
 "use client";
 
-import { TextField, TextareaField } from "@/components/partner/partner-fields";
+import { usePartnerForm } from "@/app/partner/use-partner-form";
 import { PartnerScopeCard } from "@/components/partner/partner-scope-card";
 import { cn } from "@/lib/utils";
 import {
@@ -14,12 +14,14 @@ import {
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState, type ComponentType, type FormEvent } from "react";
+import { useEffect, useState, type ComponentType } from "react";
+import { Input, Textarea } from "ui";
+import type { PartnerRequestInput } from "validators";
 
 type IconType = ComponentType<{ size?: number; className?: string }>;
 
 type ScopeOption = {
-  value: string;
+  value: PartnerRequestInput["serviceScope"];
   icon: IconType;
   title: string;
   description: string;
@@ -36,95 +38,125 @@ const scopeOptions: ScopeOption[] = [
     value: "install-program",
     icon: Cpu,
     title: "Install + program",
-    description: "I install and configure — routing, security, WiFi, policies.",
+    description: "I install and configure - routing, security, WiFi, policies.",
   },
 ];
 
 const TOAST_DURATION_MS = 2800;
 
 export const PartnerForm = () => {
-  const [scope, setScope] = useState("install-program");
   const [toastVisible, setToastVisible] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {
+    form: {
+      register,
+      reset,
+      setValue,
+      watch,
+      formState: { errors },
+    },
+    state,
+    isPending,
+    onSubmit,
+  } = usePartnerForm();
+  const scope = watch("serviceScope");
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setToastVisible(true);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(
+  useEffect(() => {
+    if (!state.success) return;
+
+    reset();
+    // Toggle the toast from async timer callbacks (never synchronously in the
+    // effect body) so a successful submit doesn't cascade renders.
+    const showTimer = setTimeout(() => setToastVisible(true), 0);
+    const hideTimer = setTimeout(
       () => setToastVisible(false),
       TOAST_DURATION_MS,
     );
-  };
+
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [reset, state]);
 
   return (
     <>
-      <form onSubmit={onSubmit} noValidate className="mt-8 flex flex-col gap-5">
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="font-grotesk mt-8 flex flex-col gap-5"
+      >
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <TextField
-            id="partnerName"
-            name="partnerName"
+          <Input
             label="Partner name"
             placeholder="Abdullah Al-Mutairi"
-            icon={User}
+            icon={<User size={16} />}
             autoComplete="name"
             required
+            error={errors.fullName?.message}
+            {...register("fullName")}
           />
-          <TextField
-            id="companyName"
-            name="companyName"
+          <Input
             label="Company name"
             placeholder="Acme Integrators"
-            icon={Building2}
+            icon={<Building2 size={16} />}
             autoComplete="organization"
             required
+            error={errors.companyName?.message}
+            {...register("companyName")}
           />
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <TextField
-            id="email"
-            name="email"
+          <Input
             label="Email"
             type="email"
             placeholder="you@company.com"
-            icon={Mail}
+            icon={<Mail size={16} />}
             autoComplete="email"
             required
+            error={errors.email?.message}
+            {...register("email")}
           />
-          <TextField
-            id="location"
-            name="location"
+          <Input
             label="Location"
             placeholder="Riyadh, Saudi Arabia"
-            icon={MapPin}
+            icon={<MapPin size={16} />}
             autoComplete="address-level2"
+            error={errors.location?.message}
+            {...register("location")}
           />
         </div>
 
-        <TextareaField
-          id="about"
-          name="about"
+        <Textarea
           label="About you"
-          placeholder="A short intro — who you are, years in the field, team size, notable projects…"
+          rows={3}
+          className="resize-y leading-relaxed"
+          placeholder="A short intro - who you are, years in the field, team size, notable projects..."
+          error={errors.about?.message}
+          {...register("about")}
         />
-        <TextareaField
-          id="offer"
-          name="offer"
+        <Textarea
           label="What you offer"
-          placeholder="The services and products you deliver — cabling, switching, WiFi, surveillance, support contracts…"
+          rows={3}
+          className="resize-y leading-relaxed"
+          placeholder="The services and products you deliver - cabling, switching, WiFi, surveillance, support contracts..."
+          error={errors.offer?.message}
+          {...register("offer")}
         />
-        <TextareaField
-          id="special"
-          name="special"
+        <Textarea
           label="What makes you special"
-          placeholder="Why should a client pick you over another partner? Certifications, speed, coverage, guarantees…"
+          rows={3}
+          className="resize-y leading-relaxed"
+          placeholder="Why should a client pick you over another partner? Certifications, speed, coverage, guarantees..."
+          error={errors.special?.message}
+          {...register("special")}
         />
 
         <fieldset>
           <legend className="font-grotesk mb-3 block text-xs font-semibold text-ink">
             Service scope
           </legend>
+          <input type="hidden" {...register("serviceScope")} />
           <div
             role="radiogroup"
             aria-label="Service scope"
@@ -135,20 +167,35 @@ export const PartnerForm = () => {
                 key={option.value}
                 value={option.value}
                 selected={scope === option.value}
-                onSelect={setScope}
+                onSelect={(value) =>
+                  setValue("serviceScope", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 icon={option.icon}
                 title={option.title}
                 description={option.description}
               />
             ))}
           </div>
+          {errors.serviceScope?.message && (
+            <p className="font-grotesk mt-1.5 text-xs text-red-500">
+              {errors.serviceScope.message}
+            </p>
+          )}
         </fieldset>
+
+        {state.error && (
+          <p className="font-grotesk text-sm text-red-500">{state.error}</p>
+        )}
 
         <button
           type="submit"
-          className="font-grotesk mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-semibold text-white shadow-[0_14px_34px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+          disabled={isPending}
+          className="font-grotesk mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-semibold text-white shadow-[0_14px_34px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
         >
-          Submit application
+          {isPending ? "Submitting..." : "Submit application"}
           <ArrowRight size={18} />
         </button>
 

@@ -6,6 +6,7 @@ import {
   FileText,
   Layers,
   LayoutDashboard,
+  Network,
   Package,
   Search,
   Tags,
@@ -40,7 +41,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: "Sales",
-    links: [{ icon: FileText, label: "BOQs", href: "/boqs" }],
+    links: [
+      { icon: FileText, label: "BOQs", href: "/boqs" },
+      { icon: Network, label: "Partners", href: "/partners" },
+    ],
   },
 ];
 

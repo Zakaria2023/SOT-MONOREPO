@@ -23,6 +23,7 @@
     "services": "workspace:*",
     "storage": "workspace:*",
     "ui": "workspace:*",
+    "validators": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
