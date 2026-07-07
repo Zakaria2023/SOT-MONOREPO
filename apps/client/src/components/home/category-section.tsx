@@ -42,7 +42,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
           </div>
         </header>
 
-        <ul className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3 md:auto-rows-[230px]">
+        <ul className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3 md:auto-rows-57.5">
           {featured.map((category, index) => {
             const isFeatured = index === 0;
 

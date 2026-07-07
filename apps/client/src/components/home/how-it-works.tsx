@@ -115,7 +115,7 @@ export const HowItWorks = () => {
       <ol className="relative mx-auto mt-16 flex max-w-4xl flex-col gap-12 px-6 md:mt-20 md:gap-4">
         <div
           aria-hidden="true"
-          className="absolute top-0 bottom-0 left-6 w-[3px] -translate-x-1/2 rounded-full bg-[#E7E0F3] md:left-1/2"
+          className="absolute top-0 bottom-0 left-6 w-0.75 -translate-x-1/2 rounded-full bg-[#E7E0F3] md:left-1/2"
         >
           <div
             className="w-full rounded-full bg-linear-to-b from-violet-400 to-primary"
