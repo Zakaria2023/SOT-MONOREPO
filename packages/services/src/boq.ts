@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -12,10 +12,18 @@ export type { SelectBoqItems, SelectBoqs };
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
+import { Users } from "../../../db/schema/users";
 
 export type BoqDetail = {
   boq: SelectBoqs;
   items: SelectBoqItems[];
+};
+
+/** A BOQ enriched with its customer, line-item count and subtotal (admin list). */
+export type BoqListItem = SelectBoqs & {
+  customerName: string | null;
+  itemCount: number;
+  subtotal: number;
 };
 
 /**
@@ -118,4 +126,60 @@ export const getSubmittedBoqs = async (): Promise<SelectBoqs[]> =>
     .select()
     .from(Boqs)
     .where(eq(Boqs.status, "submitted"))
+    .orderBy(desc(Boqs.submittedAt));
+
+/** Every BOQ with its customer, item count and subtotal (admin oversight). */
+export const getAllBoqs = async (): Promise<BoqListItem[]> => {
+  const boqs = await db
+    .select({
+      ...getTableColumns(Boqs),
+      customerName: Users.fullName,
+    })
+    .from(Boqs)
+    .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+    .orderBy(desc(Boqs.createdAt));
+
+  const totals = await db
+    .select({
+      boqUuid: BoqItems.boqUuid,
+      itemCount: sql<number>`sum(${BoqItems.quantity})`,
+      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`,
+    })
+    .from(BoqItems)
+    .groupBy(BoqItems.boqUuid);
+
+  const totalsByBoq = new Map(totals.map((row) => [row.boqUuid, row]));
+
+  return boqs.map((boq) => {
+    const total = totalsByBoq.get(boq.uuid);
+    return {
+      ...boq,
+      itemCount: Number(total?.itemCount ?? 0),
+      subtotal: Number(total?.subtotal ?? 0),
+    };
+  });
+};
+
+/** Assigns (or clears, when `preSeller` is null) the pre-seller for a BOQ. */
+export const assignBoq = async (
+  boqUuid: string,
+  preSeller: { id: string; name: string } | null,
+): Promise<void> => {
+  await db
+    .update(Boqs)
+    .set({
+      assignedPreSellerId: preSeller?.id ?? null,
+      assignedPreSellerName: preSeller?.name ?? null,
+    })
+    .where(eq(Boqs.uuid, boqUuid));
+};
+
+/** BOQs assigned to a given pre-seller (Clerk user id), newest first. */
+export const getAssignedBoqs = async (
+  preSellerId: string,
+): Promise<SelectBoqs[]> =>
+  db
+    .select()
+    .from(Boqs)
+    .where(eq(Boqs.assignedPreSellerId, preSellerId))
     .orderBy(desc(Boqs.submittedAt));

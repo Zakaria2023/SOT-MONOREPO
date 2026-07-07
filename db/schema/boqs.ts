@@ -23,6 +23,11 @@ export const Boqs = mysqlTable(
     reference: varchar("reference", { length: 50 }).notNull(),
     status: mysqlEnum("status", boqStatuses).default("draft").notNull(),
 
+    // The pre-seller (Clerk user) an admin has assigned this BOQ to. The name is
+    // denormalized here because pre-sellers live in Clerk, not the Users table.
+    assignedPreSellerId: varchar("assigned_pre_seller_id", { length: 64 }),
+    assignedPreSellerName: varchar("assigned_pre_seller_name", { length: 255 }),
+
     submittedAt: timestamp("submitted_at"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -31,6 +36,7 @@ export const Boqs = mysqlTable(
   (table) => [
     index("idx_boqs_user_uuid").on(table.userUuid),
     index("idx_boqs_status").on(table.status),
+    index("idx_boqs_assigned_pre_seller_id").on(table.assignedPreSellerId),
   ],
 );
 

@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Award,
+  FileText,
   Layers,
   LayoutDashboard,
   Package,
@@ -36,6 +37,10 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Tags, label: "Categories", href: "/categories" },
       { icon: Package, label: "Products", href: "/products" },
     ],
+  },
+  {
+    title: "Sales",
+    links: [{ icon: FileText, label: "BOQs", href: "/boqs" }],
   },
 ];
 

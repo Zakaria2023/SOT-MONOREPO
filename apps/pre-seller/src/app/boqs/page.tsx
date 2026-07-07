@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getSubmittedBoqs } from "services";
 
 const BoqsPage = async () => {
-  await requirePreSeller();
+  const user = await requirePreSeller();
   const boqs = await getSubmittedBoqs();
 
   return (
@@ -45,7 +45,22 @@ const BoqsPage = async () => {
                         : "—"}
                     </p>
                   </div>
-                  <ArrowRight size={18} className="text-primary" />
+                  <div className="flex items-center gap-3">
+                    {boq.assignedPreSellerId === user.id ? (
+                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                        Assigned to you
+                      </span>
+                    ) : boq.assignedPreSellerName ? (
+                      <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-500">
+                        {boq.assignedPreSellerName}
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-400">
+                        Unassigned
+                      </span>
+                    )}
+                    <ArrowRight size={18} className="text-primary" />
+                  </div>
                 </Link>
               </li>
             ))}

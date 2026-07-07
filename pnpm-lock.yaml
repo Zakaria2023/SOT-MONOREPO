@@ -60,6 +60,9 @@ importers:
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
+      services:
+        specifier: workspace:*
+        version: link:../../packages/services
       storage:
         specifier: workspace:*
         version: link:../../packages/storage
