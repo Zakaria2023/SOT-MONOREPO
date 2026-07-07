@@ -65,6 +65,12 @@ export const Navbar = async () => {
         ) : (
           <div className="flex items-center gap-3">
             <Link
+              href="/partner"
+              className="font-grotesk hidden text-sm font-medium text-[#3C3F46] transition-colors hover:text-primary sm:block"
+            >
+              Become a partner
+            </Link>
+            <Link
               href="/sign-in"
               className="font-grotesk rounded-[10px] border border-[#E3E4E9] px-4 py-2.5 text-sm font-medium text-[#3C3F46] transition-colors hover:bg-[#F5F3FB] hover:text-primary"
             >
