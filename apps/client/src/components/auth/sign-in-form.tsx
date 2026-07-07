@@ -25,9 +25,7 @@ export const SignInForm = () => {
   return (
     <div className="relative w-full max-w-md rounded-3xl bg-white p-9 shadow-[0_30px_80px_-24px_rgba(20,22,27,0.2),0_24px_70px_-34px_rgba(124,58,237,0.5)]">
       <div>
-        <h1 className="font-heading text-3xl font-extrabold text-ink">
-          Welcome back
-        </h1>
+        <h1 className="font-heading text-3xl text-ink">Welcome back</h1>
         <p className="font-grotesk mt-2 text-sm text-[#62656B]">
           New to Stratum?{" "}
           <Link href="/sign-up" className="font-bold text-primary">

@@ -13,7 +13,7 @@ const DashboardPage = async () => {
           <p className="text-xs font-bold tracking-widest text-primary uppercase">
             Pre-seller
           </p>
-          <h1 className="font-heading mt-2 text-4xl font-extrabold text-ink">
+          <h1 className="font-heading mt-2 text-4xl text-ink">
             Welcome, {user.firstName ?? "there"}
           </h1>
           <p className="mt-2 text-neutral-500">

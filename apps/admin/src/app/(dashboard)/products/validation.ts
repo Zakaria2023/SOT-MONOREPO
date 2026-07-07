@@ -25,11 +25,9 @@ export const productFormSchema = z.object({
   partNumber: z.string().optional(),
   modelNumber: z.string().optional(),
   bom: z.string().optional(),
-  blurb: z.string().optional(),
   description: z.string().optional(),
   role: z.string().optional(),
   image: z.string().optional(),
-  ribbon: z.string().optional(),
   isFeatured: z.boolean(),
   price: z
     .string()

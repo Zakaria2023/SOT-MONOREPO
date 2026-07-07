@@ -13,7 +13,7 @@ export const ProductSection = ({ products }: ProductSectionProps) => (
   <section className="w-full bg-white pt-14 pb-24">
     <div className="mx-auto max-w-6xl px-8">
       <header className="text-center">
-        <h2 className="font-heading text-3xl font-extrabold text-ink">
+        <h2 className="font-heading text-3xl text-ink">
           Hardware in this deployment
         </h2>
       </header>
@@ -76,7 +76,7 @@ export const ProductSection = ({ products }: ProductSectionProps) => (
                 </h3>
 
                 <p className="font-grotesk mt-2 line-clamp-2 text-sm leading-relaxed text-[#62656B]">
-                  {product.blurb}
+                  {product.description}
                 </p>
 
                 <div className="mt-4 flex items-center justify-between pt-1">

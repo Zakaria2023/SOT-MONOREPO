@@ -1,6 +1,6 @@
+import { ProductsTable } from "@/components/products/products-table";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { ProductsTable } from "@/components/products/products-table";
 import { getProducts } from "./action";
 
 const ProductsPage = async () => {
@@ -10,9 +10,7 @@ const ProductsPage = async () => {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <h1 className="font-heading text-2xl font-extrabold text-ink">
-            Products
-          </h1>
+          <h1 className="font-heading text-2xl text-ink">Products</h1>
           <p className="text-sm text-muted">Manage your product catalog.</p>
         </div>
 

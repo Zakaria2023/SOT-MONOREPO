@@ -1,6 +1,6 @@
+import { CategoriesTable } from "@/components/categories/categories-table";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { CategoriesTable } from "@/components/categories/categories-table";
 import { getCategories } from "./action";
 
 const CategoriesPage = async () => {
@@ -10,12 +10,8 @@ const CategoriesPage = async () => {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <h1 className="font-heading text-2xl font-extrabold text-ink">
-            Categories
-          </h1>
-          <p className="text-sm text-muted">
-            Manage your product categories.
-          </p>
+          <h1 className="font-heading text-2xl text-ink">Categories</h1>
+          <p className="text-sm text-muted">Manage your product categories.</p>
         </div>
 
         <Link

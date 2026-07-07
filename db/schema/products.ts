@@ -44,7 +44,6 @@ export const Products = mysqlTable(
     modelNumber: varchar("model_number", { length: 255 }), // MN
     bom: text("bom"), // BOM — Bill of Materials
 
-    blurb: varchar("blurb", { length: 500 }), // short line on the card
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"
 
@@ -52,7 +51,6 @@ export const Products = mysqlTable(
     image: varchar("image", { length: 255 }),
 
     // Merchandising
-    ribbon: varchar("ribbon", { length: 100 }), // "Recommended", "New" badge
     isFeatured: boolean("is_featured").default(false),
 
     // Pricing

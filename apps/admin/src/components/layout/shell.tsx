@@ -1,52 +1,29 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
+import { createContext, useContext } from "react";
 import { Navbar } from "@/components/layout/navbar";
+import { Sidebar } from "@/components/layout/sidebar";
 
 type ShellProps = {
-  title?: string;
-  subtitle?: string;
-  searchPlaceholder?: string;
-  actionLabel?: string;
-  actionHref?: string;
   children: ReactNode;
 };
 
+// Kept so the Table's client-side filtering still resolves; the global search
+// input was removed from the navbar, so this is always empty for now.
 const SearchContext = createContext("");
 
 export const useSearch = () => useContext(SearchContext);
 
-export const Shell = ({
-  title = "Overview",
-  subtitle,
-  searchPlaceholder,
-  actionLabel,
-  actionHref,
-  children,
-}: ShellProps) => {
-  const [search, setSearch] = useState("");
+export const Shell = ({ children }: ShellProps) => (
+  <SearchContext.Provider value="">
+    <div className="min-h-screen">
+      <Sidebar />
 
-  return (
-    <SearchContext.Provider value={search}>
-      <div className="flex h-screen">
-        <Sidebar />
-
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          <Navbar
-            title={title}
-            subtitle={subtitle}
-            search={search}
-            onSearchChange={(event) => setSearch(event.target.value)}
-            searchPlaceholder={searchPlaceholder}
-            actionLabel={actionLabel}
-            actionHref={actionHref}
-          />
-
-          <main className="flex-1 px-7.5 py-6.5">{children}</main>
-        </div>
+      <div className="ml-18 flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1 px-8 py-8">{children}</main>
       </div>
-    </SearchContext.Provider>
-  );
-};
+    </div>
+  </SearchContext.Provider>
+);

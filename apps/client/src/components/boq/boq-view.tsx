@@ -40,9 +40,7 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
         </Link>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-4xl font-extrabold text-ink">
-            Bill of Quantities
-          </h1>
+          <h1 className="font-heading text-4xl text-ink">Bill of Quantities</h1>
           <span
             className={cn(
               "font-grotesk rounded-full px-3 py-1 text-xs font-bold",
@@ -55,7 +53,8 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
           </span>
         </div>
         <p className="font-grotesk mt-1 text-sm text-[#8A8F98]">
-          {boq.reference} · {items.length} {items.length === 1 ? "item" : "items"}
+          {boq.reference} · {items.length}{" "}
+          {items.length === 1 ? "item" : "items"}
         </p>
 
         <div className="mt-8 grid gap-7 lg:grid-cols-[1.6fr_380px]">
@@ -91,16 +90,17 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
                 </span>
 
                 <span className="font-grotesk w-24 text-right text-base font-bold tabular-nums text-ink">
-                  {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
+                  {formatMoney(
+                    Number(item.unitPrice) * item.quantity,
+                    currency,
+                  )}
                 </span>
               </div>
             ))}
           </div>
 
           <div className="h-fit rounded-[18px] border border-[#ECEEF1] bg-white p-6 shadow-[0_18px_40px_-24px_rgba(20,22,27,0.12)] lg:sticky lg:top-24">
-            <h2 className="font-heading text-xl font-extrabold text-ink">
-              Summary
-            </h2>
+            <h2 className="font-heading text-xl text-ink">Summary</h2>
 
             <div className="mt-6 space-y-3">
               <div className="flex items-center justify-between text-sm">
@@ -123,7 +123,7 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
               <span className="font-grotesk text-base font-medium text-ink">
                 Total
               </span>
-              <span className="font-heading text-3xl font-extrabold tabular-nums text-ink">
+              <span className="font-heading text-3xl tabular-nums text-ink">
                 {formatMoney(total, currency)}
               </span>
             </div>

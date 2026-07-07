@@ -36,7 +36,9 @@ export const HowItWorks = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const stepRefs = useRef<(HTMLLIElement | null)[]>([]);
   const [progress, setProgress] = useState(0);
-  const [visible, setVisible] = useState<boolean[]>(() => steps.map(() => false));
+  const [visible, setVisible] = useState<boolean[]>(() =>
+    steps.map(() => false),
+  );
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -101,7 +103,7 @@ export const HowItWorks = () => {
         <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
           How it works
         </p>
-        <h2 className="font-heading mt-4 text-4xl leading-tight font-extrabold text-ink">
+        <h2 className="font-heading mt-4 text-4xl leading-tight text-ink">
           From request to a running network.
         </h2>
         <p className="font-grotesk mt-4 text-lg text-[#62656B]">
@@ -144,7 +146,7 @@ export const HowItWorks = () => {
               >
                 <span
                   className={cn(
-                    "font-heading text-2xl font-extrabold",
+                    "font-heading text-2xl",
                     isLast ? "text-white" : "text-primary",
                   )}
                 >
@@ -167,7 +169,7 @@ export const HowItWorks = () => {
                   <p className="font-grotesk text-xs font-semibold tracking-wider text-primary uppercase">
                     {step.label}
                   </p>
-                  <h3 className="font-heading mt-2 text-xl font-extrabold text-ink">
+                  <h3 className="font-heading mt-2 text-xl text-ink">
                     {step.title}
                   </h3>
                   <p className="font-grotesk mt-2 text-sm leading-relaxed text-[#62656B]">

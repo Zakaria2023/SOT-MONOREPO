@@ -37,9 +37,7 @@ const BoqDetailPage = async ({ params }: Props) => {
         ← Review queue
       </Link>
 
-      <h1 className="font-heading mt-4 text-4xl font-extrabold text-ink">
-        {boq.reference}
-      </h1>
+      <h1 className="font-heading mt-4 text-4xl text-ink">{boq.reference}</h1>
       <p className="mt-1 text-sm text-neutral-500">
         {items.length} {items.length === 1 ? "item" : "items"} · status:{" "}
         {boq.status}
@@ -77,7 +75,7 @@ const BoqDetailPage = async ({ params }: Props) => {
       <div className="mt-6 flex flex-col items-end gap-1 text-sm text-neutral-600">
         <div>Subtotal: {money(subtotal, currency)}</div>
         <div>VAT (15%): {money(vat, currency)}</div>
-        <div className="mt-1 text-lg font-extrabold text-ink">
+        <div className="mt-1 text-lg text-ink">
           Total: {money(total, currency)}
         </div>
       </div>

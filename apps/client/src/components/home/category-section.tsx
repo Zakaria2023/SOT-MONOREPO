@@ -19,7 +19,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
           <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
             Top categories
           </p>
-          <h2 className="font-heading mt-3 max-w-2xl text-5xl leading-tight font-extrabold text-ink">
+          <h2 className="font-heading mt-3 max-w-2xl text-5xl leading-tight text-ink">
             Shop by what you&apos;re building.
           </h2>
 
@@ -81,7 +81,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
                   <div className="relative p-6">
                     <h3
                       className={cn(
-                        "font-heading leading-tight font-extrabold text-white",
+                        "font-heading leading-tight text-white",
                         isFeatured ? "text-3xl" : "text-2xl",
                       )}
                     >

@@ -66,9 +66,7 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
           Continue shopping
         </Link>
 
-        <h1 className="font-heading mt-4 text-4xl font-extrabold text-ink">
-          Your cart
-        </h1>
+        <h1 className="font-heading mt-4 text-4xl text-ink">Your cart</h1>
         <p className="font-grotesk mt-1 text-sm text-[#8A8F98]">
           {itemCount} {itemCount === 1 ? "item" : "items"} in your basket
         </p>
@@ -119,7 +117,9 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
                   <div className="flex items-center rounded-full border border-[#E3E4E9]">
                     <button
                       type="button"
-                      onClick={() => changeQuantity(item.uuid, item.quantity - 1)}
+                      onClick={() =>
+                        changeQuantity(item.uuid, item.quantity - 1)
+                      }
                       disabled={item.quantity <= 1}
                       aria-label="Decrease quantity"
                       className="flex h-9 w-9 items-center justify-center rounded-l-full text-[#62656B] transition-colors hover:text-primary disabled:pointer-events-none disabled:opacity-40"
@@ -131,7 +131,9 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => changeQuantity(item.uuid, item.quantity + 1)}
+                      onClick={() =>
+                        changeQuantity(item.uuid, item.quantity + 1)
+                      }
                       aria-label="Increase quantity"
                       className="flex h-9 w-9 items-center justify-center rounded-r-full text-[#62656B] transition-colors hover:text-primary"
                     >
@@ -140,7 +142,10 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
                   </div>
 
                   <span className="font-grotesk w-24 text-right text-base font-bold tabular-nums text-ink">
-                    {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
+                    {formatMoney(
+                      Number(item.unitPrice) * item.quantity,
+                      currency,
+                    )}
                   </span>
 
                   <button
@@ -157,9 +162,7 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
           </div>
 
           <div className="h-fit rounded-[18px] border border-[#ECEEF1] bg-white p-6 shadow-[0_18px_40px_-24px_rgba(20,22,27,0.12)] lg:sticky lg:top-24">
-            <h2 className="font-heading text-xl font-extrabold text-ink">
-              Order summary
-            </h2>
+            <h2 className="font-heading text-xl text-ink">Order summary</h2>
 
             <div className="mt-6 space-y-3">
               <div className="flex items-center justify-between text-sm">
@@ -182,7 +185,7 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
               <span className="font-grotesk text-base font-medium text-ink">
                 Total
               </span>
-              <span className="font-heading text-3xl font-extrabold tabular-nums text-ink">
+              <span className="font-heading text-3xl tabular-nums text-ink">
                 {formatMoney(total, currency)}
               </span>
             </div>

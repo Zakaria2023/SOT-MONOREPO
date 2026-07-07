@@ -16,9 +16,7 @@ const BoqsPage = async () => {
         ← Dashboard
       </Link>
 
-      <h1 className="font-heading mt-4 text-4xl font-extrabold text-ink">
-        Review queue
-      </h1>
+      <h1 className="font-heading mt-4 text-4xl text-ink">Review queue</h1>
       <p className="mt-2 text-neutral-500">
         BOQs customers have submitted for review.
       </p>

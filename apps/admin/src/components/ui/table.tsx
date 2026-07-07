@@ -34,14 +34,14 @@ export const Table = <T,>({
   });
 
   return (
-    <div className="rounded-card border border-hairline bg-surface">
+    <div className="overflow-hidden rounded-card border border-hairline bg-surface shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-hairline">
+          <tr className="border-b border-hairline bg-hover">
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-5 py-3 text-xs font-semibold text-faint uppercase ${
+                className={`px-6 py-3.5 text-xs font-semibold tracking-wide text-muted uppercase ${
                   column.align === "right" ? "text-right" : "text-left"
                 }`}
               >
@@ -52,13 +52,13 @@ export const Table = <T,>({
         </thead>
 
         {filteredData.length > 0 && (
-          <tbody className="divide-y divide-hairline">
+          <tbody className="divide-y divide-hairline-soft">
             {filteredData.map((row, index) => (
-              <tr key={index} className="hover:bg-hover">
+              <tr key={index} className="transition-colors hover:bg-hover">
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`px-5 py-3.5 text-sm text-ink ${
+                    className={`px-6 py-4 text-sm text-ink ${
                       column.align === "right" ? "text-right" : "text-left"
                     }`}
                   >

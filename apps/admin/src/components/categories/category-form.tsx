@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRef, useState } from "react";
 import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { Button } from "@/components/ui/button";
@@ -9,18 +7,27 @@ import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { documentDownloadUrl } from "@/lib/documents";
 import type { SelectCategories } from "@/db/schema/categories";
+import { documentDownloadUrl } from "@/lib/documents";
+import { ArrowUpDown, Tags } from "lucide-react";
+import Link from "next/link";
+import { useRef, useState } from "react";
 
 type CategoryFormProps =
   | { mode: "add"; categories: SelectCategories[] }
-  | { mode: "edit"; categories: SelectCategories[]; category: SelectCategories };
+  | {
+      mode: "edit";
+      categories: SelectCategories[];
+      category: SelectCategories;
+    };
 
 export const CategoryForm = (props: CategoryFormProps) => {
   const { mode, categories } = props;
 
   const { form, state, isPending, onSubmit } = useCategoryForm(
-    mode === "edit" ? { mode: "edit", category: props.category } : { mode: "add" },
+    mode === "edit"
+      ? { mode: "edit", category: props.category }
+      : { mode: "add" },
   );
   const {
     register,
@@ -38,31 +45,44 @@ export const CategoryForm = (props: CategoryFormProps) => {
         hasSubmittedRef.current = true;
         onSubmit(event);
       }}
-      className="flex max-w-xl flex-col gap-5 rounded-card border border-hairline bg-surface p-6"
+      className="flex flex-col gap-6 rounded-card border border-hairline bg-surface p-7 shadow-[0_1px_2px_rgba(27,35,51,0.04)]"
     >
-      <Input
-        label="Name"
-        type="text"
-        {...register("name")}
-        error={errors.name?.message}
-      />
+      <div className="flex items-center gap-3 border-b border-hairline pb-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-tint text-primary">
+          <Tags size={20} />
+        </div>
+        <h2 className="font-heading text-xl text-ink">
+          {mode === "edit" ? "Edit category" : "Create category"}
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <Input
+          label="Name"
+          labelIcon={<Tags size={15} />}
+          type="text"
+          {...register("name")}
+          error={errors.name?.message}
+        />
+
+        <CategoryDropdown
+          control={control}
+          name="parentUuid"
+          categories={categories}
+        />
+
+        {mode === "edit" && (
+          <Input
+            label="Order"
+            labelIcon={<ArrowUpDown size={15} />}
+            type="number"
+            {...register("order", { valueAsNumber: true })}
+            error={errors.order?.message}
+          />
+        )}
+      </div>
 
       <Textarea label="Description" rows={3} {...register("description")} />
-
-      <CategoryDropdown
-        control={control}
-        name="parentUuid"
-        categories={categories}
-      />
-
-      {mode === "edit" && (
-        <Input
-          label="Order"
-          type="number"
-          {...register("order", { valueAsNumber: true })}
-          error={errors.order?.message}
-        />
-      )}
 
       <ImageUpload
         label="Image"
@@ -79,7 +99,7 @@ export const CategoryForm = (props: CategoryFormProps) => {
 
       <FormError message={state.error} />
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 border-t border-hairline pt-5">
         <Button type="submit" disabled={isPending || isUploadingImage}>
           {mode === "edit"
             ? isPending

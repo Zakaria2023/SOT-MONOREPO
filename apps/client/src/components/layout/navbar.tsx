@@ -23,9 +23,7 @@ export const Navbar = async () => {
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
             <Menu size={20} strokeWidth={2.5} />
           </span>
-          <span className="font-heading text-2xl font-extrabold text-ink">
-            Stratum
-          </span>
+          <span className="font-heading text-2xl text-ink">Stratum</span>
         </Link>
 
         <CategoryMenu categories={tree.slice(0, 3)} />
