@@ -60,3 +60,10 @@
     transform: scale(1) translateY(0);
   }
 }
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}

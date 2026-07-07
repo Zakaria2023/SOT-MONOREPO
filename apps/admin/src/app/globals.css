@@ -66,3 +66,10 @@ body {
   background: var(--color-page);
   color: var(--color-ink);
 }
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}

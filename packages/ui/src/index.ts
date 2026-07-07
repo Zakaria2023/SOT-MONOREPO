@@ -5,6 +5,5 @@ export * from "./dropdown";
 export * from "./form-error";
 export * from "./image-upload";
 export * from "./input";
-export * from "./search-context";
 export * from "./table";
 export * from "./textarea";
