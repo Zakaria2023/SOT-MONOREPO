@@ -11,24 +11,37 @@ import {
   SelectBoqItems,
   SelectBoqs,
 } from "../../../db/schema/boqs";
-
-export type { SelectBoqItems, SelectBoqs };
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
-import { Users } from "../../../db/schema/users";
+import { SelectUsers, Users } from "../../../db/schema/users";
 import { findNearestApprovedPartners, type MatchedPartner } from "./partners";
+
+export type { SelectBoqItems, SelectBoqs };
 
 export type BoqDetail = {
   boq: SelectBoqs;
   items: SelectBoqItems[];
 };
 
-/** A BOQ enriched with its customer, line-item count and subtotal (admin list). */
 export type BoqListItem = SelectBoqs & {
-  customerName: string | null;
+  customerName: SelectUsers["fullName"] | null;
   itemCount: number;
   subtotal: number;
+};
+
+export type PartnerBoqListItem = SelectBoqs & {
+  matchRank: NonNullable<SelectBoqPartners["matchRank"]>;
+  dispatchedAt: SelectBoqPartners["createdAt"];
+};
+
+export type SubmitBoqResult = {
+  boq: SelectBoqs;
+  partners: MatchedPartner[];
+};
+
+export type PartnerBoqDetail = BoqDetail & {
+  preSellerComment: SelectBoqPartners["preSellerComment"];
 };
 
 /**
@@ -233,11 +246,6 @@ export const getNearestPartnersForBoq = async ({
   return findNearestApprovedPartners(customer?.location ?? null, 3);
 };
 
-export type SubmitBoqResult = {
-  boq: SelectBoqs;
-  partners: MatchedPartner[];
-};
-
 /**
  * Submits a draft BOQ the pre-seller has reviewed: marks it submitted and
  * dispatches it to the three approved partners closest to the customer's
@@ -316,12 +324,6 @@ export const getBoqPartners = async (
     .where(eq(BoqPartners.boqUuid, boqUuid))
     .orderBy(asc(BoqPartners.matchRank));
 
-/** A BOQ enriched with the match rank/dispatch time for a partner's list. */
-export type PartnerBoqListItem = SelectBoqs & {
-  matchRank: number;
-  dispatchedAt: Date;
-};
-
 /** BOQs dispatched to a given partner (Clerk user id), newest first. */
 export const getPartnerBoqs = async (
   partnerClerkUserId: string,
@@ -336,11 +338,6 @@ export const getPartnerBoqs = async (
     .innerJoin(Boqs, eq(BoqPartners.boqUuid, Boqs.uuid))
     .where(eq(BoqPartners.partnerClerkUserId, partnerClerkUserId))
     .orderBy(desc(BoqPartners.createdAt));
-
-/** A dispatched BOQ with its items plus the note the pre-seller left for it. */
-export type PartnerBoqDetail = BoqDetail & {
-  preSellerComment: string | null;
-};
 
 /** A dispatched BOQ with its items, only if it was sent to this partner. */
 export const getPartnerBoq = async (

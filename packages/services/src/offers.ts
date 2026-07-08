@@ -2,10 +2,10 @@ import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
-import { Boqs } from "../../../db/schema/boqs";
+import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import { Offers, SelectOffers } from "../../../db/schema/offers";
 import { PartnerRequests } from "../../../db/schema/partner-requests";
-import { Users } from "../../../db/schema/users";
+import { SelectUsers, Users } from "../../../db/schema/users";
 
 export type { SelectOffers };
 
@@ -36,8 +36,8 @@ export type RejectOfferInput = OfferReviewInput & {
 
 /** An offer enriched with its BOQ reference and customer (admin list). */
 export type OfferListItem = SelectOffers & {
-  boqReference: string | null;
-  customerName: string | null;
+  boqReference: SelectBoqs["reference"] | null;
+  customerName: SelectUsers["fullName"] | null;
 };
 
 /** The approved partner profile (scope/name) behind a Clerk user, or null. */
@@ -255,7 +255,7 @@ const getOwnedBoq = async (userUuid: string, boqUuid: string) => {
 
 /** An approved/selected offer enriched with its BOQ reference (customer view). */
 export type OfferForUser = SelectOffers & {
-  boqReference: string | null;
+  boqReference: SelectBoqs["reference"] | null;
 };
 
 /**

@@ -7,8 +7,8 @@ import {
   SelectCartItems,
   SelectCarts,
 } from "../../../db/schema/carts";
-import { Categories } from "../../../db/schema/categories";
-import { Products } from "../../../db/schema/products";
+import { Categories, SelectCategories } from "../../../db/schema/categories";
+import { Products, SelectProducts } from "../../../db/schema/products";
 
 export type AddToCartInput = {
   // The authenticated user's uuid. The transport (Server Action / Route
@@ -20,14 +20,14 @@ export type AddToCartInput = {
 };
 
 export type CartLineItem = {
-  uuid: string; // cart item uuid
-  productUuid: string;
-  name: string;
-  categoryName: string | null;
-  image: string | null;
-  unitPrice: string;
-  currency: string | null;
-  quantity: number;
+  uuid: SelectCartItems["uuid"]; // cart item uuid
+  productUuid: SelectCartItems["productUuid"];
+  name: SelectProducts["name"];
+  categoryName: SelectCategories["name"] | null;
+  image: SelectProducts["image"];
+  unitPrice: SelectProducts["price"];
+  currency: SelectProducts["currency"];
+  quantity: SelectCartItems["quantity"];
 };
 
 /** The user's cart line items with the product details needed to render them. */

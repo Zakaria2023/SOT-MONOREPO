@@ -611,3 +611,34 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
     // ...columns
   );
   ```
+
+## Service DTO Types
+
+- Service DTO/list/detail types must derive every field that maps to a database column from the table's `Select*` type — via indexed access (`SelectX["field"]`), `Pick`, or `Omit` — never hand-typed. This keeps them in sync with the schema automatically. Add `| null` for a left-joined column, and wrap in `NonNullable<...>` for a column the query coalesces to non-null.
+- Only genuinely computed values — SQL aggregates (`SUM`/`COUNT`, e.g. `itemCount`, `subtotal`) or composed values (e.g. `companyName || fullName`) — may be plain types, since no single column backs them.
+
+  ```ts
+  // ❌ Bad — passthrough columns re-typed by hand
+  export type OfferListItem = SelectOffers & {
+    boqReference: string | null;
+    customerName: string | null;
+  };
+
+  // ✅ Good — each column-backed field derived from its DB type
+  export type OfferListItem = SelectOffers & {
+    boqReference: SelectBoqs["reference"] | null; // left-joined
+    customerName: SelectUsers["fullName"] | null;
+  };
+
+  // ✅ Good — aggregates stay plain; coalesced column uses NonNullable
+  export type PartnerBoqListItem = SelectBoqs & {
+    matchRank: NonNullable<SelectBoqPartners["matchRank"]>;
+    dispatchedAt: SelectBoqPartners["createdAt"];
+  };
+
+  export type BoqListItem = SelectBoqs & {
+    customerName: SelectUsers["fullName"] | null;
+    itemCount: number; // SUM(...) — no single column backs it
+    subtotal: number; // SUM(...)
+  };
+  ```
