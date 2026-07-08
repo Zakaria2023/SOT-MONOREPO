@@ -1,6 +1,7 @@
 import { OfferForm } from "@/components/offers/offer-form";
 import { formatMoney, offerTotal } from "@/lib/helpers";
 import { requirePartner } from "@/lib/server/auth";
+import { MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -104,6 +105,18 @@ const BoqDetailPage = async ({ params }: Props) => {
       <p className="mt-3 text-right text-sm text-neutral-600">
         Catalog subtotal: {formatMoney(subtotal, currency)}
       </p>
+
+      {detail.preSellerComment && (
+        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
+          <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-ink">
+            <MessageSquare size={18} className="text-primary" />
+            Note from the pre-seller
+          </h2>
+          <p className="mt-2 text-sm whitespace-pre-wrap text-neutral-600">
+            {detail.preSellerComment}
+          </p>
+        </div>
+      )}
 
       <section className="mt-10 rounded-2xl border border-neutral-200 p-6">
         <h2 className="font-heading text-2xl text-ink">Your offer</h2>

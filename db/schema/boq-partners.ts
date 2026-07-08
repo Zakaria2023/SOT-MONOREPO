@@ -4,6 +4,7 @@ import {
   index,
   int,
   mysqlTable,
+  text,
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
@@ -24,6 +25,9 @@ export const BoqPartners = mysqlTable(
     partnerRequestUuid: char("partner_request_uuid", { length: 36 }),
     partnerName: varchar("partner_name", { length: 255 }),
     partnerLocation: varchar("partner_location", { length: 255 }),
+
+    // The pre-seller's note written for this specific partner in the send dialog.
+    preSellerComment: text("pre_seller_comment"),
 
     // 1 = closest match, ascending.
     matchRank: int("match_rank").notNull().default(0),

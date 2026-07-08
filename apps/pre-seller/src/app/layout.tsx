@@ -15,7 +15,7 @@ type Props = {
 const RootLayout = ({ children }: Props) => (
   <ClerkProvider>
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-white text-ink font-sans">
+      <body className="min-h-full flex flex-col text-ink font-sans">
         {children}
       </body>
     </html>

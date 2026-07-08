@@ -105,57 +105,6 @@ export const getUserBoqs = async (userUuid: string): Promise<SelectBoqs[]> =>
     .where(eq(Boqs.userUuid, userUuid))
     .orderBy(desc(Boqs.createdAt));
 
-// Verifies a BOQ item belongs to a draft BOQ assigned to the given
-// pre-seller, returning its numeric id.
-const findAssignedDraftItemId = async (
-  preSellerId: string,
-  boqItemUuid: string,
-): Promise<number> => {
-  const [row] = await db
-    .select({ id: BoqItems.id, status: Boqs.status })
-    .from(BoqItems)
-    .innerJoin(Boqs, eq(BoqItems.boqUuid, Boqs.uuid))
-    .where(
-      and(
-        eq(BoqItems.uuid, boqItemUuid),
-        eq(Boqs.assignedPreSellerId, preSellerId),
-      ),
-    );
-  if (!row) throw new Error("BOQ item not found");
-  if (row.status !== "draft") {
-    throw new Error("Only draft BOQs can be edited");
-  }
-  return row.id;
-};
-
-/** Updates a line's quantity on a draft BOQ assigned to the pre-seller. */
-export const updateBoqItemQuantity = async ({
-  preSellerId,
-  boqItemUuid,
-  quantity,
-}: {
-  preSellerId: string;
-  boqItemUuid: string;
-  quantity: number;
-}): Promise<void> => {
-  if (quantity < 1) throw new Error("Quantity must be at least 1");
-
-  const id = await findAssignedDraftItemId(preSellerId, boqItemUuid);
-  await db.update(BoqItems).set({ quantity }).where(eq(BoqItems.id, id));
-};
-
-/** Removes a line from a draft BOQ assigned to the pre-seller. */
-export const removeBoqItem = async ({
-  preSellerId,
-  boqItemUuid,
-}: {
-  preSellerId: string;
-  boqItemUuid: string;
-}): Promise<void> => {
-  const id = await findAssignedDraftItemId(preSellerId, boqItemUuid);
-  await db.delete(BoqItems).where(eq(BoqItems.id, id));
-};
-
 /** Every BOQ with its customer, item count and subtotal (admin oversight). */
 export const getAllBoqs = async (): Promise<BoqListItem[]> => {
   const boqs = await db
@@ -202,33 +151,50 @@ export const assignBoq = async (
     .where(eq(Boqs.uuid, boqUuid));
 };
 
-/** BOQs assigned to a given pre-seller (Clerk user id), newest first. */
+/**
+ * BOQs assigned to a given pre-seller (Clerk user id), newest first, each
+ * enriched with the customer, line-item count and subtotal for the list view.
+ */
 export const getAssignedBoqs = async (
   preSellerId: string,
-): Promise<SelectBoqs[]> =>
-  db
-    .select()
+): Promise<BoqListItem[]> => {
+  const boqs = await db
+    .select({
+      ...getTableColumns(Boqs),
+      customerName: Users.fullName,
+    })
     .from(Boqs)
+    .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
     .where(eq(Boqs.assignedPreSellerId, preSellerId))
     .orderBy(desc(Boqs.createdAt));
 
-export type SubmitBoqResult = {
-  boq: SelectBoqs;
-  partners: MatchedPartner[];
+  const totals = await db
+    .select({
+      boqUuid: BoqItems.boqUuid,
+      itemCount: sql<number>`sum(${BoqItems.quantity})`,
+      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`,
+    })
+    .from(BoqItems)
+    .groupBy(BoqItems.boqUuid);
+
+  const totalsByBoq = new Map(totals.map((row) => [row.boqUuid, row]));
+
+  return boqs.map((boq) => {
+    const total = totalsByBoq.get(boq.uuid);
+    return {
+      ...boq,
+      itemCount: Number(total?.itemCount ?? 0),
+      subtotal: Number(total?.subtotal ?? 0),
+    };
+  });
 };
 
-/**
- * Submits a draft BOQ the pre-seller has reviewed: marks it submitted and
- * dispatches it to the three approved partners closest to the customer's
- * location. Re-runnable dispatch is idempotent (prior matches are replaced).
- */
-export const submitReviewedBoq = async ({
-  preSellerId,
-  boqUuid,
-}: {
-  preSellerId: string;
-  boqUuid: string;
-}): Promise<SubmitBoqResult> => {
+// Loads a draft BOQ assigned to the pre-seller, throwing if it isn't theirs or
+// has already been submitted.
+const loadAssignedDraftBoq = async (
+  preSellerId: string,
+  boqUuid: string,
+): Promise<SelectBoqs> => {
   const [boq] = await db
     .select()
     .from(Boqs)
@@ -239,6 +205,53 @@ export const submitReviewedBoq = async ({
   if (boq.status !== "draft") {
     throw new Error("This BOQ has already been submitted");
   }
+  return boq;
+};
+
+/**
+ * Previews the three approved partners a draft BOQ would be dispatched to,
+ * closest to the customer first — used to populate the pre-seller's send dialog
+ * before anything is committed.
+ */
+export const getNearestPartnersForBoq = async ({
+  preSellerId,
+  boqUuid,
+}: {
+  preSellerId: string;
+  boqUuid: string;
+}): Promise<MatchedPartner[]> => {
+  const boq = await loadAssignedDraftBoq(preSellerId, boqUuid);
+
+  const [customer] = await db
+    .select({ location: Users.location })
+    .from(Users)
+    .where(eq(Users.uuid, boq.userUuid));
+
+  return findNearestApprovedPartners(customer?.location ?? null, 3);
+};
+
+export type SubmitBoqResult = {
+  boq: SelectBoqs;
+  partners: MatchedPartner[];
+};
+
+/**
+ * Submits a draft BOQ the pre-seller has reviewed: marks it submitted and
+ * dispatches it to the three approved partners closest to the customer's
+ * location, attaching the per-partner note the pre-seller wrote (keyed by the
+ * partner's Clerk user id). Re-runnable dispatch is idempotent (prior matches
+ * are replaced).
+ */
+export const submitReviewedBoq = async ({
+  preSellerId,
+  boqUuid,
+  comments = {},
+}: {
+  preSellerId: string;
+  boqUuid: string;
+  comments?: Record<string, string>;
+}): Promise<SubmitBoqResult> => {
+  const boq = await loadAssignedDraftBoq(preSellerId, boqUuid);
 
   const items = await db
     .select({ id: BoqItems.id })
@@ -270,15 +283,19 @@ export const submitReviewedBoq = async ({
 
   await db.delete(BoqPartners).where(eq(BoqPartners.boqUuid, boqUuid));
   await db.insert(BoqPartners).values(
-    partners.map((partner) => ({
-      uuid: randomUUID(),
-      boqUuid,
-      partnerClerkUserId: partner.clerkUserId,
-      partnerRequestUuid: partner.partnerRequestUuid,
-      partnerName: partner.name,
-      partnerLocation: partner.location,
-      matchRank: partner.rank,
-    })),
+    partners.map((partner) => {
+      const note = comments[partner.clerkUserId]?.trim();
+      return {
+        uuid: randomUUID(),
+        boqUuid,
+        partnerClerkUserId: partner.clerkUserId,
+        partnerRequestUuid: partner.partnerRequestUuid,
+        partnerName: partner.name,
+        partnerLocation: partner.location,
+        preSellerComment: note ? note : null,
+        matchRank: partner.rank,
+      };
+    }),
   );
 
   const [updated] = await db.select().from(Boqs).where(eq(Boqs.id, boq.id));
@@ -317,13 +334,18 @@ export const getPartnerBoqs = async (
     .where(eq(BoqPartners.partnerClerkUserId, partnerClerkUserId))
     .orderBy(desc(BoqPartners.createdAt));
 
+/** A dispatched BOQ with its items plus the note the pre-seller left for it. */
+export type PartnerBoqDetail = BoqDetail & {
+  preSellerComment: string | null;
+};
+
 /** A dispatched BOQ with its items, only if it was sent to this partner. */
 export const getPartnerBoq = async (
   partnerClerkUserId: string,
   boqUuid: string,
-): Promise<BoqDetail | null> => {
+): Promise<PartnerBoqDetail | null> => {
   const [link] = await db
-    .select({ id: BoqPartners.id })
+    .select({ preSellerComment: BoqPartners.preSellerComment })
     .from(BoqPartners)
     .where(
       and(
@@ -333,5 +355,8 @@ export const getPartnerBoq = async (
     );
   if (!link) return null;
 
-  return getBoq(boqUuid);
+  const detail = await getBoq(boqUuid);
+  if (!detail) return null;
+
+  return { ...detail, preSellerComment: link.preSellerComment };
 };
