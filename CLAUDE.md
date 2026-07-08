@@ -40,6 +40,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 - No business logic inside a Server Action or Route Handler — only in `packages/services`.
 - No direct database access from client components, the mobile app, or anywhere outside `packages/database`.
 - Mobile never touches Drizzle or the database — only the versioned REST API.
+- Never modify `db/index.ts` (the database connection/pool setup). Leave this file exactly as-is under all circumstances unless the user explicitly asks to change it.
 
 ## Package Manager
 
