@@ -30,7 +30,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "../../db/enum.ts",
+    "../../db/label.ts"
   ],
   "exclude": ["node_modules"]
 }

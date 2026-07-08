@@ -11,7 +11,7 @@ import {
   unique,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { offerStatuses } from "../../apps/admin/src/lib/enum";
+import { offerStatuses } from "../enum";
 
 // A partner's priced offer against a dispatched BOQ. The partner is a Clerk
 // user, so their name/scope are denormalized here. programmingPrice is null
@@ -31,10 +31,14 @@ export const Offers = mysqlTable(
     partnerName: varchar("partner_name", { length: 255 }),
     serviceScope: varchar("service_scope", { length: 50 }).notNull(),
 
-    productPrice: decimal("product_price", { precision: 12, scale: 2 })
-      .notNull(),
-    installPrice: decimal("install_price", { precision: 12, scale: 2 })
-      .notNull(),
+    productPrice: decimal("product_price", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    installPrice: decimal("install_price", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
     programmingPrice: decimal("programming_price", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
 
@@ -57,10 +61,7 @@ export const Offers = mysqlTable(
     index("idx_offers_boq_uuid").on(table.boqUuid),
     index("idx_offers_partner").on(table.partnerClerkUserId),
     index("idx_offers_status").on(table.status),
-    unique("uq_offers_boq_partner").on(
-      table.boqUuid,
-      table.partnerClerkUserId,
-    ),
+    unique("uq_offers_boq_partner").on(table.boqUuid, table.partnerClerkUserId),
   ],
 );
 

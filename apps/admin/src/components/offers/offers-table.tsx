@@ -2,11 +2,11 @@
 
 import type { OfferRow } from "@/app/(dashboard)/offers/action";
 import { OfferRowActions } from "@/components/offers/offer-row-actions";
-import type { OfferStatus } from "@/lib/enum";
+import type { OfferStatus } from "@/db/enum";
+import { OFFER_STATUS_LABELS, PARTNER_SERVICE_SCOPE_LABELS } from "@/db/label";
 import { formatSar } from "@/lib/helpers";
-import { OFFER_STATUS_LABELS, PARTNER_SERVICE_SCOPE_LABELS } from "@/lib/label";
-import { Table } from "ui";
 import type { TableColumn } from "ui";
+import { Table } from "ui";
 import type { PartnerServiceScope } from "validators";
 
 type OffersTableProps = {
@@ -49,11 +49,15 @@ const columns: TableColumn<OfferRow>[] = [
       <div className="min-w-44 space-y-1 text-sm">
         <div className="flex justify-between gap-6">
           <span className="text-muted">Product</span>
-          <span className="text-ink">{formatSar(Number(offer.productPrice))}</span>
+          <span className="text-ink">
+            {formatSar(Number(offer.productPrice))}
+          </span>
         </div>
         <div className="flex justify-between gap-6">
           <span className="text-muted">Install</span>
-          <span className="text-ink">{formatSar(Number(offer.installPrice))}</span>
+          <span className="text-ink">
+            {formatSar(Number(offer.installPrice))}
+          </span>
         </div>
         {offer.programmingPrice && (
           <div className="flex justify-between gap-6">
@@ -97,7 +101,9 @@ const columns: TableColumn<OfferRow>[] = [
           </p>
         )}
         {offer.reviewedByName && (
-          <p className="text-sm text-muted">Reviewed by {offer.reviewedByName}</p>
+          <p className="text-sm text-muted">
+            Reviewed by {offer.reviewedByName}
+          </p>
         )}
       </div>
     ),

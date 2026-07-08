@@ -8,7 +8,6 @@ import {
   unique,
 } from "drizzle-orm/mysql-core";
 
-// One cart per user.
 export const Carts = mysqlTable("Carts", {
   id: int("id").primaryKey().autoincrement(),
   uuid: char("uuid", { length: 36 }).notNull().unique(),

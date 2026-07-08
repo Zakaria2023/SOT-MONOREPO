@@ -2,13 +2,13 @@
 
 import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
 import { PartnerRequestRowActions } from "@/components/partners/partner-request-row-actions";
-import type { PartnerRequestStatus } from "@/lib/enum";
+import type { PartnerRequestStatus } from "@/db/enum";
 import {
   PARTNER_REQUEST_STATUS_LABELS,
   PARTNER_SERVICE_SCOPE_LABELS,
-} from "@/lib/label";
-import { Table } from "ui";
+} from "@/db/label";
 import type { TableColumn } from "ui";
+import { Table } from "ui";
 import type { PartnerServiceScope } from "validators";
 
 type PartnerRequestsTableProps = {
@@ -94,7 +94,9 @@ const columns: TableColumn<PartnerRequestListItem>[] = [
           </p>
         )}
         {request.reviewedByName && (
-          <p className="text-sm text-muted">Reviewed by {request.reviewedByName}</p>
+          <p className="text-sm text-muted">
+            Reviewed by {request.reviewedByName}
+          </p>
         )}
       </div>
     ),

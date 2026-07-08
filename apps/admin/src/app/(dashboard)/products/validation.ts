@@ -1,6 +1,6 @@
-import { z } from "zod";
-import { productStatuses } from "@/lib/enum";
+import { productStatuses } from "@/db/enum";
 import { highlightSchema, specGroupSchema } from "@/lib/specs";
+import { z } from "zod";
 
 export const productFormSchema = z.object({
   categoryUuid: z.string().min(1, "Category is required"),

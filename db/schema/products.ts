@@ -12,7 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { productStatuses } from "../../apps/admin/src/lib/enum";
+import { productStatuses } from "../enum";
 
 export type ProductHighlight = {
   k: string;

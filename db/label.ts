@@ -1,4 +1,4 @@
-import type { PartnerServiceScope } from "validators";
+import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
   BoqStatus,
   OfferStatus,

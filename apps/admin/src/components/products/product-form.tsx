@@ -4,20 +4,12 @@ import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { SpecsPreview } from "@/components/specs/specs-preview";
-import { Button } from "ui";
-import { Checkbox } from "ui";
-import { Dropdown } from "ui";
-import { FormError } from "ui";
-import { ImageUpload } from "ui";
-import { Input } from "ui";
-import { MultiImageUpload } from "ui";
-import { Textarea } from "ui";
+import { productStatuses } from "@/db/enum";
+import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
-import { productStatuses } from "@/lib/enum";
-import { PRODUCT_STATUS_LABELS } from "@/lib/label";
 import {
   ArrowUpDown,
   Barcode,
@@ -31,6 +23,16 @@ import {
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Controller, FormProvider } from "react-hook-form";
+import {
+  Button,
+  Checkbox,
+  Dropdown,
+  FormError,
+  ImageUpload,
+  Input,
+  MultiImageUpload,
+  Textarea,
+} from "ui";
 
 type ProductFormProps =
   | { mode: "add"; categories: SelectCategories[]; brands: SelectBrands[] }
