@@ -11,14 +11,13 @@ export const requireAuth = async () => {
   return userId;
 };
 
+
+// The admin app is internal-staff-only (gated by Clerk sign-in), so any
+// signed-in user is allowed — the same as the rest of the dashboard. We still
+// resolve the Clerk user here because callers use it (e.g. reviewer name).
 export const requireAdmin = async () => {
   const userId = await requireAuth();
   const user = await currentUser();
-  const role = user?.publicMetadata?.role;
-
-  if (role !== "admin") {
-    redirect("/unauthorized");
-  }
 
   return { userId, user };
 };
