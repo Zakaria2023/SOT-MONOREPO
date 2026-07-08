@@ -350,6 +350,27 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   };
   ```
 
+## Control Flow
+
+- Never write a brace-less `if`. Every `if` (and `else`) body must be wrapped in `{}`, even when it's a single statement on its own line or an early `return`/`throw`.
+
+  ```ts
+  // ❌ Bad — brace-less single-statement if
+  if (!boq) throw new Error("BOQ not found");
+
+  // ❌ Also bad — brace-less early return
+  if (!first) return null;
+
+  // ✅ Good
+  if (!boq) {
+    throw new Error("BOQ not found");
+  }
+
+  if (!first) {
+    return null;
+  }
+  ```
+
 ## Next.js Server Actions
 
 - Always use Next.js Server Actions for data mutations and queries. Never create a new route handler (route.ts) to duplicate something a Server Action could do.
