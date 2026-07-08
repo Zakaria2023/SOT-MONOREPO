@@ -3,6 +3,7 @@
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import { getReviewerName, splitFullName } from "@/lib/helpers";
 import { requireAdmin } from "@/lib/server/auth";
+import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
@@ -96,6 +97,19 @@ export const approvePartnerRequestAction = async (
       } catch {
         // Leave the original error as the user-facing result.
       }
+    }
+
+    // Clerk validation failures (e.g. a weak or breached password) come back as
+    // a 422 whose top-level message is just "Unprocessable Entity" — surface the
+    // specific reason from the errors array instead.
+    if (isClerkAPIResponseError(error)) {
+      const [firstError] = error.errors;
+      return {
+        error:
+          firstError?.longMessage ??
+          firstError?.message ??
+          "Failed to approve partner request.",
+      };
     }
 
     return {

@@ -1,7 +1,8 @@
 "use client";
 
 import { Button, FormError, Input, Textarea } from "ui";
-import { ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { useState } from "react";
 
 type PartnerRequestReviewDialogProps = {
   open: boolean;
@@ -30,6 +31,8 @@ export const PartnerRequestReviewDialog = ({
   onConfirm,
   onCancel,
 }: PartnerRequestReviewDialogProps) => {
+  const [showPassword, setShowPassword] = useState(false);
+
   if (!open) return null;
 
   const approve = mode === "approve";
@@ -63,12 +66,23 @@ export const PartnerRequestReviewDialog = ({
         <div className="mt-5">
           {approve ? (
             <Input
-              type="password"
+              type={showPassword ? "text" : "password"}
               label="Password"
               placeholder="Create a password"
               value={password}
               onChange={(event) => onPasswordChange(event.target.value)}
               disabled={isSubmitting}
+              rightSlot={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  disabled={isSubmitting}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="text-faint transition-colors hover:text-ink"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              }
             />
           ) : (
             <Textarea
