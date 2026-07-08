@@ -1,7 +1,7 @@
 import { OfferForm } from "@/components/offers/offer-form";
 import { formatMoney, offerTotal } from "@/lib/helpers";
 import { requirePartner } from "@/lib/server/auth";
-import { MessageSquare } from "lucide-react";
+import { ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -16,10 +16,10 @@ type Props = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700",
-  approved: "bg-green-50 text-green-700",
-  rejected: "bg-red-50 text-red-700",
-  selected: "bg-primary/10 text-primary",
+  pending: "bg-warning-tint text-warning",
+  approved: "bg-success-tint text-success",
+  rejected: "bg-danger-tint text-danger",
+  selected: "bg-primary-tint text-primary",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -60,40 +60,41 @@ const BoqDetailPage = async ({ params }: Props) => {
   };
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-16">
-      <Link
-        href="/boqs"
-        className="text-sm font-medium text-neutral-500 transition-colors hover:text-primary"
-      >
-        ← Incoming BOQs
-      </Link>
+    <div className="flex max-w-3xl flex-col gap-6">
+      <div>
+        <Link
+          href="/boqs"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-primary"
+        >
+          <ArrowLeft size={16} />
+          Incoming BOQs
+        </Link>
 
-      <h1 className="font-heading mt-4 text-4xl text-ink">{boq.reference}</h1>
-      <p className="mt-1 text-sm text-neutral-500">
-        {items.length} {items.length === 1 ? "item" : "items"}
-      </p>
+        <h1 className="font-heading mt-3 text-2xl text-ink">{boq.reference}</h1>
+        <p className="mt-1 text-sm text-muted">
+          {items.length} {items.length === 1 ? "item" : "items"}
+        </p>
+      </div>
 
-      <div className="mt-8 overflow-hidden rounded-2xl border border-neutral-200">
+      <div className="overflow-hidden rounded-card border border-hairline bg-surface shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
         {items.map((item, index) => (
           <div
             key={item.uuid}
             className={`flex items-center justify-between gap-4 p-5 ${
-              index > 0 ? "border-t border-neutral-100" : ""
+              index > 0 ? "border-t border-hairline-soft" : ""
             }`}
           >
             <div>
               {item.categoryName && (
-                <p className="text-xs text-neutral-400">{item.categoryName}</p>
+                <p className="text-xs text-faint">{item.categoryName}</p>
               )}
-              <p className="font-heading text-base font-semibold text-ink">
-                {item.name}
-              </p>
-              <p className="text-xs text-neutral-500">
+              <p className="font-heading text-base text-ink">{item.name}</p>
+              <p className="text-xs text-muted">
                 {formatMoney(Number(item.unitPrice), currency)} each
               </p>
             </div>
             <div className="flex items-center gap-6">
-              <p className="text-sm text-neutral-500">Qty {item.quantity}</p>
+              <p className="text-sm text-muted">Qty {item.quantity}</p>
               <p className="w-28 text-right font-semibold tabular-nums text-ink">
                 {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
               </p>
@@ -102,25 +103,28 @@ const BoqDetailPage = async ({ params }: Props) => {
         ))}
       </div>
 
-      <p className="mt-3 text-right text-sm text-neutral-600">
-        Catalog subtotal: {formatMoney(subtotal, currency)}
+      <p className="text-sm text-muted">
+        Catalog subtotal:{" "}
+        <span className="font-medium text-ink">
+          {formatMoney(subtotal, currency)}
+        </span>
       </p>
 
       {detail.preSellerComment && (
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
-          <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-ink">
+        <div className="rounded-card border border-hairline bg-surface p-6 shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
+          <h2 className="flex items-center gap-2 font-heading text-lg text-ink">
             <MessageSquare size={18} className="text-primary" />
             Note from the pre-seller
           </h2>
-          <p className="mt-2 text-sm whitespace-pre-wrap text-neutral-600">
+          <p className="mt-2 text-sm whitespace-pre-wrap text-secondary">
             {detail.preSellerComment}
           </p>
         </div>
       )}
 
-      <section className="mt-10 rounded-2xl border border-neutral-200 p-6">
-        <h2 className="font-heading text-2xl text-ink">Your offer</h2>
-        <p className="mt-1 text-sm text-neutral-500">
+      <section className="rounded-card border border-hairline bg-surface p-6 shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
+        <h2 className="font-heading text-xl text-ink">Your offer</h2>
+        <p className="mt-1 text-sm text-muted">
           Price the product, installation
           {showProgramming ? " and programming" : ""}, and describe what you
           deliver. The admin reviews it before the customer sees it.
@@ -130,17 +134,17 @@ const BoqDetailPage = async ({ params }: Props) => {
           <div className="mt-5 flex flex-col gap-3">
             <span
               className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-                STATUS_STYLES[offer.status] ?? "bg-neutral-100 text-neutral-600"
+                STATUS_STYLES[offer.status] ?? "bg-hover text-muted"
               }`}
             >
               {STATUS_LABELS[offer.status] ?? offer.status}
             </span>
             {offer.status === "rejected" && offer.rejectionReason && (
-              <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+              <p className="rounded-control bg-danger-tint p-3 text-sm text-danger">
                 {offer.rejectionReason}
               </p>
             )}
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-muted">
               Current total:{" "}
               <span className="font-semibold text-ink">
                 {formatMoney(offerTotal(offer), currency)}
@@ -159,7 +163,7 @@ const BoqDetailPage = async ({ params }: Props) => {
             />
           </div>
         ) : (
-          <div className="mt-5 flex flex-col gap-2 rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600">
+          <div className="mt-5 flex flex-col gap-2 rounded-control bg-hover p-4 text-sm text-muted">
             <div className="flex justify-between">
               <span>Product</span>
               <span className="font-medium text-ink">
@@ -181,14 +185,14 @@ const BoqDetailPage = async ({ params }: Props) => {
               </div>
             )}
             {offer?.description && (
-              <p className="mt-2 whitespace-pre-wrap text-neutral-600">
+              <p className="mt-2 whitespace-pre-wrap text-secondary">
                 {offer.description}
               </p>
             )}
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 };
 

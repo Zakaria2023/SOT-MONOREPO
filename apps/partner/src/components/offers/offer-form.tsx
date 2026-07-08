@@ -1,6 +1,6 @@
 "use client";
 
-import { useOfferForm } from "@/app/boqs/[uuid]/use-offer-form";
+import { useOfferForm } from "@/app/(dashboard)/boqs/[uuid]/use-offer-form";
 import { CheckCircle2, Cpu, Package, Send, Wrench } from "lucide-react";
 import { Input, Textarea } from "ui";
 import type { OfferInput } from "validators";
