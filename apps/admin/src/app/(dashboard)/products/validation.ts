@@ -14,6 +14,7 @@ export const productFormSchema = z.object({
   description: z.string().optional(),
   role: z.string().optional(),
   image: z.string().optional(),
+  images: z.array(z.string()).optional(),
   isFeatured: z.boolean(),
   price: z
     .string()

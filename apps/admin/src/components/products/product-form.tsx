@@ -10,6 +10,7 @@ import { Dropdown } from "ui";
 import { FormError } from "ui";
 import { ImageUpload } from "ui";
 import { Input } from "ui";
+import { MultiImageUpload } from "ui";
 import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
@@ -61,6 +62,7 @@ export const ProductForm = (props: ProductFormProps) => {
   } = form;
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
   const hasSubmittedRef = useRef(false);
 
   const inheritCategorySpecs = (categoryUuid: string) => {
@@ -201,7 +203,7 @@ export const ProductForm = (props: ProductFormProps) => {
         <Checkbox label="Featured product" {...register("isFeatured")} />
 
         <ImageUpload
-          label="Image"
+          label="Main image"
           register={register("image")}
           onUploaded={(documentId) => setValue("image", documentId)}
           onUploadingChange={setIsUploadingImage}
@@ -213,12 +215,29 @@ export const ProductForm = (props: ProductFormProps) => {
           }
         />
 
+        <Controller
+          control={control}
+          name="images"
+          render={({ field }) => (
+            <MultiImageUpload
+              label="Sub images"
+              value={field.value ?? []}
+              onChange={field.onChange}
+              getPreviewUrl={documentDownloadUrl}
+              onUploadingChange={setIsUploadingSubImages}
+            />
+          )}
+        />
+
         <SpecsPreview />
 
         <FormError message={state.error} />
 
         <div className="flex items-center gap-3 border-t border-hairline pt-5">
-          <Button type="submit" disabled={isPending || isUploadingImage}>
+          <Button
+            type="submit"
+            disabled={isPending || isUploadingImage || isUploadingSubImages}
+          >
             {mode === "edit"
               ? isPending
                 ? "Saving..."

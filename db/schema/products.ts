@@ -48,7 +48,8 @@ export const Products = mysqlTable(
     role: varchar("role", { length: 500 }), // "role in your network"
 
     // Media
-    image: varchar("image", { length: 255 }),
+    image: varchar("image", { length: 255 }), // main image (document id)
+    images: json("images").$type<string[]>(), // sub images (document ids)
 
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
