@@ -25,7 +25,8 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
   );
   const vat = subtotal * VAT_RATE;
   const total = subtotal + vat;
-  const isDraft = boq.status === "draft";
+  const status = boq.status ?? "draft";
+  const isDraft = status === "draft";
 
   return (
     <main className="w-full bg-white">
@@ -48,7 +49,7 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
                 : "bg-green-50 text-green-700",
             )}
           >
-            {STATUS_LABELS[boq.status] ?? boq.status}
+            {STATUS_LABELS[status] ?? status}
           </span>
         </div>
         <p className="font-grotesk mt-1 text-sm text-[#8A8F98]">

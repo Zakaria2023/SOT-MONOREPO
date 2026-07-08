@@ -21,10 +21,8 @@ export const Boqs = mysqlTable(
     userUuid: char("user_uuid", { length: 36 }).notNull(),
 
     reference: varchar("reference", { length: 50 }).notNull(),
-    status: mysqlEnum("status", boqStatuses).default("draft").notNull(),
+    status: mysqlEnum("status", boqStatuses).default("draft"),
 
-    // The pre-seller (Clerk user) an admin has assigned this BOQ to. The name is
-    // denormalized here because pre-sellers live in Clerk, not the Users table.
     assignedPreSellerId: varchar("assigned_pre_seller_id", { length: 64 }),
     assignedPreSellerName: varchar("assigned_pre_seller_name", { length: 255 }),
 
@@ -40,7 +38,6 @@ export const Boqs = mysqlTable(
   ],
 );
 
-// Line items are snapshotted at BOQ creation so the quote stays fixed.
 export const BoqItems = mysqlTable(
   "BoqItems",
   {

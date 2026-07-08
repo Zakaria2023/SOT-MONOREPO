@@ -9,8 +9,6 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 
-// One row per (BOQ, partner) the pre-seller dispatched a reviewed BOQ to. The
-// partner is a Clerk user, so their name/location are denormalized here.
 export const BoqPartners = mysqlTable(
   "BoqPartners",
   {
@@ -26,11 +24,11 @@ export const BoqPartners = mysqlTable(
     partnerName: varchar("partner_name", { length: 255 }),
     partnerLocation: varchar("partner_location", { length: 255 }),
 
-    // The pre-seller's note written for this specific partner in the send dialog.
     preSellerComment: text("pre_seller_comment"),
 
     // 1 = closest match, ascending.
-    matchRank: int("match_rank").notNull().default(0),
+    // 0 = no match.
+    matchRank: int("match_rank").default(0),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

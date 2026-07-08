@@ -85,16 +85,19 @@ export const createBoqFromCart = async (
 
 /** A BOQ with its line items (or null if it doesn't exist). */
 export const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
-  const [boq] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
-  if (!boq) return null;
-
-  const items = await db
-    .select()
-    .from(BoqItems)
-    .where(eq(BoqItems.boqUuid, boqUuid))
+  const rows = await db
+    .select({ boq: getTableColumns(Boqs), item: getTableColumns(BoqItems) })
+    .from(Boqs)
+    .leftJoin(BoqItems, eq(BoqItems.boqUuid, Boqs.uuid))
+    .where(eq(Boqs.uuid, boqUuid))
     .orderBy(asc(BoqItems.createdAt));
 
-  return { boq, items };
+  const [first] = rows;
+  if (!first) return null;
+
+  const items = rows.flatMap((row) => (row.item ? [row.item] : []));
+
+  return { boq: first.boq, items };
 };
 
 /** All BOQs created by a user, newest first. */
@@ -326,7 +329,7 @@ export const getPartnerBoqs = async (
   db
     .select({
       ...getTableColumns(Boqs),
-      matchRank: BoqPartners.matchRank,
+      matchRank: sql<number>`coalesce(${BoqPartners.matchRank}, 0)`,
       dispatchedAt: BoqPartners.createdAt,
     })
     .from(BoqPartners)
