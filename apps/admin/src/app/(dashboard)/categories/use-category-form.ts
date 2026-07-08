@@ -32,6 +32,8 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
       parentUuid: category?.parentUuid ?? "",
       order: category?.order ?? 0,
       image: category?.image ?? "",
+      highlights: category?.highlights ?? [],
+      specGroups: category?.specGroups ?? [],
     },
   });
 
@@ -43,6 +45,8 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
         parentUuid: values.parentUuid || null,
         order: values.order,
         image: values.image || null,
+        highlights: values.highlights,
+        specGroups: values.specGroups,
       });
     });
   });

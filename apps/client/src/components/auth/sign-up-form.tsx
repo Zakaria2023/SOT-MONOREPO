@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { useSignUpForm } from "@/app/sign-up/use-sign-up-form";
 import {
   ArrowRight,
   Building2,
@@ -13,22 +13,26 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { Input } from "ui";
 
 export const SignUpForm = () => {
   const [showPassword, setShowPassword] = useState(false);
-
-  const handleSubmit = (event: FormEvent) => {
-    // UI only for now — auth is wired up later.
-    event.preventDefault();
-  };
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const {
+    form: {
+      register,
+      formState: { errors },
+    },
+    state,
+    isPending,
+    onSubmit,
+  } = useSignUpForm();
 
   return (
     <div className="relative w-full max-w-md rounded-3xl bg-white p-9 shadow-[0_30px_80px_-24px_rgba(20,22,27,0.2),0_24px_70px_-34px_rgba(124,58,237,0.5)]">
       <div>
-        <h1 className="font-heading text-3xl font-extrabold text-ink">
-          Create your account
-        </h1>
+        <h1 className="font-heading text-3xl text-ink">Create your account</h1>
         <p className="font-grotesk mt-2 text-sm text-[#62656B]">
           Already have an account?{" "}
           <Link href="/sign-in" className="font-bold text-primary">
@@ -37,56 +41,65 @@ export const SignUpForm = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="font-grotesk mt-6 flex flex-col gap-4"
+      >
         <Input
-          id="fullName"
           label="Full name"
           placeholder="Jane Doe"
-          icon={User}
+          icon={<User size={16} />}
           autoComplete="name"
+          error={errors.fullName?.message}
+          {...register("fullName")}
         />
 
         <Input
-          id="email"
           label="Work email"
           type="email"
           placeholder="you@company.com"
-          icon={Mail}
+          icon={<Mail size={16} />}
           autoComplete="email"
+          error={errors.email?.message}
+          {...register("email")}
         />
 
         <Input
-          id="phone"
           label="Phone"
           type="tel"
           placeholder="+966 5X XXX XXXX"
-          icon={Phone}
+          icon={<Phone size={16} />}
           autoComplete="tel"
+          error={errors.phone?.message}
+          {...register("phone")}
         />
 
         <Input
-          id="companyName"
           label="Company name"
           placeholder="Acme Corp"
-          icon={Building2}
+          icon={<Building2 size={16} />}
           autoComplete="organization"
+          error={errors.companyName?.message}
+          {...register("companyName")}
         />
 
         <Input
-          id="location"
           label="Location"
           placeholder="Riyadh, Saudi Arabia"
-          icon={MapPin}
+          icon={<MapPin size={16} />}
           autoComplete="address-level2"
+          error={errors.location?.message}
+          {...register("location")}
         />
 
         <Input
-          id="password"
           label="Password"
           type={showPassword ? "text" : "password"}
           placeholder="Create a password"
-          icon={Lock}
+          icon={<Lock size={16} />}
           autoComplete="new-password"
+          error={errors.password?.message}
           rightSlot={
             <button
               type="button"
@@ -97,13 +110,41 @@ export const SignUpForm = () => {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           }
+          {...register("password")}
         />
+
+        <Input
+          label="Confirm password"
+          type={showConfirmPassword ? "text" : "password"}
+          placeholder="Re-enter your password"
+          icon={<Lock size={16} />}
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((value) => !value)}
+              aria-label={
+                showConfirmPassword ? "Hide password" : "Show password"
+              }
+              className="text-[#8A8F98] transition-colors hover:text-ink"
+            >
+              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+          {...register("confirmPassword")}
+        />
+
+        {state.error && (
+          <p className="font-grotesk text-sm text-red-500">{state.error}</p>
+        )}
 
         <button
           type="submit"
-          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+          disabled={isPending}
+          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
         >
-          Create account
+          {isPending ? "Creating account…" : "Create account"}
           <ArrowRight size={18} />
         </button>
       </form>

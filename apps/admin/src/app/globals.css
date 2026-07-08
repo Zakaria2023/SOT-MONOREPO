@@ -1,39 +1,42 @@
 @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@source "../../../../packages/ui/src";
 
 @theme {
   --font-sans: "Hanken Grotesk", sans-serif;
   --font-heading: "Newsreader", serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  --color-primary: #7c3aed;
-  --color-primary-hover: #6d28d9;
-  --color-primary-tint: #f4f1fb;
-  --color-primary-tint-border: #ece6fb;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-tint: #eff4ff;
+  --color-primary-tint-border: #dbe6fe;
 
-  --color-ink: #14161b;
-  --color-muted: #8a8f98;
-  --color-faint: #a7a2b4;
-  --color-secondary: #5a6068;
+  --color-accent: #17877a;
 
-  --color-page: #f5f4fa;
+  --color-ink: #1b2333;
+  --color-muted: #6b7686;
+  --color-faint: #9aa4b2;
+  --color-secondary: #4b5563;
+
+  --color-page: #f6f8fb;
   --color-surface: #ffffff;
-  --color-hairline: #eceaf2;
-  --color-hairline-soft: #f0eef5;
-  --color-hover: #faf9fd;
-  --color-search-border: #e7e2f2;
+  --color-hairline: #e7ebf1;
+  --color-hairline-soft: #eef1f6;
+  --color-hover: #f4f7fb;
+  --color-search-border: #dbe1ea;
 
-  --color-success: #127a4e;
-  --color-success-tint: #e9f7f0;
-  --color-warning: #9a6b00;
-  --color-warning-tint: #fdf4e3;
-  --color-danger: #b23a28;
-  --color-danger-tint: #fceae8;
-  --color-info: #2a6fdb;
-  --color-info-tint: #eaf1fc;
+  --color-success: #12854b;
+  --color-success-tint: #e7f6ee;
+  --color-warning: #b45309;
+  --color-warning-tint: #fdf1e3;
+  --color-danger: #dc2626;
+  --color-danger-tint: #fdeaea;
+  --color-info: #2563eb;
+  --color-info-tint: #eff4ff;
 
-  --radius-card: 18px;
-  --radius-control: 11px;
+  --radius-card: 16px;
+  --radius-control: 10px;
 
   --animate-fade-in: fade-in 0.15s ease-out;
   --animate-scale-in: scale-in 0.15s ease-out;
@@ -62,4 +65,11 @@
 body {
   background: var(--color-page);
   color: var(--color-ink);
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }

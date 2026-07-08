@@ -1,57 +1,77 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Bell, Plus, Search } from "lucide-react";
-import Link from "next/link";
-import { ChangeEventHandler } from "react";
+"use client";
 
-type NavbarProps = {
-  title: string;
-  subtitle?: string;
-  search: string;
-  onSearchChange: ChangeEventHandler<HTMLInputElement>;
-  searchPlaceholder?: string;
-  actionLabel?: string;
-  actionHref?: string;
+import { Bell, ChevronRight, Home } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Fragment } from "react";
+
+const LABELS: Record<string, string> = {
+  brands: "Brands",
+  categories: "Categories",
+  products: "Products",
+  partners: "Partners",
+  offers: "Offers",
+  new: "New",
+  edit: "Edit",
 };
 
-export const Navbar = ({
-  title,
-  subtitle,
-  search,
-  onSearchChange,
-  searchPlaceholder = "Search...",
-  actionLabel,
-  actionHref,
-}: NavbarProps) => (
-  <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-hairline bg-surface/80 px-7.5 py-4 backdrop-blur">
-    <div className="flex flex-col">
-      <h1 className="font-heading text-2xl font-extrabold text-ink">{title}</h1>
-      {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
-    </div>
+// Dynamic route segments (uuids) aren't shown as their own crumb.
+const isDynamic = (segment: string) => segment.length >= 20;
 
-    <div className="flex items-center gap-3">
-      <Input
-        value={search}
-        onChange={onSearchChange}
-        placeholder={searchPlaceholder}
-        icon={<Search size={16} />}
-        wrapperClassName="w-60"
-      />
+const toLabel = (segment: string) =>
+  LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
 
-      <Button type="button" variant="icon" className="relative">
+export const Navbar = () => {
+  const pathname = usePathname();
+  const segments = pathname
+    .split("/")
+    .filter(Boolean)
+    .filter((segment) => !isDynamic(segment));
+
+  return (
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-hairline bg-surface px-8 py-3">
+      <nav className="flex items-center gap-1.5">
+        <Link
+          href="/"
+          title="Home"
+          className={`flex h-8 w-8 items-center justify-center rounded-control transition-colors ${
+            segments.length === 0
+              ? "bg-primary text-white"
+              : "bg-primary-tint text-primary hover:bg-primary-tint-border"
+          }`}
+        >
+          <Home size={16} />
+        </Link>
+
+        {segments.map((segment, index) => {
+          const href = "/" + segments.slice(0, index + 1).join("/");
+          const isLast = index === segments.length - 1;
+
+          return (
+            <Fragment key={href}>
+              <ChevronRight size={15} className="text-faint" />
+              <Link
+                href={href}
+                className={`rounded-control px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isLast
+                    ? "bg-primary text-white"
+                    : "text-secondary hover:bg-hover"
+                }`}
+              >
+                {toLabel(segment)}
+              </Link>
+            </Fragment>
+          );
+        })}
+      </nav>
+
+      <button
+        type="button"
+        className="relative flex h-9 w-9 items-center justify-center rounded-control border border-hairline text-secondary transition-colors hover:bg-hover"
+      >
         <Bell size={18} />
         <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-danger" />
-      </Button>
-
-      {actionLabel && actionHref && (
-        <Link
-          href={actionHref}
-          className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
-        >
-          <Plus size={16} />
-          {actionLabel}
-        </Link>
-      )}
-    </div>
-  </header>
-);
+      </button>
+    </header>
+  );
+};

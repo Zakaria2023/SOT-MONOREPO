@@ -3,7 +3,8 @@
 import { db } from "@/db";
 import { Brands, InsertBrands, SelectBrands } from "@/db/schema/brands";
 import { generateUuid } from "@/lib/helpers";
-import { asc, count, eq } from "drizzle-orm";
+import { asc, count, eq, getTableColumns } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -18,9 +19,22 @@ export type BrandActionResult = {
   success?: boolean;
 };
 
-export const getBrands = async (): Promise<SelectBrands[]> => {
+export type BrandListItem = SelectBrands & {
+  parentName: SelectBrands["name"] | null;
+};
+
+const ParentBrands = alias(Brands, "parent_brands");
+
+export const getBrands = async (): Promise<BrandListItem[]> => {
   try {
-    return await db.select().from(Brands).orderBy(asc(Brands.order));
+    return await db
+      .select({
+        ...getTableColumns(Brands),
+        parentName: ParentBrands.name,
+      })
+      .from(Brands)
+      .leftJoin(ParentBrands, eq(Brands.parentUuid, ParentBrands.uuid))
+      .orderBy(asc(Brands.order));
   } catch {
     throw new Error("Failed to fetch brands");
   }

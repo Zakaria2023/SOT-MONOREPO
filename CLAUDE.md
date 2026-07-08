@@ -224,7 +224,9 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   ```tsx
   // ❌ Bad — imperative navigation for a plain link
   const openProduct = (slug: string) => router.push(`/products/${slug}`);
-  <article role="button" onClick={() => openProduct(slug)}>...</article>;
+  <article role="button" onClick={() => openProduct(slug)}>
+    ...
+  </article>;
 
   // ✅ Good — stretched Link overlay, buttons sit above it
   <article className="relative">
@@ -283,6 +285,18 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
   // ✅ Good
   <p className="line-clamp-1" />
+  ```
+
+- Never use extra-bold or heavier font weights (`font-extrabold`, `font-black`). Keep text at `font-normal`, `font-medium`, or at most `font-semibold` for emphasis.
+
+  ```tsx
+  // ❌ Bad
+  <span className="font-extrabold" />
+
+  // ✅ Good
+  <h3 className="font-bold" />
+  <h3 className="font-semibold" />
+  <span className="font-medium" />
   ```
 
 ## Exports

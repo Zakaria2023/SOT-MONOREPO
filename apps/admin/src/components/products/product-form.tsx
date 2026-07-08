@@ -1,26 +1,36 @@
 "use client";
 
-import Link from "next/link";
-import { useRef, useState } from "react";
-import { Controller, FormProvider } from "react-hook-form";
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
-import { HighlightsEditor } from "@/components/products/highlights-editor";
-import { SpecGroupsEditor } from "@/components/products/spec-groups-editor";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dropdown } from "@/components/ui/dropdown";
-import { FormError } from "@/components/ui/form-error";
-import { ImageUpload } from "@/components/ui/image-upload";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { documentDownloadUrl } from "@/lib/documents";
+import { SpecsPreview } from "@/components/specs/specs-preview";
+import { Button } from "ui";
+import { Checkbox } from "ui";
+import { Dropdown } from "ui";
+import { FormError } from "ui";
+import { ImageUpload } from "ui";
+import { Input } from "ui";
+import { MultiImageUpload } from "ui";
+import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
+import { documentDownloadUrl } from "@/lib/documents";
 import { productStatuses } from "@/lib/enum";
 import { PRODUCT_STATUS_LABELS } from "@/lib/label";
+import {
+  ArrowUpDown,
+  Barcode,
+  Boxes,
+  Coins,
+  Hash,
+  Package,
+  Tag,
+  Waypoints,
+} from "lucide-react";
+import Link from "next/link";
+import { useRef, useState } from "react";
+import { Controller, FormProvider } from "react-hook-form";
 
 type ProductFormProps =
   | { mode: "add"; categories: SelectCategories[]; brands: SelectBrands[] }
@@ -40,7 +50,9 @@ export const ProductForm = (props: ProductFormProps) => {
   const { mode, categories, brands } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
-    mode === "edit" ? { mode: "edit", product: props.product } : { mode: "add" },
+    mode === "edit"
+      ? { mode: "edit", product: props.product }
+      : { mode: "add" },
   );
   const {
     register,
@@ -50,7 +62,14 @@ export const ProductForm = (props: ProductFormProps) => {
   } = form;
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
   const hasSubmittedRef = useRef(false);
+
+  const inheritCategorySpecs = (categoryUuid: string) => {
+    const category = categories.find((item) => item.uuid === categoryUuid);
+    setValue("highlights", category?.highlights ?? []);
+    setValue("specGroups", category?.specGroups ?? []);
+  };
 
   return (
     <FormProvider {...form}>
@@ -59,20 +78,50 @@ export const ProductForm = (props: ProductFormProps) => {
           hasSubmittedRef.current = true;
           onSubmit(event);
         }}
-        className="flex flex-col gap-5 rounded-card border border-hairline bg-surface p-6"
+        className="flex flex-col gap-6 rounded-card border border-hairline bg-surface p-7 shadow-[0_1px_2px_rgba(27,35,51,0.04)]"
       >
-        <div className="grid grid-cols-3 gap-4">
+        <div className="flex items-center gap-3 border-b border-hairline pb-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-control bg-primary-tint text-primary">
+            <Package size={20} />
+          </div>
+          <h2 className="font-heading text-xl text-ink">
+            {mode === "edit" ? "Edit product" : "Create product"}
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
           <Input
             label="Name"
+            labelIcon={<Package size={15} />}
             type="text"
             {...register("name")}
             error={errors.name?.message}
           />
-          <Input label="SKU" type="text" {...register("sku")} />
-          <Input label="Model" type="text" {...register("model")} />
-        </div>
+          <Input
+            label="SKU"
+            labelIcon={<Hash size={15} />}
+            type="text"
+            {...register("sku")}
+          />
+          <Input
+            label="Model"
+            labelIcon={<Tag size={15} />}
+            type="text"
+            {...register("model")}
+          />
+          <Input
+            label="Part Number (PN)"
+            labelIcon={<Barcode size={15} />}
+            type="text"
+            {...register("partNumber")}
+          />
+          <Input
+            label="Model Number (MN)"
+            labelIcon={<Barcode size={15} />}
+            type="text"
+            {...register("modelNumber")}
+          />
 
-        <div className="grid grid-cols-4 gap-4">
           <CategoryDropdown
             control={control}
             name="categoryUuid"
@@ -81,8 +130,8 @@ export const ProductForm = (props: ProductFormProps) => {
             placeholder="Select a category"
             allowEmpty={false}
             error={errors.categoryUuid?.message}
+            onValueChange={inheritCategorySpecs}
           />
-
           <BrandDropdown
             control={control}
             name="brandUuid"
@@ -90,7 +139,7 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.brandUuid?.message}
           />
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-ink">Status</label>
             <Controller
               control={control}
@@ -107,19 +156,14 @@ export const ProductForm = (props: ProductFormProps) => {
 
           <Input
             label="Currency"
+            labelIcon={<Coins size={15} />}
             type="text"
             {...register("currency")}
             error={errors.currency?.message}
           />
-        </div>
-
-        <Input label="Blurb" type="text" {...register("blurb")} />
-        <Textarea label="Description" rows={4} {...register("description")} />
-        <Input label="Role" type="text" {...register("role")} />
-
-        <div className="grid grid-cols-4 gap-4">
           <Input
             label="Price"
+            labelIcon={<Coins size={15} />}
             type="text"
             inputMode="decimal"
             placeholder="0.00"
@@ -128,28 +172,38 @@ export const ProductForm = (props: ProductFormProps) => {
           />
           <Input
             label="Stock"
+            labelIcon={<Boxes size={15} />}
             type="number"
             {...register("stock", { valueAsNumber: true })}
           />
-          <Input label="Ribbon" type="text" {...register("ribbon")} />
-          <Input label="Icon Key" type="text" {...register("iconKey")} />
-        </div>
-
-        {mode === "edit" && (
-          <div className="grid grid-cols-4 gap-4">
+          <Input
+            label="Role"
+            labelIcon={<Waypoints size={15} />}
+            type="text"
+            {...register("role")}
+          />
+          {mode === "edit" && (
             <Input
               label="Order"
+              labelIcon={<ArrowUpDown size={15} />}
               type="number"
               {...register("order", { valueAsNumber: true })}
               error={errors.order?.message}
             />
-          </div>
-        )}
+          )}
+        </div>
+
+        <Textarea
+          label="Bill of Materials (BOM)"
+          rows={4}
+          {...register("bom")}
+        />
+        <Textarea label="Description" rows={4} {...register("description")} />
 
         <Checkbox label="Featured product" {...register("isFeatured")} />
 
         <ImageUpload
-          label="Image"
+          label="Main image"
           register={register("image")}
           onUploaded={(documentId) => setValue("image", documentId)}
           onUploadingChange={setIsUploadingImage}
@@ -161,13 +215,29 @@ export const ProductForm = (props: ProductFormProps) => {
           }
         />
 
-        <HighlightsEditor />
-        <SpecGroupsEditor />
+        <Controller
+          control={control}
+          name="images"
+          render={({ field }) => (
+            <MultiImageUpload
+              label="Sub images"
+              value={field.value ?? []}
+              onChange={field.onChange}
+              getPreviewUrl={documentDownloadUrl}
+              onUploadingChange={setIsUploadingSubImages}
+            />
+          )}
+        />
+
+        <SpecsPreview />
 
         <FormError message={state.error} />
 
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={isPending || isUploadingImage}>
+        <div className="flex items-center gap-3 border-t border-hairline pt-5">
+          <Button
+            type="submit"
+            disabled={isPending || isUploadingImage || isUploadingSubImages}
+          >
             {mode === "edit"
               ? isPending
                 ? "Saving..."

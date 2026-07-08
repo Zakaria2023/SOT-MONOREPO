@@ -4,16 +4,17 @@ import { ImageOff } from "lucide-react";
 import Image from "next/image";
 import { documentDownloadUrl } from "@/lib/documents";
 import { ProductRowActions } from "@/components/products/product-row-actions";
-import { Table } from "@/components/ui/table";
-import type { TableColumn } from "@/components/ui/table";
+import { Table } from "ui";
+import type { TableColumn } from "ui";
 import { PRODUCT_STATUS_LABELS } from "@/lib/label";
+import type { ProductStatus } from "@/lib/enum";
 import type { ProductListItem } from "@/app/(dashboard)/products/action";
 
 type ProductsTableProps = {
   products: ProductListItem[];
 };
 
-const STATUS_BADGE_CLASSES: Record<ProductListItem["status"], string> = {
+const STATUS_BADGE_CLASSES: Record<ProductStatus, string> = {
   draft: "bg-warning-tint text-warning",
   published: "bg-success-tint text-success",
   archived: "bg-hover text-faint",
@@ -67,13 +68,16 @@ const columns: TableColumn<ProductListItem>[] = [
   {
     key: "status",
     header: "Status",
-    render: (product) => (
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[product.status]}`}
-      >
-        {PRODUCT_STATUS_LABELS[product.status]}
-      </span>
-    ),
+    render: (product) => {
+      const status = product.status ?? "draft";
+      return (
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[status]}`}
+        >
+          {PRODUCT_STATUS_LABELS[status]}
+        </span>
+      );
+    },
   },
   {
     key: "order",

@@ -6,6 +6,13 @@ import {
   signAccessToken,
   verifyPassword,
 } from "auth";
+
+export {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+  verifyAccessToken,
+} from "auth";
+export type { AccessTokenPayload } from "auth";
 import { and, eq, gt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
@@ -35,6 +42,37 @@ const toAuthUser = (user: SelectUsers): AuthUser => {
   const { password: _password, ...rest } = user;
   void _password;
   return rest;
+};
+
+/** Looks up a user by uuid, returning them without the password hash. */
+export const getUserByUuid = async (
+  uuid: string,
+): Promise<AuthUser | null> => {
+  const [user] = await db.select().from(Users).where(eq(Users.uuid, uuid));
+  return user ? toAuthUser(user) : null;
+};
+
+/**
+ * Resolves the user behind a still-valid refresh token *without* rotating it.
+ * The web client uses this to keep a session alive after the short-lived access
+ * token expires: identity survives for the refresh token's lifetime even while
+ * idle. Returns null if the token is unknown or its session has lapsed. Token
+ * rotation stays in `refreshSession` (used by the mobile refresh endpoint).
+ */
+export const getUserByRefreshToken = async (
+  refreshToken: string,
+): Promise<AuthUser | null> => {
+  const tokenHash = hashRefreshToken(refreshToken);
+
+  const [session] = await db
+    .select({ userUuid: Sessions.userUuid })
+    .from(Sessions)
+    .where(
+      and(eq(Sessions.tokenHash, tokenHash), gt(Sessions.expiresAt, new Date())),
+    );
+  if (!session) return null;
+
+  return getUserByUuid(session.userUuid);
 };
 
 /**

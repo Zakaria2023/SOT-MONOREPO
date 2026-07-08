@@ -1,19 +1,24 @@
+import { AddToCartButton } from "@/components/home/add-to-cart-button";
 import { documentDownloadUrl } from "@/lib/documents";
 import { formatPrice } from "@/lib/helpers";
-import { ArrowRight, ImageOff, ShoppingCart } from "lucide-react";
+import { ArrowRight, ImageOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ProductListItem } from "services";
 
 type ProductSectionProps = {
   products: ProductListItem[];
+  isAuthenticated: boolean;
 };
 
-export const ProductSection = ({ products }: ProductSectionProps) => (
+export const ProductSection = ({
+  products,
+  isAuthenticated,
+}: ProductSectionProps) => (
   <section className="w-full bg-white pt-14 pb-24">
     <div className="mx-auto max-w-6xl px-8">
       <header className="text-center">
-        <h2 className="font-heading text-3xl font-extrabold text-ink">
+        <h2 className="font-heading text-3xl text-ink">
           Hardware in this deployment
         </h2>
       </header>
@@ -76,7 +81,7 @@ export const ProductSection = ({ products }: ProductSectionProps) => (
                 </h3>
 
                 <p className="font-grotesk mt-2 line-clamp-2 text-sm leading-relaxed text-[#62656B]">
-                  {product.blurb}
+                  {product.description}
                 </p>
 
                 <div className="mt-4 flex items-center justify-between pt-1">
@@ -84,13 +89,9 @@ export const ProductSection = ({ products }: ProductSectionProps) => (
                     {formatPrice(product.price, product.currency)}
                   </span>
 
-                  <button
-                    type="button"
-                    className="font-grotesk relative z-20 inline-flex items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-                  >
-                    <ShoppingCart size={16} />
-                    Add
-                  </button>
+                  {isAuthenticated && (
+                    <AddToCartButton productUuid={product.uuid} />
+                  )}
                 </div>
               </div>
             </article>

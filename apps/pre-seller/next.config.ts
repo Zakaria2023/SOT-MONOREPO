@@ -1,0 +1,12 @@
+import type { NextConfig } from "next";
+import path from "path";
+
+const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname, "../.."),
+  experimental: {
+    externalDir: true,
+  },
+  transpilePackages: ["services", "auth", "ui"],
+};
+
+export default nextConfig;

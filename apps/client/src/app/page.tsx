@@ -3,13 +3,16 @@ import { CategorySection } from "@/components/home/category-section";
 import { HeroSection } from "@/components/home/hero-section";
 import { HowItWorks } from "@/components/home/how-it-works";
 import { ProductSection } from "@/components/home/product-section";
-import { getBrands, getCategories, getProducts } from "services";
+import { getCurrentUser } from "@/lib/auth";
+import { getCachedCategories } from "@/lib/data";
+import { getBrands, getProducts } from "services";
 
 const HomePage = async () => {
-  const [products, categories, brands] = await Promise.all([
+  const [products, categories, brands, user] = await Promise.all([
     getProducts(),
-    getCategories(),
+    getCachedCategories(),
     getBrands(),
+    getCurrentUser(),
   ]);
 
   return (
@@ -17,7 +20,7 @@ const HomePage = async () => {
       <HeroSection />
       <HowItWorks />
       <CategorySection categories={categories} />
-      <ProductSection products={products} />
+      <ProductSection products={products} isAuthenticated={Boolean(user)} />
       <BrandSection brands={brands} />
     </>
   );

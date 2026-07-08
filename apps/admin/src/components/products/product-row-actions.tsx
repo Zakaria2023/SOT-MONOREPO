@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteProduct } from "@/app/(dashboard)/products/action";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "ui";
+import { ConfirmDialog } from "ui";
 
 type ProductRowActionsProps = {
   uuid: string;
