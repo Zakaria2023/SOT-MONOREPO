@@ -9,7 +9,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { CategoryHighlight, CategorySpecGroup } from "../types";
+import { Highlight, SpecGroup } from "../types";
 
 export const Categories = mysqlTable(
   "Categories",
@@ -25,8 +25,8 @@ export const Categories = mysqlTable(
 
     image: varchar("image", { length: 255 }),
 
-    highlights: json("highlights").$type<CategoryHighlight[]>(),
-    specGroups: json("spec_groups").$type<CategorySpecGroup[]>(),
+    highlights: json("highlights").$type<Highlight[]>(),
+    specGroups: json("spec_groups").$type<SpecGroup[]>(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

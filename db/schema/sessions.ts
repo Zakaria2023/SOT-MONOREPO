@@ -16,7 +16,6 @@ export const Sessions = mysqlTable(
 
     userUuid: char("user_uuid", { length: 36 }).notNull(),
 
-    // Hashed refresh token — the plaintext token is never stored.
     tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
 
     expiresAt: timestamp("expires_at").notNull(),
