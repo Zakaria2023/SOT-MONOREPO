@@ -472,12 +472,13 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 ## Enums
 
 - Never use TypeScript's `enum`. Always define enums as a `const` array typed with `as const satisfies readonly string[]`, and derive the union type from it with `(typeof arr)[number]`.
-- Never define an enum inline inside a database schema file (e.g. inline in the array argument to `mysqlEnum(...)`). Define it in `apps/admin/src/lib/enum.ts` and import the const array into the schema file instead.
-- All enums for the app live together in the single `apps/admin/src/lib/enum.ts` file — not scattered across one-file-per-enum.
-- Labels never live in `enum.ts`. All label maps live together in the single `apps/admin/src/lib/label.ts` file instead, each exported as a `Record<EnumType, string>`.
+- Never define an enum inline inside a database schema file (e.g. inline in the array argument to `mysqlEnum(...)`). Define it in `db/enum.ts` and import the const array into the schema file instead.
+- All enums for the app live together in the single `db/enum.ts` file — not scattered across one-file-per-enum.
+- Labels never live in `enum.ts`. All label maps live together in the single `db/label.ts` file instead, each exported as a `Record<EnumType, string>`.
+- Shared JSON-column shape types (e.g. `CategoryHighlight`, `CategorySpecGroup`) live in `db/types.ts` and are imported by the schema files via a relative path (e.g. `../types`) rather than redefined inline.
 
   ```ts
-  // ✅ Good — apps/admin/src/lib/enum.ts
+  // ✅ Good — db/enum.ts
   export const productStatuses = [
     "draft",
     "published",
@@ -488,7 +489,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   ```
 
   ```ts
-  // ✅ Good — apps/admin/src/lib/label.ts
+  // ✅ Good — db/label.ts
   import { ProductStatus } from "./enum";
 
   export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
@@ -503,9 +504,9 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   // db/schema/products.ts
   status: mysqlEnum("status", ["draft", "published", "archived"]);
 
-  // ✅ Good — import the const array from apps/admin/src/lib/enum.ts
+  // ✅ Good — import the const array from db/enum.ts
   // db/schema/products.ts
-  import { productStatuses } from "../../apps/admin/src/lib/enum";
+  import { productStatuses } from "../enum";
 
   status: mysqlEnum("status", productStatuses);
   ```
