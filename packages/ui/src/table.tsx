@@ -18,7 +18,7 @@ export const Table = <T,>({
   data,
   emptyMessage = "No results.",
 }: TableProps<T>) => (
-  <div className="overflow-hidden rounded-card border border-hairline bg-surface shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
+  <div className="overflow-x-auto rounded-card border border-hairline bg-surface shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
     <table className="w-full border-collapse">
       <thead>
         <tr className="border-b border-hairline bg-hover">
