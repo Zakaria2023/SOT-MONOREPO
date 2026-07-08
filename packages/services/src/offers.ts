@@ -253,6 +253,33 @@ const getOwnedBoq = async (userUuid: string, boqUuid: string) => {
   return boq ?? null;
 };
 
+/** An approved/selected offer enriched with its BOQ reference (customer view). */
+export type OfferForUser = SelectOffers & {
+  boqReference: string | null;
+};
+
+/**
+ * Every approved (and customer-selected) offer across all BOQs the user owns,
+ * each tagged with its BOQ reference. Powers the customer's "Your offers" page.
+ */
+export const getOffersForUser = async (
+  userUuid: string,
+): Promise<OfferForUser[]> =>
+  db
+    .select({
+      ...getTableColumns(Offers),
+      boqReference: Boqs.reference,
+    })
+    .from(Offers)
+    .innerJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
+    .where(
+      and(
+        eq(Boqs.userUuid, userUuid),
+        inArray(Offers.status, ["approved", "selected"]),
+      ),
+    )
+    .orderBy(desc(Offers.status), desc(Offers.createdAt));
+
 /** Approved (and the customer-selected) offers for a BOQ the user owns. */
 export const getApprovedOffersForUser = async (
   userUuid: string,

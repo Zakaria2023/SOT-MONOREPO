@@ -24,5 +24,6 @@ export const chooseOffer = async (
   }
 
   revalidatePath(`/boq/${boqUuid}`);
+  revalidatePath("/offers");
   return {};
 };
