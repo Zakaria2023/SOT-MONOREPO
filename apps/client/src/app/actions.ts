@@ -1,8 +1,10 @@
 "use server";
 
 import { getCurrentUser } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { addToCart } from "services";
+import { redirect } from "next/navigation";
+import { addToCart, logoutUser } from "services";
 
 export type AddToCartResult = {
   error?: string;
@@ -24,4 +26,23 @@ export const addProductToCart = async (
 
   revalidatePath("/");
   return {};
+};
+
+/** Revokes the current session and clears the auth cookies, then goes home. */
+export const signOut = async (): Promise<void> => {
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get("refresh_token")?.value;
+
+  if (refreshToken) {
+    try {
+      await logoutUser(refreshToken);
+    } catch {
+      // Session may already be gone — clear the cookies regardless.
+    }
+  }
+
+  cookieStore.delete("access_token");
+  cookieStore.delete("refresh_token");
+
+  redirect("/");
 };

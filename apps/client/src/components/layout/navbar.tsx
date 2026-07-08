@@ -1,8 +1,8 @@
 import { CategoryMenu } from "@/components/layout/category-menu";
+import { ProfileMenu } from "@/components/layout/profile-menu";
 import { getCurrentUser } from "@/lib/auth";
 import { buildCategoryTree } from "@/lib/categories";
 import { getCachedCategories, getCachedProducts } from "@/lib/data";
-import { getInitials } from "@/lib/helpers";
 import { Menu, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { getCartItemCount } from "services";
@@ -54,13 +54,7 @@ export const Navbar = async () => {
                 </span>
               )}
             </Link>
-            <Link
-              href="/account"
-              aria-label="Account"
-              className="font-grotesk flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white"
-            >
-              {getInitials(user.fullName)}
-            </Link>
+            <ProfileMenu fullName={user.fullName} />
           </div>
         ) : (
           <div className="flex items-center gap-3">
