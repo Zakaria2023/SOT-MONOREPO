@@ -3,7 +3,7 @@ import { formatMoney } from "@/lib/helpers";
 import { requirePreSeller } from "@/lib/server/auth";
 import { MapPin, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getBoq, getBoqPartners, getNearestPartnersForBoq } from "services";
+import { getBoq, getBoqPartners, getBoqPartnerOptions } from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;
@@ -27,9 +27,9 @@ const BoqDetailPage = async ({ params }: Props) => {
   const vat = subtotal * 0.15;
   const total = subtotal + vat;
   const isDraft = boq.status === "draft";
-  const nearestPartners = isDraft
-    ? await getNearestPartnersForBoq({ preSellerId: user.id, boqUuid: uuid })
-    : [];
+  const partnerOptions = isDraft
+    ? await getBoqPartnerOptions({ preSellerId: user.id, boqUuid: uuid })
+    : { close: [], others: [] };
   const partners = isDraft ? [] : await getBoqPartners(uuid);
 
   return (
@@ -87,7 +87,11 @@ const BoqDetailPage = async ({ params }: Props) => {
       </div>
 
       {isDraft ? (
-        <SendToPartnersDialog boqUuid={boq.uuid} partners={nearestPartners} />
+        <SendToPartnersDialog
+          boqUuid={boq.uuid}
+          closePartners={partnerOptions.close}
+          otherPartners={partnerOptions.others}
+        />
       ) : (
         <div className="rounded-card border border-hairline bg-surface p-6 shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
           <h2 className="font-heading text-lg text-ink">
@@ -95,7 +99,7 @@ const BoqDetailPage = async ({ params }: Props) => {
             {partners.length === 1 ? "partner" : "partners"}
           </h2>
           <p className="mt-0.5 text-sm text-muted">
-            Matched to the customer&apos;s location, closest first.
+            Same-city matches first, then any hand-picked partners.
           </p>
           <ul className="mt-4 flex flex-col gap-3">
             {partners.map((partner) => (
@@ -115,9 +119,15 @@ const BoqDetailPage = async ({ params }: Props) => {
                       </p>
                     )}
                   </div>
-                  <span className="rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-semibold text-primary">
-                    #{partner.matchRank}
-                  </span>
+                  {partner.matchRank && partner.matchRank > 0 ? (
+                    <span className="rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-semibold text-primary">
+                      #{partner.matchRank}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-hover px-2.5 py-0.5 text-xs font-semibold text-secondary">
+                      Hand-picked
+                    </span>
+                  )}
                 </div>
                 {partner.preSellerComment && (
                   <p className="flex items-start gap-2 text-sm whitespace-pre-wrap text-secondary">

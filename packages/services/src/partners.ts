@@ -166,7 +166,11 @@ export const rejectPartnerRequest = async ({
     .where(eq(PartnerRequests.uuid, partnerRequestUuid));
 };
 
-/** An approved partner matched to a BOQ, closest first (rank 1 = closest). */
+/**
+ * An approved partner offered for a BOQ.
+ * `rank` is 1-based closeness among same-city matches (1 = closest); it is `0`
+ * for partners that are not a same-city match (offered for manual selection).
+ */
 export type MatchedPartner = {
   partnerRequestUuid: string;
   clerkUserId: string;
@@ -174,6 +178,20 @@ export type MatchedPartner = {
   location: string | null;
   rank: number;
 };
+
+/**
+ * Approved partners split for a BOQ:
+ * - `close`  — same-city matches, auto-suggested and pre-selected (rank 1..n).
+ * - `others` — every other approved partner, for the pre-seller to pick
+ *   manually when there aren't enough close ones (rank 0).
+ */
+export type BoqPartnerOptions = {
+  close: MatchedPartner[];
+  others: MatchedPartner[];
+};
+
+// A same-city match scores >= 100 (see scoreLocationCloseness).
+const SAME_CITY_SCORE = 100;
 
 // Splits a free-text location ("Riyadh, Saudi Arabia") into comparable tokens.
 const locationTokens = (value: string | null | undefined): string[] =>
@@ -203,14 +221,13 @@ const scoreLocationCloseness = (
 };
 
 /**
- * Returns up to `limit` approved partners closest to the customer's location.
- * Partners with no location (or when the customer has none) still qualify, but
- * rank below any location match; ties break toward the most recently approved.
+ * Splits approved partners for a BOQ into same-city matches (`close`, ranked
+ * closest-first) and everyone else (`others`, offered for manual selection).
+ * Within each group, ties break toward the most recently approved partner.
  */
-export const findNearestApprovedPartners = async (
+export const getApprovedPartnerOptions = async (
   userLocation: string | null,
-  limit = 3,
-): Promise<MatchedPartner[]> => {
+): Promise<BoqPartnerOptions> => {
   const partners = await db
     .select({
       partnerRequestUuid: PartnerRequests.uuid,
@@ -228,7 +245,7 @@ export const findNearestApprovedPartners = async (
       ),
     );
 
-  return partners
+  const scored = partners
     .flatMap((partner) =>
       partner.clerkUserId
         ? [{ partner, clerkUserId: partner.clerkUserId }]
@@ -243,13 +260,24 @@ export const findNearestApprovedPartners = async (
       (a, b) =>
         b.score - a.score ||
         b.partner.createdAt.getTime() - a.partner.createdAt.getTime(),
-    )
-    .slice(0, limit)
-    .map(({ partner, clerkUserId }, index) => ({
-      partnerRequestUuid: partner.partnerRequestUuid,
-      clerkUserId,
-      name: partner.companyName || partner.fullName,
-      location: partner.location,
-      rank: index + 1,
-    }));
+    );
+
+  const closeEntries = scored.filter((entry) => entry.score >= SAME_CITY_SCORE);
+  const otherEntries = scored.filter((entry) => entry.score < SAME_CITY_SCORE);
+
+  const toMatched = (
+    { partner, clerkUserId }: (typeof scored)[number],
+    rank: number,
+  ): MatchedPartner => ({
+    partnerRequestUuid: partner.partnerRequestUuid,
+    clerkUserId,
+    name: partner.companyName || partner.fullName,
+    location: partner.location,
+    rank,
+  });
+
+  return {
+    close: closeEntries.map((entry, index) => toMatched(entry, index + 1)),
+    others: otherEntries.map((entry) => toMatched(entry, 0)),
+  };
 };

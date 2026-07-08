@@ -9,17 +9,24 @@ export type SubmitBoqResult = {
 };
 
 /**
- * Submits the reviewed BOQ and dispatches it to the 3 nearest partners, storing
- * the note the pre-seller wrote for each one (keyed by partner Clerk user id).
+ * Submits the reviewed BOQ and dispatches it to the partners the pre-seller
+ * selected (same-city matches plus any hand-picked ones), storing the note
+ * written for each one (keyed by partner Clerk user id).
  */
 export const submitBoq = async (
   boqUuid: string,
+  partnerClerkUserIds: string[],
   comments: Record<string, string>,
 ): Promise<SubmitBoqResult> => {
   const user = await requirePreSeller();
 
   try {
-    await submitReviewedBoq({ preSellerId: user.id, boqUuid, comments });
+    await submitReviewedBoq({
+      preSellerId: user.id,
+      boqUuid,
+      partnerClerkUserIds,
+      comments,
+    });
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to submit BOQ",
