@@ -13,9 +13,6 @@ import {
 } from "drizzle-orm/mysql-core";
 import { offerStatuses } from "../enum";
 
-// A partner's priced offer against a dispatched BOQ. The partner is a Clerk
-// user, so their name/scope are denormalized here. programmingPrice is null
-// for installation-only partners.
 export const Offers = mysqlTable(
   "Offers",
   {
