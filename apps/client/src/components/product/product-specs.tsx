@@ -8,7 +8,7 @@ export const ProductSpecs = ({ specGroups }: ProductSpecsProps) => {
   if (specGroups.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-8 pt-16">
+    <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
       <h2 className="font-heading text-3xl text-ink">
         Technical specifications
       </h2>

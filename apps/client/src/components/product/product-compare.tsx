@@ -7,26 +7,36 @@ import type { ProductDetail, ProductListItem } from "services";
 type ProductCompareProps = {
   current: ProductDetail;
   others: ProductListItem[];
+  categoryHighlights: NonNullable<ProductDetail["highlights"]>;
 };
 
-const valueFor = (product: ProductListItem, key: string): string =>
-  (product.highlights ?? []).find((highlight) => highlight.k === key)?.v ?? "—";
-
-export const ProductCompare = ({ current, others }: ProductCompareProps) => {
+export const ProductCompare = ({
+  current,
+  others,
+  categoryHighlights,
+}: ProductCompareProps) => {
   if (others.length === 0) return null;
 
   const products = [current, ...others];
 
+  // Products share their category's spec structure, so fall back to the
+  // category highlights for any product that has none of its own.
+  const highlightsFor = (product: ProductListItem) =>
+    product.highlights?.length ? product.highlights : categoryHighlights;
+
+  const valueFor = (product: ProductListItem, key: string): string =>
+    highlightsFor(product).find((highlight) => highlight.k === key)?.v ?? "—";
+
   const keys: string[] = [];
   for (const product of products) {
-    for (const highlight of product.highlights ?? []) {
+    for (const highlight of highlightsFor(product)) {
       if (!keys.includes(highlight.k)) keys.push(highlight.k);
     }
   }
   if (keys.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-8 pt-16">
+    <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
       <h2 className="font-heading text-3xl text-ink">Compare the line-up</h2>
       <p className="mt-2 text-muted">
         How this product lines up against others in{" "}
@@ -34,7 +44,7 @@ export const ProductCompare = ({ current, others }: ProductCompareProps) => {
       </p>
 
       <div className="mt-8 overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
+        <table className="w-full min-w-160 border-collapse">
           <thead>
             <tr>
               <th className="w-44" />

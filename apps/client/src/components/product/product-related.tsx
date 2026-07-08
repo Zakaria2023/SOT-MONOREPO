@@ -13,7 +13,7 @@ export const ProductRelated = ({ products }: ProductRelatedProps) => {
   if (products.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-8 pt-16">
+    <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
       <h2 className="font-heading text-3xl text-ink">Pairs well with</h2>
       <p className="mt-2 text-muted">
         Other devices in the same range — tap a tile to jump to its page.
@@ -24,7 +24,7 @@ export const ProductRelated = ({ products }: ProductRelatedProps) => {
           <Link
             key={product.uuid}
             href={`/products/${product.slug}`}
-            className="group relative flex h-44 flex-col justify-between overflow-hidden rounded-card border border-hairline bg-gradient-to-br from-primary-tint to-[#efe9fb] p-5 transition-shadow hover:shadow-lg"
+            className="group relative flex h-44 flex-col justify-between overflow-hidden rounded-card border border-hairline bg-linear-to-br from-primary-tint to-[#efe9fb] p-5 transition-shadow hover:shadow-lg"
           >
             <div className="flex items-start justify-between">
               {product.image ? (

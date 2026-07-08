@@ -17,30 +17,33 @@ import type { ProductDetail } from "services";
 
 type ProductHeroProps = {
   product: ProductDetail;
+  highlights: NonNullable<ProductDetail["highlights"]>;
   isAuthenticated: boolean;
 };
 
 const STAT_ICONS: LucideIcon[] = [Gauge, ShieldCheck, Users, Layers, Cpu, Network];
 
-export const ProductHero = ({ product, isAuthenticated }: ProductHeroProps) => {
-  const highlights = product.highlights ?? [];
-  const specRows = (product.specGroups ?? []).flatMap((group) => group.rows);
+export const ProductHero = ({
+  product,
+  highlights,
+  isAuthenticated,
+}: ProductHeroProps) => {
   const chipHighlights = highlights.slice(0, 2);
-  const tileRows = specRows.slice(0, 4);
   const statHighlights = highlights.slice(0, 4);
+  const subImages = product.images ?? [];
 
   return (
-    <section className="mx-auto max-w-6xl px-8 pt-8">
+    <section className="mx-auto max-w-7xl px-6 pt-8 lg:px-8">
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-sm text-faint transition-colors hover:text-ink"
+        className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-3.5 py-2 text-sm font-medium text-muted shadow-sm transition-colors hover:border-primary hover:text-primary"
       >
-        <ArrowLeft size={15} /> Back to deployment
+        <ArrowLeft size={16} /> Back to home
       </Link>
 
       <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
-          <div className="relative flex h-[420px] items-center justify-center overflow-hidden rounded-card border border-hairline bg-gradient-to-br from-primary-tint to-[#efe9fb]">
+          <div className="relative flex h-105 items-center justify-center overflow-hidden rounded-card border border-hairline bg-linear-to-br from-primary-tint to-[#efe9fb]">
             {product.image ? (
               <Image
                 src={documentDownloadUrl(product.image)}
@@ -69,15 +72,20 @@ export const ProductHero = ({ product, isAuthenticated }: ProductHeroProps) => {
             )}
           </div>
 
-          {tileRows.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {tileRows.map((row, index) => (
+          {subImages.length > 0 && (
+            <div className="mt-3 grid grid-cols-4 gap-3">
+              {subImages.map((imageId) => (
                 <div
-                  key={`${row.k}-${index}`}
-                  className="rounded-control border border-hairline bg-surface p-3"
+                  key={imageId}
+                  className="relative aspect-square overflow-hidden rounded-control border border-hairline bg-surface"
                 >
-                  <p className="text-sm font-semibold text-ink">{row.v}</p>
-                  <p className="mt-0.5 text-xs text-faint">{row.k}</p>
+                  <Image
+                    src={documentDownloadUrl(imageId)}
+                    alt={product.name}
+                    fill
+                    unoptimized
+                    className="object-contain p-2"
+                  />
                 </div>
               ))}
             </div>
