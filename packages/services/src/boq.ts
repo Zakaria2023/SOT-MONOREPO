@@ -18,6 +18,7 @@ import { SelectUsers, Users } from "../../../db/schema/users";
 import {
   getApprovedPartnerOptions,
   type BoqPartnerOptions,
+  type DbExecutor,
   type MatchedPartner,
 } from "./partners";
 
@@ -196,8 +197,9 @@ export const getAssignedBoqs = async (
 const loadAssignedDraftBoq = async (
   preSellerId: string,
   boqUuid: string,
+  executor: DbExecutor = db,
 ): Promise<SelectBoqs> => {
-  const [boq] = await db
+  const [boq] = await executor
     .select()
     .from(Boqs)
     .where(
@@ -239,45 +241,49 @@ export const submitReviewedBoq = async ({
   boqUuid: string;
   partnerClerkUserIds: string[];
   comments?: Record<string, string>;
-}): Promise<SubmitBoqResult> => {
-  const boq = await loadAssignedDraftBoq(preSellerId, boqUuid);
+}): Promise<SubmitBoqResult> =>
+  db.transaction(async (tx) => {
+    // Guard and mutate in one transaction so a BOQ can't be double-submitted
+    // between the draft check and the status update.
+    const boq = await loadAssignedDraftBoq(preSellerId, boqUuid, tx);
 
-  const items = await db
-    .select({ id: BoqItems.id })
-    .from(BoqItems)
-    .where(eq(BoqItems.boqUuid, boqUuid));
-  if (items.length === 0) {
-    throw new Error("Add at least one item before submitting");
-  }
+    const [firstItem] = await tx
+      .select({ id: BoqItems.id })
+      .from(BoqItems)
+      .where(eq(BoqItems.boqUuid, boqUuid))
+      .limit(1);
+    if (!firstItem) {
+      throw new Error("Add at least one item before submitting");
+    }
 
-  const [customer] = await db
-    .select({ location: Users.location })
-    .from(Users)
-    .where(eq(Users.uuid, boq.userUuid));
+    const [customer] = await tx
+      .select({ location: Users.location })
+      .from(Users)
+      .where(eq(Users.uuid, boq.userUuid));
 
-  // Only genuinely approved partners may be dispatched — resolve the client's
-  // selection against the server's current options rather than trusting it.
-  const options = await getApprovedPartnerOptions(customer?.location ?? null);
-  const selectedIds = new Set(partnerClerkUserIds);
-  const otherById = new Map(
-    options.others.map((partner) => [partner.clerkUserId, partner]),
-  );
+    // Resolve the client's selection against the current approved partners so a
+    // partner un-approved mid-flight can't be dispatched. Close matches keep
+    // their closeness order; hand-picked others follow in the chosen order.
+    const options = await getApprovedPartnerOptions(
+      customer?.location ?? null,
+      tx,
+    );
+    const selectedIds = new Set(partnerClerkUserIds);
+    const otherById = new Map(
+      options.others.map((partner) => [partner.clerkUserId, partner]),
+    );
+    const selectedClose = options.close.filter((partner) =>
+      selectedIds.has(partner.clerkUserId),
+    );
+    const selectedOthers = partnerClerkUserIds.flatMap((id) => {
+      const partner = otherById.get(id);
+      return partner ? [partner] : [];
+    });
+    const partners = [...selectedClose, ...selectedOthers];
+    if (partners.length === 0) {
+      throw new Error("Select at least one partner to send this BOQ to");
+    }
 
-  // Close matches keep their closeness order; hand-picked others follow in the
-  // order the pre-seller chose them.
-  const selectedClose = options.close.filter((partner) =>
-    selectedIds.has(partner.clerkUserId),
-  );
-  const selectedOthers = partnerClerkUserIds.flatMap((id) => {
-    const partner = otherById.get(id);
-    return partner ? [partner] : [];
-  });
-  const partners = [...selectedClose, ...selectedOthers];
-  if (partners.length === 0) {
-    throw new Error("Select at least one partner to send this BOQ to");
-  }
-
-  const updated = await db.transaction(async (tx) => {
     await tx
       .update(Boqs)
       .set({ status: "submitted", submittedAt: new Date() })
@@ -300,15 +306,12 @@ export const submitReviewedBoq = async ({
       }),
     );
 
-    const [row] = await tx.select().from(Boqs).where(eq(Boqs.id, boq.id));
-    if (!row) {
+    const [updated] = await tx.select().from(Boqs).where(eq(Boqs.id, boq.id));
+    if (!updated) {
       throw new Error("Failed to submit BOQ");
     }
-    return row;
+    return { boq: updated, partners };
   });
-
-  return { boq: updated, partners };
-};
 
 export const getBoqPartners = async (
   boqUuid: string,

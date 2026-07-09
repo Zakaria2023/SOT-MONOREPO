@@ -6,6 +6,14 @@ import {
   SelectPartnerRequests,
 } from "../../../db/schema/partner-requests";
 
+/**
+ * A database handle that is either the base connection or an open transaction,
+ * so a helper can run standalone or as part of a caller's transaction.
+ */
+export type DbExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export type PartnerRequestInput = {
   fullName: string;
   companyName: string;
@@ -227,8 +235,9 @@ const scoreLocationCloseness = (
  */
 export const getApprovedPartnerOptions = async (
   userLocation: string | null,
+  executor: DbExecutor = db,
 ): Promise<BoqPartnerOptions> => {
-  const partners = await db
+  const partners = await executor
     .select({
       partnerRequestUuid: PartnerRequests.uuid,
       clerkUserId: PartnerRequests.approvedClerkUserId,
