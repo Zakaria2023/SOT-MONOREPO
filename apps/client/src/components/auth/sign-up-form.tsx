@@ -1,6 +1,7 @@
 "use client";
 
 import { useSignUpForm } from "@/app/sign-up/use-sign-up-form";
+import { LocationPicker } from "@/components/location/location-picker";
 import {
   ArrowRight,
   Building2,
@@ -8,12 +9,12 @@ import {
   EyeOff,
   Lock,
   Mail,
-  MapPin,
   Phone,
   User,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { Controller } from "react-hook-form";
 import { Input } from "ui";
 
 export const SignUpForm = () => {
@@ -22,6 +23,7 @@ export const SignUpForm = () => {
   const {
     form: {
       register,
+      control,
       formState: { errors },
     },
     state,
@@ -84,13 +86,16 @@ export const SignUpForm = () => {
           {...register("companyName")}
         />
 
-        <Input
-          label="Location"
-          placeholder="Riyadh, Saudi Arabia"
-          icon={<MapPin size={16} />}
-          autoComplete="address-level2"
-          error={errors.location?.message}
-          {...register("location")}
+        <Controller
+          control={control}
+          name="location"
+          render={({ field }) => (
+            <LocationPicker
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              error={errors.location?.message}
+            />
+          )}
         />
 
         <Input

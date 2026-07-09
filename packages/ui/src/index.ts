@@ -1,5 +1,6 @@
 export * from "./button";
 export * from "./checkbox";
+export * from "./combobox";
 export * from "./confirm-dialog";
 export * from "./dropdown";
 export * from "./form-error";

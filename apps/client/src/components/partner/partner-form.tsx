@@ -1,6 +1,7 @@
 "use client";
 
 import { usePartnerForm } from "@/app/partner/use-partner-form";
+import { LocationPicker } from "@/components/location/location-picker";
 import { PartnerScopeCard } from "@/components/partner/partner-scope-card";
 import { cn } from "@/lib/utils";
 import {
@@ -9,12 +10,12 @@ import {
   CheckCircle2,
   Cpu,
   Mail,
-  MapPin,
   User,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ComponentType } from "react";
+import { Controller } from "react-hook-form";
 import { Input, Textarea } from "ui";
 import type { PartnerRequestInput } from "validators";
 
@@ -50,6 +51,7 @@ export const PartnerForm = () => {
     form: {
       register,
       reset,
+      control,
       setValue,
       watch,
       formState: { errors },
@@ -106,26 +108,28 @@ export const PartnerForm = () => {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Input
-            label="Email"
-            type="email"
-            placeholder="you@company.com"
-            icon={<Mail size={16} />}
-            autoComplete="email"
-            required
-            error={errors.email?.message}
-            {...register("email")}
-          />
-          <Input
-            label="Location"
-            placeholder="Riyadh, Saudi Arabia"
-            icon={<MapPin size={16} />}
-            autoComplete="address-level2"
-            error={errors.location?.message}
-            {...register("location")}
-          />
-        </div>
+        <Input
+          label="Email"
+          type="email"
+          placeholder="you@company.com"
+          icon={<Mail size={16} />}
+          autoComplete="email"
+          required
+          error={errors.email?.message}
+          {...register("email")}
+        />
+
+        <Controller
+          control={control}
+          name="location"
+          render={({ field }) => (
+            <LocationPicker
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              error={errors.location?.message}
+            />
+          )}
+        />
 
         <Textarea
           label="About you"
