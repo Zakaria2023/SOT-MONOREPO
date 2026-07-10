@@ -6,7 +6,7 @@ import {
   InsertCategories,
   SelectCategories,
 } from "@/db/schema/categories";
-import { generateUuid } from "@/lib/helpers";
+import { generateUuid } from "utils";
 import { alias } from "drizzle-orm/mysql-core";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";

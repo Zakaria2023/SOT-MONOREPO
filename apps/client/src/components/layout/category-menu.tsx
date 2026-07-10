@@ -1,7 +1,7 @@
 "use client";
 
 import type { CategoryNode } from "@/lib/categories";
-import { formatPrice } from "@/lib/helpers";
+import { formatPrice } from "utils";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Layers, Package } from "lucide-react";
 import Link from "next/link";

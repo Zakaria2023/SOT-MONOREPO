@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney, offerTotal } from "@/lib/helpers";
+import { formatMoney, offerTotal } from "utils";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard } from "lucide-react";
 import type { SelectOffers } from "services";

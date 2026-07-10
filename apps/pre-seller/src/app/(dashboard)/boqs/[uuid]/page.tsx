@@ -1,5 +1,5 @@
 import { SendToPartnersDialog } from "@/components/boqs/send-to-partners-dialog";
-import { formatMoney } from "@/lib/helpers";
+import { formatMoney } from "utils";
 import { requirePreSeller } from "@/lib/server/auth";
 import { MapPin, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";

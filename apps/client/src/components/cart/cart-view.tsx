@@ -2,7 +2,7 @@
 
 import { checkout, removeItem, updateQuantity } from "@/app/cart/actions";
 import { documentDownloadUrl } from "@/lib/documents";
-import { formatMoney } from "@/lib/helpers";
+import { formatMoney } from "utils";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,

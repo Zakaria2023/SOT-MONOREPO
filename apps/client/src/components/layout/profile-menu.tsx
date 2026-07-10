@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "@/app/actions";
-import { getInitials } from "@/lib/helpers";
+import { getInitials } from "utils";
 import { LogOut, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";

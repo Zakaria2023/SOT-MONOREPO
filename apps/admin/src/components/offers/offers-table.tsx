@@ -4,7 +4,7 @@ import type { OfferRow } from "@/app/(dashboard)/offers/action";
 import { OfferRowActions } from "@/components/offers/offer-row-actions";
 import type { OfferStatus } from "@/db/enum";
 import { OFFER_STATUS_LABELS, PARTNER_SERVICE_SCOPE_LABELS } from "@/db/label";
-import { formatSar } from "@/lib/helpers";
+import { formatSar } from "utils";
 import type { TableColumn } from "ui";
 import { Table } from "ui";
 import type { PartnerServiceScope } from "validators";

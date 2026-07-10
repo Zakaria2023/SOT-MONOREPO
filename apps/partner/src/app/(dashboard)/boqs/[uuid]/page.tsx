@@ -1,5 +1,5 @@
 import { OfferForm } from "@/components/offers/offer-form";
-import { formatMoney, offerTotal } from "@/lib/helpers";
+import { formatMoney, offerTotal } from "utils";
 import { requirePartner } from "@/lib/server/auth";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";

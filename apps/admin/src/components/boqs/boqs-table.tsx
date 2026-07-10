@@ -4,7 +4,7 @@ import type { PreSellerOption } from "@/app/(dashboard)/boqs/action";
 import { AssignPreSeller } from "@/components/boqs/assign-pre-seller";
 import type { BoqStatus } from "@/db/enum";
 import { BOQ_STATUS_LABELS } from "@/db/label";
-import { formatSar } from "@/lib/helpers";
+import { formatSar } from "utils";
 import type { BoqListItem } from "services";
 import type { TableColumn } from "ui";
 import { Table } from "ui";

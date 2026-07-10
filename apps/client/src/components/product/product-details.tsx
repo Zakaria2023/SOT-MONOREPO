@@ -1,4 +1,4 @@
-import { capitalize } from "@/lib/helpers";
+import { capitalize } from "utils";
 import type { ProductDetail } from "services";
 
 type DetailField = {

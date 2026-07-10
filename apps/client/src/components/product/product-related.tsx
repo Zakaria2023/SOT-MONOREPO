@@ -1,5 +1,5 @@
 import { documentDownloadUrl } from "@/lib/documents";
-import { formatPrice } from "@/lib/helpers";
+import { formatPrice } from "utils";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

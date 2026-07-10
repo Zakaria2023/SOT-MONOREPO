@@ -1,7 +1,7 @@
 "use server";
 
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
-import { getReviewerName, splitFullName } from "@/lib/helpers";
+import { getReviewerName, splitFullName } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";

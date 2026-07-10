@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/helpers";
+import { formatMoney } from "utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { BoqListItem } from "services";
