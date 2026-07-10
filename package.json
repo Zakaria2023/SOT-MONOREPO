@@ -15,13 +15,15 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
+    "test": "vitest run",
     "db:push": "dotenv -e .env.local -- drizzle-kit push"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
     "turbo": "^2.5.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
