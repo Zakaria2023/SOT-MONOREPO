@@ -4,37 +4,39 @@ import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
 import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import { Offers, SelectOffers } from "../../../db/schema/offers";
-import { PartnerRequests } from "../../../db/schema/partner-requests";
+import {
+  PartnerRequests,
+  SelectPartnerRequests,
+} from "../../../db/schema/partner-requests";
 import { SelectUsers, Users } from "../../../db/schema/users";
 
 export type { SelectOffers };
 
 export type ApprovedPartner = {
-  partnerRequestUuid: string;
-  name: string;
-  serviceScope: string;
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  name: string; // companyName || fullName — composed, no single column
+  serviceScope: SelectPartnerRequests["serviceScope"];
 };
 
 export type CreateOfferInput = {
-  partnerClerkUserId: string;
-  boqUuid: string;
-  productPrice: string;
-  installPrice: string;
-  programmingPrice?: string;
-  description: string;
+  partnerClerkUserId: SelectOffers["partnerClerkUserId"];
+  boqUuid: SelectOffers["boqUuid"];
+  productPrice: SelectOffers["productPrice"];
+  installPrice: SelectOffers["installPrice"];
+  programmingPrice?: NonNullable<SelectOffers["programmingPrice"]>;
+  description: SelectOffers["description"];
 };
 
 export type OfferReviewInput = {
-  offerUuid: string;
-  reviewedByClerkUserId?: string | null;
-  reviewedByName?: string | null;
+  offerUuid: SelectOffers["uuid"];
+  reviewedByClerkUserId?: SelectOffers["reviewedByClerkUserId"];
+  reviewedByName?: SelectOffers["reviewedByName"];
 };
 
 export type RejectOfferInput = OfferReviewInput & {
-  rejectionReason: string;
+  rejectionReason: NonNullable<SelectOffers["rejectionReason"]>;
 };
 
-/** An offer enriched with its BOQ reference and customer (admin list). */
 export type OfferListItem = SelectOffers & {
   boqReference: SelectBoqs["reference"] | null;
   customerName: SelectUsers["fullName"] | null;
@@ -125,7 +127,9 @@ export const createOrUpdateOffer = async (
     existing &&
     (existing.status === "approved" || existing.status === "selected")
   ) {
-    throw new Error("Your offer has already been approved and can't be changed");
+    throw new Error(
+      "Your offer has already been approved and can't be changed",
+    );
   }
 
   const values = {
