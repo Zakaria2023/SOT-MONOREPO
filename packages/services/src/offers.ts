@@ -103,10 +103,14 @@ export const createOrUpdateOffer = async (
         eq(BoqPartners.partnerClerkUserId, input.partnerClerkUserId),
       ),
     );
-  if (!dispatch) throw new Error("This BOQ was not sent to you");
+  if (!dispatch) {
+    throw new Error("This BOQ was not sent to you");
+  }
 
   const partner = await getApprovedPartnerByClerkId(input.partnerClerkUserId);
-  if (!partner) throw new Error("Partner profile not found");
+  if (!partner) {
+    throw new Error("Partner profile not found");
+  }
 
   const programmingPrice =
     partner.serviceScope === "install-program"
@@ -160,7 +164,9 @@ export const createOrUpdateOffer = async (
       input.partnerClerkUserId,
       input.boqUuid,
     );
-    if (!updated) throw new Error("Failed to save offer");
+    if (!updated) {
+      throw new Error("Failed to save offer");
+    }
     return updated;
   }
 
@@ -173,7 +179,9 @@ export const createOrUpdateOffer = async (
   });
 
   const [created] = await db.select().from(Offers).where(eq(Offers.uuid, uuid));
-  if (!created) throw new Error("Failed to save offer");
+  if (!created) {
+    throw new Error("Failed to save offer");
+  }
   return created;
 };
 
@@ -190,6 +198,7 @@ export const listOffers = async (): Promise<OfferListItem[]> =>
     .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
     .orderBy(desc(Offers.createdAt));
 
+/** The offer with this uuid, or null. */
 export const getOfferByUuid = async (
   uuid: string,
 ): Promise<SelectOffers | null> => {
@@ -204,7 +213,9 @@ export const approveOffer = async ({
   reviewedByName = null,
 }: OfferReviewInput): Promise<void> => {
   const offer = await getOfferByUuid(offerUuid);
-  if (!offer) throw new Error("Offer not found");
+  if (!offer) {
+    throw new Error("Offer not found");
+  }
   if (offer.status !== "pending") {
     throw new Error("This offer has already been reviewed");
   }
@@ -230,7 +241,9 @@ export const rejectOffer = async ({
   reviewedByName = null,
 }: RejectOfferInput): Promise<void> => {
   const offer = await getOfferByUuid(offerUuid);
-  if (!offer) throw new Error("Offer not found");
+  if (!offer) {
+    throw new Error("Offer not found");
+  }
   if (offer.status !== "pending") {
     throw new Error("This offer has already been reviewed");
   }
@@ -288,21 +301,19 @@ export const getOffersForUser = async (
 export const getApprovedOffersForUser = async (
   userUuid: string,
   boqUuid: string,
-): Promise<SelectOffers[]> => {
-  const boq = await getOwnedBoq(userUuid, boqUuid);
-  if (!boq) return [];
-
-  return db
-    .select()
+): Promise<SelectOffers[]> =>
+  db
+    .select(getTableColumns(Offers))
     .from(Offers)
+    .innerJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
     .where(
       and(
-        eq(Offers.boqUuid, boqUuid),
+        eq(Boqs.uuid, boqUuid),
+        eq(Boqs.userUuid, userUuid),
         inArray(Offers.status, ["approved", "selected"]),
       ),
     )
     .orderBy(desc(Offers.status), Offers.createdAt);
-};
 
 /** Marks one approved offer as the customer's selection (replaces any prior). */
 export const selectOffer = async ({
@@ -325,14 +336,17 @@ export const selectOffer = async ({
     throw new Error("This offer can't be selected");
   }
 
-  // Reset any previously selected offer on this BOQ back to approved.
-  await db
-    .update(Offers)
-    .set({ status: "approved", selectedAt: null })
-    .where(and(eq(Offers.boqUuid, boqUuid), eq(Offers.status, "selected")));
+  // Swap the selection atomically: demote any currently selected offer on this
+  // BOQ back to approved, then mark the chosen one selected.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(Offers)
+      .set({ status: "approved", selectedAt: null })
+      .where(and(eq(Offers.boqUuid, boqUuid), eq(Offers.status, "selected")));
 
-  await db
-    .update(Offers)
-    .set({ status: "selected", selectedAt: new Date() })
-    .where(eq(Offers.uuid, offerUuid));
+    await tx
+      .update(Offers)
+      .set({ status: "selected", selectedAt: new Date() })
+      .where(eq(Offers.uuid, offerUuid));
+  });
 };
