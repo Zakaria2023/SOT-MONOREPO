@@ -214,6 +214,7 @@ const loadAssignedDraftBoq = async (
   return boq;
 };
 
+// Get the 3 partner options for a BOQ based on the customer's location
 export const getBoqPartnerOptions = async ({
   preSellerId,
   boqUuid,
@@ -243,8 +244,6 @@ export const submitReviewedBoq = async ({
   comments?: Record<string, string>;
 }): Promise<SubmitBoqResult> =>
   db.transaction(async (tx) => {
-    // Guard and mutate in one transaction so a BOQ can't be double-submitted
-    // between the draft check and the status update.
     const boq = await loadAssignedDraftBoq(preSellerId, boqUuid, tx);
 
     const [firstItem] = await tx
@@ -261,9 +260,6 @@ export const submitReviewedBoq = async ({
       .from(Users)
       .where(eq(Users.uuid, boq.userUuid));
 
-    // Resolve the client's selection against the current approved partners so a
-    // partner un-approved mid-flight can't be dispatched. Close matches keep
-    // their closeness order; hand-picked others follow in the chosen order.
     const options = await getApprovedPartnerOptions(
       customer?.location ?? null,
       tx,
