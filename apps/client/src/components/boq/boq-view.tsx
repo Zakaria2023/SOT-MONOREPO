@@ -1,4 +1,4 @@
-import { formatMoney } from "utils";
+import { formatMoney, lineTotal, summarizeCart } from "utils";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, CheckCircle2, Package } from "lucide-react";
 import Link from "next/link";
@@ -15,16 +15,9 @@ const STATUS_LABELS: Record<string, string> = {
   reviewed: "Reviewed",
 };
 
-const VAT_RATE = 0.15;
-
 export const BoqView = ({ boq, items }: BoqViewProps) => {
   const currency = items[0]?.currency ?? "SAR";
-  const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * item.quantity,
-    0,
-  );
-  const vat = subtotal * VAT_RATE;
-  const total = subtotal + vat;
+  const { subtotal, vat, total } = summarizeCart(items);
   const status = boq.status ?? "draft";
   const isDraft = status === "draft";
 
@@ -91,7 +84,7 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
 
                 <span className="font-grotesk w-24 text-right text-base font-bold tabular-nums text-ink">
                   {formatMoney(
-                    Number(item.unitPrice) * item.quantity,
+                    lineTotal(item.unitPrice, item.quantity),
                     currency,
                   )}
                 </span>

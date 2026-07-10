@@ -5,11 +5,15 @@ import {
   formatMoney,
   formatPrice,
   formatSar,
+  fromMinorUnits,
   getInitials,
   getReviewerName,
+  lineTotal,
   offerTotal,
   slugify,
   splitFullName,
+  summarizeCart,
+  toMinorUnits,
 } from "./index";
 
 // offerTotal only reads the three price fields; cast a minimal object to the row.
@@ -48,6 +52,58 @@ describe("formatPrice", () => {
 
   it("defaults currency to SAR", () => {
     expect(formatPrice("4200", null)).toBe("SAR 4,200");
+  });
+});
+
+describe("toMinorUnits / fromMinorUnits", () => {
+  it("parses decimal strings to integer minor units", () => {
+    expect(toMinorUnits("4200.55")).toBe(420055);
+    expect(toMinorUnits(0.1)).toBe(10);
+  });
+
+  it("round-trips back to major units", () => {
+    expect(fromMinorUnits(420055)).toBe(4200.55);
+  });
+});
+
+describe("lineTotal", () => {
+  it("multiplies exactly, avoiding float drift", () => {
+    // 0.1 * 3 === 0.30000000000000004 with naive float math
+    expect(lineTotal("0.10", 3)).toBe(0.3);
+  });
+
+  it("handles whole prices and quantities", () => {
+    expect(lineTotal("4200.00", 2)).toBe(8400);
+  });
+});
+
+describe("summarizeCart", () => {
+  it("sums without floating-point drift", () => {
+    // Naive 0.1 summed ten times is 0.9999999999999999
+    const lines = Array.from({ length: 10 }, () => ({
+      unitPrice: "0.10",
+      quantity: 1,
+    }));
+    expect(summarizeCart(lines).subtotal).toBe(1);
+  });
+
+  it("computes 15% VAT and total", () => {
+    const { subtotal, vat, total } = summarizeCart([
+      { unitPrice: "100.00", quantity: 2 },
+    ]);
+    expect(subtotal).toBe(200);
+    expect(vat).toBe(30);
+    expect(total).toBe(230);
+  });
+
+  it("rounds VAT to the halala exactly once", () => {
+    // subtotal 30 halalas -> VAT round(30 * 15 / 100) = round(4.5) = 5 halalas
+    const { vat } = summarizeCart([{ unitPrice: "0.10", quantity: 3 }]);
+    expect(vat).toBe(0.05);
+  });
+
+  it("returns zeros for an empty cart", () => {
+    expect(summarizeCart([])).toEqual({ subtotal: 0, vat: 0, total: 0 });
   });
 });
 

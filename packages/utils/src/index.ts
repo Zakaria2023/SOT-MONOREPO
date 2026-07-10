@@ -23,11 +23,55 @@ export const formatSar = (amount: number): string =>
 export const formatPrice = (price: string, currency: string | null): string =>
   `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
 
+// Saudi VAT rate applied to BOQ/cart subtotals, as a whole-number percentage.
+const VAT_PERCENT = 15;
+
+/** Parse a decimal money value (string or number) into integer minor units. */
+export const toMinorUnits = (value: string | number): number =>
+  Math.round(Number(value) * 100);
+
+/** Convert integer minor units back to a major-unit number (420055 -> 4200.55). */
+export const fromMinorUnits = (minor: number): number => minor / 100;
+
+/** Exact line total (unit price x quantity) in major units. */
+export const lineTotal = (
+  unitPrice: string | number,
+  quantity: number,
+): number => fromMinorUnits(toMinorUnits(unitPrice) * quantity);
+
+export type CartTotals = {
+  subtotal: number;
+  vat: number;
+  total: number;
+};
+
+/**
+ * Subtotal, VAT, and total for a set of line items. All arithmetic runs in
+ * integer minor units so no floating-point drift enters the money, converting
+ * back to major units once at the end.
+ */
+export const summarizeCart = (
+  lines: { unitPrice: string | number; quantity: number }[],
+): CartTotals => {
+  const subtotalMinor = lines.reduce(
+    (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
+    0,
+  );
+  const vatMinor = Math.round((subtotalMinor * VAT_PERCENT) / 100);
+  return {
+    subtotal: fromMinorUnits(subtotalMinor),
+    vat: fromMinorUnits(vatMinor),
+    total: fromMinorUnits(subtotalMinor + vatMinor),
+  };
+};
+
 /** Sum of an offer's product, install, and (optional) programming prices. */
 export const offerTotal = (offer: SelectOffers): number =>
-  Number(offer.productPrice) +
-  Number(offer.installPrice) +
-  Number(offer.programmingPrice ?? 0);
+  fromMinorUnits(
+    toMinorUnits(offer.productPrice) +
+      toMinorUnits(offer.installPrice) +
+      toMinorUnits(offer.programmingPrice ?? 0),
+  );
 
 /** Capitalizes the first letter of a string, e.g. "published" -> "Published". */
 export const capitalize = (value: string): string =>

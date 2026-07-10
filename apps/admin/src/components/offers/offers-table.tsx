@@ -4,7 +4,7 @@ import type { OfferRow } from "@/app/(dashboard)/offers/action";
 import { OfferRowActions } from "@/components/offers/offer-row-actions";
 import type { OfferStatus } from "@/db/enum";
 import { OFFER_STATUS_LABELS, PARTNER_SERVICE_SCOPE_LABELS } from "@/db/label";
-import { formatSar } from "utils";
+import { formatSar, offerTotal } from "utils";
 import type { TableColumn } from "ui";
 import { Table } from "ui";
 import type { PartnerServiceScope } from "validators";
@@ -19,11 +19,6 @@ const STATUS_BADGE_CLASSES: Record<OfferStatus, string> = {
   rejected: "bg-danger-tint text-danger",
   selected: "bg-primary-tint text-primary",
 };
-
-const offerTotal = (offer: OfferRow): number =>
-  Number(offer.productPrice) +
-  Number(offer.installPrice) +
-  Number(offer.programmingPrice ?? 0);
 
 const columns: TableColumn<OfferRow>[] = [
   {

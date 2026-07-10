@@ -2,7 +2,7 @@
 
 import { checkout, removeItem, updateQuantity } from "@/app/cart/actions";
 import { documentDownloadUrl } from "@/lib/documents";
-import { formatMoney } from "utils";
+import { formatMoney, lineTotal, summarizeCart } from "utils";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -20,8 +20,6 @@ import type { CartLineItem } from "services";
 type CartViewProps = {
   items: CartLineItem[];
 };
-
-const VAT_RATE = 0.15;
 
 export const CartView = ({ items: initialItems }: CartViewProps) => {
   const [items, setItems] = useState(initialItems);
@@ -48,12 +46,7 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
 
   const currency = items[0]?.currency ?? "SAR";
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * item.quantity,
-    0,
-  );
-  const vat = subtotal * VAT_RATE;
-  const total = subtotal + vat;
+  const { subtotal, vat, total } = summarizeCart(items);
 
   return (
     <main className="w-full bg-white">
@@ -143,7 +136,7 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
 
                   <span className="font-grotesk w-24 text-right text-base font-bold tabular-nums text-ink">
                     {formatMoney(
-                      Number(item.unitPrice) * item.quantity,
+                      lineTotal(item.unitPrice, item.quantity),
                       currency,
                     )}
                   </span>

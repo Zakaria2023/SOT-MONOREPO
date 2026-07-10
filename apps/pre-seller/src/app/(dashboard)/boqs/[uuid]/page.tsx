@@ -1,5 +1,5 @@
 import { SendToPartnersDialog } from "@/components/boqs/send-to-partners-dialog";
-import { formatMoney } from "utils";
+import { formatMoney, lineTotal, summarizeCart } from "utils";
 import { requirePreSeller } from "@/lib/server/auth";
 import { MapPin, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -20,12 +20,7 @@ const BoqDetailPage = async ({ params }: Props) => {
 
   const { boq, items } = detail;
   const currency = items[0]?.currency ?? "SAR";
-  const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * item.quantity,
-    0,
-  );
-  const vat = subtotal * 0.15;
-  const total = subtotal + vat;
+  const { subtotal, vat, total } = summarizeCart(items);
   const isDraft = boq.status === "draft";
   const partnerOptions = isDraft
     ? await getBoqPartnerOptions({ preSellerId: user.id, boqUuid: uuid })
@@ -68,7 +63,7 @@ const BoqDetailPage = async ({ params }: Props) => {
                 <p className="text-sm text-muted">Qty {item.quantity}</p>
                 <p className="w-28 text-right font-semibold tabular-nums text-ink">
                   {formatMoney(
-                    Number(item.unitPrice) * item.quantity,
+                    lineTotal(item.unitPrice, item.quantity),
                     currency,
                   )}
                 </p>
