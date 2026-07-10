@@ -8,6 +8,7 @@ import { FormError } from "@/components/ui/form-error";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { documentDownloadUrl } from "@/lib/documents";
 import type { SelectBrands } from "@/db/schema/brands";
 
 type BrandFormProps =
@@ -63,7 +64,7 @@ export const BrandForm = (props: BrandFormProps) => {
         submittedRef={hasSubmittedRef}
         previewUrl={
           mode === "edit" && props.brand.image
-            ? `/api/documents/${props.brand.image}/download`
+            ? documentDownloadUrl(props.brand.image)
             : null
         }
       />

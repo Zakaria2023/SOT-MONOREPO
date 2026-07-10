@@ -2,6 +2,7 @@
 
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
+import { documentDownloadUrl } from "@/lib/documents";
 import { ProductRowActions } from "@/components/products/product-row-actions";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
@@ -25,7 +26,7 @@ const columns: TableColumn<ProductListItem>[] = [
     render: (product) =>
       product.image ? (
         <Image
-          src={`/api/documents/${product.image}/download`}
+          src={documentDownloadUrl(product.image)}
           alt={product.name}
           width={40}
           height={40}

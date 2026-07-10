@@ -2,6 +2,7 @@
 
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
+import { documentDownloadUrl } from "@/lib/documents";
 import { CategoryRowActions } from "@/components/categories/category-row-actions";
 import { Table } from "@/components/ui/table";
 import type { TableColumn } from "@/components/ui/table";
@@ -18,7 +19,7 @@ const columns: TableColumn<CategoryListItem>[] = [
     render: (category) =>
       category.image ? (
         <Image
-          src={`/api/documents/${category.image}/download`}
+          src={documentDownloadUrl(category.image)}
           alt={category.name}
           width={40}
           height={40}

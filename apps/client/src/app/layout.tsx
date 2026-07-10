@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { SalesAssistantWidget } from "@/components/assistant/sales-assistant-widget";
 import "./globals.css";
 
-type RootLayoutProps = Readonly<{
+type RootLayoutProps = {
   children: ReactNode;
-}>;
+};
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en" className="h-full antialiased">
-    <body className="min-h-full flex flex-col bg-page text-ink font-sans">
+    <body className="min-h-full flex flex-col font-sans">
       {children}
       <SalesAssistantWidget />
     </body>

@@ -14,7 +14,7 @@ export const Brands = mysqlTable("Brands", {
 
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  order: int("order").default(0).notNull(),
+  order: int("order").default(0),
 
   image: varchar("image", { length: 255 }),
 

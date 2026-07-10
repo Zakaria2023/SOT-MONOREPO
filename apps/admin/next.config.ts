@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   experimental: {
     externalDir: true,
   },
+  transpilePackages: ["storage"],
   images: {
     remotePatterns: [
       {

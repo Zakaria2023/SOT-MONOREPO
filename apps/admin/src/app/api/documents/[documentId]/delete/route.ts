@@ -1,6 +1,9 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { cloudflareR2, CLOUDFLARE_R2_BUCKET_NAME } from "@/lib/server/cloudflare-r2";
-import { createDocumentObjectKey } from "@/lib/server/document-storage";
+import {
+  cloudflareR2,
+  CLOUDFLARE_R2_BUCKET_NAME,
+  createDocumentObjectKey,
+} from "storage";
 
 export const DELETE = async (
   _req: Request,

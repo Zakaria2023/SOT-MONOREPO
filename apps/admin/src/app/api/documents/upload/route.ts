@@ -3,13 +3,11 @@ import { generateUuid } from "@/lib/helpers";
 import {
   cloudflareR2,
   CLOUDFLARE_R2_BUCKET_NAME,
-} from "@/lib/server/cloudflare-r2";
-import {
   createDocumentObjectKey,
   isAllowedDocumentType,
   isAllowedImageType,
   MAX_DOCUMENT_SIZE_BYTES,
-} from "@/lib/server/document-storage";
+} from "storage";
 
 export const POST = async (req: Request) => {
   try {

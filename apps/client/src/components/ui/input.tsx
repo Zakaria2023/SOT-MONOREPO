@@ -1,45 +1,77 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import type { ComponentType, InputHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
 import { FormError } from "@/components/ui/form-error";
+import { cn } from "@/lib/utils";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
-  icon?: ReactNode;
+  labelAccessory?: ReactNode;
+  icon?: ComponentType<{ size?: number; className?: string }>;
+  rightSlot?: ReactNode;
   error?: string;
   wrapperClassName?: string;
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   (
-    { label, icon, error, wrapperClassName = "", id, name, className = "", ...props },
+    {
+      label,
+      labelAccessory,
+      icon: Icon,
+      rightSlot,
+      error,
+      wrapperClassName = "",
+      id,
+      name,
+      className = "",
+      type = "text",
+      ...props
+    },
     ref,
   ) => {
     const inputId = id ?? name;
 
     return (
-      <div className="flex flex-col gap-1.5">
-        {label && (
-          <label htmlFor={inputId} className="text-sm font-semibold text-ink">
-            {label}
-          </label>
+      <div>
+        {(label || labelAccessory) && (
+          <div className="mb-2 flex items-center justify-between">
+            {label && (
+              <label
+                htmlFor={inputId}
+                className="font-grotesk text-sm font-bold text-ink"
+              >
+                {label}
+              </label>
+            )}
+            {labelAccessory}
+          </div>
         )}
 
-        <div className={`relative ${wrapperClassName}`}>
-          {icon && (
-            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint">
-              {icon}
-            </span>
+        <div className={cn("relative", wrapperClassName)}>
+          {Icon && (
+            <Icon
+              size={16}
+              className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#8A8F98]"
+            />
           )}
-
           <input
             ref={ref}
             id={inputId}
             name={name}
-            className={`w-full rounded-control border border-search-border bg-surface py-2 text-sm text-ink outline-none focus:border-primary ${
-              icon ? "pl-9 pr-3" : "px-3"
-            } ${className}`}
+            type={type}
+            className={cn(
+              "font-grotesk w-full rounded-xl border border-[#E3E4E9] bg-white py-3 text-sm text-ink transition-colors placeholder:text-[#9A9DA5] focus:border-primary focus:outline-none",
+              Icon ? "pl-10" : "pl-3.5",
+              rightSlot ? "pr-11" : "pr-3.5",
+              className,
+            )}
             {...props}
           />
+          {rightSlot && (
+            <div className="absolute top-1/2 right-3 -translate-y-1/2">
+              {rightSlot}
+            </div>
+          )}
         </div>
 
         <FormError message={error} />
