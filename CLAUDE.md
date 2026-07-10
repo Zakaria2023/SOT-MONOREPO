@@ -19,6 +19,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 - `packages/validators` — zod schemas shared between Server Actions and Route Handlers so input validation never drifts between the two.
 - `packages/auth` — one shared identity-verification module used by both transports.
 - `packages/types` — shared TypeScript types/DTOs.
+- `packages/utils` — framework-agnostic helper functions (formatters, `slugify`, `generateUuid`, etc.) shared across apps, imported from `"utils"`.
 
 **Calling convention**
 
@@ -571,7 +572,9 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
 ## Helpers
 
-- Reusable helper/utility functions (formatters, parsers, URL builders, etc.) must live in a dedicated helpers file — `src/lib/helpers.ts` (or another focused `src/lib/*.ts` module) — never defined inline at the top of a component file. Import them into the component.
+- Reusable helper/utility functions (formatters, parsers, URL builders, etc.) must never be defined inline at the top of a component file. Import them instead.
+- Framework-agnostic helpers shared across apps (formatters like `formatMoney`/`formatPrice`, `slugify`, `generateUuid`, etc.) live in the shared `packages/utils` package and are imported from `"utils"`. This is the single home for cross-app helpers — do not re-add a per-app `src/lib/helpers.ts` that duplicates them.
+- Only helpers that are genuinely specific to one app **and** tied to that app's transport/runtime (e.g. `apps/api`'s request/auth helpers that import `next/server`) stay in that app's `src/lib/*.ts`. Never put `next/server`-bound or otherwise app-specific code into `packages/utils`, since that package is imported by browser (client) code too.
 
   ```tsx
   // ❌ Bad — helper defined inline in the component file
@@ -582,13 +585,18 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
     <span>{formatPrice(product.price, product.currency)}</span>
   );
 
-  // ✅ Good — helper lives in src/lib/helpers.ts
-  // src/lib/helpers.ts
+  // ❌ Also bad — re-defining a shared helper in a per-app src/lib/helpers.ts
+  // apps/client/src/lib/helpers.ts
+  export const formatPrice = (price: string, currency: string | null): string =>
+    `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+
+  // ✅ Good — shared helper lives in packages/utils, imported from "utils"
+  // packages/utils/src/index.ts
   export const formatPrice = (price: string, currency: string | null): string =>
     `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
 
   // product-card.tsx
-  import { formatPrice } from "@/lib/helpers";
+  import { formatPrice } from "utils";
 
   export const ProductCard = ({ product }: ProductCardProps) => (
     <span>{formatPrice(product.price, product.currency)}</span>
