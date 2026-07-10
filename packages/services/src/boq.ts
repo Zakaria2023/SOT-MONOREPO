@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -49,6 +49,8 @@ export type PartnerBoqDetail = BoqDetail & {
   preSellerComment: SelectBoqPartners["preSellerComment"];
 };
 
+// Create a draft BOQ from the user's cart, snapshotting each line, then empty
+// the cart — all in one transaction.
 export const createBoqFromCart = async (
   userUuid: string,
 ): Promise<SelectBoqs> => {
@@ -105,6 +107,7 @@ export const createBoqFromCart = async (
   });
 };
 
+// Load a single BOQ together with its line items.
 export const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   const rows = await db
     .select({ boq: getTableColumns(Boqs), item: getTableColumns(BoqItems) })
@@ -114,13 +117,16 @@ export const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
     .orderBy(asc(BoqItems.createdAt));
 
   const [first] = rows;
-  if (!first) return null;
+  if (!first) {
+    return null;
+  }
 
   const items = rows.flatMap((row) => (row.item ? [row.item] : []));
 
   return { boq: first.boq, items };
 };
 
+// List a user's own BOQs, newest first.
 export const getUserBoqs = async (userUuid: string): Promise<SelectBoqs[]> =>
   db
     .select()
@@ -128,9 +134,15 @@ export const getUserBoqs = async (userUuid: string): Promise<SelectBoqs[]> =>
     .where(eq(Boqs.userUuid, userUuid))
     .orderBy(desc(Boqs.createdAt));
 
+// Attach item count and subtotal (summed from BoqItems) to each BOQ, keying the
+// aggregate to just these BOQs instead of scanning the whole table.
 const attachBoqTotals = async <T extends { uuid: string }>(
   boqs: T[],
 ): Promise<(T & { itemCount: number; subtotal: number })[]> => {
+  if (boqs.length === 0) {
+    return [];
+  }
+
   const totals = await db
     .select({
       boqUuid: BoqItems.boqUuid,
@@ -138,6 +150,12 @@ const attachBoqTotals = async <T extends { uuid: string }>(
       subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`,
     })
     .from(BoqItems)
+    .where(
+      inArray(
+        BoqItems.boqUuid,
+        boqs.map((boq) => boq.uuid),
+      ),
+    )
     .groupBy(BoqItems.boqUuid);
 
   const totalsByBoq = new Map(totals.map((row) => [row.boqUuid, row]));
@@ -152,6 +170,7 @@ const attachBoqTotals = async <T extends { uuid: string }>(
   });
 };
 
+// List every BOQ with the customer's name and totals, newest first.
 export const getAllBoqs = async (): Promise<BoqListItem[]> => {
   const boqs = await db
     .select({
@@ -165,6 +184,7 @@ export const getAllBoqs = async (): Promise<BoqListItem[]> => {
   return attachBoqTotals(boqs);
 };
 
+// Assign a BOQ to a pre-seller for review, or unassign it when given null.
 export const assignBoq = async (
   boqUuid: string,
   preSeller: { id: string; name: string } | null,
@@ -178,6 +198,7 @@ export const assignBoq = async (
     .where(eq(Boqs.uuid, boqUuid));
 };
 
+// List the BOQs assigned to a pre-seller, with customer name and totals.
 export const getAssignedBoqs = async (
   preSellerId: string,
 ): Promise<BoqListItem[]> => {
@@ -194,6 +215,7 @@ export const getAssignedBoqs = async (
   return attachBoqTotals(boqs);
 };
 
+// Load a BOQ that belongs to this pre-seller and is still a draft, else throw.
 const loadAssignedDraftBoq = async (
   preSellerId: string,
   boqUuid: string,
@@ -214,7 +236,20 @@ const loadAssignedDraftBoq = async (
   return boq;
 };
 
-// Get the 3 partner options for a BOQ based on the customer's location
+// Look up the location a BOQ's customer set on their profile.
+const getCustomerLocation = async (
+  userUuid: string,
+  executor: DbExecutor = db,
+): Promise<string | null> => {
+  const [customer] = await executor
+    .select({ location: Users.location })
+    .from(Users)
+    .where(eq(Users.uuid, userUuid));
+  return customer?.location ?? null;
+};
+
+// Partner options for a draft BOQ: same-city matches to auto-suggest, plus the
+// rest of the approved partners to hand-pick from.
 export const getBoqPartnerOptions = async ({
   preSellerId,
   boqUuid,
@@ -223,15 +258,13 @@ export const getBoqPartnerOptions = async ({
   boqUuid: string;
 }): Promise<BoqPartnerOptions> => {
   const boq = await loadAssignedDraftBoq(preSellerId, boqUuid);
+  const location = await getCustomerLocation(boq.userUuid);
 
-  const [customer] = await db
-    .select({ location: Users.location })
-    .from(Users)
-    .where(eq(Users.uuid, boq.userUuid));
-
-  return getApprovedPartnerOptions(customer?.location ?? null);
+  return getApprovedPartnerOptions(location);
 };
 
+// Submit a draft BOQ to the selected partners and mark it submitted — guard,
+// reads and writes all in one transaction.
 export const submitReviewedBoq = async ({
   preSellerId,
   boqUuid,
@@ -255,15 +288,8 @@ export const submitReviewedBoq = async ({
       throw new Error("Add at least one item before submitting");
     }
 
-    const [customer] = await tx
-      .select({ location: Users.location })
-      .from(Users)
-      .where(eq(Users.uuid, boq.userUuid));
-
-    const options = await getApprovedPartnerOptions(
-      customer?.location ?? null,
-      tx,
-    );
+    const location = await getCustomerLocation(boq.userUuid, tx);
+    const options = await getApprovedPartnerOptions(location, tx);
     const selectedIds = new Set(partnerClerkUserIds);
     const otherById = new Map(
       options.others.map((partner) => [partner.clerkUserId, partner]),
@@ -309,6 +335,7 @@ export const submitReviewedBoq = async ({
     return { boq: updated, partners };
   });
 
+// List the partners a submitted BOQ was dispatched to, closest match first.
 export const getBoqPartners = async (
   boqUuid: string,
 ): Promise<SelectBoqPartners[]> =>
@@ -318,6 +345,7 @@ export const getBoqPartners = async (
     .where(eq(BoqPartners.boqUuid, boqUuid))
     .orderBy(asc(BoqPartners.matchRank));
 
+// List the BOQs dispatched to a partner, most recently dispatched first.
 export const getPartnerBoqs = async (
   partnerClerkUserId: string,
 ): Promise<PartnerBoqListItem[]> =>
@@ -332,6 +360,8 @@ export const getPartnerBoqs = async (
     .where(eq(BoqPartners.partnerClerkUserId, partnerClerkUserId))
     .orderBy(desc(BoqPartners.createdAt));
 
+// Load one dispatched BOQ for a partner — its items plus the pre-seller's note
+// — or null if it wasn't dispatched to them.
 export const getPartnerBoq = async (
   partnerClerkUserId: string,
   boqUuid: string,
@@ -345,10 +375,14 @@ export const getPartnerBoq = async (
         eq(BoqPartners.partnerClerkUserId, partnerClerkUserId),
       ),
     );
-  if (!link) return null;
+  if (!link) {
+    return null;
+  }
 
   const detail = await getBoq(boqUuid);
-  if (!detail) return null;
+  if (!detail) {
+    return null;
+  }
 
   return { ...detail, preSellerComment: link.preSellerComment };
 };
