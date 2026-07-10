@@ -12,6 +12,8 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { offerStatuses } from "../enum";
+import { Boqs } from "./boqs";
+import { PartnerRequests } from "./partner-requests";
 
 export const Offers = mysqlTable(
   "Offers",
@@ -19,12 +21,17 @@ export const Offers = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-    boqUuid: char("boq_uuid", { length: 36 }).notNull(),
+    boqUuid: char("boq_uuid", { length: 36 })
+      .notNull()
+      .references(() => Boqs.uuid, { onDelete: "cascade" }),
 
     partnerClerkUserId: varchar("partner_clerk_user_id", {
       length: 64,
     }).notNull(),
-    partnerRequestUuid: char("partner_request_uuid", { length: 36 }),
+    partnerRequestUuid: char("partner_request_uuid", { length: 36 }).references(
+      () => PartnerRequests.uuid,
+      { onDelete: "set null" },
+    ),
     partnerName: varchar("partner_name", { length: 255 }),
     serviceScope: varchar("service_scope", { length: 50 }).notNull(),
 
@@ -56,6 +63,7 @@ export const Offers = mysqlTable(
   },
   (table) => [
     index("idx_offers_boq_uuid").on(table.boqUuid),
+    index("idx_offers_partner_request_uuid").on(table.partnerRequestUuid),
     index("idx_offers_partner").on(table.partnerClerkUserId),
     index("idx_offers_status").on(table.status),
     unique("uq_offers_boq_partner").on(table.boqUuid, table.partnerClerkUserId),

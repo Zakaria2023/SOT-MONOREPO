@@ -14,6 +14,8 @@ import {
 } from "drizzle-orm/mysql-core";
 import { productStatuses } from "../enum";
 import { Highlight, SpecGroup } from "../types";
+import { Brands } from "./brands";
+import { Categories } from "./categories";
 
 export const Products = mysqlTable(
   "Products",
@@ -22,8 +24,12 @@ export const Products = mysqlTable(
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
     // Relations
-    categoryUuid: char("category_uuid", { length: 36 }).notNull(),
-    brandUuid: char("brand_uuid", { length: 36 }).notNull(),
+    categoryUuid: char("category_uuid", { length: 36 })
+      .notNull()
+      .references(() => Categories.uuid, { onDelete: "restrict" }),
+    brandUuid: char("brand_uuid", { length: 36 })
+      .notNull()
+      .references(() => Brands.uuid, { onDelete: "restrict" }),
 
     // Identity
     name: varchar("name", { length: 255 }).notNull(),

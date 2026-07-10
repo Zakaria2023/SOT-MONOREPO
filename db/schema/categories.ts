@@ -8,6 +8,7 @@ import {
   text,
   timestamp,
   varchar,
+  type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
 import { Highlight, SpecGroup } from "../types";
 
@@ -17,7 +18,10 @@ export const Categories = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-    parentUuid: char("parent_uuid", { length: 36 }),
+    parentUuid: char("parent_uuid", { length: 36 }).references(
+      (): AnyMySqlColumn => Categories.uuid,
+      { onDelete: "set null" },
+    ),
 
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
