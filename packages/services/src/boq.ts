@@ -107,8 +107,9 @@ export const createBoqFromCart = async (
   });
 };
 
-// Load a single BOQ together with its line items.
-export const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
+// Load a single BOQ with its line items. Internal — callers use the ownership-
+// scoped getUserBoq / getAssignedBoq / getPartnerBoq so access can't be skipped.
+const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   const rows = await db
     .select({ boq: getTableColumns(Boqs), item: getTableColumns(BoqItems) })
     .from(Boqs)
@@ -124,6 +125,30 @@ export const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   const items = rows.flatMap((row) => (row.item ? [row.item] : []));
 
   return { boq: first.boq, items };
+};
+
+/** A BOQ with its items, but only if it belongs to this customer. */
+export const getUserBoq = async (
+  userUuid: string,
+  boqUuid: string,
+): Promise<BoqDetail | null> => {
+  const detail = await getBoq(boqUuid);
+  if (!detail || detail.boq.userUuid !== userUuid) {
+    return null;
+  }
+  return detail;
+};
+
+/** A BOQ with its items, but only if it is assigned to this pre-seller. */
+export const getAssignedBoq = async (
+  preSellerId: string,
+  boqUuid: string,
+): Promise<BoqDetail | null> => {
+  const detail = await getBoq(boqUuid);
+  if (!detail || detail.boq.assignedPreSellerId !== preSellerId) {
+    return null;
+  }
+  return detail;
 };
 
 // List a user's own BOQs, newest first.

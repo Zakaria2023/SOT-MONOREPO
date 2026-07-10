@@ -3,7 +3,7 @@ import { OffersSection } from "@/components/boq/offers-section";
 import { getCurrentUser } from "@/lib/auth";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getApprovedOffersForUser, getBoq } from "services";
+import { getApprovedOffersForUser, getUserBoq } from "services";
 
 export const metadata: Metadata = {
   title: "Your BOQ · Stratum",
@@ -21,8 +21,8 @@ const BoqPage = async ({ params }: Props) => {
     redirect("/sign-in");
   }
 
-  const detail = await getBoq(uuid);
-  if (!detail || detail.boq.userUuid !== user.uuid) {
+  const detail = await getUserBoq(user.uuid, uuid);
+  if (!detail) {
     notFound();
   }
 

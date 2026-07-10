@@ -1,6 +1,6 @@
 import { getUserFromRequest, unauthorized } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { getBoq } from "services";
+import { getUserBoq } from "services";
 
 type Params = {
   params: Promise<{ uuid: string }>;
@@ -13,9 +13,8 @@ export const GET = async (request: Request, { params }: Params) => {
   }
 
   const { uuid } = await params;
-  const detail = await getBoq(uuid);
-  // Only the BOQ's owner may read it — otherwise treat it as not found.
-  if (!detail || detail.boq.userUuid !== user.uuid) {
+  const detail = await getUserBoq(user.uuid, uuid);
+  if (!detail) {
     return NextResponse.json({ error: "BOQ not found" }, { status: 404 });
   }
 

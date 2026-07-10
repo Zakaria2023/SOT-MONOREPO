@@ -3,7 +3,11 @@ import { formatMoney, lineTotal, summarizeCart } from "utils";
 import { requirePreSeller } from "@/lib/server/auth";
 import { MapPin, MessageSquare } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getBoq, getBoqPartners, getBoqPartnerOptions } from "services";
+import {
+  getAssignedBoq,
+  getBoqPartners,
+  getBoqPartnerOptions,
+} from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;
@@ -13,8 +17,8 @@ const BoqDetailPage = async ({ params }: Props) => {
   const user = await requirePreSeller();
 
   const { uuid } = await params;
-  const detail = await getBoq(uuid);
-  if (!detail || detail.boq.assignedPreSellerId !== user.id) {
+  const detail = await getAssignedBoq(user.id, uuid);
+  if (!detail) {
     notFound();
   }
 
