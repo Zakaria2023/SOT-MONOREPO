@@ -15,28 +15,28 @@ export type DbExecutor =
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PartnerRequestInput = {
-  fullName: string;
-  companyName: string;
-  email: string;
-  location?: string;
-  about?: string;
-  offer?: string;
-  special?: string;
-  serviceScope: string;
+  fullName: SelectPartnerRequests["fullName"];
+  companyName: SelectPartnerRequests["companyName"];
+  email: SelectPartnerRequests["email"];
+  location?: NonNullable<SelectPartnerRequests["location"]>;
+  about?: NonNullable<SelectPartnerRequests["about"]>;
+  offer?: NonNullable<SelectPartnerRequests["offer"]>;
+  special?: NonNullable<SelectPartnerRequests["special"]>;
+  serviceScope: SelectPartnerRequests["serviceScope"];
 };
 
 export type ApprovePartnerRequestInput = {
-  partnerRequestUuid: string;
-  approvedClerkUserId: string;
-  reviewedByClerkUserId?: string | null;
-  reviewedByName?: string | null;
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  approvedClerkUserId: NonNullable<SelectPartnerRequests["approvedClerkUserId"]>;
+  reviewedByClerkUserId?: SelectPartnerRequests["reviewedByClerkUserId"];
+  reviewedByName?: SelectPartnerRequests["reviewedByName"];
 };
 
 export type RejectPartnerRequestInput = {
-  partnerRequestUuid: string;
-  rejectionReason: string;
-  reviewedByClerkUserId?: string | null;
-  reviewedByName?: string | null;
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  rejectionReason: NonNullable<SelectPartnerRequests["rejectionReason"]>;
+  reviewedByClerkUserId?: SelectPartnerRequests["reviewedByClerkUserId"];
+  reviewedByName?: SelectPartnerRequests["reviewedByName"];
 };
 
 const normalizeText = (value?: string | null): string | null => {
@@ -46,6 +46,7 @@ const normalizeText = (value?: string | null): string | null => {
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+/** Create a pending partner request, rejecting a duplicate active email. */
 export const createPartnerRequest = async (
   input: PartnerRequestInput,
 ): Promise<SelectPartnerRequests> => {
@@ -92,17 +93,21 @@ export const createPartnerRequest = async (
     .from(PartnerRequests)
     .where(eq(PartnerRequests.uuid, uuid));
 
-  if (!request) throw new Error("Failed to create partner request");
+  if (!request) {
+    throw new Error("Failed to create partner request");
+  }
 
   return request;
 };
 
+/** Every partner request, newest first (admin review queue). */
 export const listPartnerRequests = async (): Promise<SelectPartnerRequests[]> =>
   db
     .select()
     .from(PartnerRequests)
     .orderBy(desc(PartnerRequests.createdAt), desc(PartnerRequests.id));
 
+/** The partner request with this uuid, or null. */
 export const getPartnerRequestByUuid = async (
   uuid: string,
 ): Promise<SelectPartnerRequests | null> => {
@@ -114,6 +119,7 @@ export const getPartnerRequestByUuid = async (
   return request ?? null;
 };
 
+/** Approve a pending partner request, linking the approved Clerk user. */
 export const approvePartnerRequest = async ({
   partnerRequestUuid,
   approvedClerkUserId,
@@ -144,6 +150,7 @@ export const approvePartnerRequest = async ({
     .where(eq(PartnerRequests.uuid, partnerRequestUuid));
 };
 
+/** Reject a pending partner request with a reason. */
 export const rejectPartnerRequest = async ({
   partnerRequestUuid,
   rejectionReason,
@@ -180,10 +187,10 @@ export const rejectPartnerRequest = async ({
  * for partners that are not a same-city match (offered for manual selection).
  */
 export type MatchedPartner = {
-  partnerRequestUuid: string;
-  clerkUserId: string;
-  name: string;
-  location: string | null;
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  clerkUserId: NonNullable<SelectPartnerRequests["approvedClerkUserId"]>;
+  name: string; // companyName || fullName — composed, no single column
+  location: SelectPartnerRequests["location"];
   rank: number;
 };
 
@@ -219,7 +226,9 @@ const scoreLocationCloseness = (
 ): number => {
   const userParts = locationTokens(userLocation);
   const partnerParts = locationTokens(partnerLocation);
-  if (userParts.length === 0 || partnerParts.length === 0) return 0;
+  if (userParts.length === 0 || partnerParts.length === 0) {
+    return 0;
+  }
 
   const partnerSet = new Set(partnerParts);
   const shared = userParts.filter((token) => partnerSet.has(token)).length;
