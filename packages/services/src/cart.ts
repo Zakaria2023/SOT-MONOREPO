@@ -1,10 +1,9 @@
-import { and, asc, eq, sum } from "drizzle-orm";
+import { and, asc, eq, sql, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { CartItems, Carts, SelectCartItems } from "../../../db/schema/carts";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
-import { type DbExecutor } from "./partners";
 
 export type AddToCartInput = {
   userUuid: string;
@@ -23,18 +22,16 @@ export type CartLineItem = {
   quantity: SelectCartItems["quantity"];
 };
 
-// Get a user's cart with cart items
-export const getCart = async (userUuid: string): Promise<CartLineItem[]> => {
-  const [cart] = await db
-    .select({ uuid: Carts.uuid })
-    .from(Carts)
-    .where(eq(Carts.userUuid, userUuid));
-
-  if (!cart) {
-    return [];
+// Reject a non-positive quantity before it reaches the database.
+const assertValidQuantity = (quantity: number): void => {
+  if (quantity < 1) {
+    throw new Error("Quantity must be at least 1");
   }
+};
 
-  return db
+// Return every line item in the user's cart, with product and category details.
+export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
+  db
     .select({
       uuid: CartItems.uuid,
       productUuid: CartItems.productUuid,
@@ -45,14 +42,15 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> => {
       currency: Products.currency,
       quantity: CartItems.quantity,
     })
-    .from(CartItems)
+    .from(Carts)
+    .innerJoin(CartItems, eq(CartItems.cartUuid, Carts.uuid))
     .innerJoin(Products, eq(CartItems.productUuid, Products.uuid))
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
-    .where(eq(CartItems.cartUuid, cart.uuid))
+    .where(eq(Carts.userUuid, userUuid))
     .orderBy(asc(CartItems.createdAt));
-};
 
-// cart item exist AND belong to this user? If so, give me its internal
+// Resolve a cart item's public uuid to its internal id, but only when the item
+// belongs to this user (joined through the owning cart). Returns null otherwise.
 const findOwnedCartItemId = async (
   userUuid: string,
   cartItemUuid: string,
@@ -65,7 +63,7 @@ const findOwnedCartItemId = async (
   return item?.id ?? null;
 };
 
-// update cart item quantity for this user and cart item
+// Set a cart item's quantity; throws if the item isn't in this user's cart.
 export const updateCartItemQuantity = async ({
   userUuid,
   cartItemUuid,
@@ -75,15 +73,17 @@ export const updateCartItemQuantity = async ({
   cartItemUuid: string;
   quantity: number;
 }): Promise<void> => {
-  if (quantity < 1) throw new Error("Quantity must be at least 1");
+  assertValidQuantity(quantity);
 
   const id = await findOwnedCartItemId(userUuid, cartItemUuid);
-  if (id === null) throw new Error("Cart item not found");
+  if (id === null) {
+    throw new Error("Cart item not found");
+  }
 
   await db.update(CartItems).set({ quantity }).where(eq(CartItems.id, id));
 };
 
-// remove cart item for this user and cart item
+// Remove a cart item from the user's cart; a no-op if it isn't theirs.
 export const removeCartItem = async ({
   userUuid,
   cartItemUuid,
@@ -92,32 +92,26 @@ export const removeCartItem = async ({
   cartItemUuid: string;
 }): Promise<void> => {
   const id = await findOwnedCartItemId(userUuid, cartItemUuid);
-  if (id === null) return;
+  if (id === null) {
+    return;
+  }
 
   await db.delete(CartItems).where(eq(CartItems.id, id));
 };
 
-// Get a user's cart item count
+// Total number of units in the user's cart (sum of quantities); 0 if empty.
 export const getCartItemCount = async (userUuid: string): Promise<number> => {
-  const [cart] = await db
-    .select({ uuid: Carts.uuid })
-    .from(Carts)
-    .where(eq(Carts.userUuid, userUuid));
-  if (!cart) return 0;
-
   const [row] = await db
     .select({ total: sum(CartItems.quantity) })
-    .from(CartItems)
-    .where(eq(CartItems.cartUuid, cart.uuid));
+    .from(Carts)
+    .innerJoin(CartItems, eq(CartItems.cartUuid, Carts.uuid))
+    .where(eq(Carts.userUuid, userUuid));
   return Number(row?.total ?? 0);
 };
 
 // Return the user's cart uuid, creating the cart first if it doesn't exist.
-const getOrCreateCartUuid = async (
-  userUuid: string,
-  executor: DbExecutor = db,
-): Promise<string> => {
-  const [existing] = await executor
+const getOrCreateCartUuid = async (userUuid: string): Promise<string> => {
+  const [existing] = await db
     .select({ uuid: Carts.uuid })
     .from(Carts)
     .where(eq(Carts.userUuid, userUuid));
@@ -126,71 +120,51 @@ const getOrCreateCartUuid = async (
   }
 
   const uuid = randomUUID();
-  await executor.insert(Carts).values({ uuid, userUuid });
+  await db.insert(Carts).values({ uuid, userUuid });
   return uuid;
 };
 
+// Add a product to the user's cart, creating the cart if needed. Adding a
+// product already in the cart bumps its quantity instead of duplicating it.
 export const addToCart = async ({
   userUuid,
   productUuid,
   quantity = 1,
 }: AddToCartInput): Promise<SelectCartItems> => {
-  if (quantity < 1) {
-    throw new Error("Quantity must be at least 1");
+  assertValidQuantity(quantity);
+
+  const [product] = await db
+    .select({ uuid: Products.uuid })
+    .from(Products)
+    .where(eq(Products.uuid, productUuid));
+  if (!product) {
+    throw new Error("Product not found");
   }
 
-  return db.transaction(async (tx) => {
-    const [product] = await tx
-      .select({ uuid: Products.uuid })
-      .from(Products)
-      .where(eq(Products.uuid, productUuid));
-    if (!product) {
-      throw new Error("Product not found");
-    }
+  const cartUuid = await getOrCreateCartUuid(userUuid);
 
-    const cartUuid = await getOrCreateCartUuid(userUuid, tx);
-
-    const [existingItem] = await tx
-      .select()
-      .from(CartItems)
-      .where(
-        and(
-          eq(CartItems.cartUuid, cartUuid),
-          eq(CartItems.productUuid, productUuid),
-        ),
-      );
-
-    if (existingItem) {
-      await tx
-        .update(CartItems)
-        .set({ quantity: existingItem.quantity + quantity })
-        .where(eq(CartItems.id, existingItem.id));
-
-      const [updated] = await tx
-        .select()
-        .from(CartItems)
-        .where(eq(CartItems.id, existingItem.id));
-      if (!updated) {
-        throw new Error("Failed to update cart item");
-      }
-      return updated;
-    }
-
-    const itemUuid = randomUUID();
-    await tx.insert(CartItems).values({
-      uuid: itemUuid,
-      cartUuid,
-      productUuid,
-      quantity,
+  // One statement instead of select-then-update-or-insert: the unique key on
+  // (cart_uuid, product_uuid) turns a repeat add into a quantity bump.
+  await db
+    .insert(CartItems)
+    .values({ uuid: randomUUID(), cartUuid, productUuid, quantity })
+    .onDuplicateKeyUpdate({
+      set: { quantity: sql`${CartItems.quantity} + ${quantity}` },
     });
 
-    const [item] = await tx
-      .select()
-      .from(CartItems)
-      .where(eq(CartItems.uuid, itemUuid));
-    if (!item) {
-      throw new Error("Failed to add item to cart");
-    }
-    return item;
-  });
+  // No RETURNING on MySQL — read the row back by its unique pair (the row's own
+  // uuid differs from the one above when it was an update, not an insert).
+  const [item] = await db
+    .select()
+    .from(CartItems)
+    .where(
+      and(
+        eq(CartItems.cartUuid, cartUuid),
+        eq(CartItems.productUuid, productUuid),
+      ),
+    );
+  if (!item) {
+    throw new Error("Failed to add item to cart");
+  }
+  return item;
 };
