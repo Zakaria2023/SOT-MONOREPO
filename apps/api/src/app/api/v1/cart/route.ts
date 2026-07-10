@@ -1,4 +1,4 @@
-import { getUserFromRequest, unauthorized } from "@/lib/auth";
+import { getUserFromRequest, unauthorized } from "@/lib/helpers";
 import { NextResponse } from "next/server";
 import { getCart } from "services";
 

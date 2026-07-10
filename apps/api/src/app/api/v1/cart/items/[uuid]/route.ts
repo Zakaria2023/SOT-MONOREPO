@@ -1,5 +1,9 @@
-import { getUserFromRequest, unauthorized } from "@/lib/auth";
-import { getNumberField, readBody } from "@/lib/request";
+import {
+  getNumberField,
+  getUserFromRequest,
+  readBody,
+  unauthorized,
+} from "@/lib/helpers";
 import { NextResponse } from "next/server";
 import { removeCartItem, updateCartItemQuantity } from "services";
 

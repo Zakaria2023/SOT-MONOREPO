@@ -1,4 +1,4 @@
-import { getStringField, readBody } from "@/lib/request";
+import { getStringField, readBody } from "@/lib/helpers";
 import { NextResponse } from "next/server";
 import { logoutUser } from "services";
 

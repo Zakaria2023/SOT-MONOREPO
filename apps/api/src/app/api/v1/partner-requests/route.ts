@@ -1,4 +1,4 @@
-import { readBody } from "@/lib/request";
+import { readBody } from "@/lib/helpers";
 import { NextResponse } from "next/server";
 import { createPartnerRequest } from "services";
 import { partnerRequestSchema } from "validators";
