@@ -1,26 +1,19 @@
 import { and, asc, eq, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
-import {
-  CartItems,
-  Carts,
-  SelectCartItems,
-  SelectCarts,
-} from "../../../db/schema/carts";
+import { CartItems, Carts, SelectCartItems } from "../../../db/schema/carts";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
+import { type DbExecutor } from "./partners";
 
 export type AddToCartInput = {
-  // The authenticated user's uuid. The transport (Server Action / Route
-  // Handler) resolves this from the access token before calling in — the
-  // cart service itself performs no auth checks.
   userUuid: string;
   productUuid: string;
   quantity?: number;
 };
 
 export type CartLineItem = {
-  uuid: SelectCartItems["uuid"]; // cart item uuid
+  uuid: SelectCartItems["uuid"];
   productUuid: SelectCartItems["productUuid"];
   name: SelectProducts["name"];
   categoryName: SelectCategories["name"] | null;
@@ -30,13 +23,16 @@ export type CartLineItem = {
   quantity: SelectCartItems["quantity"];
 };
 
-/** The user's cart line items with the product details needed to render them. */
+// Get a user's cart with cart items
 export const getCart = async (userUuid: string): Promise<CartLineItem[]> => {
   const [cart] = await db
     .select({ uuid: Carts.uuid })
     .from(Carts)
     .where(eq(Carts.userUuid, userUuid));
-  if (!cart) return [];
+
+  if (!cart) {
+    return [];
+  }
 
   return db
     .select({
@@ -56,7 +52,7 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> => {
     .orderBy(asc(CartItems.createdAt));
 };
 
-// Verifies a cart item belongs to the user's cart, returning its numeric id.
+// cart item exist AND belong to this user? If so, give me its internal
 const findOwnedCartItemId = async (
   userUuid: string,
   cartItemUuid: string,
@@ -65,12 +61,11 @@ const findOwnedCartItemId = async (
     .select({ id: CartItems.id })
     .from(CartItems)
     .innerJoin(Carts, eq(CartItems.cartUuid, Carts.uuid))
-    .where(
-      and(eq(CartItems.uuid, cartItemUuid), eq(Carts.userUuid, userUuid)),
-    );
+    .where(and(eq(CartItems.uuid, cartItemUuid), eq(Carts.userUuid, userUuid)));
   return item?.id ?? null;
 };
 
+// update cart item quantity for this user and cart item
 export const updateCartItemQuantity = async ({
   userUuid,
   cartItemUuid,
@@ -88,6 +83,7 @@ export const updateCartItemQuantity = async ({
   await db.update(CartItems).set({ quantity }).where(eq(CartItems.id, id));
 };
 
+// remove cart item for this user and cart item
 export const removeCartItem = async ({
   userUuid,
   cartItemUuid,
@@ -101,7 +97,7 @@ export const removeCartItem = async ({
   await db.delete(CartItems).where(eq(CartItems.id, id));
 };
 
-/** Total quantity of items in the user's cart (0 if they have no cart yet). */
+// Get a user's cart item count
 export const getCartItemCount = async (userUuid: string): Promise<number> => {
   const [cart] = await db
     .select({ uuid: Carts.uuid })
@@ -116,77 +112,85 @@ export const getCartItemCount = async (userUuid: string): Promise<number> => {
   return Number(row?.total ?? 0);
 };
 
-/** Returns the user's cart, creating it on first use. */
-const getOrCreateCart = async (userUuid: string): Promise<SelectCarts> => {
-  const [existing] = await db
-    .select()
+// Return the user's cart uuid, creating the cart first if it doesn't exist.
+const getOrCreateCartUuid = async (
+  userUuid: string,
+  executor: DbExecutor = db,
+): Promise<string> => {
+  const [existing] = await executor
+    .select({ uuid: Carts.uuid })
     .from(Carts)
     .where(eq(Carts.userUuid, userUuid));
-  if (existing) return existing;
+  if (existing) {
+    return existing.uuid;
+  }
 
   const uuid = randomUUID();
-  await db.insert(Carts).values({ uuid, userUuid });
-
-  const [cart] = await db.select().from(Carts).where(eq(Carts.uuid, uuid));
-  if (!cart) throw new Error("Failed to create cart");
-  return cart;
+  await executor.insert(Carts).values({ uuid, userUuid });
+  return uuid;
 };
 
-/**
- * Adds a product to the user's cart. If the product is already in the cart,
- * its quantity is increased; otherwise a new line item is created.
- */
 export const addToCart = async ({
   userUuid,
   productUuid,
   quantity = 1,
 }: AddToCartInput): Promise<SelectCartItems> => {
-  if (quantity < 1) throw new Error("Quantity must be at least 1");
-
-  const [product] = await db
-    .select({ uuid: Products.uuid })
-    .from(Products)
-    .where(eq(Products.uuid, productUuid));
-  if (!product) throw new Error("Product not found");
-
-  const cart = await getOrCreateCart(userUuid);
-
-  const [existingItem] = await db
-    .select()
-    .from(CartItems)
-    .where(
-      and(
-        eq(CartItems.cartUuid, cart.uuid),
-        eq(CartItems.productUuid, productUuid),
-      ),
-    );
-
-  if (existingItem) {
-    await db
-      .update(CartItems)
-      .set({ quantity: existingItem.quantity + quantity })
-      .where(eq(CartItems.id, existingItem.id));
-
-    const [updated] = await db
-      .select()
-      .from(CartItems)
-      .where(eq(CartItems.id, existingItem.id));
-    if (!updated) throw new Error("Failed to update cart item");
-    return updated;
+  if (quantity < 1) {
+    throw new Error("Quantity must be at least 1");
   }
 
-  const itemUuid = randomUUID();
-  await db.insert(CartItems).values({
-    uuid: itemUuid,
-    cartUuid: cart.uuid,
-    productUuid,
-    quantity,
-  });
+  return db.transaction(async (tx) => {
+    const [product] = await tx
+      .select({ uuid: Products.uuid })
+      .from(Products)
+      .where(eq(Products.uuid, productUuid));
+    if (!product) {
+      throw new Error("Product not found");
+    }
 
-  const [item] = await db
-    .select()
-    .from(CartItems)
-    .where(eq(CartItems.uuid, itemUuid));
-  if (!item) throw new Error("Failed to add item to cart");
-  return item;
+    const cartUuid = await getOrCreateCartUuid(userUuid, tx);
+
+    const [existingItem] = await tx
+      .select()
+      .from(CartItems)
+      .where(
+        and(
+          eq(CartItems.cartUuid, cartUuid),
+          eq(CartItems.productUuid, productUuid),
+        ),
+      );
+
+    if (existingItem) {
+      await tx
+        .update(CartItems)
+        .set({ quantity: existingItem.quantity + quantity })
+        .where(eq(CartItems.id, existingItem.id));
+
+      const [updated] = await tx
+        .select()
+        .from(CartItems)
+        .where(eq(CartItems.id, existingItem.id));
+      if (!updated) {
+        throw new Error("Failed to update cart item");
+      }
+      return updated;
+    }
+
+    const itemUuid = randomUUID();
+    await tx.insert(CartItems).values({
+      uuid: itemUuid,
+      cartUuid,
+      productUuid,
+      quantity,
+    });
+
+    const [item] = await tx
+      .select()
+      .from(CartItems)
+      .where(eq(CartItems.uuid, itemUuid));
+    if (!item) {
+      throw new Error("Failed to add item to cart");
+    }
+    return item;
+  });
 };
