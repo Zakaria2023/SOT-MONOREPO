@@ -185,6 +185,9 @@ importers:
       ui:
         specifier: workspace:*
         version: link:../../packages/ui
+      utils:
+        specifier: workspace:*
+        version: link:../../packages/utils
       validators:
         specifier: workspace:*
         version: link:../../packages/validators
@@ -246,6 +249,9 @@ importers:
       ui:
         specifier: workspace:*
         version: link:../../packages/ui
+      utils:
+        specifier: workspace:*
+        version: link:../../packages/utils
       validators:
         specifier: workspace:*
         version: link:../../packages/validators
@@ -304,6 +310,9 @@ importers:
       ui:
         specifier: workspace:*
         version: link:../../packages/ui
+      utils:
+        specifier: workspace:*
+        version: link:../../packages/utils
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4
@@ -399,6 +408,19 @@ importers:
         version: 7.80.0(react@19.2.4)
       typescript:
         specifier: ^5
+        version: 5.9.3
+
+  packages/utils:
+    dependencies:
+      services:
+        specifier: workspace:*
+        version: link:../services
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      typescript:
+        specifier: ^5.7.0
         version: 5.9.3
 
   packages/validators:

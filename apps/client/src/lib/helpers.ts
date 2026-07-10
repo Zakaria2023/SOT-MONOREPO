@@ -1,18 +1,8 @@
-import type { SelectOffers } from "services";
+export { formatMoney, offerTotal } from "utils";
 
 /** Formats a decimal price string with its currency, e.g. "SAR 4,200". */
 export const formatPrice = (price: string, currency: string | null): string =>
   `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
-
-/** Formats a numeric amount as whole-unit currency, e.g. "SAR 17,768". */
-export const formatMoney = (amount: number, currency: string | null): string =>
-  `${currency ?? "SAR"} ${Math.round(amount).toLocaleString("en-US")}`;
-
-/** Sum of an offer's product, install, and (optional) programming prices. */
-export const offerTotal = (offer: SelectOffers): number =>
-  Number(offer.productPrice) +
-  Number(offer.installPrice) +
-  Number(offer.programmingPrice ?? 0);
 
 /** Capitalizes the first letter of a string, e.g. "published" -> "Published". */
 export const capitalize = (value: string): string =>

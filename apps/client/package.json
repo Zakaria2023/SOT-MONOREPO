@@ -24,6 +24,7 @@
     "storage": "workspace:*",
     "tailwind-merge": "^3.6.0",
     "ui": "workspace:*",
+    "utils": "workspace:*",
     "validators": "workspace:*",
     "zod": "^4.4.3"
   },
