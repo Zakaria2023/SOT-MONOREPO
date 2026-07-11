@@ -28,20 +28,20 @@ const BrandRow = ({ node, depth, selected, onToggle }: BrandRowProps) => {
           type="button"
           onClick={() => onToggle(node.uuid)}
           style={{ paddingLeft: 12 + depth * 20 }}
-          className="font-grotesk flex w-full items-center gap-2.5 rounded-lg py-2 pr-3 text-sm transition-colors hover:bg-[#F5F3FC]"
+          className="font-grotesk flex w-full items-center gap-2.5 rounded-lg py-2 pr-3 text-sm transition-colors hover:bg-surface-2"
         >
           <span
             className={cn(
               "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
               checked
                 ? "border-primary bg-primary text-white"
-                : "border-[#D6D3E0] bg-white",
+                : "border-[#D6D3E0] bg-surface",
             )}
           >
             {checked && <Check size={13} />}
           </span>
           <span className="flex-1 text-left text-ink">{node.name}</span>
-          <span className="text-xs text-[#8A8F98]">{node.count}</span>
+          <span className="text-xs text-faint">{node.count}</span>
         </button>
       </li>
       {node.children.map((child) => (
@@ -58,8 +58,8 @@ const BrandRow = ({ node, depth, selected, onToggle }: BrandRowProps) => {
 };
 
 export const BrandFilter = ({ tree, selected, onToggle }: BrandFilterProps) => (
-  <div className="rounded-2xl border border-hairline bg-white p-5 shadow-sm">
-    <p className="font-grotesk text-xs font-semibold tracking-widest text-[#8A8F98] uppercase">
+  <div className="rounded-2xl border border-hairline bg-surface p-5 shadow-sm">
+    <p className="font-grotesk text-xs font-semibold tracking-widest text-faint uppercase">
       Brands
     </p>
     <ul className="mt-3 flex flex-col gap-0.5">

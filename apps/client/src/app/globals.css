@@ -1,21 +1,39 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @source "../../../../packages/ui/src";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "Cairo", sans-serif;
   --font-heading: "Newsreader", serif;
   --font-grotesk: "Hanken Grotesk", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 
+  /* Accent (shared across themes) */
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
   --color-primary-tint: #f4f1fb;
+  --color-accent-cyan: #22d3ee;
+  --color-accent-violet: #8b7bff;
+  --color-success: #34e29b;
 
+  /* Text — light */
   --color-ink: #14161b;
+  --color-secondary: #5a6068;
   --color-muted: #5a6068;
   --color-faint: #8a8f98;
+  --color-dim: #8a8f98;
+  --color-placeholder: #9aa0aa;
+
+  /* Surfaces — light */
   --color-page: #f5f4fa;
   --color-surface: #ffffff;
+  --color-surface-2: #f4f3f8;
+  --color-hover: rgba(0, 0, 0, 0.04);
+
+  /* Borders — light */
   --color-hairline: #eceaf2;
   --color-search-border: #e3e4e9;
 
@@ -27,6 +45,50 @@
   --animate-spotlight-sweep: spotlight-sweep 2.6s ease-out both;
   --animate-orb-pulse: orb-pulse 6s ease-in-out infinite;
   --animate-spotlight: spotlight 2s ease 0.75s 1 forwards;
+}
+
+/* Dark theme — token overrides applied when <html> has the .dark class. */
+.dark {
+  --color-primary: #8b7bff;
+  --color-primary-hover: #7e8dff;
+  --color-primary-tint: rgba(124, 110, 255, 0.14);
+
+  --color-ink: #eaf0fb;
+  --color-secondary: #9198ac;
+  --color-muted: #9198ac;
+  --color-faint: #606a80;
+  --color-dim: #606a80;
+  --color-placeholder: #586074;
+
+  --color-page: #060a14;
+  --color-surface: rgba(255, 255, 255, 0.035);
+  --color-surface-2: #0a1020;
+  --color-hover: rgba(255, 255, 255, 0.06);
+
+  --color-hairline: rgba(255, 255, 255, 0.09);
+  --color-search-border: rgba(255, 255, 255, 0.16);
+}
+
+:root {
+  --gradient-accent: linear-gradient(
+    115deg,
+    #22d3ee 0%,
+    #7e8dff 52%,
+    #b77cff 100%
+  );
+}
+
+/* Signature accent gradient — buttons, active icons. */
+.bg-accent-gradient {
+  background-image: var(--gradient-accent);
+}
+
+/* Gradient-clipped text — headlines. */
+.text-accent-gradient {
+  background-image: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @keyframes spotlight-sweep {
@@ -80,6 +142,11 @@
 }
 
 @layer base {
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+  }
+
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;

@@ -19,7 +19,7 @@ const OffersPage = async () => {
   return (
     <main className="px-6 py-12 lg:px-16">
       <h1 className="font-heading text-3xl text-ink">Your offers</h1>
-      <p className="font-grotesk mt-1 text-sm text-[#62656B]">
+      <p className="font-grotesk mt-1 text-sm text-muted">
         Approved offers from our partners across all your BOQs. Pick the one
         that fits you best.
       </p>

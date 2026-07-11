@@ -30,7 +30,7 @@ export const PartnerScopeCard = ({
       "flex flex-col rounded-[14px] border p-4 text-left transition-all",
       selected
         ? "border-primary bg-primary/5 ring-4 ring-primary/15"
-        : "border-[#E3E4E9] hover:border-primary/40",
+        : "border-search-border hover:border-primary/40",
     )}
   >
     <div className="flex items-start justify-between">
@@ -52,7 +52,7 @@ export const PartnerScopeCard = ({
       </span>
     </div>
     <h3 className="font-heading mt-3 text-base text-ink">{title}</h3>
-    <p className="font-grotesk mt-1 text-xs leading-relaxed text-[#62656B]">
+    <p className="font-grotesk mt-1 text-xs leading-relaxed text-muted">
       {description}
     </p>
   </button>

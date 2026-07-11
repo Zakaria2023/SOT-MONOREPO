@@ -37,9 +37,9 @@ export const OffersSection = ({
     if (!awaiting) return null;
     return (
       <div className="mx-auto max-w-6xl px-6 pb-16 lg:px-8">
-        <div className="rounded-[18px] border border-dashed border-[#E3E4E9] p-8 text-center">
+        <div className="rounded-[18px] border border-dashed border-search-border p-8 text-center">
           <h2 className="font-heading text-xl text-ink">Offers on the way</h2>
-          <p className="font-grotesk mt-1 text-sm text-[#62656B]">
+          <p className="font-grotesk mt-1 text-sm text-muted">
             Your BOQ is with our partners. Their offers will appear here once
             approved.
           </p>
@@ -51,7 +51,7 @@ export const OffersSection = ({
   return (
     <div className="mx-auto px-6 pb-16 lg:px-8">
       <h2 className="font-heading text-2xl text-ink">Offers for you</h2>
-      <p className="font-grotesk mt-1 text-sm text-[#62656B]">
+      <p className="font-grotesk mt-1 text-sm text-muted">
         Compare what our partners quoted and pick the one that fits you best.
       </p>
 
@@ -71,7 +71,7 @@ export const OffersSection = ({
         ))}
       </div>
 
-      <p className="font-grotesk mt-6 flex items-center gap-2 text-xs text-[#9CA0A8]">
+      <p className="font-grotesk mt-6 flex items-center gap-2 text-xs text-faint">
         <Package size={14} />
         Payment is coming soon — selecting an offer just reserves your choice
         for now.

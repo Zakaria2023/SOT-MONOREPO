@@ -203,7 +203,7 @@ export const PartnerForm = () => {
           <ArrowRight size={18} />
         </button>
 
-        <p className="font-grotesk text-center text-xs text-[#9CA0A8]">
+        <p className="font-grotesk text-center text-xs text-faint">
           By applying you agree to Stratum’s{" "}
           <Link href="/partner-terms" className="text-primary">
             Partner Terms

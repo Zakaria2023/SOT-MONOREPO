@@ -34,8 +34,8 @@ export const CategoryFilter = ({
     });
 
   return (
-    <div className="rounded-2xl border border-hairline bg-white p-5 shadow-sm">
-      <p className="font-grotesk text-xs font-semibold tracking-widest text-[#8A8F98] uppercase">
+    <div className="rounded-2xl border border-hairline bg-surface p-5 shadow-sm">
+      <p className="font-grotesk text-xs font-semibold tracking-widest text-faint uppercase">
         Categories
       </p>
 
@@ -48,14 +48,14 @@ export const CategoryFilter = ({
               "font-grotesk flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",
               selected === null
                 ? "bg-primary-tint font-bold text-primary"
-                : "text-ink hover:bg-[#F5F3FC]",
+                : "text-ink hover:bg-surface-2",
             )}
           >
             <span>All products</span>
             <span
               className={cn(
                 "text-xs",
-                selected === null ? "text-primary" : "text-[#8A8F98]",
+                selected === null ? "text-primary" : "text-faint",
               )}
             >
               {total}
@@ -72,7 +72,7 @@ export const CategoryFilter = ({
               <div
                 className={cn(
                   "flex items-center gap-1 rounded-lg pr-1 transition-colors",
-                  isActive ? "bg-primary-tint" : "hover:bg-[#F5F3FC]",
+                  isActive ? "bg-primary-tint" : "hover:bg-surface-2",
                 )}
               >
                 <button
@@ -83,7 +83,7 @@ export const CategoryFilter = ({
                   <span
                     className={cn(
                       "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-                      isActive ? "bg-white" : "bg-primary-tint",
+                      isActive ? "bg-surface" : "bg-primary-tint",
                     )}
                   >
                     {createElement(glyphFor(node.name), {
@@ -102,7 +102,7 @@ export const CategoryFilter = ({
                   <span
                     className={cn(
                       "text-xs",
-                      isActive ? "text-primary" : "text-[#8A8F98]",
+                      isActive ? "text-primary" : "text-faint",
                     )}
                   >
                     {node.count}
@@ -116,7 +116,7 @@ export const CategoryFilter = ({
                     aria-label={
                       isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`
                     }
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-[#8A8F98] transition-colors hover:text-primary"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-faint transition-colors hover:text-primary"
                   >
                     <ChevronDown
                       size={16}
@@ -139,14 +139,14 @@ export const CategoryFilter = ({
                             "font-grotesk flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-colors",
                             childActive
                               ? "bg-primary-tint font-bold text-primary"
-                              : "text-[#62656B] hover:bg-[#F5F3FC]",
+                              : "text-muted hover:bg-surface-2",
                           )}
                         >
                           <span>{child.name}</span>
                           <span
                             className={cn(
                               "text-xs",
-                              childActive ? "text-primary" : "text-[#8A8F98]",
+                              childActive ? "text-primary" : "text-faint",
                             )}
                           >
                             {child.count}
