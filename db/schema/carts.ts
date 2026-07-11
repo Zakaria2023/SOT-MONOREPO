@@ -3,10 +3,12 @@ import {
   char,
   index,
   int,
+  mysqlEnum,
   mysqlTable,
   timestamp,
   unique,
 } from "drizzle-orm/mysql-core";
+import { cartItemKinds } from "../enum";
 import { Products } from "./products";
 import { Users } from "./users";
 
@@ -37,6 +39,8 @@ export const CartItems = mysqlTable(
       .references(() => Products.uuid, { onDelete: "cascade" }),
 
     quantity: int("quantity").default(1).notNull(),
+    // "solution" = added via a whole category; "product" = added on its own.
+    kind: mysqlEnum("kind", cartItemKinds).default("product").notNull(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

@@ -1,4 +1,5 @@
 import { AddToCartButton } from "@/components/home/add-to-cart-button";
+import { BuyNowButton } from "@/components/product/buy-now-button";
 import { documentDownloadUrl } from "@/lib/documents";
 import { formatPrice } from "utils";
 import {
@@ -115,14 +116,17 @@ export const ProductHero = ({
             </p>
           )}
 
-          <div className="mt-6 flex items-center justify-between gap-4 rounded-card border border-hairline bg-page/60 p-5">
+          <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-page/60 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-heading text-3xl text-ink">
                 {formatPrice(product.price, product.currency)}
               </p>
               <p className="mt-0.5 text-sm text-faint">per unit</p>
             </div>
-            {isAuthenticated && <AddToCartButton productUuid={product.uuid} />}
+            <div className="flex items-center gap-2">
+              <BuyNowButton />
+              {isAuthenticated && <AddToCartButton productUuid={product.uuid} />}
+            </div>
           </div>
 
           {statHighlights.length > 0 && (

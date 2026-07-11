@@ -21,6 +21,7 @@ export type CartLineItem = {
   unitPrice: SelectProducts["price"];
   currency: SelectProducts["currency"];
   quantity: SelectCartItems["quantity"];
+  kind: SelectCartItems["kind"];
 };
 
 // Reject a non-positive quantity before it reaches the database.
@@ -42,6 +43,7 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
       unitPrice: Products.price,
       currency: Products.currency,
       quantity: CartItems.quantity,
+      kind: CartItems.kind,
     })
     .from(Carts)
     .innerJoin(CartItems, eq(CartItems.cartUuid, Carts.uuid))
@@ -148,7 +150,7 @@ export const addToCart = async ({
   // (cart_uuid, product_uuid) turns a repeat add into a quantity bump.
   await db
     .insert(CartItems)
-    .values({ uuid: randomUUID(), cartUuid, productUuid, quantity })
+    .values({ uuid: randomUUID(), cartUuid, productUuid, quantity, kind: "product" })
     .onDuplicateKeyUpdate({
       set: { quantity: sql`${CartItems.quantity} + ${quantity}` },
     });
@@ -168,4 +170,40 @@ export const addToCart = async ({
     throw new Error("Failed to add item to cart");
   }
   return item;
+};
+
+/**
+ * Add every product in a category to the user's cart as a "solution" — a
+ * missing product is inserted, one already in the cart has its quantity bumped.
+ */
+export const addCategoryToCart = async (
+  userUuid: string,
+  categoryUuid: string,
+): Promise<void> => {
+  const products = await db
+    .select({ uuid: Products.uuid })
+    .from(Products)
+    .where(eq(Products.categoryUuid, categoryUuid));
+  if (products.length === 0) {
+    throw new ValidationError("This category has no products to add");
+  }
+
+  const cartUuid = await getOrCreateCartUuid(userUuid);
+
+  await db.transaction(async (tx) => {
+    for (const product of products) {
+      await tx
+        .insert(CartItems)
+        .values({
+          uuid: randomUUID(),
+          cartUuid,
+          productUuid: product.uuid,
+          quantity: 1,
+          kind: "solution",
+        })
+        .onDuplicateKeyUpdate({
+          set: { quantity: sql`${CartItems.quantity} + 1` },
+        });
+    }
+  });
 };

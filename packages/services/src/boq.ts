@@ -75,9 +75,11 @@ export const createBoqFromCart = async (
     .from(CartItems)
     .innerJoin(Products, eq(CartItems.productUuid, Products.uuid))
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
-    .where(eq(CartItems.cartUuid, cart.uuid));
+    .where(
+      and(eq(CartItems.cartUuid, cart.uuid), eq(CartItems.kind, "solution")),
+    );
   if (lines.length === 0) {
-    throw new ValidationError("Your cart is empty");
+    throw new ValidationError("Add a solution to your cart before sending a BOQ");
   }
 
   const boqUuid = randomUUID();
@@ -98,7 +100,11 @@ export const createBoqFromCart = async (
       })),
     );
 
-    await tx.delete(CartItems).where(eq(CartItems.cartUuid, cart.uuid));
+    await tx
+      .delete(CartItems)
+      .where(
+        and(eq(CartItems.cartUuid, cart.uuid), eq(CartItems.kind, "solution")),
+      );
 
     const [boq] = await tx.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
     if (!boq) {

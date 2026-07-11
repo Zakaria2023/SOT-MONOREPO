@@ -4,6 +4,8 @@ import { db } from "../../../db";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
 
+export type { SelectCategories };
+
 export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
   productCount: number;
