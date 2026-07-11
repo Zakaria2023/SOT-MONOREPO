@@ -1,14 +1,14 @@
 "use client";
 
+import type { ProductListItem } from "@/app/(dashboard)/products/action";
+import { ProductRowActions } from "@/components/products/product-row-actions";
+import type { ProductStatus } from "@/db/enum";
+import { PRODUCT_STATUS_LABELS } from "@/db/label";
+import { documentDownloadUrl } from "@/lib/documents";
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
-import { documentDownloadUrl } from "@/lib/documents";
-import { ProductRowActions } from "@/components/products/product-row-actions";
-import { Table } from "ui";
 import type { TableColumn } from "ui";
-import { PRODUCT_STATUS_LABELS } from "@/lib/label";
-import type { ProductStatus } from "@/lib/enum";
-import type { ProductListItem } from "@/app/(dashboard)/products/action";
+import { Table } from "ui";
 
 type ProductsTableProps = {
   products: ProductListItem[];

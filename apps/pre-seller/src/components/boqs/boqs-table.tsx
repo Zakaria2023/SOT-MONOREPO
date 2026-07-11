@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/helpers";
+import { formatMoney } from "utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { BoqListItem } from "services";
@@ -51,15 +51,18 @@ const COLUMNS: TableColumn<BoqListItem>[] = [
   {
     key: "status",
     header: "Status",
-    render: (boq) => (
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-          STATUS_BADGE_CLASSES[boq.status] ?? "bg-hover text-faint"
-        }`}
-      >
-        {STATUS_LABELS[boq.status] ?? boq.status}
-      </span>
-    ),
+    render: (boq) => {
+      const status = boq.status ?? "draft";
+      return (
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+            STATUS_BADGE_CLASSES[status] ?? "bg-hover text-faint"
+          }`}
+        >
+          {STATUS_LABELS[status] ?? status}
+        </span>
+      );
+    },
   },
   {
     key: "created",

@@ -1,6 +1,6 @@
 import { AddToCartButton } from "@/components/home/add-to-cart-button";
 import { documentDownloadUrl } from "@/lib/documents";
-import { formatPrice } from "@/lib/helpers";
+import { formatPrice } from "utils";
 import {
   ArrowLeft,
   Cpu,

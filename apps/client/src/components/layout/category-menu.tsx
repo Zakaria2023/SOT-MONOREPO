@@ -1,7 +1,7 @@
 "use client";
 
 import type { CategoryNode } from "@/lib/categories";
-import { formatPrice } from "@/lib/helpers";
+import { formatPrice } from "utils";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Layers, Package } from "lucide-react";
 import Link from "next/link";
@@ -57,7 +57,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
               "font-grotesk relative flex h-18 items-center text-sm font-medium transition-colors",
               activeTopUuid === parent.uuid
                 ? "text-primary"
-                : "text-[#3C3F46] hover:text-primary",
+                : "text-secondary hover:text-primary",
             )}
           >
             {parent.name}
@@ -72,10 +72,10 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
         <div
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
-          className="fixed inset-x-0 top-18 z-40 border-b border-[#ECEEF1] bg-white shadow-[0_24px_48px_-24px_rgba(20,22,27,0.25)]"
+          className="fixed inset-x-0 top-18 z-40 border-b border-hairline bg-surface-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)]"
         >
           <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-            <p className="font-grotesk text-xs font-bold tracking-widest text-[#8A8F98] uppercase">
+            <p className="font-grotesk text-xs font-bold tracking-widest text-faint uppercase">
               {activeTop.name}
             </p>
 
@@ -91,7 +91,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
                         <p className="font-heading text-base font-bold text-ink">
                           {child.name}
                         </p>
-                        <p className="font-grotesk text-xs text-[#8A8F98]">
+                        <p className="font-grotesk text-xs text-faint">
                           {child.productCount} products
                         </p>
                       </div>
@@ -108,7 +108,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
                                 "font-grotesk flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",
                                 activeLeafUuid === leaf.uuid
                                   ? "bg-primary-tint text-primary"
-                                  : "text-[#3C3F46] hover:text-primary",
+                                  : "text-secondary hover:text-primary",
                               )}
                             >
                               {leaf.name}
@@ -126,8 +126,8 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
             )}
 
             {activeLeaf && activeLeaf.products.length > 0 && (
-              <div className="mt-8 border-t border-[#ECEEF1] pt-6">
-                <p className="font-grotesk text-xs font-bold tracking-widest text-[#8A8F98] uppercase">
+              <div className="mt-8 border-t border-hairline pt-6">
+                <p className="font-grotesk text-xs font-bold tracking-widest text-faint uppercase">
                   In stock{" "}
                   <span className="text-primary">{activeLeaf.name}</span>
                 </p>
@@ -136,7 +136,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
                     <Link
                       key={product.uuid}
                       href={`/products/${product.slug}`}
-                      className="flex items-center gap-3 rounded-xl border border-[#ECEEF1] p-3 transition-colors hover:border-primary/40"
+                      className="flex items-center gap-3 rounded-xl border border-hairline p-3 transition-colors hover:border-primary/40"
                     >
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-tint text-primary">
                         <Package size={18} />
@@ -150,7 +150,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
                         <p className="font-heading text-sm font-bold text-ink">
                           {product.name}
                         </p>
-                        <p className="font-grotesk text-xs text-[#8A8F98]">
+                        <p className="font-grotesk text-xs text-faint">
                           {formatPrice(product.price, product.currency)}
                         </p>
                       </div>

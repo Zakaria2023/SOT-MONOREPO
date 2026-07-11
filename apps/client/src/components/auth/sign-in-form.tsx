@@ -23,10 +23,10 @@ export const SignInForm = () => {
   const keepSignedIn = watch("keepSignedIn");
 
   return (
-    <div className="relative w-full max-w-md rounded-3xl bg-white p-9 shadow-[0_30px_80px_-24px_rgba(20,22,27,0.2),0_24px_70px_-34px_rgba(124,58,237,0.5)]">
+    <div className="relative w-full max-w-md rounded-3xl bg-surface p-9 shadow-[0_30px_80px_-24px_rgba(20,22,27,0.2),0_24px_70px_-34px_rgba(124,58,237,0.5)]">
       <div>
         <h1 className="font-heading text-3xl text-ink">Welcome back</h1>
-        <p className="font-grotesk mt-2 text-sm text-[#62656B]">
+        <p className="font-grotesk mt-2 text-sm text-muted">
           New to Stratum?{" "}
           <Link href="/sign-up" className="font-bold text-primary">
             Create one
@@ -69,7 +69,7 @@ export const SignInForm = () => {
               type="button"
               onClick={() => setShowPassword((value) => !value)}
               aria-label={showPassword ? "Hide password" : "Show password"}
-              className="text-[#8A8F98] transition-colors hover:text-ink"
+              className="text-faint transition-colors hover:text-ink"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -88,7 +88,7 @@ export const SignInForm = () => {
               "flex h-5 w-5 items-center justify-center rounded-md border transition-colors",
               keepSignedIn
                 ? "border-primary bg-primary"
-                : "border-[#E3E4E9] bg-white",
+                : "border-search-border bg-surface",
             )}
           >
             {keepSignedIn && (

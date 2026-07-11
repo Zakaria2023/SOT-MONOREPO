@@ -9,7 +9,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { partnerRequestStatuses } from "../../apps/admin/src/lib/enum";
+import { partnerRequestStatuses } from "../enum";
 
 export const PartnerRequests = mysqlTable(
   "PartnerRequests",

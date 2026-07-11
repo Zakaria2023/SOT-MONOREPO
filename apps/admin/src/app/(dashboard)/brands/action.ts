@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { Brands, InsertBrands, SelectBrands } from "@/db/schema/brands";
-import { generateUuid } from "@/lib/helpers";
+import { generateUuid } from "utils";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { revalidatePath } from "next/cache";

@@ -12,17 +12,10 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { productStatuses } from "../../apps/admin/src/lib/enum";
-
-export type ProductHighlight = {
-  k: string;
-  v: string;
-};
-
-export type ProductSpecGroup = {
-  title: string;
-  rows: { k: string; v: string }[];
-};
+import { productStatuses } from "../enum";
+import { Highlight, SpecGroup } from "../types";
+import { Brands } from "./brands";
+import { Categories } from "./categories";
 
 export const Products = mysqlTable(
   "Products",
@@ -31,14 +24,18 @@ export const Products = mysqlTable(
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
     // Relations
-    categoryUuid: char("category_uuid", { length: 36 }).notNull(),
-    brandUuid: char("brand_uuid", { length: 36 }).notNull(),
+    categoryUuid: char("category_uuid", { length: 36 })
+      .notNull()
+      .references(() => Categories.uuid, { onDelete: "restrict" }),
+    brandUuid: char("brand_uuid", { length: 36 })
+      .notNull()
+      .references(() => Brands.uuid, { onDelete: "restrict" }),
 
     // Identity
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
-    sku: varchar("sku", { length: 100 }).unique(), // e.g. model / part number
-    model: varchar("model", { length: 255 }), // "Meridian Gateway Pro X"
+    sku: varchar("sku", { length: 100 }).unique(),
+    model: varchar("model", { length: 255 }),
 
     partNumber: varchar("part_number", { length: 255 }), // PN
     modelNumber: varchar("model_number", { length: 255 }), // MN
@@ -48,8 +45,8 @@ export const Products = mysqlTable(
     role: varchar("role", { length: 500 }), // "role in your network"
 
     // Media
-    image: varchar("image", { length: 255 }), // main image (document id)
-    images: json("images").$type<string[]>(), // sub images (document ids)
+    image: varchar("image", { length: 255 }),
+    images: json("images").$type<string[]>(),
 
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
@@ -61,8 +58,8 @@ export const Products = mysqlTable(
     // Inventory
     stock: int("stock").default(0),
 
-    highlights: json("highlights").$type<ProductHighlight[]>(), // [{ k: "Throughput", v: "10 Gbps" }, ...]
-    specGroups: json("spec_groups").$type<ProductSpecGroup[]>(), // [{ title, rows: [{ k, v }] }, ...]
+    highlights: json("highlights").$type<Highlight[]>(),
+    specGroups: json("spec_groups").$type<SpecGroup[]>(),
 
     // State & ordering
     status: mysqlEnum("status", productStatuses).default("draft"),

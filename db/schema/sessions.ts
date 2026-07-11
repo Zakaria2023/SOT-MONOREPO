@@ -7,6 +7,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { Users } from "./users";
 
 export const Sessions = mysqlTable(
   "Sessions",
@@ -14,9 +15,10 @@ export const Sessions = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-    userUuid: char("user_uuid", { length: 36 }).notNull(),
+    userUuid: char("user_uuid", { length: 36 })
+      .notNull()
+      .references(() => Users.uuid, { onDelete: "cascade" }),
 
-    // Hashed refresh token — the plaintext token is never stored.
     tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
 
     expiresAt: timestamp("expires_at").notNull(),

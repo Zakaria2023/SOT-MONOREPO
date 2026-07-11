@@ -13,7 +13,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
   const featured = categories.slice(0, 5);
 
   return (
-    <section className="w-full bg-white py-24">
+    <section className="w-full bg-surface py-24">
       <div className="mx-auto max-w-6xl px-8">
         <header>
           <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
@@ -24,7 +24,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
           </h2>
 
           <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <p className="font-grotesk max-w-md text-base leading-relaxed text-[#62656B]">
+            <p className="font-grotesk max-w-md text-base leading-relaxed text-muted">
               Browse the categories our engineers deploy most — every product
               genuine, configured and installation-ready.
             </p>

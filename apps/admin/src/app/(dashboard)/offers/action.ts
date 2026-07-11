@@ -1,6 +1,6 @@
 "use server";
 
-import { getReviewerName } from "@/lib/helpers";
+import { getReviewerName } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {

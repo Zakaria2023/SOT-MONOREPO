@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney, offerTotal } from "@/lib/helpers";
+import { formatMoney, offerTotal } from "utils";
 import { cn } from "@/lib/utils";
 import { Check, CreditCard } from "lucide-react";
 import type { SelectOffers } from "services";
@@ -30,8 +30,8 @@ export const OfferCard = ({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-[18px] border bg-white p-6 transition-colors",
-        selected ? "border-primary ring-4 ring-primary/15" : "border-[#ECEEF1]",
+        "flex flex-col rounded-[18px] border bg-surface p-6 transition-colors",
+        selected ? "border-primary ring-4 ring-primary/15" : "border-hairline",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -39,7 +39,7 @@ export const OfferCard = ({
           <p className="font-heading text-lg font-semibold text-ink">
             {offer.partnerName ?? "Partner"}
           </p>
-          <p className="font-grotesk text-xs text-[#8A8F98]">
+          <p className="font-grotesk text-xs text-faint">
             {SCOPE_LABELS[offer.serviceScope] ?? offer.serviceScope}
           </p>
         </div>
@@ -52,33 +52,33 @@ export const OfferCard = ({
       </div>
 
       {boqReference && (
-        <p className="font-grotesk mt-2 text-xs text-[#8A8F98]">
+        <p className="font-grotesk mt-2 text-xs text-faint">
           For {boqReference}
         </p>
       )}
 
       <div className="font-grotesk mt-5 flex flex-col gap-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-[#62656B]">Product</span>
+          <span className="text-muted">Product</span>
           <span className="text-ink">
             {formatMoney(Number(offer.productPrice), currency)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-[#62656B]">Installation</span>
+          <span className="text-muted">Installation</span>
           <span className="text-ink">
             {formatMoney(Number(offer.installPrice), currency)}
           </span>
         </div>
         {offer.programmingPrice && (
           <div className="flex justify-between">
-            <span className="text-[#62656B]">Programming</span>
+            <span className="text-muted">Programming</span>
             <span className="text-ink">
               {formatMoney(Number(offer.programmingPrice), currency)}
             </span>
           </div>
         )}
-        <div className="mt-1 flex items-center justify-between border-t border-[#ECEEF1] pt-3">
+        <div className="mt-1 flex items-center justify-between border-t border-hairline pt-3">
           <span className="font-medium text-ink">Total</span>
           <span className="font-heading text-2xl tabular-nums text-ink">
             {formatMoney(offerTotal(offer), currency)}
@@ -87,7 +87,7 @@ export const OfferCard = ({
       </div>
 
       {offer.description && (
-        <p className="font-grotesk mt-4 whitespace-pre-wrap text-sm text-[#62656B]">
+        <p className="font-grotesk mt-4 whitespace-pre-wrap text-sm text-muted">
           {offer.description}
         </p>
       )}

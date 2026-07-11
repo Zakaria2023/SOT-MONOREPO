@@ -2,42 +2,45 @@ import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
-import { Boqs } from "../../../db/schema/boqs";
+import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import { Offers, SelectOffers } from "../../../db/schema/offers";
-import { PartnerRequests } from "../../../db/schema/partner-requests";
-import { Users } from "../../../db/schema/users";
+import {
+  PartnerRequests,
+  SelectPartnerRequests,
+} from "../../../db/schema/partner-requests";
+import { SelectUsers, Users } from "../../../db/schema/users";
+import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 
 export type { SelectOffers };
 
 export type ApprovedPartner = {
-  partnerRequestUuid: string;
-  name: string;
-  serviceScope: string;
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  name: string; // companyName || fullName — composed, no single column
+  serviceScope: SelectPartnerRequests["serviceScope"];
 };
 
 export type CreateOfferInput = {
-  partnerClerkUserId: string;
-  boqUuid: string;
-  productPrice: string;
-  installPrice: string;
-  programmingPrice?: string;
-  description: string;
+  partnerClerkUserId: SelectOffers["partnerClerkUserId"];
+  boqUuid: SelectOffers["boqUuid"];
+  productPrice: SelectOffers["productPrice"];
+  installPrice: SelectOffers["installPrice"];
+  programmingPrice?: NonNullable<SelectOffers["programmingPrice"]>;
+  description: SelectOffers["description"];
 };
 
 export type OfferReviewInput = {
-  offerUuid: string;
-  reviewedByClerkUserId?: string | null;
-  reviewedByName?: string | null;
+  offerUuid: SelectOffers["uuid"];
+  reviewedByClerkUserId?: SelectOffers["reviewedByClerkUserId"];
+  reviewedByName?: SelectOffers["reviewedByName"];
 };
 
 export type RejectOfferInput = OfferReviewInput & {
-  rejectionReason: string;
+  rejectionReason: NonNullable<SelectOffers["rejectionReason"]>;
 };
 
-/** An offer enriched with its BOQ reference and customer (admin list). */
 export type OfferListItem = SelectOffers & {
-  boqReference: string | null;
-  customerName: string | null;
+  boqReference: SelectBoqs["reference"] | null;
+  customerName: SelectUsers["fullName"] | null;
 };
 
 /** The approved partner profile (scope/name) behind a Clerk user, or null. */
@@ -101,10 +104,14 @@ export const createOrUpdateOffer = async (
         eq(BoqPartners.partnerClerkUserId, input.partnerClerkUserId),
       ),
     );
-  if (!dispatch) throw new Error("This BOQ was not sent to you");
+  if (!dispatch) {
+    throw new ForbiddenError("This BOQ was not sent to you");
+  }
 
   const partner = await getApprovedPartnerByClerkId(input.partnerClerkUserId);
-  if (!partner) throw new Error("Partner profile not found");
+  if (!partner) {
+    throw new ValidationError("Partner profile not found");
+  }
 
   const programmingPrice =
     partner.serviceScope === "install-program"
@@ -114,7 +121,7 @@ export const createOrUpdateOffer = async (
     partner.serviceScope === "install-program" &&
     (!programmingPrice || programmingPrice.length === 0)
   ) {
-    throw new Error("Programming price is required");
+    throw new ValidationError("Programming price is required");
   }
 
   const existing = await getPartnerOffer(
@@ -125,7 +132,9 @@ export const createOrUpdateOffer = async (
     existing &&
     (existing.status === "approved" || existing.status === "selected")
   ) {
-    throw new Error("Your offer has already been approved and can't be changed");
+    throw new ConflictError(
+      "Your offer has already been approved and can't be changed",
+    );
   }
 
   const values = {
@@ -156,7 +165,9 @@ export const createOrUpdateOffer = async (
       input.partnerClerkUserId,
       input.boqUuid,
     );
-    if (!updated) throw new Error("Failed to save offer");
+    if (!updated) {
+      throw new Error("Failed to save offer");
+    }
     return updated;
   }
 
@@ -169,7 +180,9 @@ export const createOrUpdateOffer = async (
   });
 
   const [created] = await db.select().from(Offers).where(eq(Offers.uuid, uuid));
-  if (!created) throw new Error("Failed to save offer");
+  if (!created) {
+    throw new Error("Failed to save offer");
+  }
   return created;
 };
 
@@ -186,6 +199,7 @@ export const listOffers = async (): Promise<OfferListItem[]> =>
     .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
     .orderBy(desc(Offers.createdAt));
 
+/** The offer with this uuid, or null. */
 export const getOfferByUuid = async (
   uuid: string,
 ): Promise<SelectOffers | null> => {
@@ -200,9 +214,11 @@ export const approveOffer = async ({
   reviewedByName = null,
 }: OfferReviewInput): Promise<void> => {
   const offer = await getOfferByUuid(offerUuid);
-  if (!offer) throw new Error("Offer not found");
+  if (!offer) {
+    throw new ValidationError("Offer not found");
+  }
   if (offer.status !== "pending") {
-    throw new Error("This offer has already been reviewed");
+    throw new ConflictError("This offer has already been reviewed");
   }
 
   await db
@@ -226,9 +242,11 @@ export const rejectOffer = async ({
   reviewedByName = null,
 }: RejectOfferInput): Promise<void> => {
   const offer = await getOfferByUuid(offerUuid);
-  if (!offer) throw new Error("Offer not found");
+  if (!offer) {
+    throw new ValidationError("Offer not found");
+  }
   if (offer.status !== "pending") {
-    throw new Error("This offer has already been reviewed");
+    throw new ConflictError("This offer has already been reviewed");
   }
 
   await db
@@ -255,7 +273,7 @@ const getOwnedBoq = async (userUuid: string, boqUuid: string) => {
 
 /** An approved/selected offer enriched with its BOQ reference (customer view). */
 export type OfferForUser = SelectOffers & {
-  boqReference: string | null;
+  boqReference: SelectBoqs["reference"] | null;
 };
 
 /**
@@ -284,21 +302,19 @@ export const getOffersForUser = async (
 export const getApprovedOffersForUser = async (
   userUuid: string,
   boqUuid: string,
-): Promise<SelectOffers[]> => {
-  const boq = await getOwnedBoq(userUuid, boqUuid);
-  if (!boq) return [];
-
-  return db
-    .select()
+): Promise<SelectOffers[]> =>
+  db
+    .select(getTableColumns(Offers))
     .from(Offers)
+    .innerJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
     .where(
       and(
-        eq(Offers.boqUuid, boqUuid),
+        eq(Boqs.uuid, boqUuid),
+        eq(Boqs.userUuid, userUuid),
         inArray(Offers.status, ["approved", "selected"]),
       ),
     )
     .orderBy(desc(Offers.status), Offers.createdAt);
-};
 
 /** Marks one approved offer as the customer's selection (replaces any prior). */
 export const selectOffer = async ({
@@ -311,24 +327,29 @@ export const selectOffer = async ({
   offerUuid: string;
 }): Promise<void> => {
   const boq = await getOwnedBoq(userUuid, boqUuid);
-  if (!boq) throw new Error("BOQ not found");
+  if (!boq) {
+    throw new ValidationError("BOQ not found");
+  }
 
   const offer = await getOfferByUuid(offerUuid);
   if (!offer || offer.boqUuid !== boqUuid) {
-    throw new Error("Offer not found");
+    throw new ValidationError("Offer not found");
   }
   if (offer.status !== "approved" && offer.status !== "selected") {
-    throw new Error("This offer can't be selected");
+    throw new ConflictError("This offer can't be selected");
   }
 
-  // Reset any previously selected offer on this BOQ back to approved.
-  await db
-    .update(Offers)
-    .set({ status: "approved", selectedAt: null })
-    .where(and(eq(Offers.boqUuid, boqUuid), eq(Offers.status, "selected")));
+  // Swap the selection atomically: demote any currently selected offer on this
+  // BOQ back to approved, then mark the chosen one selected.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(Offers)
+      .set({ status: "approved", selectedAt: null })
+      .where(and(eq(Offers.boqUuid, boqUuid), eq(Offers.status, "selected")));
 
-  await db
-    .update(Offers)
-    .set({ status: "selected", selectedAt: new Date() })
-    .where(eq(Offers.uuid, offerUuid));
+    await tx
+      .update(Offers)
+      .set({ status: "selected", selectedAt: new Date() })
+      .where(eq(Offers.uuid, offerUuid));
+  });
 };

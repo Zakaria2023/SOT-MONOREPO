@@ -8,17 +8,9 @@ import {
   text,
   timestamp,
   varchar,
+  type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
-
-export type CategoryHighlight = {
-  k: string;
-  v: string;
-};
-
-export type CategorySpecGroup = {
-  title: string;
-  rows: { k: string; v: string }[];
-};
+import { Highlight, SpecGroup } from "../types";
 
 export const Categories = mysqlTable(
   "Categories",
@@ -26,7 +18,10 @@ export const Categories = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-    parentUuid: char("parent_uuid", { length: 36 }),
+    parentUuid: char("parent_uuid", { length: 36 }).references(
+      (): AnyMySqlColumn => Categories.uuid,
+      { onDelete: "set null" },
+    ),
 
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
@@ -34,9 +29,8 @@ export const Categories = mysqlTable(
 
     image: varchar("image", { length: 255 }),
 
-    // Default spec structure inherited by products assigned to this category.
-    highlights: json("highlights").$type<CategoryHighlight[]>(),
-    specGroups: json("spec_groups").$type<CategorySpecGroup[]>(),
+    highlights: json("highlights").$type<Highlight[]>(),
+    specGroups: json("spec_groups").$type<SpecGroup[]>(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

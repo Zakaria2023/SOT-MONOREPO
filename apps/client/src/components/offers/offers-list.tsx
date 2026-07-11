@@ -28,9 +28,9 @@ export const OffersList = ({ offers }: OffersListProps) => {
 
   if (offers.length === 0) {
     return (
-      <div className="mt-8 rounded-[18px] border border-dashed border-[#E3E4E9] p-10 text-center">
+      <div className="mt-8 rounded-[18px] border border-dashed border-search-border p-10 text-center">
         <h2 className="font-heading text-xl text-ink">No offers yet</h2>
-        <p className="font-grotesk mt-1 text-sm text-[#62656B]">
+        <p className="font-grotesk mt-1 text-sm text-muted">
           Once our partners quote your BOQs, their approved offers will show up
           here.
         </p>
@@ -63,7 +63,7 @@ export const OffersList = ({ offers }: OffersListProps) => {
         ))}
       </div>
 
-      <p className="font-grotesk mt-6 flex items-center gap-2 text-xs text-[#9CA0A8]">
+      <p className="font-grotesk mt-6 flex items-center gap-2 text-xs text-faint">
         <Package size={14} />
         Payment is coming soon — selecting an offer just reserves your choice for
         now.

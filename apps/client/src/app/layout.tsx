@@ -12,9 +12,13 @@ type Props = {
   children: ReactNode;
 };
 
+// Applies the saved (or system) theme before first paint to avoid a flash.
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+
 const RootLayout = ({ children }: Props) => (
-  <html lang="en" className="h-full antialiased">
+  <html lang="en" suppressHydrationWarning className="h-full antialiased">
     <body className="min-h-full flex flex-col font-sans">
+      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       <Navbar />
       {children}
     </body>

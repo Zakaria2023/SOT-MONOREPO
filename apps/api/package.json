@@ -14,7 +14,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "services": "workspace:*",
-    "storage": "workspace:*"
+    "storage": "workspace:*",
+    "validators": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20",

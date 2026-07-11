@@ -97,7 +97,7 @@ export const HowItWorks = () => {
   return (
     <section
       ref={sectionRef}
-      className="w-full border-y border-[#ECEEF1] bg-linear-to-b from-[#FAF8FF] to-[#F5F6FA] pt-22 pb-26"
+      className="w-full border-y border-hairline bg-page pt-22 pb-26"
     >
       <header className="mx-auto max-w-xl px-6 text-center">
         <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
@@ -106,7 +106,7 @@ export const HowItWorks = () => {
         <h2 className="font-heading mt-4 text-4xl leading-tight text-ink">
           From request to a running network.
         </h2>
-        <p className="font-grotesk mt-4 text-lg text-[#62656B]">
+        <p className="font-grotesk mt-4 text-lg text-muted">
           Four steps. We handle every layer of the deployment — and you sign off
           at each checkpoint.
         </p>
@@ -115,7 +115,7 @@ export const HowItWorks = () => {
       <ol className="relative mx-auto mt-16 flex max-w-4xl flex-col gap-12 px-6 md:mt-20 md:gap-4">
         <div
           aria-hidden="true"
-          className="absolute top-0 bottom-0 left-6 w-0.75 -translate-x-1/2 rounded-full bg-[#E7E0F3] md:left-1/2"
+          className="absolute top-0 bottom-0 left-6 z-0 w-0.75 -translate-x-1/2 rounded-full bg-hairline md:left-1/2"
         >
           <div
             className="w-full rounded-full bg-linear-to-b from-violet-400 to-primary"
@@ -140,7 +140,7 @@ export const HowItWorks = () => {
               <span
                 className={cn(
                   "absolute top-1/2 left-6 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-primary shadow-[0_8px_24px_-6px_rgba(124,58,237,0.5)] transition-all duration-500 motion-safe:ease-spring md:left-1/2",
-                  isLast ? "bg-primary" : "bg-white",
+                  isLast ? "bg-primary" : "bg-page",
                   isVisible ? "" : "motion-safe:scale-50 motion-safe:opacity-0",
                 )}
               >
@@ -165,14 +165,14 @@ export const HowItWorks = () => {
                     : "motion-safe:translate-y-11 motion-safe:opacity-0",
                 )}
               >
-                <div className="max-w-sm rounded-[18px] border border-[#EFEAF7] bg-white p-6 shadow-[0_18px_40px_rgba(20,22,27,0.07)]">
+                <div className="max-w-sm rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_rgba(20,22,27,0.07)]">
                   <p className="font-grotesk text-xs font-semibold tracking-wider text-primary uppercase">
                     {step.label}
                   </p>
                   <h3 className="font-heading mt-2 text-xl text-ink">
                     {step.title}
                   </h3>
-                  <p className="font-grotesk mt-2 text-sm leading-relaxed text-[#62656B]">
+                  <p className="font-grotesk mt-2 text-sm leading-relaxed text-muted">
                     {step.body}
                   </p>
                 </div>

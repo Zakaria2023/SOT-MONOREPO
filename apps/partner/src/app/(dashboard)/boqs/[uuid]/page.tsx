@@ -1,5 +1,5 @@
 import { OfferForm } from "@/components/offers/offer-form";
-import { formatMoney, offerTotal } from "@/lib/helpers";
+import { formatMoney, lineTotal, offerTotal, summarizeCart } from "utils";
 import { requirePartner } from "@/lib/server/auth";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
@@ -44,10 +44,7 @@ const BoqDetailPage = async ({ params }: Props) => {
 
   const { boq, items } = detail;
   const currency = items[0]?.currency ?? "SAR";
-  const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * item.quantity,
-    0,
-  );
+  const { subtotal } = summarizeCart(items);
   const showProgramming = partner?.serviceScope === "install-program";
   const editable =
     !offer || offer.status === "pending" || offer.status === "rejected";
@@ -96,7 +93,7 @@ const BoqDetailPage = async ({ params }: Props) => {
             <div className="flex items-center gap-6">
               <p className="text-sm text-muted">Qty {item.quantity}</p>
               <p className="w-28 text-right font-semibold tabular-nums text-ink">
-                {formatMoney(Number(item.unitPrice) * item.quantity, currency)}
+                {formatMoney(lineTotal(item.unitPrice, item.quantity), currency)}
               </p>
             </div>
           </div>

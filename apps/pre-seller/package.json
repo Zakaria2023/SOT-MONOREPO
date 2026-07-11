@@ -17,7 +17,8 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.80.0",
     "services": "workspace:*",
-    "ui": "workspace:*"
+    "ui": "workspace:*",
+    "utils": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

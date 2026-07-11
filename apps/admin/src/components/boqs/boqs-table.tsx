@@ -2,12 +2,12 @@
 
 import type { PreSellerOption } from "@/app/(dashboard)/boqs/action";
 import { AssignPreSeller } from "@/components/boqs/assign-pre-seller";
-import { Table } from "ui";
-import type { TableColumn } from "ui";
-import type { BoqStatus } from "@/lib/enum";
-import { formatSar } from "@/lib/helpers";
-import { BOQ_STATUS_LABELS } from "@/lib/label";
+import type { BoqStatus } from "@/db/enum";
+import { BOQ_STATUS_LABELS } from "@/db/label";
+import { formatSar } from "utils";
 import type { BoqListItem } from "services";
+import type { TableColumn } from "ui";
+import { Table } from "ui";
 
 type BoqsTableProps = {
   boqs: BoqListItem[];
@@ -50,13 +50,16 @@ const buildColumns = (
   {
     key: "status",
     header: "Status",
-    render: (boq) => (
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[boq.status]}`}
-      >
-        {BOQ_STATUS_LABELS[boq.status]}
-      </span>
-    ),
+    render: (boq) => {
+      const status = boq.status ?? "draft";
+      return (
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[status]}`}
+        >
+          {BOQ_STATUS_LABELS[status]}
+        </span>
+      );
+    },
   },
   {
     key: "assigned",

@@ -9,7 +9,9 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { boqStatuses } from "../../apps/admin/src/lib/enum";
+import { boqStatuses } from "../enum";
+import { Products } from "./products";
+import { Users } from "./users";
 
 export const Boqs = mysqlTable(
   "Boqs",
@@ -18,13 +20,13 @@ export const Boqs = mysqlTable(
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
     // The end user who created the BOQ.
-    userUuid: char("user_uuid", { length: 36 }).notNull(),
+    userUuid: char("user_uuid", { length: 36 })
+      .notNull()
+      .references(() => Users.uuid, { onDelete: "restrict" }),
 
     reference: varchar("reference", { length: 50 }).notNull(),
-    status: mysqlEnum("status", boqStatuses).default("draft").notNull(),
+    status: mysqlEnum("status", boqStatuses).default("draft"),
 
-    // The pre-seller (Clerk user) an admin has assigned this BOQ to. The name is
-    // denormalized here because pre-sellers live in Clerk, not the Users table.
     assignedPreSellerId: varchar("assigned_pre_seller_id", { length: 64 }),
     assignedPreSellerName: varchar("assigned_pre_seller_name", { length: 255 }),
 
@@ -40,15 +42,18 @@ export const Boqs = mysqlTable(
   ],
 );
 
-// Line items are snapshotted at BOQ creation so the quote stays fixed.
 export const BoqItems = mysqlTable(
   "BoqItems",
   {
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-    boqUuid: char("boq_uuid", { length: 36 }).notNull(),
-    productUuid: char("product_uuid", { length: 36 }).notNull(),
+    boqUuid: char("boq_uuid", { length: 36 })
+      .notNull()
+      .references(() => Boqs.uuid, { onDelete: "cascade" }),
+    productUuid: char("product_uuid", { length: 36 })
+      .notNull()
+      .references(() => Products.uuid, { onDelete: "restrict" }),
 
     name: varchar("name", { length: 255 }).notNull(),
     categoryName: varchar("category_name", { length: 255 }),
@@ -59,7 +64,10 @@ export const BoqItems = mysqlTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
-  (table) => [index("idx_boq_items_boq_uuid").on(table.boqUuid)],
+  (table) => [
+    index("idx_boq_items_boq_uuid").on(table.boqUuid),
+    index("idx_boq_items_product_uuid").on(table.productUuid),
+  ],
 );
 
 export type SelectBoqs = InferSelectModel<typeof Boqs>;

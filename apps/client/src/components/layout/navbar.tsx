@@ -1,5 +1,6 @@
 import { CategoryMenu } from "@/components/layout/category-menu";
 import { ProfileMenu } from "@/components/layout/profile-menu";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 import { buildCategoryTree } from "@/lib/categories";
 import { getCachedCategories, getCachedProducts } from "@/lib/data";
@@ -17,7 +18,7 @@ export const Navbar = async () => {
   const tree = buildCategoryTree(categories, products);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#ECEEF1] bg-white shadow-[0_1px_3px_rgba(20,22,27,0.06)]">
+    <header className="sticky top-0 z-50 w-full border-b border-hairline bg-page/80 shadow-[0_1px_3px_rgba(20,22,27,0.06)] backdrop-blur-xl">
       <nav className="mx-auto flex h-18 max-w-7xl items-center justify-between px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
@@ -30,9 +31,10 @@ export const Navbar = async () => {
 
         {user ? (
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/support"
-              className="font-grotesk hidden text-sm font-medium text-[#3C3F46] transition-colors hover:text-primary sm:block"
+              className="font-grotesk hidden text-sm font-medium text-secondary transition-colors hover:text-primary sm:block"
             >
               Support
             </Link>
@@ -45,7 +47,7 @@ export const Navbar = async () => {
             <Link
               href="/cart"
               aria-label="Cart"
-              className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#E3E4E9] text-[#3C3F46] transition-colors hover:text-primary"
+              className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-search-border text-secondary transition-colors hover:text-primary"
             >
               <ShoppingCart size={18} />
               {cartCount > 0 && (
@@ -58,15 +60,16 @@ export const Navbar = async () => {
           </div>
         ) : (
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/partner"
-              className="font-grotesk hidden text-sm font-medium text-[#3C3F46] transition-colors hover:text-primary sm:block"
+              className="font-grotesk hidden text-sm font-medium text-secondary transition-colors hover:text-primary sm:block"
             >
               Become a partner
             </Link>
             <Link
               href="/sign-in"
-              className="font-grotesk rounded-[10px] border border-[#E3E4E9] px-4 py-2.5 text-sm font-medium text-[#3C3F46] transition-colors hover:bg-[#F5F3FB] hover:text-primary"
+              className="font-grotesk rounded-[10px] border border-search-border px-4 py-2.5 text-sm font-medium text-secondary transition-colors hover:bg-surface-2 hover:text-primary"
             >
               Sign in
             </Link>

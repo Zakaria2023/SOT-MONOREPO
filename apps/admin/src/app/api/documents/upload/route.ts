@@ -1,5 +1,5 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { generateUuid } from "@/lib/helpers";
+import { generateUuid } from "utils";
 import {
   cloudflareR2,
   CLOUDFLARE_R2_BUCKET_NAME,
