@@ -1,6 +1,6 @@
 import { readBody } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { loginUser } from "services";
+import { loginUser, toErrorResponse } from "services";
 import { loginSchema } from "validators";
 
 export const POST = async (request: Request) => {
@@ -19,9 +19,7 @@ export const POST = async (request: Request) => {
     });
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to sign in." },
-      { status: 401 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };

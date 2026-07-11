@@ -15,6 +15,7 @@ import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
+import { ConflictError, ValidationError } from "./errors";
 import {
   getApprovedPartnerOptions,
   type BoqPartnerOptions,
@@ -59,7 +60,7 @@ export const createBoqFromCart = async (
     .from(Carts)
     .where(eq(Carts.userUuid, userUuid));
   if (!cart) {
-    throw new Error("Your cart is empty");
+    throw new ValidationError("Your cart is empty");
   }
 
   const lines = await db
@@ -76,7 +77,7 @@ export const createBoqFromCart = async (
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
     .where(eq(CartItems.cartUuid, cart.uuid));
   if (lines.length === 0) {
-    throw new Error("Your cart is empty");
+    throw new ValidationError("Your cart is empty");
   }
 
   const boqUuid = randomUUID();
@@ -253,10 +254,10 @@ const loadAssignedDraftBoq = async (
       and(eq(Boqs.uuid, boqUuid), eq(Boqs.assignedPreSellerId, preSellerId)),
     );
   if (!boq) {
-    throw new Error("BOQ not found");
+    throw new ValidationError("BOQ not found");
   }
   if (boq.status !== "draft") {
-    throw new Error("This BOQ has already been submitted");
+    throw new ConflictError("This BOQ has already been submitted");
   }
   return boq;
 };
@@ -310,7 +311,7 @@ export const submitReviewedBoq = async ({
       .where(eq(BoqItems.boqUuid, boqUuid))
       .limit(1);
     if (!firstItem) {
-      throw new Error("Add at least one item before submitting");
+      throw new ValidationError("Add at least one item before submitting");
     }
 
     const location = await getCustomerLocation(boq.userUuid, tx);
@@ -328,7 +329,7 @@ export const submitReviewedBoq = async ({
     });
     const partners = [...selectedClose, ...selectedOthers];
     if (partners.length === 0) {
-      throw new Error("Select at least one partner to send this BOQ to");
+      throw new ValidationError("Select at least one partner to send this BOQ to");
     }
 
     await tx

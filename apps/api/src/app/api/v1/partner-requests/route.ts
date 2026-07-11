@@ -1,6 +1,6 @@
 import { readBody } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { createPartnerRequest } from "services";
+import { createPartnerRequest, toErrorResponse } from "services";
 import { partnerRequestSchema } from "validators";
 
 export const POST = async (request: Request) => {
@@ -16,14 +16,7 @@ export const POST = async (request: Request) => {
     const created = await createPartnerRequest(parsed.data);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to submit partner request.",
-      },
-      { status: 400 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };

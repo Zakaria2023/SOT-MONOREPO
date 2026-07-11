@@ -5,6 +5,7 @@ import {
   PartnerRequests,
   SelectPartnerRequests,
 } from "../../../db/schema/partner-requests";
+import { ConflictError, ValidationError } from "./errors";
 
 /**
  * A database handle that is either the base connection or an open transaction,
@@ -67,7 +68,7 @@ export const createPartnerRequest = async (
     .orderBy(desc(PartnerRequests.createdAt));
 
   if (existingActiveRequest) {
-    throw new Error(
+    throw new ConflictError(
       existingActiveRequest.status === "approved"
         ? "This email has already been approved as a partner."
         : "A partner request with this email is already pending review.",
@@ -129,11 +130,11 @@ export const approvePartnerRequest = async ({
   const request = await getPartnerRequestByUuid(partnerRequestUuid);
 
   if (!request) {
-    throw new Error("Partner request not found");
+    throw new ValidationError("Partner request not found");
   }
 
   if (request.status !== "pending") {
-    throw new Error("This partner request has already been reviewed");
+    throw new ConflictError("This partner request has already been reviewed");
   }
 
   await db
@@ -160,11 +161,11 @@ export const rejectPartnerRequest = async ({
   const request = await getPartnerRequestByUuid(partnerRequestUuid);
 
   if (!request) {
-    throw new Error("Partner request not found");
+    throw new ValidationError("Partner request not found");
   }
 
   if (request.status !== "pending") {
-    throw new Error("This partner request has already been reviewed");
+    throw new ConflictError("This partner request has already been reviewed");
   }
 
   await db

@@ -5,7 +5,11 @@ import {
   unauthorized,
 } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { removeCartItem, updateCartItemQuantity } from "services";
+import {
+  removeCartItem,
+  toErrorResponse,
+  updateCartItemQuantity,
+} from "services";
 
 type Params = {
   params: Promise<{ uuid: string }>;
@@ -31,13 +35,8 @@ export const PATCH = async (request: Request, { params }: Params) => {
     });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to update cart item",
-      },
-      { status: 400 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };
 

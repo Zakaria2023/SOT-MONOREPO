@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { Sessions } from "../../../db/schema/sessions";
 import { InsertUsers, SelectUsers, Users } from "../../../db/schema/users";
+import { AuthError, ConflictError } from "./errors";
 
 /** A user safe to return to a caller — never includes the password hash. */
 export type AuthUser = Omit<SelectUsers, "password">;
@@ -103,7 +104,7 @@ export const registerUser = async (
     .from(Users)
     .where(eq(Users.email, input.email));
   if (existing.length > 0) {
-    throw new Error("An account with this email already exists");
+    throw new ConflictError("An account with this email already exists");
   }
 
   const uuid = randomUUID();
@@ -122,10 +123,10 @@ export const loginUser = async ({
   password,
 }: LoginUserInput): Promise<AuthResult> => {
   const [user] = await db.select().from(Users).where(eq(Users.email, email));
-  if (!user) throw new Error("Invalid email or password");
+  if (!user) throw new AuthError("Invalid email or password");
 
   const valid = await verifyPassword(password, user.password);
-  if (!valid) throw new Error("Invalid email or password");
+  if (!valid) throw new AuthError("Invalid email or password");
 
   return createSession(user);
 };
@@ -145,13 +146,13 @@ export const refreshSession = async (
     .where(
       and(eq(Sessions.tokenHash, tokenHash), gt(Sessions.expiresAt, new Date())),
     );
-  if (!session) throw new Error("Invalid or expired session");
+  if (!session) throw new AuthError("Invalid or expired session");
 
   const [user] = await db
     .select()
     .from(Users)
     .where(eq(Users.uuid, session.userUuid));
-  if (!user) throw new Error("Invalid or expired session");
+  if (!user) throw new AuthError("Invalid or expired session");
 
   await db.delete(Sessions).where(eq(Sessions.id, session.id));
 

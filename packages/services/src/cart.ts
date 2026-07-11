@@ -4,6 +4,7 @@ import { db } from "../../../db";
 import { CartItems, Carts, SelectCartItems } from "../../../db/schema/carts";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
+import { ValidationError } from "./errors";
 
 export type AddToCartInput = {
   userUuid: string;
@@ -25,7 +26,7 @@ export type CartLineItem = {
 // Reject a non-positive quantity before it reaches the database.
 const assertValidQuantity = (quantity: number): void => {
   if (quantity < 1) {
-    throw new Error("Quantity must be at least 1");
+    throw new ValidationError("Quantity must be at least 1");
   }
 };
 
@@ -77,7 +78,7 @@ export const updateCartItemQuantity = async ({
 
   const id = await findOwnedCartItemId(userUuid, cartItemUuid);
   if (id === null) {
-    throw new Error("Cart item not found");
+    throw new ValidationError("Cart item not found");
   }
 
   await db.update(CartItems).set({ quantity }).where(eq(CartItems.id, id));
@@ -138,7 +139,7 @@ export const addToCart = async ({
     .from(Products)
     .where(eq(Products.uuid, productUuid));
   if (!product) {
-    throw new Error("Product not found");
+    throw new ValidationError("Product not found");
   }
 
   const cartUuid = await getOrCreateCartUuid(userUuid);

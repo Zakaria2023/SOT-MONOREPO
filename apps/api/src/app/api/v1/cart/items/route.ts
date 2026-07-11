@@ -6,7 +6,7 @@ import {
   unauthorized,
 } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { addToCart } from "services";
+import { addToCart, toErrorResponse } from "services";
 
 export const POST = async (request: Request) => {
   const user = await getUserFromRequest(request);
@@ -32,11 +32,7 @@ export const POST = async (request: Request) => {
     });
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to add to cart",
-      },
-      { status: 400 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };

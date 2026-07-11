@@ -9,6 +9,7 @@ import {
   SelectPartnerRequests,
 } from "../../../db/schema/partner-requests";
 import { SelectUsers, Users } from "../../../db/schema/users";
+import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 
 export type { SelectOffers };
 
@@ -104,12 +105,12 @@ export const createOrUpdateOffer = async (
       ),
     );
   if (!dispatch) {
-    throw new Error("This BOQ was not sent to you");
+    throw new ForbiddenError("This BOQ was not sent to you");
   }
 
   const partner = await getApprovedPartnerByClerkId(input.partnerClerkUserId);
   if (!partner) {
-    throw new Error("Partner profile not found");
+    throw new ValidationError("Partner profile not found");
   }
 
   const programmingPrice =
@@ -120,7 +121,7 @@ export const createOrUpdateOffer = async (
     partner.serviceScope === "install-program" &&
     (!programmingPrice || programmingPrice.length === 0)
   ) {
-    throw new Error("Programming price is required");
+    throw new ValidationError("Programming price is required");
   }
 
   const existing = await getPartnerOffer(
@@ -131,7 +132,7 @@ export const createOrUpdateOffer = async (
     existing &&
     (existing.status === "approved" || existing.status === "selected")
   ) {
-    throw new Error(
+    throw new ConflictError(
       "Your offer has already been approved and can't be changed",
     );
   }
@@ -214,10 +215,10 @@ export const approveOffer = async ({
 }: OfferReviewInput): Promise<void> => {
   const offer = await getOfferByUuid(offerUuid);
   if (!offer) {
-    throw new Error("Offer not found");
+    throw new ValidationError("Offer not found");
   }
   if (offer.status !== "pending") {
-    throw new Error("This offer has already been reviewed");
+    throw new ConflictError("This offer has already been reviewed");
   }
 
   await db
@@ -242,10 +243,10 @@ export const rejectOffer = async ({
 }: RejectOfferInput): Promise<void> => {
   const offer = await getOfferByUuid(offerUuid);
   if (!offer) {
-    throw new Error("Offer not found");
+    throw new ValidationError("Offer not found");
   }
   if (offer.status !== "pending") {
-    throw new Error("This offer has already been reviewed");
+    throw new ConflictError("This offer has already been reviewed");
   }
 
   await db
@@ -326,14 +327,16 @@ export const selectOffer = async ({
   offerUuid: string;
 }): Promise<void> => {
   const boq = await getOwnedBoq(userUuid, boqUuid);
-  if (!boq) throw new Error("BOQ not found");
+  if (!boq) {
+    throw new ValidationError("BOQ not found");
+  }
 
   const offer = await getOfferByUuid(offerUuid);
   if (!offer || offer.boqUuid !== boqUuid) {
-    throw new Error("Offer not found");
+    throw new ValidationError("Offer not found");
   }
   if (offer.status !== "approved" && offer.status !== "selected") {
-    throw new Error("This offer can't be selected");
+    throw new ConflictError("This offer can't be selected");
   }
 
   // Swap the selection atomically: demote any currently selected offer on this

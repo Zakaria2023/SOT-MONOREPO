@@ -5,7 +5,7 @@ import {
   unauthorized,
 } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { selectOffer } from "services";
+import { selectOffer, toErrorResponse } from "services";
 
 type Params = {
   params: Promise<{ uuid: string }>;
@@ -27,11 +27,7 @@ export const POST = async (request: Request, { params }: Params) => {
     await selectOffer({ userUuid: user.uuid, boqUuid: uuid, offerUuid });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to select offer",
-      },
-      { status: 400 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };

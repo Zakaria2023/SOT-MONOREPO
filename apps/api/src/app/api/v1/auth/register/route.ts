@@ -1,6 +1,6 @@
 import { readBody } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { registerUser } from "services";
+import { registerUser, toErrorResponse } from "services";
 import { registerSchema } from "validators";
 
 export const POST = async (request: Request) => {
@@ -20,12 +20,7 @@ export const POST = async (request: Request) => {
     const result = await registerUser(input);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to create account.",
-      },
-      { status: 400 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };

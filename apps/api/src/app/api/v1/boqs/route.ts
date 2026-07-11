@@ -1,6 +1,6 @@
 import { getUserFromRequest, unauthorized } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { createBoqFromCart, getUserBoqs } from "services";
+import { createBoqFromCart, getUserBoqs, toErrorResponse } from "services";
 
 export const GET = async (request: Request) => {
   const user = await getUserFromRequest(request);
@@ -22,9 +22,7 @@ export const POST = async (request: Request) => {
     const boq = await createBoqFromCart(user.uuid);
     return NextResponse.json(boq, { status: 201 });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create BOQ" },
-      { status: 400 },
-    );
+    const { status, message } = toErrorResponse(error);
+    return NextResponse.json({ error: message }, { status });
   }
 };
