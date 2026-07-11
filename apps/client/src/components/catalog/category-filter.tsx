@@ -1,10 +1,11 @@
 "use client";
 
-import { glyphFor } from "@/lib/catalog-icons";
 import { type TreeNode } from "@/lib/catalog";
+import { documentDownloadUrl } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-import { createElement, useState } from "react";
+import Image from "next/image";
+import { useState } from "react";
 import type { CategoryListItem } from "services";
 
 type CategoryFilterProps = {
@@ -82,14 +83,23 @@ export const CategoryFilter = ({
                 >
                   <span
                     className={cn(
-                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+                      "relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg",
                       isActive ? "bg-surface" : "bg-primary-tint",
                     )}
                   >
-                    {createElement(glyphFor(node.name), {
-                      size: 15,
-                      className: "text-primary",
-                    })}
+                    {node.image ? (
+                      <Image
+                        src={documentDownloadUrl(node.image)}
+                        alt={node.name}
+                        fill
+                        unoptimized
+                        className="object-contain p-0.5"
+                      />
+                    ) : (
+                      <span className="font-heading text-xs font-bold text-primary">
+                        {node.name.charAt(0)}
+                      </span>
+                    )}
                   </span>
                   <span
                     className={cn(
