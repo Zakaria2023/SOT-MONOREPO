@@ -1,4 +1,15 @@
-import { and, asc, eq, getTableColumns, inArray, ne } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  ne,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
@@ -13,8 +24,49 @@ export type ProductDetail = ProductListItem & {
   category: SelectCategories | null;
 };
 
-export const getProducts = async (): Promise<ProductListItem[]> => {
+export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
+
+export type ProductFilters = {
+  /** Case-insensitive match against product name or brand name. */
+  search?: string;
+  /** Restrict to these category uuids (pass a whole subtree to include children). */
+  categoryUuids?: string[];
+  /** Restrict to these brand uuids (pass a whole subtree to include children). */
+  brandUuids?: string[];
+  /** Column ordering applied in SQL. */
+  sort?: ProductSort;
+};
+
+// SQL ordering for each sort option.
+const productOrder = (sort: ProductSort | undefined) => {
+  switch (sort) {
+    case "price-asc":
+      return [asc(Products.price)];
+    case "price-desc":
+      return [desc(Products.price)];
+    case "name":
+      return [asc(Products.name)];
+    default:
+      return [desc(Products.isFeatured), asc(Products.order)];
+  }
+};
+
+export const getProducts = async (
+  filters: ProductFilters = {},
+): Promise<ProductListItem[]> => {
   try {
+    const conditions: (SQL | undefined)[] = [];
+    if (filters.search) {
+      const term = `%${filters.search}%`;
+      conditions.push(or(like(Products.name, term), like(Brands.name, term)));
+    }
+    if (filters.categoryUuids && filters.categoryUuids.length > 0) {
+      conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
+    }
+    if (filters.brandUuids && filters.brandUuids.length > 0) {
+      conditions.push(inArray(Products.brandUuid, filters.brandUuids));
+    }
+
     return await db
       .select({
         ...getTableColumns(Products),
@@ -24,7 +76,8 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
-      .orderBy(asc(Products.order));
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(...productOrder(filters.sort));
   } catch {
     throw new Error("Failed to fetch products");
   }
