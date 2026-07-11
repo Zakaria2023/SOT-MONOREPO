@@ -1,7 +1,7 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import {
-  cloudflareR2,
-  CLOUDFLARE_R2_BUCKET_NAME,
+  getCloudflareR2,
+  getR2BucketName,
   createDocumentObjectKey,
 } from "storage";
 
@@ -12,9 +12,9 @@ export const DELETE = async (
   try {
     const { documentId } = await context.params;
 
-    await cloudflareR2.send(
+    await getCloudflareR2().send(
       new DeleteObjectCommand({
-        Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: getR2BucketName(),
         Key: createDocumentObjectKey(documentId),
       }),
     );
