@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3003",
-    "build": "next build",
-    "start": "next start --port 3003",
+    "dev": "dotenv -e ../../.env.local -- next dev --port 3003",
+    "build": "dotenv -e ../../.env.local -- next build",
+    "start": "dotenv -e ../../.env.local -- next start --port 3003",
     "lint": "eslint",
     "type-check": "tsc --noEmit"
   },
