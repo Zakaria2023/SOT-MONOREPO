@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowRight, Server, ShieldCheck, Sparkles, Wrench } from "lucide-react";
+import {
+  ArrowRight,
+  Layers,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -57,6 +64,13 @@ export const TechHero = () => (
               size={17}
               className="transition-transform group-hover:translate-x-0.5"
             />
+          </Link>
+          <Link
+            href="/categories"
+            className="font-grotesk inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface px-6 py-3.5 text-sm font-semibold text-ink transition-colors hover:border-search-border hover:bg-hover"
+          >
+            <Layers size={17} className="text-accent-cyan" />
+            Shop by solution
           </Link>
           <button
             type="button"

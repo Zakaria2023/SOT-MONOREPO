@@ -30,3 +30,10 @@ export const offerStatuses = [
 ] as const satisfies readonly string[];
 
 export type OfferStatus = (typeof offerStatuses)[number];
+
+export const cartItemKinds = [
+  "solution",
+  "product",
+] as const satisfies readonly string[];
+
+export type CartItemKind = (typeof cartItemKinds)[number];

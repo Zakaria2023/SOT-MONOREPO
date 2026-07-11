@@ -3,10 +3,12 @@ import {
   char,
   index,
   int,
+  mysqlEnum,
   mysqlTable,
   timestamp,
   unique,
 } from "drizzle-orm/mysql-core";
+import { cartItemKinds } from "../enum";
 import { Products } from "./products";
 import { Users } from "./users";
 
@@ -37,6 +39,8 @@ export const CartItems = mysqlTable(
       .references(() => Products.uuid, { onDelete: "cascade" }),
 
     quantity: int("quantity").default(1).notNull(),
+    // "solution" = added via a whole category; "product" = added on its own.
+    kind: mysqlEnum("kind", cartItemKinds).default("product").notNull(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -44,8 +48,14 @@ export const CartItems = mysqlTable(
   (table) => [
     index("idx_cart_items_cart_uuid").on(table.cartUuid),
     index("idx_cart_items_product_uuid").on(table.productUuid),
-    // A product appears at most once per cart — adding again bumps the quantity.
-    unique("uq_cart_items_cart_product").on(table.cartUuid, table.productUuid),
+    // A product appears at most once per kind per cart, so the same product can
+    // live as its own "product" line and inside a "solution" independently —
+    // adding again bumps the quantity of the matching-kind row.
+    unique("uq_cart_items_cart_product_kind").on(
+      table.cartUuid,
+      table.productUuid,
+      table.kind,
+    ),
   ],
 );
 

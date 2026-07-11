@@ -50,10 +50,13 @@ export type PartnerBoqDetail = BoqDetail & {
   preSellerComment: SelectBoqPartners["preSellerComment"];
 };
 
-// Create a draft BOQ from the user's cart, snapshotting each line, then empty
-// the cart — all in one transaction.
+// Create a draft BOQ from one solution in the user's cart — the solution lines
+// belonging to the given category — snapshotting each line, then removing just
+// those lines from the cart. All in one transaction; other solutions and the
+// user's standalone products stay in the cart.
 export const createBoqFromCart = async (
   userUuid: string,
+  categoryUuid: string,
 ): Promise<SelectBoqs> => {
   const [cart] = await db
     .select({ uuid: Carts.uuid })
@@ -75,11 +78,18 @@ export const createBoqFromCart = async (
     .from(CartItems)
     .innerJoin(Products, eq(CartItems.productUuid, Products.uuid))
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
-    .where(eq(CartItems.cartUuid, cart.uuid));
+    .where(
+      and(
+        eq(CartItems.cartUuid, cart.uuid),
+        eq(CartItems.kind, "solution"),
+        eq(Products.categoryUuid, categoryUuid),
+      ),
+    );
   if (lines.length === 0) {
-    throw new ValidationError("Your cart is empty");
+    throw new ValidationError("Add a solution to your cart before sending a BOQ");
   }
 
+  const productUuids = lines.map((line) => line.productUuid);
   const boqUuid = randomUUID();
   const reference = `BOQ-${boqUuid.slice(0, 8).toUpperCase()}`;
 
@@ -98,7 +108,15 @@ export const createBoqFromCart = async (
       })),
     );
 
-    await tx.delete(CartItems).where(eq(CartItems.cartUuid, cart.uuid));
+    await tx
+      .delete(CartItems)
+      .where(
+        and(
+          eq(CartItems.cartUuid, cart.uuid),
+          eq(CartItems.kind, "solution"),
+          inArray(CartItems.productUuid, productUuids),
+        ),
+      );
 
     const [boq] = await tx.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
     if (!boq) {
