@@ -155,8 +155,10 @@ export const addToCart = async ({
       set: { quantity: sql`${CartItems.quantity} + ${quantity}` },
     });
 
-  // No RETURNING on MySQL — read the row back by its unique pair (the row's own
-  // uuid differs from the one above when it was an update, not an insert).
+  // No RETURNING on MySQL — read the row back by its unique triple (the row's
+  // own uuid differs from the one above when it was an update, not an insert).
+  // Scope to the "product" kind so a solution line for the same product, if any,
+  // isn't picked up instead.
   const [item] = await db
     .select()
     .from(CartItems)
@@ -164,6 +166,7 @@ export const addToCart = async ({
       and(
         eq(CartItems.cartUuid, cartUuid),
         eq(CartItems.productUuid, productUuid),
+        eq(CartItems.kind, "product"),
       ),
     );
   if (!item) {
