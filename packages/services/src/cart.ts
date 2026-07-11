@@ -16,6 +16,7 @@ export type CartLineItem = {
   uuid: SelectCartItems["uuid"];
   productUuid: SelectCartItems["productUuid"];
   name: SelectProducts["name"];
+  categoryUuid: SelectProducts["categoryUuid"];
   categoryName: SelectCategories["name"] | null;
   image: SelectProducts["image"];
   unitPrice: SelectProducts["price"];
@@ -38,6 +39,7 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
       uuid: CartItems.uuid,
       productUuid: CartItems.productUuid,
       name: Products.name,
+      categoryUuid: Products.categoryUuid,
       categoryName: Categories.name,
       image: Products.image,
       unitPrice: Products.price,

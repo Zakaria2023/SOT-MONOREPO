@@ -11,15 +11,27 @@ export const GET = async (request: Request) => {
   return NextResponse.json(await getUserBoqs(user.uuid));
 };
 
-// Checkout: turn the caller's cart into a new draft BOQ.
+// Checkout: turn one solution (category) in the caller's cart into a draft BOQ.
 export const POST = async (request: Request) => {
   const user = await getUserFromRequest(request);
   if (!user) {
     return unauthorized();
   }
 
+  const body: unknown = await request.json().catch(() => null);
+  const categoryUuid =
+    typeof body === "object" && body !== null && "categoryUuid" in body
+      ? (body as { categoryUuid: unknown }).categoryUuid
+      : null;
+  if (typeof categoryUuid !== "string" || categoryUuid.length === 0) {
+    return NextResponse.json(
+      { error: "categoryUuid is required" },
+      { status: 400 },
+    );
+  }
+
   try {
-    const boq = await createBoqFromCart(user.uuid);
+    const boq = await createBoqFromCart(user.uuid, categoryUuid);
     return NextResponse.json(boq, { status: 201 });
   } catch (error) {
     const { status, message } = toErrorResponse(error);

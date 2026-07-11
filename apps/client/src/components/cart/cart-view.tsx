@@ -30,6 +30,7 @@ type CartRowProps = {
 };
 
 type CartSectionProps = {
+  eyebrow?: string;
   title: string;
   subtitle: string;
   items: CartLineItem[];
@@ -104,6 +105,7 @@ const CartRow = ({ item, currency, onQuantity, onRemove }: CartRowProps) => (
 );
 
 const CartSection = ({
+  eyebrow,
   title,
   subtitle,
   items,
@@ -118,6 +120,11 @@ const CartSection = ({
     <section className="rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
+          {eyebrow && (
+            <p className="font-grotesk text-xs font-semibold uppercase tracking-wide text-primary">
+              {eyebrow}
+            </p>
+          )}
           <h2 className="font-heading text-xl text-ink">{title}</h2>
           <p className="font-grotesk mt-0.5 text-sm text-faint">{subtitle}</p>
         </div>
@@ -207,8 +214,19 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
 
   const currency = items[0]?.currency ?? "SAR";
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const solutions = items.filter((item) => item.kind === "solution");
   const products = items.filter((item) => item.kind === "product");
+
+  // Each solution (a whole category added at once) gets its own checkout card,
+  // keyed by the category its products belong to.
+  const solutionGroups = new Map<string, CartLineItem[]>();
+  for (const item of items) {
+    if (item.kind !== "solution" || !item.categoryUuid) {
+      continue;
+    }
+    const group = solutionGroups.get(item.categoryUuid) ?? [];
+    group.push(item);
+    solutionGroups.set(item.categoryUuid, group);
+  }
 
   return (
     <main className="min-h-screen w-full bg-page">
@@ -232,16 +250,23 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
           </p>
         ) : (
           <div className="mt-8 flex flex-col gap-6">
-            {solutions.length > 0 && (
+            {[...solutionGroups.entries()].map(([categoryUuid, groupItems]) => (
               <CartSection
-                title="Solution"
+                key={categoryUuid}
+                eyebrow="Solution"
+                title={groupItems[0]?.categoryName ?? "Solution"}
                 subtitle="Sent as a BOQ — our team reviews it and returns a quote."
-                items={solutions}
+                items={groupItems}
                 currency={currency}
                 onQuantity={onQuantity}
                 onRemove={onRemove}
                 footer={
                   <form action={checkout}>
+                    <input
+                      type="hidden"
+                      name="categoryUuid"
+                      value={categoryUuid}
+                    />
                     <button
                       type="submit"
                       className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
@@ -252,7 +277,7 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
                   </form>
                 }
               />
-            )}
+            ))}
 
             {products.length > 0 && (
               <CartSection
