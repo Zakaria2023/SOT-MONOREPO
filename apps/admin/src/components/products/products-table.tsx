@@ -9,6 +9,7 @@ import { ImageOff } from "lucide-react";
 import Image from "next/image";
 import type { TableColumn } from "ui";
 import { Table } from "ui";
+import { formatPrice } from "utils";
 
 type ProductsTableProps = {
   products: ProductListItem[];
@@ -63,7 +64,12 @@ const columns: TableColumn<ProductListItem>[] = [
     key: "price",
     header: "Price",
     align: "right",
-    render: (product) => `${product.price} ${product.currency}`,
+    render: (product) =>
+      product.price ? (
+        formatPrice(product.price, product.currency)
+      ) : (
+        <span className="text-faint">Set by partner</span>
+      ),
   },
   {
     key: "status",

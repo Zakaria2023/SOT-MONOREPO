@@ -164,11 +164,11 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.currency?.message}
           />
           <Input
-            label="Price"
+            label="Price (optional)"
             labelIcon={<Coins size={15} />}
             type="text"
             inputMode="decimal"
-            placeholder="0.00"
+            placeholder="Set by partner"
             {...register("price")}
             error={errors.price?.message}
           />

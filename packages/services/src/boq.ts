@@ -102,7 +102,7 @@ export const createBoqFromCart = async (
         productUuid: line.productUuid,
         name: line.name,
         categoryName: line.categoryName,
-        unitPrice: line.unitPrice,
+        unitPrice: line.unitPrice ?? "0",
         currency: line.currency,
         quantity: line.quantity,
       })),
