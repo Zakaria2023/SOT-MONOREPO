@@ -2,6 +2,8 @@
 
 import { useSignUpForm } from "@/app/sign-up/use-sign-up-form";
 import { LocationPicker } from "@/components/location/location-picker";
+import { PhoneInput } from "@/components/auth/phone-input";
+import { SocialButtons } from "@/components/auth/social-buttons";
 import {
   ArrowRight,
   Building2,
@@ -11,7 +13,6 @@ import {
   Lock,
   Mail,
   MessageSquare,
-  Phone,
   User,
 } from "lucide-react";
 import Link from "next/link";
@@ -84,14 +85,16 @@ export const SignUpForm = () => {
               {...register("email")}
             />
 
-            <Input
-              label="Phone"
-              type="tel"
-              placeholder="+966 5X XXX XXXX"
-              icon={<Phone size={16} />}
-              autoComplete="tel"
-              error={errors.phone?.message}
-              {...register("phone")}
+            <Controller
+              control={control}
+              name="phone"
+              render={({ field }) => (
+                <PhoneInput
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.phone?.message}
+                />
+              )}
             />
 
             <Input
@@ -168,6 +171,8 @@ export const SignUpForm = () => {
               {isPending ? "Creating account…" : "Create account"}
               <ArrowRight size={18} />
             </button>
+
+            <SocialButtons />
           </form>
         </>
       ) : (

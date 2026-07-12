@@ -1,6 +1,7 @@
 "use client";
 
 import { useSignInForm } from "@/app/sign-in/use-sign-in-form";
+import { SocialButtons } from "@/components/auth/social-buttons";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Check, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import Link from "next/link";
@@ -112,6 +113,8 @@ export const SignInForm = () => {
           {isPending ? "Signing in…" : "Sign in"}
           <ArrowRight size={18} />
         </button>
+
+        <SocialButtons />
       </form>
     </div>
   );
