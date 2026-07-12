@@ -17,9 +17,11 @@ export const productFormSchema = z.object({
   images: z.array(z.string()).optional(),
   isFeatured: z.boolean(),
   price: z
-    .string()
-    .min(1, "Price is required")
-    .regex(/^\d+(\.\d{1,2})?$/, "Enter a valid price"),
+    .union([
+      z.literal(""),
+      z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid price"),
+    ])
+    .optional(),
   currency: z.string().min(1, "Required").max(3),
   stock: z.number().int().min(0).optional(),
   highlights: z.array(highlightSchema).optional(),

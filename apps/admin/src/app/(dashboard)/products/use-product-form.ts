@@ -66,7 +66,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
         image: values.image || null,
         images: values.images ?? [],
         isFeatured: values.isFeatured,
-        price: values.price,
+        price: values.price || null,
         currency: values.currency,
         stock: values.stock,
         highlights: values.highlights ?? [],

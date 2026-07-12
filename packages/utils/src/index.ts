@@ -19,23 +19,35 @@ export const formatMoney = (amount: number, currency: string | null): string =>
 export const formatSar = (amount: number): string =>
   `SAR ${Math.round(amount).toLocaleString("en-US")}`;
 
-/** Formats a decimal price string with its currency, e.g. "SAR 4,200". */
-export const formatPrice = (price: string, currency: string | null): string =>
-  `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+/**
+ * Formats a decimal price string with its currency, e.g. "SAR 4,200". A product
+ * may have no price yet (a partner sets it when quoting), so fall back to a
+ * "Price on request" label when it's missing.
+ */
+export const formatPrice = (
+  price: string | null,
+  currency: string | null,
+): string =>
+  price
+    ? `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`
+    : "Price on request";
 
 // Saudi VAT rate applied to BOQ/cart subtotals, as a whole-number percentage.
 const VAT_PERCENT = 15;
 
-/** Parse a decimal money value (string or number) into integer minor units. */
-export const toMinorUnits = (value: string | number): number =>
-  Math.round(Number(value) * 100);
+/**
+ * Parse a decimal money value into integer minor units. A missing price (null)
+ * counts as zero, so an unpriced product doesn't break cart/BOQ totals.
+ */
+export const toMinorUnits = (value: string | number | null): number =>
+  Math.round(Number(value ?? 0) * 100);
 
 /** Convert integer minor units back to a major-unit number (420055 -> 4200.55). */
 export const fromMinorUnits = (minor: number): number => minor / 100;
 
 /** Exact line total (unit price x quantity) in major units. */
 export const lineTotal = (
-  unitPrice: string | number,
+  unitPrice: string | number | null,
   quantity: number,
 ): number => fromMinorUnits(toMinorUnits(unitPrice) * quantity);
 
@@ -51,7 +63,7 @@ export type CartTotals = {
  * back to major units once at the end.
  */
 export const summarizeCart = (
-  lines: { unitPrice: string | number; quantity: number }[],
+  lines: { unitPrice: string | number | null; quantity: number }[],
 ): CartTotals => {
   const subtotalMinor = lines.reduce(
     (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,

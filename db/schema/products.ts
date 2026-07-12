@@ -51,8 +51,8 @@ export const Products = mysqlTable(
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
 
-    // Pricing
-    price: decimal("price", { precision: 12, scale: 2 }).notNull(),
+    // Pricing — optional; a partner can set the price when they quote the product.
+    price: decimal("price", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
 
     // Inventory

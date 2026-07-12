@@ -53,6 +53,10 @@ describe("formatPrice", () => {
   it("defaults currency to SAR", () => {
     expect(formatPrice("4200", null)).toBe("SAR 4,200");
   });
+
+  it("falls back to a label when the price is unset", () => {
+    expect(formatPrice(null, "SAR")).toBe("Price on request");
+  });
 });
 
 describe("toMinorUnits / fromMinorUnits", () => {
@@ -104,6 +108,16 @@ describe("summarizeCart", () => {
 
   it("returns zeros for an empty cart", () => {
     expect(summarizeCart([])).toEqual({ subtotal: 0, vat: 0, total: 0 });
+  });
+
+  it("treats an unpriced line as zero", () => {
+    const { subtotal, vat, total } = summarizeCart([
+      { unitPrice: null, quantity: 3 },
+      { unitPrice: "100.00", quantity: 1 },
+    ]);
+    expect(subtotal).toBe(100);
+    expect(vat).toBe(15);
+    expect(total).toBe(115);
   });
 });
 
