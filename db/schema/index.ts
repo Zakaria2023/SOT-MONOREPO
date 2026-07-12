@@ -6,5 +6,4 @@ export * from "./categories";
 export * from "./offers";
 export * from "./partner-requests";
 export * from "./products";
-export * from "./sessions";
 export * from "./users";

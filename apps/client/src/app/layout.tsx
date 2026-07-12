@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -16,13 +17,15 @@ type Props = {
 const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
 const RootLayout = ({ children }: Props) => (
-  <html lang="en" suppressHydrationWarning className="h-full antialiased">
-    <body className="min-h-full flex flex-col font-sans">
-      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-      <Navbar />
-      {children}
-    </body>
-  </html>
+  <ClerkProvider>
+    <html lang="en" suppressHydrationWarning className="h-full antialiased">
+      <body className="min-h-full flex flex-col font-sans">
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <Navbar />
+        {children}
+      </body>
+    </html>
+  </ClerkProvider>
 );
 
 export default RootLayout;

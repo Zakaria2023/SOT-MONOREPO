@@ -1,167 +1,107 @@
-import {
-  generateRefreshToken,
-  hashPassword,
-  hashRefreshToken,
-  REFRESH_TOKEN_TTL_SECONDS,
-  signAccessToken,
-  verifyPassword,
-} from "auth";
-
-export {
-  ACCESS_TOKEN_TTL_SECONDS,
-  REFRESH_TOKEN_TTL_SECONDS,
-  verifyAccessToken,
-} from "auth";
-export type { AccessTokenPayload } from "auth";
-import { and, eq, gt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
-import { Sessions } from "../../../db/schema/sessions";
 import { InsertUsers, SelectUsers, Users } from "../../../db/schema/users";
-import { AuthError, ConflictError } from "./errors";
 
-/** A user safe to return to a caller — never includes the password hash. */
-export type AuthUser = Omit<SelectUsers, "password">;
+/**
+ * The signed-in user. Identity (email/phone/password/verification) is owned by
+ * Clerk; this row is our profile store, kept in sync by the Clerk webhook. Both
+ * transports (web Server Actions and the mobile REST API) resolve the caller to
+ * one of these via their Clerk user id.
+ */
+export type AuthUser = SelectUsers;
 
-export type AuthResult = {
-  user: AuthUser;
-  accessToken: string;
-  refreshToken: string;
-};
-
-export type RegisterUserInput = Omit<
-  InsertUsers,
-  "id" | "uuid" | "createdAt" | "updatedAt"
->;
-
-export type LoginUserInput = {
+/** Fields the Clerk webhook mirrors into our profile row. */
+export type ClerkUserSync = {
+  clerkUserId: string;
   email: string;
-  password: string;
+  fullName: string;
+  phone: string | null;
+  companyName: string | null;
+  location: string | null;
+  image: string | null;
 };
 
-const toAuthUser = (user: SelectUsers): AuthUser => {
-  const { password: _password, ...rest } = user;
-  void _password;
-  return rest;
-};
-
-/** Looks up a user by uuid, returning them without the password hash. */
+/** Looks up a user by our internal uuid. */
 export const getUserByUuid = async (
   uuid: string,
 ): Promise<AuthUser | null> => {
   const [user] = await db.select().from(Users).where(eq(Users.uuid, uuid));
-  return user ? toAuthUser(user) : null;
+  return user ?? null;
 };
 
 /**
- * Resolves the user behind a still-valid refresh token *without* rotating it.
- * The web client uses this to keep a session alive after the short-lived access
- * token expires: identity survives for the refresh token's lifetime even while
- * idle. Returns null if the token is unknown or its session has lapsed. Token
- * rotation stays in `refreshSession` (used by the mobile refresh endpoint).
+ * Resolves the profile row behind a Clerk user id. This is the single lookup
+ * both transports use after Clerk has verified the caller (cookie session on
+ * the web, Bearer session token on mobile). Returns null when no synced row
+ * exists yet — e.g. the webhook hasn't landed.
  */
-export const getUserByRefreshToken = async (
-  refreshToken: string,
+export const getUserByClerkId = async (
+  clerkUserId: string,
 ): Promise<AuthUser | null> => {
-  const tokenHash = hashRefreshToken(refreshToken);
-
-  const [session] = await db
-    .select({ userUuid: Sessions.userUuid })
-    .from(Sessions)
-    .where(
-      and(eq(Sessions.tokenHash, tokenHash), gt(Sessions.expiresAt, new Date())),
-    );
-  if (!session) return null;
-
-  return getUserByUuid(session.userUuid);
-};
-
-/**
- * Issues a session for a user: generates a refresh token, stores its hash in
- * the Sessions table, and signs a short-lived access token.
- */
-const createSession = async (user: SelectUsers): Promise<AuthResult> => {
-  const refreshToken = generateRefreshToken();
-  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
-
-  await db.insert(Sessions).values({
-    uuid: randomUUID(),
-    userUuid: user.uuid,
-    tokenHash: hashRefreshToken(refreshToken),
-    expiresAt,
-  });
-
-  const accessToken = signAccessToken({ sub: user.uuid, email: user.email });
-
-  return { user: toAuthUser(user), accessToken, refreshToken };
-};
-
-export const registerUser = async (
-  input: RegisterUserInput,
-): Promise<AuthResult> => {
-  const existing = await db
-    .select({ id: Users.id })
-    .from(Users)
-    .where(eq(Users.email, input.email));
-  if (existing.length > 0) {
-    throw new ConflictError("An account with this email already exists");
-  }
-
-  const uuid = randomUUID();
-  const password = await hashPassword(input.password);
-
-  await db.insert(Users).values({ ...input, uuid, password });
-
-  const [user] = await db.select().from(Users).where(eq(Users.uuid, uuid));
-  if (!user) throw new Error("Failed to create user");
-
-  return createSession(user);
-};
-
-export const loginUser = async ({
-  email,
-  password,
-}: LoginUserInput): Promise<AuthResult> => {
-  const [user] = await db.select().from(Users).where(eq(Users.email, email));
-  if (!user) throw new AuthError("Invalid email or password");
-
-  const valid = await verifyPassword(password, user.password);
-  if (!valid) throw new AuthError("Invalid email or password");
-
-  return createSession(user);
-};
-
-/**
- * Validates a refresh token against the Sessions table and rotates it: the
- * old session is deleted and a fresh access + refresh token pair is issued.
- */
-export const refreshSession = async (
-  refreshToken: string,
-): Promise<AuthResult> => {
-  const tokenHash = hashRefreshToken(refreshToken);
-
-  const [session] = await db
-    .select()
-    .from(Sessions)
-    .where(
-      and(eq(Sessions.tokenHash, tokenHash), gt(Sessions.expiresAt, new Date())),
-    );
-  if (!session) throw new AuthError("Invalid or expired session");
-
   const [user] = await db
     .select()
     .from(Users)
-    .where(eq(Users.uuid, session.userUuid));
-  if (!user) throw new AuthError("Invalid or expired session");
-
-  await db.delete(Sessions).where(eq(Sessions.id, session.id));
-
-  return createSession(user);
+    .where(eq(Users.clerkUserId, clerkUserId));
+  return user ?? null;
 };
 
-/** Revokes a session by deleting the row matching the refresh token. */
-export const logoutUser = async (refreshToken: string): Promise<void> => {
-  await db
-    .delete(Sessions)
-    .where(eq(Sessions.tokenHash, hashRefreshToken(refreshToken)));
+/**
+ * Upserts a profile row from a Clerk `user.created` / `user.updated` event,
+ * keyed by the Clerk user id. Called only from the Clerk webhook — Clerk is the
+ * source of truth for identity, this keeps our relational profile in step so the
+ * rest of the app (carts, BOQs, etc.) can keep joining on `Users.uuid`.
+ */
+export const syncClerkUser = async (
+  input: ClerkUserSync,
+): Promise<AuthUser> => {
+  const [existing] = await db
+    .select()
+    .from(Users)
+    .where(eq(Users.clerkUserId, input.clerkUserId));
+
+  if (existing) {
+    const values = {
+      email: input.email,
+      fullName: input.fullName,
+      phone: input.phone,
+      companyName: input.companyName,
+      location: input.location,
+      image: input.image,
+    } satisfies Partial<InsertUsers>;
+
+    await db.update(Users).set(values).where(eq(Users.id, existing.id));
+
+    const [updated] = await db
+      .select()
+      .from(Users)
+      .where(eq(Users.id, existing.id));
+    if (!updated) {
+      throw new Error("Failed to update synced user");
+    }
+    return updated;
+  }
+
+  const uuid = randomUUID();
+  await db.insert(Users).values({
+    uuid,
+    clerkUserId: input.clerkUserId,
+    email: input.email,
+    fullName: input.fullName,
+    phone: input.phone,
+    companyName: input.companyName,
+    location: input.location,
+    image: input.image,
+  });
+
+  const [created] = await db.select().from(Users).where(eq(Users.uuid, uuid));
+  if (!created) {
+    throw new Error("Failed to create synced user");
+  }
+  return created;
+};
+
+/** Removes a profile row on a Clerk `user.deleted` event. No-op if absent. */
+export const deleteClerkUser = async (clerkUserId: string): Promise<void> => {
+  await db.delete(Users).where(eq(Users.clerkUserId, clerkUserId));
 };

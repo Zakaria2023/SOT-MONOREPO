@@ -11,14 +11,17 @@ export const Users = mysqlTable("Users", {
   id: int("id").primaryKey().autoincrement(),
   uuid: char("uuid", { length: 36 }).notNull().unique(),
 
+  // Identity is owned by Clerk; this links our profile row to the Clerk user.
+  // Kept in sync by the Clerk webhook (see apps/client webhooks/clerk route).
+  clerkUserId: varchar("clerk_user_id", { length: 255 }).notNull().unique(),
+
   fullName: varchar("full_name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  phone: varchar("phone", { length: 30 }).notNull(),
+  phone: varchar("phone", { length: 30 }),
   companyName: varchar("company_name", { length: 255 }),
   location: varchar("location", { length: 255 }),
 
   image: varchar("image", { length: 255 }),
-  password: varchar("password", { length: 255 }).notNull(),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

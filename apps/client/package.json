@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.5.10",
     "@hookform/resolvers": "^5.4.0",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.98",
@@ -22,6 +23,7 @@
     "react-hook-form": "^7.80.0",
     "services": "workspace:*",
     "storage": "workspace:*",
+    "svix": "^1.42.0",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.1",
     "ui": "workspace:*",
