@@ -95,7 +95,7 @@ export const SignInForm = () => {
               <Check size={13} strokeWidth={3} className="text-white" />
             )}
           </span>
-          <span className="font-grotesk text-sm text-[#4B4E55]">
+          <span className="font-grotesk text-sm text-secondary">
             Keep me signed in
           </span>
         </label>
