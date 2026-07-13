@@ -100,7 +100,7 @@ export const Products = mysqlTable(
     >(),
 
     // State & ordering
-    status: mysqlEnum("status", productStatuses).default("draft"),
+    status: mysqlEnum("status", productStatuses).default("in_stock"),
     order: int("order").default(0),
 
     // RESERVED / dormant — for the EOL and cross-vendor-equivalence features

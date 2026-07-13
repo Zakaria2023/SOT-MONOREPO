@@ -11,9 +11,13 @@ import {
 } from "./enum";
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
-  active: "Active",
-  draft: "Draft",
-  discontinued: "Discontinued",
+  in_stock: "In Stock",
+  out_of_stock: "Out of Stock",
+  limited_stock: "Limited Stock",
+  pre_order: "Pre Order",
+  in_order: "In Order",
+  end_of_sale: "End of Sale (EOS)",
+  end_of_life: "End of Life (EOL)",
 };
 
 export const BOQ_STATUS_LABELS: Record<BoqStatus, string> = {

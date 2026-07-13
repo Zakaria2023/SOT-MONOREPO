@@ -1,7 +1,11 @@
 export const productStatuses = [
-  "active",
-  "draft",
-  "discontinued",
+  "in_stock",
+  "out_of_stock",
+  "limited_stock",
+  "pre_order",
+  "in_order",
+  "end_of_sale",
+  "end_of_life",
 ] as const satisfies readonly string[];
 
 export type ProductStatus = (typeof productStatuses)[number];

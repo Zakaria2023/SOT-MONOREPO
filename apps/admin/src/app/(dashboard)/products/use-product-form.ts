@@ -66,7 +66,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
       currency: product?.currency ?? "SAR",
       isAvailable: product?.isAvailable ?? true,
       technicalAttributes: product?.technicalAttributes ?? {},
-      status: product?.status ?? "draft",
+      status: product?.status ?? "in_stock",
       order: product?.order ?? 0,
     },
   });

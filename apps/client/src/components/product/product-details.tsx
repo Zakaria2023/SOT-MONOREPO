@@ -6,6 +6,17 @@ type DetailField = {
   value: string;
 };
 
+// Mirrors db/label.ts PRODUCT_STATUS_LABELS (client has no @/db path alias).
+const STATUS_LABELS: Record<string, string> = {
+  in_stock: "In Stock",
+  out_of_stock: "Out of Stock",
+  limited_stock: "Limited Stock",
+  pre_order: "Pre Order",
+  in_order: "In Order",
+  end_of_sale: "End of Sale (EOS)",
+  end_of_life: "End of Life (EOL)",
+};
+
 type ProductDetailsProps = {
   product: ProductDetail;
 };
@@ -27,7 +38,10 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
   }
   fields.push({ label: "Featured", value: product.isFeatured ? "Yes" : "No" });
   if (product.status)
-    fields.push({ label: "Status", value: capitalize(product.status) });
+    fields.push({
+      label: "Status",
+      value: STATUS_LABELS[product.status] ?? capitalize(product.status),
+    });
 
   if (fields.length === 0) return null;
 
