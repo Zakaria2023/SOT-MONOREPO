@@ -70,3 +70,15 @@ export const aliasTermTypes = [
 ] as const satisfies readonly string[];
 
 export type AliasTermType = (typeof aliasTermTypes)[number];
+
+// Which business line a product sells under. Phase 1 runs the first two
+// (fixed price, buy now); "projects" and "enterprise" are dormant (pre-order,
+// vendor approval) — structure built now, activated later.
+export const businessLines = [
+  "consumer",
+  "smb_sme_channels",
+  "smb_sme_projects",
+  "enterprise",
+] as const satisfies readonly string[];
+
+export type BusinessLine = (typeof businessLines)[number];

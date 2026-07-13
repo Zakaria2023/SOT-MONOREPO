@@ -12,7 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { productStatuses } from "../enum";
+import { businessLines, productStatuses } from "../enum";
 import { Highlight, SpecGroup } from "../types";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
@@ -61,9 +61,22 @@ export const Products = mysqlTable(
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
 
-    // Pricing — optional; a partner can set the price when they quote the product.
-    price: decimal("price", { precision: 12, scale: 2 }),
+    // Price book. `price` is the public MSRP — the only price shown publicly.
+    // Cost + system-integrator define the internal margin pool. Sub-distributor
+    // and end-user tiers are dormant structure (not used in Phase 1).
+    price: decimal("price", { precision: 12, scale: 2 }), // public MSRP
+    priceCost: decimal("price_cost", { precision: 12, scale: 2 }),
+    priceSystemIntegrator: decimal("price_system_integrator", {
+      precision: 12,
+      scale: 2,
+    }),
+    priceSubDistributor: decimal("price_sub_distributor", {
+      precision: 12,
+      scale: 2,
+    }),
+    priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
+    businessLine: mysqlEnum("business_line", businessLines).default("consumer"),
 
     // Inventory
     stock: int("stock").default(0),

@@ -6,8 +6,8 @@ import { LinkedCategoriesEditor } from "@/components/products/linked-categories-
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { SpecsPreview } from "@/components/specs/specs-preview";
-import { productStatuses } from "@/db/enum";
-import { PRODUCT_STATUS_LABELS } from "@/db/label";
+import { businessLines, productStatuses } from "@/db/enum";
+import { BUSINESS_LINE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProductAliases } from "@/db/schema/product-aliases";
@@ -52,6 +52,11 @@ type ProductFormProps =
 const statusOptions = productStatuses.map((status) => ({
   value: status,
   label: PRODUCT_STATUS_LABELS[status],
+}));
+
+const businessLineOptions = businessLines.map((line) => ({
+  value: line,
+  label: BUSINESS_LINE_LABELS[line],
 }));
 
 export const ProductForm = (props: ProductFormProps) => {
@@ -198,14 +203,62 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.currency?.message}
           />
           <Input
-            label="Price (optional)"
+            label="MSRP (public price)"
             labelIcon={<Coins size={15} />}
             type="text"
             inputMode="decimal"
-            placeholder="Set by partner"
             {...register("price")}
             error={errors.price?.message}
           />
+          <Input
+            label="Cost price"
+            labelIcon={<Coins size={15} />}
+            type="text"
+            inputMode="decimal"
+            {...register("priceCost")}
+            error={errors.priceCost?.message}
+          />
+          <Input
+            label="System Integrator price"
+            labelIcon={<Coins size={15} />}
+            type="text"
+            inputMode="decimal"
+            {...register("priceSystemIntegrator")}
+            error={errors.priceSystemIntegrator?.message}
+          />
+          <Input
+            label="Sub-distributor price (later)"
+            labelIcon={<Coins size={15} />}
+            type="text"
+            inputMode="decimal"
+            {...register("priceSubDistributor")}
+            error={errors.priceSubDistributor?.message}
+          />
+          <Input
+            label="End-user price (later)"
+            labelIcon={<Coins size={15} />}
+            type="text"
+            inputMode="decimal"
+            {...register("priceEndUser")}
+            error={errors.priceEndUser?.message}
+          />
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-ink">
+              Business line
+            </label>
+            <Controller
+              control={control}
+              name="businessLine"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={businessLineOptions}
+                />
+              )}
+            />
+          </div>
           <Input
             label="Stock"
             labelIcon={<Boxes size={15} />}

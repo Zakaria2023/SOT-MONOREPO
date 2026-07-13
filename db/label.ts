@@ -1,6 +1,7 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
   AliasTermType,
+  BusinessLine,
   BoqStatus,
   GovernmentRequestStatus,
   OfferStatus,
@@ -64,4 +65,11 @@ export const ALIAS_TERM_TYPE_LABELS: Record<AliasTermType, string> = {
   vendor_sku: "Vendor SKU",
   model: "Model",
   nickname: "Nickname",
+};
+
+export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {
+  consumer: "Consumer",
+  smb_sme_channels: "SMB & SME Channels",
+  smb_sme_projects: "SMB & SME Projects (later)",
+  enterprise: "Enterprise (later)",
 };
