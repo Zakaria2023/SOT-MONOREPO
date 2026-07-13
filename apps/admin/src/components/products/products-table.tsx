@@ -16,9 +16,9 @@ type ProductsTableProps = {
 };
 
 const STATUS_BADGE_CLASSES: Record<ProductStatus, string> = {
+  active: "bg-success-tint text-success",
   draft: "bg-warning-tint text-warning",
-  published: "bg-success-tint text-success",
-  archived: "bg-hover text-faint",
+  discontinued: "bg-hover text-faint",
 };
 
 const columns: TableColumn<ProductListItem>[] = [

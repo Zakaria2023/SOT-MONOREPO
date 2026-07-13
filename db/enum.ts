@@ -1,10 +1,19 @@
 export const productStatuses = [
+  "active",
   "draft",
-  "published",
-  "archived",
+  "discontinued",
 ] as const satisfies readonly string[];
 
 export type ProductStatus = (typeof productStatuses)[number];
+
+// EOL lifecycle state — RESERVED/dormant, for the end-of-life feature later.
+export const lifecycleStatuses = [
+  "current",
+  "end_of_sale",
+  "end_of_life",
+] as const satisfies readonly string[];
+
+export type LifecycleStatus = (typeof lifecycleStatuses)[number];
 
 export const boqStatuses = [
   "draft",

@@ -12,7 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { businessLines, productStatuses } from "../enum";
+import { businessLines, lifecycleStatuses, productStatuses } from "../enum";
 import { Highlight, SpecGroup } from "../types";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
@@ -112,6 +112,12 @@ export const Products = mysqlTable(
     // State & ordering
     status: mysqlEnum("status", productStatuses).default("draft"),
     order: int("order").default(0),
+
+    // RESERVED / dormant — for the EOL and cross-vendor-equivalence features
+    // later. No UI yet; the hooks exist so nothing needs retrofitting.
+    lifecycleStatus: mysqlEnum("lifecycle_status", lifecycleStatuses),
+    replacedBy: char("replaced_by", { length: 36 }), // successor product uuid
+    equivalents: json("equivalents").$type<string[]>(), // cross-vendor uuids
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
