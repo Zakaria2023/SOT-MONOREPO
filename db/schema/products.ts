@@ -47,6 +47,10 @@ export const Products = mysqlTable(
     // Identifiers (part number, model number, BOM, barcode, nicknames…) are not
     // fixed columns — they live as searchable rows in ProductAliases.
 
+    // Vendor taxonomy tag (Vendor › Line › Sub-line) for mapping & rebate
+    // tracking. Phase 1 is a hand-entered tag; a full taxonomy table comes later.
+    vendorNode: varchar("vendor_node", { length: 255 }),
+
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"
 
