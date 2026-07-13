@@ -5,6 +5,7 @@ import { formatPrice } from "utils";
 import {
   ArrowLeft,
   Cpu,
+  FileText,
   Gauge,
   Globe,
   Layers,
@@ -107,10 +108,26 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
             {product.name}
           </h1>
 
+          {product.shortDescription && (
+            <p className="mt-3 text-base font-medium text-ink">
+              {product.shortDescription}
+            </p>
+          )}
+
           {product.description && (
             <p className="mt-4 text-base leading-relaxed text-muted">
               {product.description}
             </p>
+          )}
+
+          {product.datasheet && (
+            <Link
+              href={documentDownloadUrl(product.datasheet)}
+              target="_blank"
+              className="mt-4 inline-flex w-fit items-center gap-2 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:border-primary"
+            >
+              <FileText size={16} /> Download datasheet (free)
+            </Link>
           )}
 
           <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-page/60 p-5 sm:flex-row sm:items-center sm:justify-between">

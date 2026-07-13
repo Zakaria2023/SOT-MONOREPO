@@ -2,6 +2,7 @@
 
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { AliasesEditor } from "@/components/products/aliases-editor";
+import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { LinkedCategoriesEditor } from "@/components/products/linked-categories-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
@@ -316,7 +317,24 @@ export const ProductForm = (props: ProductFormProps) => {
 
         <LinkedCategoriesEditor categories={categories} />
 
+        <Textarea
+          label="Short description"
+          rows={2}
+          {...register("shortDescription")}
+        />
         <Textarea label="Description" rows={4} {...register("description")} />
+
+        <Controller
+          control={control}
+          name="datasheet"
+          render={({ field }) => (
+            <DatasheetUpload
+              label="Datasheet (PDF)"
+              value={field.value ?? ""}
+              onChange={field.onChange}
+            />
+          )}
+        />
 
         <div className="flex flex-col gap-3">
           <Checkbox label="Featured product" {...register("isFeatured")} />

@@ -51,8 +51,12 @@ export const Products = mysqlTable(
     // tracking. Phase 1 is a hand-entered tag; a full taxonomy table comes later.
     vendorNode: varchar("vendor_node", { length: 255 }),
 
+    shortDescription: varchar("short_description", { length: 500 }), // vendor-neutral one-liner
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"
+
+    // Datasheet PDF (document id) — served free, no login, from the storefront.
+    datasheet: varchar("datasheet", { length: 64 }),
 
     // Media
     image: varchar("image", { length: 255 }),
