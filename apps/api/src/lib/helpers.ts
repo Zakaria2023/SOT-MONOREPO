@@ -1,10 +1,14 @@
+import { verifyToken } from "@clerk/backend";
 import { NextResponse } from "next/server";
-import { getUserByUuid, verifyAccessToken, type AuthUser } from "services";
+import { getUserByClerkId, type AuthUser } from "services";
 
 /**
- * Resolve the caller from the `Authorization: Bearer <access token>` header —
- * the mobile transport's equivalent of the web client's cookie lookup. Returns
- * null when the header is missing or the token is invalid/expired.
+ * Resolve the caller from the `Authorization: Bearer <Clerk session token>`
+ * header — the mobile transport's equivalent of the web client's cookie lookup.
+ * The mobile app authenticates directly with Clerk (via the Clerk Flutter SDK)
+ * and sends its short-lived session token here; we verify it networklessly and
+ * map the Clerk user id to our profile row. Returns null when the header is
+ * missing or the token is invalid/expired.
  */
 export const getUserFromRequest = async (
   request: Request,
@@ -19,9 +23,14 @@ export const getUserFromRequest = async (
     return null;
   }
 
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("Missing required environment variable: CLERK_SECRET_KEY");
+  }
+
   try {
-    const { sub } = verifyAccessToken(token);
-    return await getUserByUuid(sub);
+    const { sub } = await verifyToken(token, { secretKey });
+    return await getUserByClerkId(sub);
   } catch {
     return null;
   }

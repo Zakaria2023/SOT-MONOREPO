@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "@/app/actions";
+import { useClerk } from "@clerk/nextjs";
 import { getInitials } from "utils";
 import { LogOut, User } from "lucide-react";
 import Link from "next/link";
@@ -11,6 +11,7 @@ type ProfileMenuProps = {
 };
 
 export const ProfileMenu = ({ fullName }: ProfileMenuProps) => {
+  const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -56,14 +57,13 @@ export const ProfileMenu = ({ fullName }: ProfileMenuProps) => {
             <User size={16} /> Account
           </Link>
 
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="font-grotesk flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-2 hover:text-primary"
-            >
-              <LogOut size={16} /> Log out
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => void signOut({ redirectUrl: "/" })}
+            className="font-grotesk flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-secondary transition-colors hover:bg-surface-2 hover:text-primary"
+          >
+            <LogOut size={16} /> Log out
+          </button>
         </div>
       )}
     </div>

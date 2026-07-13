@@ -1,6 +1,7 @@
 "use client";
 
 import { useSignInForm } from "@/app/sign-in/use-sign-in-form";
+import { SocialButtons } from "@/components/auth/social-buttons";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Check, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import Link from "next/link";
@@ -40,13 +41,13 @@ export const SignInForm = () => {
         className="font-grotesk mt-6 flex flex-col gap-4"
       >
         <Input
-          label="Work email"
-          type="email"
-          placeholder="you@company.com"
+          label="Email or phone"
+          type="text"
+          placeholder="you@company.com or +9665…"
           icon={<Mail size={16} />}
-          autoComplete="email"
-          error={errors.email?.message}
-          {...register("email")}
+          autoComplete="username"
+          error={errors.identifier?.message}
+          {...register("identifier")}
         />
 
         <Input
@@ -95,7 +96,7 @@ export const SignInForm = () => {
               <Check size={13} strokeWidth={3} className="text-white" />
             )}
           </span>
-          <span className="font-grotesk text-sm text-[#4B4E55]">
+          <span className="font-grotesk text-sm text-secondary">
             Keep me signed in
           </span>
         </label>
@@ -112,6 +113,8 @@ export const SignInForm = () => {
           {isPending ? "Signing in…" : "Sign in"}
           <ArrowRight size={18} />
         </button>
+
+        <SocialButtons />
       </form>
     </div>
   );

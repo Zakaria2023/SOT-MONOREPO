@@ -25,7 +25,6 @@ type CatalogViewProps = {
   selectedBrands: string[];
   sort: ProductSort;
   search: string;
-  canAdd: boolean;
 };
 
 export const CatalogView = ({
@@ -37,7 +36,6 @@ export const CatalogView = ({
   selectedBrands,
   sort,
   search,
-  canAdd,
 }: CatalogViewProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -209,11 +207,7 @@ export const CatalogView = ({
               >
                 {products.map((product) => (
                   <li key={product.uuid}>
-                    <CatalogProductCard
-                      product={product}
-                      view={view}
-                      canAdd={canAdd}
-                    />
+                    <CatalogProductCard product={product} view={view} />
                   </li>
                 ))}
               </ul>

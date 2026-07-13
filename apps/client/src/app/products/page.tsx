@@ -1,5 +1,4 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
-import { getCurrentUser } from "@/lib/auth";
 import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
 import type { Metadata } from "next";
 import { getBrands, getCategories, getProducts } from "services";
@@ -28,10 +27,9 @@ const toArray = (value: string | string[] | undefined): string[] => {
 
 const ProductsPage = async ({ searchParams }: Props) => {
   const params = await searchParams;
-  const [categories, brands, user] = await Promise.all([
+  const [categories, brands] = await Promise.all([
     getCategories(),
     getBrands(),
-    getCurrentUser(),
   ]);
 
   const categoryTree = buildTree(
@@ -86,7 +84,6 @@ const ProductsPage = async ({ searchParams }: Props) => {
       selectedBrands={selectedBrands}
       sort={sort}
       search={search ?? ""}
-      canAdd={Boolean(user)}
     />
   );
 };

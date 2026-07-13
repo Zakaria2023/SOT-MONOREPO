@@ -1,6 +1,11 @@
 import "server-only";
 
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { randomUUID } from "node:crypto";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getCloudflareR2, getR2BucketName } from "./cloudflare-r2";
 
@@ -54,6 +59,68 @@ export const sanitizeFileName = (fileName: string): string =>
  */
 export const createDocumentObjectKey = (documentId: string): string =>
   `documents/${documentId}`;
+
+type UploadDocumentParams = {
+  documentId: string;
+  body: Buffer;
+  contentType: string;
+};
+
+/** Uploads a document to R2 under its derived key. */
+export const uploadDocument = async ({
+  documentId,
+  body,
+  contentType,
+}: UploadDocumentParams): Promise<void> => {
+  await getCloudflareR2().send(
+    new PutObjectCommand({
+      Bucket: getR2BucketName(),
+      Key: createDocumentObjectKey(documentId),
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+};
+
+/** Deletes a document from R2 by its id. */
+export const deleteDocument = async (documentId: string): Promise<void> => {
+  await getCloudflareR2().send(
+    new DeleteObjectCommand({
+      Bucket: getR2BucketName(),
+      Key: createDocumentObjectKey(documentId),
+    }),
+  );
+};
+
+export type UploadedDocument = {
+  documentId: string;
+  fileName: string;
+};
+
+/**
+ * Validates a `File` and uploads it to R2, returning its id and name. Shared by
+ * the upload Server Action and (for the admin) the upload route handler. Throws
+ * "File type not allowed" / "File too large" for a bad file.
+ */
+export const uploadDocumentFile = async (
+  file: File,
+): Promise<UploadedDocument> => {
+  if (!isAllowedDocumentType(file.type) && !isAllowedImageType(file.type)) {
+    throw new Error("File type not allowed");
+  }
+  if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+    throw new Error("File too large");
+  }
+
+  const documentId = randomUUID();
+  await uploadDocument({
+    documentId,
+    body: Buffer.from(await file.arrayBuffer()),
+    contentType: file.type,
+  });
+
+  return { documentId, fileName: file.name };
+};
 
 /**
  * Generates a pre-signed PUT URL for uploading a document directly to R2.

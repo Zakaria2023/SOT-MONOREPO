@@ -3,7 +3,6 @@ import { ProductDetails } from "@/components/product/product-details";
 import { ProductHero } from "@/components/product/product-hero";
 import { ProductRelated } from "@/components/product/product-related";
 import { ProductSpecs } from "@/components/product/product-specs";
-import { getCurrentUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import {
   getComparableProducts,
@@ -20,10 +19,9 @@ const ProductPage = async ({ params }: Props) => {
   const product = await getProductDetailBySlug(slug);
   if (!product) notFound();
 
-  const [comparables, related, user] = await Promise.all([
+  const [comparables, related] = await Promise.all([
     getComparableProducts(product.categoryUuid, product.uuid),
     getRelatedProducts(product.uuid),
-    getCurrentUser(),
   ]);
 
   // Products inherit their spec structure from their category, so fall back to
@@ -39,11 +37,7 @@ const ProductPage = async ({ params }: Props) => {
 
   return (
     <main className="min-h-screen bg-surface pb-16">
-      <ProductHero
-        product={product}
-        highlights={highlights}
-        isAuthenticated={Boolean(user)}
-      />
+      <ProductHero product={product} highlights={highlights} />
       <ProductDetails product={product} />
       <ProductSpecs specGroups={specGroups} />
       <ProductCompare

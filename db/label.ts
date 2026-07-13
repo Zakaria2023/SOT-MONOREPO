@@ -1,9 +1,11 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
   BoqStatus,
+  GovernmentRequestStatus,
   OfferStatus,
   PartnerRequestStatus,
   ProductStatus,
+  UserType,
 } from "./enum";
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
@@ -38,4 +40,19 @@ export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   approved: "Approved",
   rejected: "Rejected",
   selected: "Selected by customer",
+};
+
+export const USER_TYPE_LABELS: Record<UserType, string> = {
+  individual: "Individual / Freelancer",
+  facility: "Private Facility",
+  government: "Government",
+};
+
+export const GOVERNMENT_REQUEST_STATUS_LABELS: Record<
+  GovernmentRequestStatus,
+  string
+> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
 };

@@ -1,37 +1,63 @@
-import { cookies } from "next/headers";
+import { buildClerkUserSync } from "@/lib/clerk-user";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { cache } from "react";
-import {
-  getUserByRefreshToken,
-  getUserByUuid,
-  verifyAccessToken,
-  type AuthUser,
-} from "services";
+import { getUserByClerkId, syncClerkUser, type AuthUser } from "services";
 
 /**
- * Resolves the signed-in user from cookies, or null when there is no valid
- * session. The short-lived access token is tried first (fast, no DB round-trip
- * for the token itself); when it is missing or expired we fall back to the
- * longer-lived refresh token so the user stays signed in while idle. Verification
- * lives in the transport layer here — the services never touch the access token.
+ * Resolves the signed-in user, or null when there is no valid session. Clerk
+ * verifies the session cookie for us (via the middleware); we then map its
+ * `userId` to our profile row.
  *
- * Request-scoped via React `cache` so multiple callers in one render share the
- * result.
+ * If the user is signed in but has no profile row yet — the webhook hasn't
+ * landed, or a social sign-up just completed — we sync it on demand from Clerk
+ * so the app never treats a signed-in user as missing. Request-scoped via React
+ * `cache` so multiple callers in one render share the result.
  */
 export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
-  const store = await cookies();
-
-  const accessToken = store.get("access_token")?.value;
-  if (accessToken) {
-    try {
-      const { sub } = verifyAccessToken(accessToken);
-      return await getUserByUuid(sub);
-    } catch {
-      // Access token missing/expired — fall through to the refresh token.
-    }
+  const { userId } = await auth();
+  if (!userId) {
+    return null;
   }
 
-  const refreshToken = store.get("refresh_token")?.value;
-  if (!refreshToken) return null;
+  const existing = await getUserByClerkId(userId);
+  if (existing) {
+    return existing;
+  }
 
-  return getUserByRefreshToken(refreshToken);
+  const clerkUser = await currentUser();
+  if (!clerkUser) {
+    return null;
+  }
+
+  const email =
+    clerkUser.emailAddresses.find(
+      (entry) => entry.id === clerkUser.primaryEmailAddressId,
+    )?.emailAddress ??
+    clerkUser.emailAddresses[0]?.emailAddress ??
+    null;
+
+  const phone =
+    clerkUser.phoneNumbers.find(
+      (entry) => entry.id === clerkUser.primaryPhoneNumberId,
+    )?.phoneNumber ??
+    clerkUser.phoneNumbers[0]?.phoneNumber ??
+    null;
+
+  // A user signed up with either an email or a phone — need at least one.
+  if (!email && !phone) {
+    return null;
+  }
+
+  return syncClerkUser(
+    buildClerkUserSync({
+      clerkUserId: clerkUser.id,
+      email,
+      phone,
+      image: clerkUser.imageUrl ?? null,
+      firstName: clerkUser.firstName ?? null,
+      lastName: clerkUser.lastName ?? null,
+      metadata: clerkUser.unsafeMetadata as Record<string, unknown>,
+      publicMetadata: clerkUser.publicMetadata as Record<string, unknown>,
+    }),
+  );
 });

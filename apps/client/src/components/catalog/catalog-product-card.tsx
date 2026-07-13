@@ -1,8 +1,10 @@
 "use client";
 
-import { addProductToCart } from "@/app/actions";
+import { addProductToCart } from "@/app/cart/actions";
 import { documentDownloadUrl } from "@/lib/documents";
+import { addToGuestCart } from "@/lib/guest-cart";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@clerk/nextjs";
 import { Check, ImageOff, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,7 +15,6 @@ import { formatPrice } from "utils";
 type CatalogProductCardProps = {
   product: ProductListItem;
   view: "grid" | "list";
-  canAdd: boolean;
 };
 
 type ThumbProps = {
@@ -74,24 +75,36 @@ const Meta = ({ product }: MetaProps) => (
 );
 
 const AddButton = ({ product }: AddButtonProps) => {
+  const { isSignedIn, isLoaded } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [added, setAdded] = useState(false);
 
-  const onClick = () =>
+  const flashAdded = () => {
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  };
+
+  const onClick = () => {
+    // Guests add to their local cart; it merges into the server cart on sign-in.
+    if (!isSignedIn) {
+      addToGuestCart(product.uuid);
+      flashAdded();
+      return;
+    }
     startTransition(async () => {
       const result = await addProductToCart(product.uuid);
       if (result.error) {
         return;
       }
-      setAdded(true);
-      setTimeout(() => setAdded(false), 1500);
+      flashAdded();
     });
+  };
 
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={isPending}
+      disabled={isPending || !isLoaded}
       aria-label={`Add ${product.name} to cart`}
       className="bg-accent-gradient font-grotesk relative z-20 inline-flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#07101F] transition-opacity hover:opacity-90 disabled:opacity-60"
     >
@@ -104,7 +117,6 @@ const AddButton = ({ product }: AddButtonProps) => {
 export const CatalogProductCard = ({
   product,
   view,
-  canAdd,
 }: CatalogProductCardProps) => {
   const price = (
     <span className="font-grotesk text-lg font-bold tabular-nums text-ink">
@@ -138,7 +150,7 @@ export const CatalogProductCard = ({
         </div>
         <div className="flex shrink-0 items-center gap-4 pl-2">
           {price}
-          {canAdd && <AddButton product={product} />}
+          <AddButton product={product} />
         </div>
       </article>
     );
@@ -164,7 +176,7 @@ export const CatalogProductCard = ({
         )}
         <div className="mt-4 flex items-center justify-between pt-1">
           {price}
-          {canAdd && <AddButton product={product} />}
+          <AddButton product={product} />
         </div>
       </div>
     </article>

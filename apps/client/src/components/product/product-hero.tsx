@@ -19,16 +19,11 @@ import type { ProductDetail } from "services";
 type ProductHeroProps = {
   product: ProductDetail;
   highlights: NonNullable<ProductDetail["highlights"]>;
-  isAuthenticated: boolean;
 };
 
 const STAT_ICONS: LucideIcon[] = [Gauge, ShieldCheck, Users, Layers, Cpu, Network];
 
-export const ProductHero = ({
-  product,
-  highlights,
-  isAuthenticated,
-}: ProductHeroProps) => {
+export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
   const chipHighlights = highlights.slice(0, 2);
   const statHighlights = highlights.slice(0, 4);
   const subImages = product.images ?? [];
@@ -125,7 +120,7 @@ export const ProductHero = ({
             </div>
             <div className="flex items-center gap-2">
               <BuyNowButton />
-              {isAuthenticated && <AddToCartButton productUuid={product.uuid} />}
+              <AddToCartButton productUuid={product.uuid} />
             </div>
           </div>
 

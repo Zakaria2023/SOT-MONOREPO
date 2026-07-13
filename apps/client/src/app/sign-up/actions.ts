@@ -1,59 +1,34 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { createGovernmentRequest } from "services";
 import {
-  ACCESS_TOKEN_TTL_SECONDS,
-  REFRESH_TOKEN_TTL_SECONDS,
-  registerUser,
-  type AuthResult,
-} from "services";
-import { registerSchema, type RegisterInput } from "validators";
+  governmentRequestSchema,
+  type GovernmentRequestInput,
+} from "validators";
 
-export type RegisterActionState = {
+export type GovernmentRequestState = {
   error?: string;
+  success?: boolean;
 };
 
-export const signUp = async (
-  _prevState: RegisterActionState,
-  input: RegisterInput,
-): Promise<RegisterActionState> => {
-  const parsed = registerSchema.safeParse(input);
+// Government entities can't self-serve a login — this records a request that an
+// admin reviews and (on approval) invites to Clerk.
+export const submitGovernmentRequest = async (
+  _prevState: GovernmentRequestState,
+  input: GovernmentRequestInput,
+): Promise<GovernmentRequestState> => {
+  const parsed = governmentRequestSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Please check the form and try again." };
   }
 
-  // confirmPassword is validation-only — never sent to the service.
-  const { confirmPassword: _confirmPassword, ...userInput } = parsed.data;
-  void _confirmPassword;
-
-  let session: AuthResult;
   try {
-    session = await registerUser(userInput);
+    await createGovernmentRequest(parsed.data);
+    return { success: true };
   } catch (error) {
     return {
       error:
-        error instanceof Error ? error.message : "Failed to create account.",
+        error instanceof Error ? error.message : "Failed to submit request.",
     };
   }
-
-  const cookieStore = await cookies();
-  const secure = process.env.NODE_ENV === "production";
-
-  cookieStore.set("access_token", session.accessToken, {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: ACCESS_TOKEN_TTL_SECONDS,
-  });
-  cookieStore.set("refresh_token", session.refreshToken, {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: REFRESH_TOKEN_TTL_SECONDS,
-  });
-
-  redirect("/");
 };

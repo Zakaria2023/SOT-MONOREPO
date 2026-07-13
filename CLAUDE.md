@@ -17,7 +17,6 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 - `packages/services` — all business logic lives here as plain, framework-agnostic async functions. No `"use server"`, no request/response objects, no auth checks inside these functions. Every operation (create user, place order, etc.) exists as exactly one function here, called by both Server Actions and Route Handlers.
 - `packages/database` — the only place Drizzle is imported and the only place a DB connection is opened. Nothing outside this package — not the client browser code, not the mobile app — ever talks to the database directly.
 - `packages/validators` — zod schemas shared between Server Actions and Route Handlers so input validation never drifts between the two.
-- `packages/auth` — one shared identity-verification module used by both transports.
 - `packages/types` — shared TypeScript types/DTOs.
 - `packages/utils` — framework-agnostic helper functions (formatters, `slugify`, `generateUuid`, etc.) shared across apps, imported from `"utils"`.
 
@@ -29,12 +28,11 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
 **Auth**
 
-- `apps/admin` uses Clerk. Do not change this or add a second identity table for it.
-- `apps/client` and the mobile app share one custom identity system backed by a `users` table and a `sessions` table (for refresh tokens) in `packages/database` via Drizzle. Do not use Clerk for these.
-- On login, issue a short-lived JWT access token plus a longer-lived refresh token (stored hashed in the sessions table).
-- The web client receives tokens as httpOnly, secure cookies. Server Actions read the cookie automatically — a token is never passed manually from client-side JS.
-- The mobile app receives tokens in the JSON response body, stores them in secure device storage, and sends the access token as an `Authorization: Bearer` header on every request to `apps/api`.
-- Both transports resolve to the same verify function in `packages/auth` before any service function runs.
+- Clerk is the identity provider for **all** consumer surfaces: `apps/admin`, `apps/client`, and the mobile app. Do not reintroduce a custom password/JWT/session system.
+- The `Users` table is **not** an identity store — it is a profile store. Clerk owns credentials, email/phone verification, and sessions. Each `Users` row is linked to Clerk by `clerkUserId` and is kept in sync by the Clerk webhook (`apps/client/src/app/api/webhooks/clerk/route.ts` → `syncClerkUser`). Extra profile fields (location, image, company, etc.) live on this row, not in Clerk.
+- The web client uses `@clerk/nextjs`: `clerkMiddleware` in `proxy.ts`, `<ClerkProvider>` in the root layout. Sign-in/sign-up are custom-styled forms driven by Clerk's `useSignIn`/`useSignUp` hooks (email code + phone code verification) — Clerk sets the session cookie in the browser, so these run client-side rather than through a Server Action. `getCurrentUser` resolves the cookie session via Clerk's `auth()` then maps `userId → getUserByClerkId`.
+- The mobile app authenticates directly with Clerk via the Clerk Flutter SDK and sends its session token as an `Authorization: Bearer` header to `apps/api`. `apps/api` verifies it networklessly with `@clerk/backend`'s `verifyToken`, then maps `sub → getUserByClerkId`. `apps/api` no longer exposes login/register/refresh/logout routes.
+- Both transports resolve the caller to the same `AuthUser` (via `getUserByClerkId` in `packages/services`) before any service function runs. There is no password column, no `Sessions` table, and no `packages/auth` — Clerk owns credentials, verification, and session/refresh-token lifecycle entirely.
 
 **Hard rules**
 
@@ -370,6 +368,29 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   if (!first) {
     return null;
   }
+  ```
+
+## Route Handlers
+
+- When a route handler's logic is shared across apps (e.g. the `/api/documents/*` upload/download/delete endpoints), the handler body lives once in a package (e.g. `packages/storage`) as a plain function taking the Web `Request` (and route `context`). Never duplicate the body across apps.
+- Each app's `route.ts` must **import and call** the shared handler from a normal handler export. Never use the `export { handler as METHOD } from "package"` re-export syntax — it's disallowed.
+
+  ```ts
+  // ❌ Bad — re-export syntax
+  export { handleDocumentUpload as POST } from "storage";
+
+  // ✅ Good — import and call the shared handler
+  import { handleDocumentUpload } from "storage";
+
+  export const POST = (request: Request) => handleDocumentUpload(request);
+
+  // ✅ Good — handler that needs the route context (dynamic segment)
+  import { handleDocumentDownload } from "storage";
+
+  export const GET = (
+    request: Request,
+    context: { params: Promise<{ documentId: string }> },
+  ) => handleDocumentDownload(request, context);
   ```
 
 ## Next.js Server Actions

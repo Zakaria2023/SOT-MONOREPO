@@ -1,10 +1,12 @@
+import { CartLink } from "@/components/layout/cart-link";
 import { CategoryMenu } from "@/components/layout/category-menu";
+import { GuestCartSync } from "@/components/layout/guest-cart-sync";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 import { buildCategoryTree } from "@/lib/categories";
 import { getCachedCategories, getCachedProducts } from "@/lib/data";
-import { Menu, ShoppingCart } from "lucide-react";
+import { Menu } from "lucide-react";
 import Link from "next/link";
 import { getCartItemCount } from "services";
 
@@ -44,23 +46,14 @@ export const Navbar = async () => {
             >
               Accept offer
             </Link>
-            <Link
-              href="/cart"
-              aria-label="Cart"
-              className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-search-border text-secondary transition-colors hover:text-primary"
-            >
-              <ShoppingCart size={18} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 font-grotesk text-xs font-bold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
+            <CartLink serverCount={cartCount} />
             <ProfileMenu fullName={user.fullName} />
+            <GuestCartSync />
           </div>
         ) : (
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <CartLink serverCount={0} />
             <Link
               href="/partner"
               className="font-grotesk hidden text-sm font-medium text-secondary transition-colors hover:text-primary sm:block"
