@@ -22,6 +22,25 @@ export const partnerRequestStatuses = [
 
 export type PartnerRequestStatus = (typeof partnerRequestStatuses)[number];
 
+export const governmentRequestStatuses = [
+  "pending",
+  "approved",
+  "rejected",
+] as const satisfies readonly string[];
+
+export type GovernmentRequestStatus =
+  (typeof governmentRequestStatuses)[number];
+
+// Client account types. "government" users only exist after an admin approves
+// their request; "individual" and "facility" self-serve at sign-up.
+export const userTypes = [
+  "individual",
+  "facility",
+  "government",
+] as const satisfies readonly string[];
+
+export type UserType = (typeof userTypes)[number];
+
 export const offerStatuses = [
   "pending",
   "approved",

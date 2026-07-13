@@ -7,8 +7,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import {
-  registerSchema,
-  type RegisterInput,
+  signUpSchema,
+  type SignUpAccountType,
+  type SignUpInput,
   type SignUpMethod,
 } from "validators";
 
@@ -19,32 +20,40 @@ type SignUpState = {
 /** Which panel the sign-up card is showing. */
 export type SignUpStep = "details" | "verify";
 
-// Sign-up is a two-step Clerk flow (new signals API) that runs in the browser.
-// The user picks a single identifier — email or phone — so Clerk only ever
-// sends one verification code. The extra profile fields (full name, company,
-// location) ride along in `unsafeMetadata` for the webhook to mirror into our
-// Users table.
-export const useSignUpForm = () => {
+// The self-serve (Clerk account) sign-up for individual + facility. The user
+// verifies one identifier — email or phone (for a facility, the representative's)
+// — and every profile field rides along in `unsafeMetadata` for the webhook to
+// mirror into our Users table.
+export const useSignUpForm = (type: SignUpAccountType) => {
   const { signUp } = useSignUp();
   const router = useRouter();
 
   const [step, setStep] = useState<SignUpStep>("details");
   const [state, setState] = useState<SignUpState>({});
   const [isPending, setIsPending] = useState(false);
-
   const [code, setCode] = useState("");
   const [verifyMethod, setVerifyMethod] = useState<SignUpMethod>("email");
   const [contact, setContact] = useState("");
 
-  const form = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
+  const form = useForm<SignUpInput>({
+    resolver: zodResolver(signUpSchema),
     defaultValues: {
+      type,
       method: "email",
-      fullName: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
       email: "",
       phone: "",
-      companyName: "",
-      location: "",
+      unifiedNumber: "",
+      crNumber: "",
+      vatNumber: "",
+      nationalAddress: "",
+      crCertificate: "",
+      vatCertificate: "",
+      representativeName: "",
+      representativeMobile: "",
+      representativeEmail: "",
       password: "",
       confirmPassword: "",
     },
@@ -54,17 +63,43 @@ export const useSignUpForm = () => {
     setIsPending(true);
     setState({});
 
+    const composedName = [values.firstName, values.middleName, values.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const fullName =
+      values.type === "facility"
+        ? (values.representativeName ?? "")
+        : composedName;
+
+    // For a facility the representative's email/phone is the login identity.
+    const emailAddress =
+      values.type === "facility" ? values.representativeEmail : values.email;
+    const phoneNumber = (
+      values.type === "facility" ? values.representativeMobile : values.phone
+    )?.replace(/\s+/g, "");
+
     const unsafeMetadata = {
-      fullName: values.fullName,
-      companyName: values.companyName ?? "",
-      location: values.location ?? "",
+      type: values.type,
+      fullName,
+      firstName: values.firstName ?? "",
+      middleName: values.middleName ?? "",
+      lastName: values.lastName ?? "",
+      unifiedNumber: values.unifiedNumber ?? "",
+      crNumber: values.crNumber ?? "",
+      vatNumber: values.vatNumber ?? "",
+      nationalAddress: values.nationalAddress ?? "",
+      crCertificate: values.crCertificate ?? "",
+      vatCertificate: values.vatCertificate ?? "",
+      representativeName: values.representativeName ?? "",
+      representativeMobile: values.representativeMobile ?? "",
+      representativeEmail: values.representativeEmail ?? "",
     };
 
     try {
       if (values.method === "email") {
-        const email = values.email ?? "";
         const { error } = await signUp.password({
-          emailAddress: email,
+          emailAddress: emailAddress ?? "",
           password: values.password,
           unsafeMetadata,
         });
@@ -73,11 +108,10 @@ export const useSignUpForm = () => {
           return;
         }
         await signUp.verifications.sendEmailCode();
-        setContact(email);
+        setContact(emailAddress ?? "");
       } else {
-        const phone = (values.phone ?? "").replace(/\s+/g, "");
         const { error } = await signUp.password({
-          phoneNumber: phone,
+          phoneNumber: phoneNumber ?? "",
           password: values.password,
           unsafeMetadata,
         });
@@ -86,7 +120,7 @@ export const useSignUpForm = () => {
           return;
         }
         await signUp.verifications.sendPhoneCode({});
-        setContact(phone);
+        setContact(phoneNumber ?? "");
       }
 
       setVerifyMethod(values.method);

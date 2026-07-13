@@ -2,7 +2,7 @@
 
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { updateUserProfile } from "services";
+import { updateUserProfile, type UpdateUserProfileInput } from "services";
 import { completeProfileSchema, type CompleteProfileInput } from "./validation";
 
 export type CompleteProfileState = {
@@ -24,16 +24,43 @@ export const completeProfile = async (
 
   const parsed = completeProfileSchema.safeParse(input);
   if (!parsed.success) {
-    return { error: "Please select your location." };
+    return { error: "Please check the form and try again." };
   }
 
+  const data = parsed.data;
+  const fields: UpdateUserProfileInput =
+    data.type === "individual"
+      ? {
+          type: "individual",
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
+          fullName: [data.firstName, data.middleName, data.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim(),
+        }
+      : {
+          type: "facility",
+          fullName: data.representativeName,
+          unifiedNumber: data.unifiedNumber,
+          crNumber: data.crNumber,
+          vatNumber: data.vatNumber,
+          nationalAddress: data.nationalAddress,
+          crCertificate: data.crCertificate,
+          vatCertificate: data.vatCertificate,
+          representativeName: data.representativeName,
+          representativeMobile: data.representativeMobile,
+          representativeEmail: data.representativeEmail,
+        };
+
   try {
-    await updateUserProfile(user.uuid, { location: parsed.data.location });
+    await updateUserProfile(user.uuid, fields);
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to save profile.",
     };
   }
 
-  redirect(safeNext(parsed.data.next));
+  redirect(safeNext(data.next));
 };

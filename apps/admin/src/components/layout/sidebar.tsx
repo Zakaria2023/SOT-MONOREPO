@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Award,
   FileText,
+  Landmark,
   Layers,
   LayoutDashboard,
   Network,
@@ -45,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: FileText, label: "BOQs", href: "/boqs" },
       { icon: Network, label: "Partners", href: "/partners" },
+      { icon: Landmark, label: "Government", href: "/government" },
       { icon: Ticket, label: "Offers", href: "/offers" },
     ],
   },

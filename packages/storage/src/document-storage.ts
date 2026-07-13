@@ -55,6 +55,28 @@ export const sanitizeFileName = (fileName: string): string =>
 export const createDocumentObjectKey = (documentId: string): string =>
   `documents/${documentId}`;
 
+type UploadDocumentParams = {
+  documentId: string;
+  body: Buffer;
+  contentType: string;
+};
+
+/** Uploads a document to R2 under its derived key. */
+export const uploadDocument = async ({
+  documentId,
+  body,
+  contentType,
+}: UploadDocumentParams): Promise<void> => {
+  await getCloudflareR2().send(
+    new PutObjectCommand({
+      Bucket: getR2BucketName(),
+      Key: createDocumentObjectKey(documentId),
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+};
+
 /**
  * Generates a pre-signed PUT URL for uploading a document directly to R2.
  *

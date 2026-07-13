@@ -1,14 +1,7 @@
+import { buildClerkUserSync } from "@/lib/clerk-user";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { cache } from "react";
 import { getUserByClerkId, syncClerkUser, type AuthUser } from "services";
-
-const metaString = (
-  metadata: Record<string, unknown>,
-  key: string,
-): string | null => {
-  const value = metadata[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
-};
 
 /**
  * Resolves the signed-in user, or null when there is no valid session. Clerk
@@ -55,20 +48,16 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
     return null;
   }
 
-  const metadata = clerkUser.unsafeMetadata as Record<string, unknown>;
-  const composedName = [clerkUser.firstName, clerkUser.lastName]
-    .filter((part): part is string => Boolean(part))
-    .join(" ")
-    .trim();
-
-  return syncClerkUser({
-    clerkUserId: clerkUser.id,
-    email,
-    fullName:
-      metaString(metadata, "fullName") ?? (composedName || "Unnamed user"),
-    phone,
-    companyName: metaString(metadata, "companyName"),
-    location: metaString(metadata, "location"),
-    image: clerkUser.imageUrl ?? null,
-  });
+  return syncClerkUser(
+    buildClerkUserSync({
+      clerkUserId: clerkUser.id,
+      email,
+      phone,
+      image: clerkUser.imageUrl ?? null,
+      firstName: clerkUser.firstName ?? null,
+      lastName: clerkUser.lastName ?? null,
+      metadata: clerkUser.unsafeMetadata as Record<string, unknown>,
+      publicMetadata: clerkUser.publicMetadata as Record<string, unknown>,
+    }),
+  );
 });

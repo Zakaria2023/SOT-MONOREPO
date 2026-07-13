@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
+import { UserType } from "../../../db/enum";
 import { InsertUsers, SelectUsers, Users } from "../../../db/schema/users";
 
 /**
@@ -11,16 +12,34 @@ import { InsertUsers, SelectUsers, Users } from "../../../db/schema/users";
  */
 export type AuthUser = SelectUsers;
 
-/** Fields the Clerk webhook mirrors into our profile row. */
+/**
+ * Everything the Clerk webhook mirrors into our profile row. Identity comes from
+ * Clerk itself; the rest is carried in the user's Clerk `unsafeMetadata`, set on
+ * the sign-up form (so a `user.created` event has all of it).
+ */
 export type ClerkUserSync = {
   clerkUserId: string;
+  type: UserType | null;
   // Either email or phone identifies the user (never required to give both).
   email: string | null;
-  fullName: string;
   phone: string | null;
+  fullName: string;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
   companyName: string | null;
   location: string | null;
   image: string | null;
+  // Facility fields (null for other types).
+  unifiedNumber: string | null;
+  crNumber: string | null;
+  vatNumber: string | null;
+  nationalAddress: string | null;
+  crCertificate: string | null;
+  vatCertificate: string | null;
+  representativeName: string | null;
+  representativeMobile: string | null;
+  representativeEmail: string | null;
 };
 
 /** Looks up a user by our internal uuid. */
@@ -62,14 +81,16 @@ export const syncClerkUser = async (
     .where(eq(Users.clerkUserId, input.clerkUserId));
 
   if (existing) {
-    // On update, only refresh identity-derived fields. Profile fields the user
-    // manages in-app (location, companyName) are intentionally left untouched
-    // so a later Clerk event (e.g. an email change, or an SSO user with no
-    // metadata) can't wipe a profile they completed after sign-up.
+    // On update, only refresh identity-derived fields. Everything else is
+    // app-owned after creation (type, facility fields, location) — a later
+    // Clerk event must not wipe a profile the user completed in-app.
     const values = {
       email: input.email,
-      fullName: input.fullName,
       phone: input.phone,
+      fullName: input.fullName,
+      firstName: input.firstName,
+      middleName: input.middleName,
+      lastName: input.lastName,
       image: input.image,
     } satisfies Partial<InsertUsers>;
 
@@ -89,12 +110,25 @@ export const syncClerkUser = async (
   await db.insert(Users).values({
     uuid,
     clerkUserId: input.clerkUserId,
+    type: input.type,
     email: input.email,
-    fullName: input.fullName,
     phone: input.phone,
+    fullName: input.fullName,
+    firstName: input.firstName,
+    middleName: input.middleName,
+    lastName: input.lastName,
     companyName: input.companyName,
     location: input.location,
     image: input.image,
+    unifiedNumber: input.unifiedNumber,
+    crNumber: input.crNumber,
+    vatNumber: input.vatNumber,
+    nationalAddress: input.nationalAddress,
+    crCertificate: input.crCertificate,
+    vatCertificate: input.vatCertificate,
+    representativeName: input.representativeName,
+    representativeMobile: input.representativeMobile,
+    representativeEmail: input.representativeEmail,
   });
 
   const [created] = await db.select().from(Users).where(eq(Users.uuid, uuid));
@@ -110,12 +144,31 @@ export const deleteClerkUser = async (clerkUserId: string): Promise<void> => {
 };
 
 /**
- * Fields a user can fill in after sign-up (e.g. SSO users who never saw the
- * sign-up form). Only `location` for now; more will be added over time.
+ * Profile fields a user can set/complete after sign-up — the type and its
+ * type-specific fields. Identity (email/phone) stays with Clerk. Derived from
+ * the table so it can't drift from the schema.
  */
-export type UpdateUserProfileInput = {
-  location?: string | null;
-};
+export type UpdateUserProfileInput = Partial<
+  Pick<
+    InsertUsers,
+    | "type"
+    | "fullName"
+    | "firstName"
+    | "middleName"
+    | "lastName"
+    | "companyName"
+    | "location"
+    | "unifiedNumber"
+    | "crNumber"
+    | "vatNumber"
+    | "nationalAddress"
+    | "crCertificate"
+    | "vatCertificate"
+    | "representativeName"
+    | "representativeMobile"
+    | "representativeEmail"
+  >
+>;
 
 /** Updates the caller's own profile row and returns the fresh user. */
 export const updateUserProfile = async (
@@ -132,9 +185,23 @@ export const updateUserProfile = async (
 };
 
 /**
- * Whether a user has filled in the profile fields required before they can
- * check out. Kept in one place so the checkout guard and the profile form agree
- * on what "complete" means as more required fields are added.
+ * Whether a user has filled in the fields required before they can check out.
+ * Depends on the account type; kept in one place so the checkout guard and the
+ * profile form agree on what "complete" means.
  */
-export const isProfileComplete = (user: AuthUser): boolean =>
-  Boolean(user.location && user.location.trim().length > 0);
+export const isProfileComplete = (user: AuthUser): boolean => {
+  if (!user.type) {
+    return false;
+  }
+  if (user.type === "facility") {
+    return Boolean(
+      user.unifiedNumber &&
+        user.crNumber &&
+        user.vatNumber &&
+        user.nationalAddress &&
+        user.representativeName,
+    );
+  }
+  // Individuals and (approved) government users are complete once typed.
+  return true;
+};

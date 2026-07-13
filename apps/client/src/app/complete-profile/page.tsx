@@ -30,7 +30,11 @@ const CompleteProfilePage = async ({ searchParams }: Props) => {
 
   return (
     <AuthShell>
-      <CompleteProfileForm next={target} />
+      <CompleteProfileForm
+        next={target}
+        firstName={user.firstName ?? ""}
+        lastName={user.lastName ?? ""}
+      />
     </AuthShell>
   );
 };

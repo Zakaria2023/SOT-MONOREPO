@@ -1,3 +1,4 @@
+import { buildClerkUserSync } from "@/lib/clerk-user";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { deleteClerkUser, syncClerkUser } from "services";
@@ -29,19 +30,12 @@ type ClerkUserData = {
   last_name?: string | null;
   image_url?: string | null;
   unsafe_metadata?: Record<string, unknown>;
+  public_metadata?: Record<string, unknown>;
 };
 
 type ClerkWebhookEvent = {
   type: string;
   data: ClerkUserData;
-};
-
-const metaString = (
-  metadata: Record<string, unknown> | undefined,
-  key: string,
-): string | null => {
-  const value = metadata?.[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
 };
 
 const primaryEmail = (data: ClerkUserData): string | null => {
@@ -56,18 +50,6 @@ const primaryPhone = (data: ClerkUserData): string | null => {
   const primary =
     list.find((entry) => entry.id === data.primary_phone_number_id) ?? list[0];
   return primary?.phone_number ?? null;
-};
-
-const fullNameOf = (data: ClerkUserData): string => {
-  const fromMeta = metaString(data.unsafe_metadata, "fullName");
-  if (fromMeta) {
-    return fromMeta;
-  }
-  const composed = [data.first_name, data.last_name]
-    .filter((part): part is string => Boolean(part))
-    .join(" ")
-    .trim();
-  return composed.length > 0 ? composed : "Unnamed user";
 };
 
 export const POST = async (request: Request) => {
@@ -111,15 +93,18 @@ export const POST = async (request: Request) => {
       );
     }
 
-    await syncClerkUser({
-      clerkUserId: event.data.id,
-      email,
-      fullName: fullNameOf(event.data),
-      phone,
-      companyName: metaString(event.data.unsafe_metadata, "companyName"),
-      location: metaString(event.data.unsafe_metadata, "location"),
-      image: event.data.image_url ?? null,
-    });
+    await syncClerkUser(
+      buildClerkUserSync({
+        clerkUserId: event.data.id,
+        email,
+        phone,
+        image: event.data.image_url ?? null,
+        firstName: event.data.first_name ?? null,
+        lastName: event.data.last_name ?? null,
+        metadata: event.data.unsafe_metadata ?? {},
+        publicMetadata: event.data.public_metadata ?? {},
+      }),
+    );
   }
 
   if (event.type === "user.deleted") {
