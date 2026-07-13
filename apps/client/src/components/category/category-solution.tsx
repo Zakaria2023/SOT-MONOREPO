@@ -85,11 +85,7 @@ export const CategorySolution = ({
           <ul className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => (
               <li key={product.uuid}>
-                <CatalogProductCard
-                  product={product}
-                  view="grid"
-                  canAdd={canAdd}
-                />
+                <CatalogProductCard product={product} view="grid" />
               </li>
             ))}
           </ul>

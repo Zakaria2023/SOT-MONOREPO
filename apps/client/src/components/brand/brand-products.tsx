@@ -7,14 +7,9 @@ import type { ProductListItem, SelectBrands } from "services";
 type BrandProductsProps = {
   brand: SelectBrands;
   products: ProductListItem[];
-  canAdd: boolean;
 };
 
-export const BrandProducts = ({
-  brand,
-  products,
-  canAdd,
-}: BrandProductsProps) => (
+export const BrandProducts = ({ brand, products }: BrandProductsProps) => (
   <main className="min-h-screen bg-page">
     <div className="mx-auto max-w-6xl px-6 py-14 lg:px-8">
       <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
@@ -60,11 +55,7 @@ export const BrandProducts = ({
         <ul className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((product) => (
             <li key={product.uuid}>
-              <CatalogProductCard
-                product={product}
-                view="grid"
-                canAdd={canAdd}
-              />
+              <CatalogProductCard product={product} view="grid" />
             </li>
           ))}
         </ul>

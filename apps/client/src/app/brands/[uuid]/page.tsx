@@ -1,5 +1,4 @@
 import { BrandProducts } from "@/components/brand/brand-products";
-import { getCurrentUser } from "@/lib/auth";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getBrand, getProductsByBrand } from "services";
@@ -20,19 +19,16 @@ export const generateMetadata = async ({
 
 const BrandPage = async ({ params }: Props) => {
   const { uuid } = await params;
-  const [brand, products, user] = await Promise.all([
+  const [brand, products] = await Promise.all([
     getBrand(uuid),
     getProductsByBrand(uuid),
-    getCurrentUser(),
   ]);
 
   if (!brand) {
     notFound();
   }
 
-  return (
-    <BrandProducts brand={brand} products={products} canAdd={Boolean(user)} />
-  );
+  return <BrandProducts brand={brand} products={products} />;
 };
 
 export default BrandPage;

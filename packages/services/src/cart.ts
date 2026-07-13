@@ -1,4 +1,4 @@
-import { and, asc, eq, sql, sum } from "drizzle-orm";
+import { and, asc, eq, inArray, sql, sum } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { CartItems, Carts, SelectCartItems } from "../../../db/schema/carts";
@@ -53,6 +53,55 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
     .where(eq(Carts.userUuid, userUuid))
     .orderBy(asc(CartItems.createdAt));
+
+export type GuestCartItem = {
+  productUuid: string;
+  quantity: number;
+};
+
+/**
+ * Hydrates a guest's local cart (product uuids + quantities held in the browser)
+ * into full line items for display, without any DB cart. Unknown/removed
+ * products are dropped. `uuid` mirrors the productUuid since there's no cart row.
+ */
+export const getCartPreview = async (
+  items: GuestCartItem[],
+): Promise<CartLineItem[]> => {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const quantityByProduct = new Map(
+    items.map((item) => [item.productUuid, item.quantity]),
+  );
+
+  const rows = await db
+    .select({
+      productUuid: Products.uuid,
+      name: Products.name,
+      categoryUuid: Products.categoryUuid,
+      categoryName: Categories.name,
+      image: Products.image,
+      unitPrice: Products.price,
+      currency: Products.currency,
+    })
+    .from(Products)
+    .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+    .where(inArray(Products.uuid, Array.from(quantityByProduct.keys())));
+
+  return rows.map((row) => ({
+    uuid: row.productUuid,
+    productUuid: row.productUuid,
+    name: row.name,
+    categoryUuid: row.categoryUuid,
+    categoryName: row.categoryName,
+    image: row.image,
+    unitPrice: row.unitPrice,
+    currency: row.currency,
+    quantity: quantityByProduct.get(row.productUuid) ?? 1,
+    kind: "product",
+  }));
+};
 
 // Resolve a cart item's public uuid to its internal id, but only when the item
 // belongs to this user (joined through the owning cart). Returns null otherwise.
