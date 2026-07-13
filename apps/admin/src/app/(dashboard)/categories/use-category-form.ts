@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
+import { slugify } from "utils";
 import { createCategory, updateCategory } from "./action";
 import type { CategoryActionResult, CategoryFields } from "./action";
 import { categoryFormSchema } from "./validation";
@@ -35,6 +36,10 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
       image: category?.image ?? "",
       highlights: category?.highlights ?? [],
       specGroups: category?.specGroups ?? [],
+      specTemplate: (category?.specTemplate ?? []).map((field) => ({
+        label: field.label,
+        optionsText: field.options.join("\n"),
+      })),
     },
   });
 
@@ -49,6 +54,14 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
         image: values.image || null,
         highlights: values.highlights,
         specGroups: values.specGroups,
+        specTemplate: values.specTemplate.map((field) => ({
+          key: slugify(field.label),
+          label: field.label,
+          options: field.optionsText
+            .split("\n")
+            .map((option) => option.trim())
+            .filter((option) => option.length > 0),
+        })),
       });
     });
   });

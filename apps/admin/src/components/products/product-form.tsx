@@ -4,6 +4,7 @@ import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { AliasesEditor } from "@/components/products/aliases-editor";
 import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { LinkedCategoriesEditor } from "@/components/products/linked-categories-editor";
+import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { SpecsPreview } from "@/components/specs/specs-preview";
@@ -80,6 +81,7 @@ export const ProductForm = (props: ProductFormProps) => {
     control,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = form;
 
@@ -106,6 +108,15 @@ export const ProductForm = (props: ProductFormProps) => {
     const category = categories.find((item) => item.uuid === categoryUuid);
     setValue("highlights", category?.highlights ?? []);
     setValue("specGroups", category?.specGroups ?? []);
+
+    // Rebuild the technical-attributes map to the new template's fields,
+    // preserving any values whose field key still exists.
+    const current = getValues("technicalAttributes") ?? {};
+    const next: Record<string, string> = {};
+    for (const field of category?.specTemplate ?? []) {
+      next[field.key] = current[field.key] ?? "";
+    }
+    setValue("technicalAttributes", next);
   };
 
   return (
@@ -374,6 +385,8 @@ export const ProductForm = (props: ProductFormProps) => {
             />
           )}
         />
+
+        <TechnicalSpecsEditor categories={categories} />
 
         <SpecsPreview />
 

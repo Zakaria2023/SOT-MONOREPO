@@ -97,6 +97,11 @@ export const Products = mysqlTable(
 
     highlights: json("highlights").$type<Highlight[]>(),
     specGroups: json("spec_groups").$type<SpecGroup[]>(),
+    // Dropdown-only values filled from the category's spec template, keyed by
+    // SpecField.key. Machine-reasonable specs for filtering and the AI builder.
+    technicalAttributes: json("technical_attributes").$type<
+      Record<string, string>
+    >(),
 
     // State & ordering
     status: mysqlEnum("status", productStatuses).default("draft"),

@@ -4,6 +4,7 @@ import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form"
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { HighlightsEditor } from "@/components/specs/highlights-editor";
 import { SpecGroupsEditor } from "@/components/specs/spec-groups-editor";
+import { SpecTemplateEditor } from "@/components/categories/spec-template-editor";
 import { Button } from "ui";
 import { FormError } from "ui";
 import { ImageUpload } from "ui";
@@ -120,6 +121,7 @@ export const CategoryForm = (props: CategoryFormProps) => {
         </p>
       </div>
 
+      <SpecTemplateEditor />
       <HighlightsEditor />
       <SpecGroupsEditor />
 

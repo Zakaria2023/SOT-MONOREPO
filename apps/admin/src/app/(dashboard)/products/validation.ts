@@ -47,6 +47,7 @@ export const productFormSchema = z.object({
   isAvailable: z.boolean(),
   highlights: z.array(highlightSchema).optional(),
   specGroups: z.array(specGroupSchema).optional(),
+  technicalAttributes: z.record(z.string(), z.string()),
   status: z.enum(productStatuses),
   order: z.number().int().min(0).optional(),
 });

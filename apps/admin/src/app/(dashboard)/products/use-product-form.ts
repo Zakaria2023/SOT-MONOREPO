@@ -77,6 +77,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
       isAvailable: product?.isAvailable ?? true,
       highlights: product?.highlights ?? [],
       specGroups: product?.specGroups ?? [],
+      technicalAttributes: product?.technicalAttributes ?? {},
       status: product?.status ?? "draft",
       order: product?.order ?? 0,
     },
@@ -120,6 +121,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
         isAvailable: values.isAvailable,
         highlights: values.highlights ?? [],
         specGroups: values.specGroups ?? [],
+        technicalAttributes: values.technicalAttributes,
         status: values.status,
         order: values.order,
       });

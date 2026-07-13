@@ -10,6 +10,12 @@ export const categoryFormSchema = z.object({
   image: z.string().optional(),
   highlights: z.array(highlightSchema),
   specGroups: z.array(specGroupSchema),
+  specTemplate: z.array(
+    z.object({
+      label: z.string().min(1, "Required"),
+      optionsText: z.string(),
+    }),
+  ),
 });
 
 export type CategoryFormValues = z.infer<typeof categoryFormSchema>;
