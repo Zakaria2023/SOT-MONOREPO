@@ -13,10 +13,6 @@ import {
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
-import {
-  ProductAliases,
-  SelectProductAliases,
-} from "../../../db/schema/product-aliases";
 import { Products, SelectProducts } from "../../../db/schema/products";
 
 export type ProductListItem = SelectProducts & {
@@ -26,7 +22,6 @@ export type ProductListItem = SelectProducts & {
 
 export type ProductDetail = ProductListItem & {
   category: SelectCategories | null;
-  aliases: SelectProductAliases[];
   brandBusinessLines: SelectBrands["businessLines"];
 };
 
@@ -118,7 +113,20 @@ export const getProducts = async (
     const conditions: (SQL | undefined)[] = [];
     if (filters.search) {
       const term = `%${filters.search}%`;
-      conditions.push(or(like(Products.name, term), like(Brands.name, term)));
+      // Flexible match across every field a product might be found by.
+      conditions.push(
+        or(
+          like(Products.name, term),
+          like(Products.model, term),
+          like(Products.sku, term),
+          like(Products.productFamily, term),
+          like(Products.seriesCode, term),
+          like(Products.shortDescription, term),
+          like(Products.description, term),
+          like(Brands.name, term),
+          like(Categories.name, term),
+        ),
+      );
     }
     if (filters.categoryUuids && filters.categoryUuids.length > 0) {
       conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
@@ -222,12 +230,7 @@ export const getProductDetailBySlug = async (
       .from(Categories)
       .where(eq(Categories.uuid, product.categoryUuid));
 
-    const aliases = await db
-      .select()
-      .from(ProductAliases)
-      .where(eq(ProductAliases.productUuid, product.uuid));
-
-    return { ...product, category: category ?? null, aliases };
+    return { ...product, category: category ?? null };
   } catch {
     throw new Error("Failed to fetch product");
   }

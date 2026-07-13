@@ -1,11 +1,5 @@
-import { aliasTermTypes, productStatuses } from "@/db/enum";
+import { productStatuses } from "@/db/enum";
 import { z } from "zod";
-
-export const aliasSchema = z.object({
-  searchTerm: z.string().min(1, "Required"),
-  termType: z.enum(aliasTermTypes),
-  label: z.string().optional(),
-});
 
 const priceField = z
   .union([
@@ -21,7 +15,6 @@ export const productFormSchema = z.object({
   model: z.string().optional(),
   productFamily: z.string().optional(),
   seriesCode: z.string().max(4, "Max 4 characters").optional(),
-  aliases: z.array(aliasSchema),
   warrantyPeriod: z.string().optional(),
   warrantyRegion: z.string().optional(),
   warrantyExtendable: z.boolean(),

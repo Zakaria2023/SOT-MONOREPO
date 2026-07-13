@@ -7,5 +7,4 @@ export * from "./errors";
 export * from "./government";
 export * from "./offers";
 export * from "./partners";
-export * from "./product-aliases";
 export * from "./products";

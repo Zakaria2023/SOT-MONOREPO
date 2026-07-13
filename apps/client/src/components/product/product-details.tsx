@@ -30,12 +30,6 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
   if (product.model) fields.push({ label: "Model", value: product.model });
   if (product.productFamily)
     fields.push({ label: "Product Family", value: product.productFamily });
-  for (const alias of product.aliases) {
-    fields.push({
-      label: alias.label ?? capitalize(alias.termType),
-      value: alias.searchTerm,
-    });
-  }
   fields.push({ label: "Featured", value: product.isFeatured ? "Yes" : "No" });
   if (product.status)
     fields.push({

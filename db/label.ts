@@ -1,6 +1,5 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
-  AliasTermType,
   BusinessLine,
   BoqStatus,
   GovernmentRequestStatus,
@@ -61,14 +60,6 @@ export const GOVERNMENT_REQUEST_STATUS_LABELS: Record<
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected",
-};
-
-export const ALIAS_TERM_TYPE_LABELS: Record<AliasTermType, string> = {
-  barcode: "Barcode (EAN/GTIN)",
-  manufacturer: "Manufacturer ID",
-  vendor_sku: "Vendor SKU",
-  model: "Model",
-  nickname: "Nickname",
 };
 
 export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {

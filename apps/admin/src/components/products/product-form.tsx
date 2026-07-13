@@ -1,7 +1,6 @@
 "use client";
 
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
-import { AliasesEditor } from "@/components/products/aliases-editor";
 import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
@@ -10,7 +9,6 @@ import { productStatuses } from "@/db/enum";
 import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
-import type { SelectProductAliases } from "@/db/schema/product-aliases";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
@@ -45,7 +43,6 @@ type ProductFormProps =
       categories: SelectCategories[];
       brands: SelectBrands[];
       product: SelectProducts;
-      aliases: SelectProductAliases[];
     };
 
 const statusOptions = productStatuses.map((status) => ({
@@ -66,7 +63,6 @@ export const ProductForm = (props: ProductFormProps) => {
       ? {
           mode: "edit",
           product: props.product,
-          aliases: props.aliases,
         }
       : { mode: "add" },
   );
@@ -277,8 +273,6 @@ export const ProductForm = (props: ProductFormProps) => {
             />
           )}
         </div>
-
-        <AliasesEditor />
 
         <Textarea
           label="Short description"

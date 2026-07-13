@@ -43,9 +43,6 @@ export const Products = mysqlTable(
     productFamily: varchar("product_family", { length: 255 }),
     seriesCode: varchar("series_code", { length: 4 }),
 
-    // Identifiers (part number, model number, BOM, barcode, nicknames…) are not
-    // fixed columns — they live as searchable rows in ProductAliases.
-
     shortDescription: varchar("short_description", { length: 500 }), // vendor-neutral one-liner
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"

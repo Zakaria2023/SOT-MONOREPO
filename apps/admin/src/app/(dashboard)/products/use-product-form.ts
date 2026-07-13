@@ -8,14 +8,12 @@ import type { ProductActionResult, ProductClientFields } from "./action";
 import { productFormSchema } from "./validation";
 import type { ProductFormValues } from "./validation";
 import type { SelectProducts } from "@/db/schema/products";
-import type { SelectProductAliases } from "@/db/schema/product-aliases";
 
 type UseProductFormArgs =
   | { mode: "add" }
   | {
       mode: "edit";
       product: SelectProducts;
-      aliases: SelectProductAliases[];
     };
 
 export const useProductForm = (args: UseProductFormArgs) => {
@@ -44,14 +42,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
       countryOfOrigin: product?.countryOfOrigin ?? "",
       shortDescription: product?.shortDescription ?? "",
       datasheet: product?.datasheet ?? "",
-      aliases:
-        args.mode === "edit"
-          ? args.aliases.map((alias) => ({
-              searchTerm: alias.searchTerm,
-              termType: alias.termType,
-              label: alias.label ?? "",
-            }))
-          : [],
       description: product?.description ?? "",
       role: product?.role ?? "",
       image: product?.image ?? "",
@@ -86,11 +76,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
         countryOfOrigin: values.countryOfOrigin || null,
         shortDescription: values.shortDescription || null,
         datasheet: values.datasheet || null,
-        aliases: values.aliases.map((alias) => ({
-          searchTerm: alias.searchTerm,
-          termType: alias.termType,
-          label: alias.label || null,
-        })),
         description: values.description || null,
         role: values.role || null,
         image: values.image || null,
