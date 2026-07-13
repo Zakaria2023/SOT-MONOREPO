@@ -7,7 +7,7 @@ import { TechnicalSpecsEditor } from "@/components/products/technical-specs-edit
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { productStatuses } from "@/db/enum";
-import { BUSINESS_LINE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
+import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProductAliases } from "@/db/schema/product-aliases";
@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Controller, FormProvider, useWatch } from "react-hook-form";
+import { Controller, FormProvider } from "react-hook-form";
 import {
   Button,
   Checkbox,
@@ -73,12 +73,6 @@ export const ProductForm = (props: ProductFormProps) => {
     getValues,
     formState: { errors },
   } = form;
-
-  // Business lines are owned by the brand; the product inherits and displays
-  // them read-only based on the selected brand.
-  const brandUuid = useWatch({ control, name: "brandUuid" });
-  const brandBusinessLines =
-    brands.find((brand) => brand.uuid === brandUuid)?.businessLines ?? [];
 
   // The SKU is auto-assembled from the brand/category/series codes. We show a
   // live preview here (SEQ shown as "##" until the server assigns it on save).
@@ -226,28 +220,6 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.priceEndUser?.message}
           />
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-ink">
-              Business lines
-            </label>
-            {brandBusinessLines.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {brandBusinessLines.map((line) => (
-                  <span
-                    key={line}
-                    className="inline-flex items-center rounded-control border border-hairline bg-page px-3 py-1.5 text-sm text-ink"
-                  >
-                    {BUSINESS_LINE_LABELS[line]}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-control border border-dashed border-hairline px-3 py-2 text-sm text-faint">
-                Inherited from the brand — set business lines on the selected
-                brand.
-              </p>
-            )}
-          </div>
           <Input
             label="Stock"
             labelIcon={<Boxes size={15} />}
