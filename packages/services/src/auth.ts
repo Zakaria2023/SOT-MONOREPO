@@ -14,7 +14,8 @@ export type AuthUser = SelectUsers;
 /** Fields the Clerk webhook mirrors into our profile row. */
 export type ClerkUserSync = {
   clerkUserId: string;
-  email: string;
+  // Either email or phone identifies the user (never required to give both).
+  email: string | null;
   fullName: string;
   phone: string | null;
   companyName: string | null;
@@ -61,12 +62,14 @@ export const syncClerkUser = async (
     .where(eq(Users.clerkUserId, input.clerkUserId));
 
   if (existing) {
+    // On update, only refresh identity-derived fields. Profile fields the user
+    // manages in-app (location, companyName) are intentionally left untouched
+    // so a later Clerk event (e.g. an email change, or an SSO user with no
+    // metadata) can't wipe a profile they completed after sign-up.
     const values = {
       email: input.email,
       fullName: input.fullName,
       phone: input.phone,
-      companyName: input.companyName,
-      location: input.location,
       image: input.image,
     } satisfies Partial<InsertUsers>;
 
@@ -105,3 +108,33 @@ export const syncClerkUser = async (
 export const deleteClerkUser = async (clerkUserId: string): Promise<void> => {
   await db.delete(Users).where(eq(Users.clerkUserId, clerkUserId));
 };
+
+/**
+ * Fields a user can fill in after sign-up (e.g. SSO users who never saw the
+ * sign-up form). Only `location` for now; more will be added over time.
+ */
+export type UpdateUserProfileInput = {
+  location?: string | null;
+};
+
+/** Updates the caller's own profile row and returns the fresh user. */
+export const updateUserProfile = async (
+  userUuid: string,
+  input: UpdateUserProfileInput,
+): Promise<AuthUser> => {
+  await db.update(Users).set(input).where(eq(Users.uuid, userUuid));
+
+  const user = await getUserByUuid(userUuid);
+  if (!user) {
+    throw new Error("User not found");
+  }
+  return user;
+};
+
+/**
+ * Whether a user has filled in the profile fields required before they can
+ * check out. Kept in one place so the checkout guard and the profile form agree
+ * on what "complete" means as more required fields are added.
+ */
+export const isProfileComplete = (user: AuthUser): boolean =>
+  Boolean(user.location && user.location.trim().length > 0);

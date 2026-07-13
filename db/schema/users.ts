@@ -16,8 +16,10 @@ export const Users = mysqlTable("Users", {
   clerkUserId: varchar("clerk_user_id", { length: 255 }).notNull().unique(),
 
   fullName: varchar("full_name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  phone: varchar("phone", { length: 30 }),
+  // Users sign up with either an email or a phone, never required to give both,
+  // so each identity column is nullable. Clerk enforces their uniqueness.
+  email: varchar("email", { length: 255 }).unique(),
+  phone: varchar("phone", { length: 30 }).unique(),
   companyName: varchar("company_name", { length: 255 }),
   location: varchar("location", { length: 255 }),
 

@@ -101,9 +101,12 @@ export const POST = async (request: Request) => {
 
   if (event.type === "user.created" || event.type === "user.updated") {
     const email = primaryEmail(event.data);
-    if (!email) {
+    const phone = primaryPhone(event.data);
+    // A user must have at least one identifier; which one depends on how they
+    // signed up (email or phone).
+    if (!email && !phone) {
       return NextResponse.json(
-        { error: "User has no email address" },
+        { error: "User has no email or phone" },
         { status: 400 },
       );
     }
@@ -112,7 +115,7 @@ export const POST = async (request: Request) => {
       clerkUserId: event.data.id,
       email,
       fullName: fullNameOf(event.data),
-      phone: primaryPhone(event.data),
+      phone,
       companyName: metaString(event.data.unsafe_metadata, "companyName"),
       location: metaString(event.data.unsafe_metadata, "location"),
       image: event.data.image_url ?? null,

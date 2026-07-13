@@ -2,7 +2,7 @@ import { CartView } from "@/components/cart/cart-view";
 import { getCurrentUser } from "@/lib/auth";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCart } from "services";
+import { getCart, isProfileComplete } from "services";
 
 export const metadata: Metadata = {
   title: "Your cart · Stratum",
@@ -16,7 +16,7 @@ const CartPage = async () => {
 
   const items = await getCart(user.uuid);
 
-  return <CartView items={items} />;
+  return <CartView items={items} needsProfile={!isProfileComplete(user)} />;
 };
 
 export default CartPage;

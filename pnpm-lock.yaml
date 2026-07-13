@@ -167,6 +167,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      country-flag-emoji-polyfill:
+        specifier: ^0.1.8
+        version: 0.1.8
       country-state-city:
         specifier: ^3.2.1
         version: 3.2.1
@@ -2137,6 +2140,9 @@ packages:
   cookie@1.0.2:
     resolution: {integrity: sha512-9Kr/j4O16ISv8zBBhJoi4bXOYNTkFLOqSL3UDB0njXxCXNezjeyVrJyGOWtgfs/q2km1gwBcfH8q1yEGoMYunA==}
     engines: {node: '>=18'}
+
+  country-flag-emoji-polyfill@0.1.8:
+    resolution: {integrity: sha512-Mbah52sADS3gshUYhK5142gtUuJpHYOXlXtLFI3Ly4RqgkmPMvhX9kMZSTqDM8P7UqtSW99eHKFphhQSGXA3Cg==}
 
   country-state-city@3.2.1:
     resolution: {integrity: sha512-kxbanqMc6izjhc/EHkGPCTabSPZ2G6eG4/97akAYHJUN4stzzFEvQPZoF8oXDQ+10gM/O/yUmISCR1ZVxyb6EA==}
@@ -5160,6 +5166,8 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   cookie@1.0.2: {}
+
+  country-flag-emoji-polyfill@0.1.8: {}
 
   country-state-city@3.2.1: {}
 

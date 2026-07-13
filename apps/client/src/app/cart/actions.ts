@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import {
   createBoqFromCart,
+  isProfileComplete,
   removeCartItem,
   updateCartItemQuantity,
 } from "services";
@@ -29,6 +30,12 @@ export const checkout = async (formData: FormData) => {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/sign-in");
+  }
+
+  // Server-side guard: a profile must be complete before checkout, even if the
+  // client-side gate was bypassed.
+  if (!isProfileComplete(user)) {
+    redirect("/complete-profile?next=/cart");
   }
 
   const categoryUuid = formData.get("categoryUuid");

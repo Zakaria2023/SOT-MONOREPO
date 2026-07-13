@@ -1,6 +1,7 @@
 "use client";
 
 import { checkout, removeItem, updateQuantity } from "@/app/cart/actions";
+import { ProfileGateModal } from "@/components/profile/profile-gate-modal";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
   ArrowLeft,
@@ -20,6 +21,7 @@ import { formatMoney, lineTotal, summarizeCart } from "utils";
 
 type CartViewProps = {
   items: CartLineItem[];
+  needsProfile: boolean;
 };
 
 type CartRowProps = {
@@ -187,8 +189,12 @@ const ProductCheckout = () => {
   );
 };
 
-export const CartView = ({ items: initialItems }: CartViewProps) => {
+export const CartView = ({
+  items: initialItems,
+  needsProfile,
+}: CartViewProps) => {
   const [items, setItems] = useState(initialItems);
+  const [showProfileGate, setShowProfileGate] = useState(false);
   const [, startTransition] = useTransition();
 
   const onQuantity = (uuid: string, nextQuantity: number) => {
@@ -261,7 +267,15 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
                 onQuantity={onQuantity}
                 onRemove={onRemove}
                 footer={
-                  <form action={checkout}>
+                  <form
+                    action={checkout}
+                    onSubmit={(event) => {
+                      if (needsProfile) {
+                        event.preventDefault();
+                        setShowProfileGate(true);
+                      }
+                    }}
+                  >
                     <input
                       type="hidden"
                       name="categoryUuid"
@@ -293,6 +307,13 @@ export const CartView = ({ items: initialItems }: CartViewProps) => {
           </div>
         )}
       </div>
+
+      {showProfileGate && (
+        <ProfileGateModal
+          next="/cart"
+          onClose={() => setShowProfileGate(false)}
+        />
+      )}
     </main>
   );
 };

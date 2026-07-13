@@ -5,9 +5,12 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Cairo", sans-serif;
+  /* "Twemoji Country Flags" (injected by the flag-emoji polyfill) only contains
+     flag glyphs, so listing it first renders flags on Windows while all other
+     text falls through to the real family. */
+  --font-sans: "Twemoji Country Flags", "Cairo", sans-serif;
   --font-heading: "Newsreader", serif;
-  --font-grotesk: "Hanken Grotesk", sans-serif;
+  --font-grotesk: "Twemoji Country Flags", "Hanken Grotesk", sans-serif;
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 

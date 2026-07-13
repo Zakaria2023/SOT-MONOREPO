@@ -26,7 +26,7 @@ export const useSignInForm = () => {
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
       keepSignedIn: false,
     },
@@ -38,7 +38,7 @@ export const useSignInForm = () => {
 
     try {
       const { error } = await signIn.password({
-        emailAddress: values.email,
+        identifier: values.identifier,
         password: values.password,
       });
 

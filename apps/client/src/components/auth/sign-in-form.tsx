@@ -41,13 +41,13 @@ export const SignInForm = () => {
         className="font-grotesk mt-6 flex flex-col gap-4"
       >
         <Input
-          label="Work email"
-          type="email"
-          placeholder="you@company.com"
+          label="Email or phone"
+          type="text"
+          placeholder="you@company.com or +9665…"
           icon={<Mail size={16} />}
-          autoComplete="email"
-          error={errors.email?.message}
-          {...register("email")}
+          autoComplete="username"
+          error={errors.identifier?.message}
+          {...register("identifier")}
         />
 
         <Input

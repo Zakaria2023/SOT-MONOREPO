@@ -1,9 +1,10 @@
 "use client";
 
 import { useSignUpForm } from "@/app/sign-up/use-sign-up-form";
-import { LocationPicker } from "@/components/location/location-picker";
 import { PhoneInput } from "@/components/auth/phone-input";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { LocationPicker } from "@/components/location/location-picker";
+import { cn } from "@/lib/utils";
 import {
   ArrowRight,
   Building2,
@@ -12,7 +13,6 @@ import {
   KeyRound,
   Lock,
   Mail,
-  MessageSquare,
   User,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,20 +30,23 @@ export const SignUpForm = () => {
     form: {
       register,
       control,
+      watch,
+      setValue,
       formState: { errors },
     },
     step,
     state,
     isPending,
     onSubmitDetails,
-    emailCode,
-    setEmailCode,
-    phoneCode,
-    setPhoneCode,
+    code,
+    setCode,
     onVerify,
     resend,
+    verifyMethod,
     contact,
   } = useSignUpForm();
+
+  const method = watch("method");
 
   return (
     <div className="relative w-full max-w-md rounded-3xl bg-surface p-9 shadow-[0_30px_80px_-24px_rgba(20,22,27,0.2),0_24px_70px_-34px_rgba(124,58,237,0.5)]">
@@ -75,27 +78,53 @@ export const SignUpForm = () => {
               {...register("fullName")}
             />
 
-            <Input
-              label="Work email"
-              type="email"
-              placeholder="you@company.com"
-              icon={<Mail size={16} />}
-              autoComplete="email"
-              error={errors.email?.message}
-              {...register("email")}
-            />
+            {/* Sign up with one identifier so Clerk sends a single code. */}
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold text-ink">
+                Sign up with
+              </span>
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-search-border p-1">
+                {(["email", "phone"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setValue("method", option)}
+                    className={cn(
+                      "rounded-lg py-2 text-sm font-semibold capitalize transition-colors",
+                      method === option
+                        ? "bg-primary text-white"
+                        : "text-muted hover:text-ink",
+                    )}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            <Controller
-              control={control}
-              name="phone"
-              render={({ field }) => (
-                <PhoneInput
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  error={errors.phone?.message}
-                />
-              )}
-            />
+            {method === "email" ? (
+              <Input
+                label="Work email"
+                type="email"
+                placeholder="you@company.com"
+                icon={<Mail size={16} />}
+                autoComplete="email"
+                error={errors.email?.message}
+                {...register("email")}
+              />
+            ) : (
+              <Controller
+                control={control}
+                name="phone"
+                render={({ field }) => (
+                  <PhoneInput
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    error={errors.phone?.message}
+                  />
+                )}
+              />
+            )}
 
             <Input
               label="Company name"
@@ -181,8 +210,7 @@ export const SignUpForm = () => {
             <h1 className="font-heading text-3xl text-ink">Verify it&apos;s you</h1>
             <p className="font-grotesk mt-2 text-sm text-muted">
               We sent a code to{" "}
-              <span className="font-bold text-ink">{contact.email}</span> and{" "}
-              <span className="font-bold text-ink">{contact.phone}</span>.
+              <span className="font-bold text-ink">{contact}</span>.
             </p>
           </div>
 
@@ -195,23 +223,13 @@ export const SignUpForm = () => {
             className="font-grotesk mt-6 flex flex-col gap-4"
           >
             <Input
-              label="Email code"
+              label={verifyMethod === "email" ? "Email code" : "Phone code"}
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="6-digit code"
-              icon={<Mail size={16} />}
-              value={emailCode}
-              onChange={(event) => setEmailCode(event.target.value)}
-            />
-
-            <Input
-              label="Phone code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="6-digit code"
-              icon={<MessageSquare size={16} />}
-              value={phoneCode}
-              onChange={(event) => setPhoneCode(event.target.value)}
+              icon={<KeyRound size={16} />}
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
             />
 
             {state.error && (
@@ -228,7 +246,7 @@ export const SignUpForm = () => {
               onClick={() => void resend()}
               className="font-grotesk text-sm font-bold text-primary"
             >
-              Resend codes
+              Resend code
             </button>
           </form>
         </>

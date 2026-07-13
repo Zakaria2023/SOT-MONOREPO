@@ -1,3 +1,4 @@
+import { FlagEmojiPolyfill } from "@/components/common/flag-emoji-polyfill";
 import { Navbar } from "@/components/layout/navbar";
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
@@ -21,6 +22,7 @@ const RootLayout = ({ children }: Props) => (
     <html lang="en" suppressHydrationWarning className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <FlagEmojiPolyfill />
         <Navbar />
         {children}
       </body>

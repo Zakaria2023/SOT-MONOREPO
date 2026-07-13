@@ -6,7 +6,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { registerSchema, type RegisterInput } from "validators";
+import {
+  registerSchema,
+  type RegisterInput,
+  type SignUpMethod,
+} from "validators";
 
 type SignUpState = {
   error?: string;
@@ -15,14 +19,11 @@ type SignUpState = {
 /** Which panel the sign-up card is showing. */
 export type SignUpStep = "details" | "verify";
 
-// Sign-up is a two-step Clerk flow (new signals API) that has to run in the
-// browser:
-//   1. "details" — collect the profile fields + password, create the Clerk user
-//      via signUp.password(), and send an email code + phone code.
-//   2. "verify"  — the user enters both codes; once Clerk marks the sign-up
-//      complete we finalize the session. The extra profile fields (full name,
-//      company, location) ride along in `unsafeMetadata` so the webhook can
-//      mirror them into our Users table.
+// Sign-up is a two-step Clerk flow (new signals API) that runs in the browser.
+// The user picks a single identifier — email or phone — so Clerk only ever
+// sends one verification code. The extra profile fields (full name, company,
+// location) ride along in `unsafeMetadata` for the webhook to mirror into our
+// Users table.
 export const useSignUpForm = () => {
   const { signUp } = useSignUp();
   const router = useRouter();
@@ -31,13 +32,14 @@ export const useSignUpForm = () => {
   const [state, setState] = useState<SignUpState>({});
   const [isPending, setIsPending] = useState(false);
 
-  const [emailCode, setEmailCode] = useState("");
-  const [phoneCode, setPhoneCode] = useState("");
-  const [contact, setContact] = useState({ email: "", phone: "" });
+  const [code, setCode] = useState("");
+  const [verifyMethod, setVerifyMethod] = useState<SignUpMethod>("email");
+  const [contact, setContact] = useState("");
 
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      method: "email",
       fullName: "",
       email: "",
       phone: "",
@@ -52,29 +54,42 @@ export const useSignUpForm = () => {
     setIsPending(true);
     setState({});
 
-    const phone = values.phone.replace(/\s+/g, "");
+    const unsafeMetadata = {
+      fullName: values.fullName,
+      companyName: values.companyName ?? "",
+      location: values.location ?? "",
+    };
 
     try {
-      const { error } = await signUp.password({
-        emailAddress: values.email,
-        phoneNumber: phone,
-        password: values.password,
-        unsafeMetadata: {
-          fullName: values.fullName,
-          companyName: values.companyName ?? "",
-          location: values.location ?? "",
-        },
-      });
-
-      if (error) {
-        setState({ error: toClerkErrorMessage(error) });
-        return;
+      if (values.method === "email") {
+        const email = values.email ?? "";
+        const { error } = await signUp.password({
+          emailAddress: email,
+          password: values.password,
+          unsafeMetadata,
+        });
+        if (error) {
+          setState({ error: toClerkErrorMessage(error) });
+          return;
+        }
+        await signUp.verifications.sendEmailCode();
+        setContact(email);
+      } else {
+        const phone = (values.phone ?? "").replace(/\s+/g, "");
+        const { error } = await signUp.password({
+          phoneNumber: phone,
+          password: values.password,
+          unsafeMetadata,
+        });
+        if (error) {
+          setState({ error: toClerkErrorMessage(error) });
+          return;
+        }
+        await signUp.verifications.sendPhoneCode({});
+        setContact(phone);
       }
 
-      await signUp.verifications.sendEmailCode();
-      await signUp.verifications.sendPhoneCode({});
-
-      setContact({ email: values.email, phone });
+      setVerifyMethod(values.method);
       setStep("verify");
     } catch (error) {
       setState({ error: toClerkErrorMessage(error) });
@@ -88,19 +103,13 @@ export const useSignUpForm = () => {
     setState({});
 
     try {
-      const emailResult = await signUp.verifications.verifyEmailCode({
-        code: emailCode,
-      });
-      if (emailResult.error) {
-        setState({ error: toClerkErrorMessage(emailResult.error, "Invalid email code.") });
-        return;
-      }
+      const result =
+        verifyMethod === "email"
+          ? await signUp.verifications.verifyEmailCode({ code })
+          : await signUp.verifications.verifyPhoneCode({ code });
 
-      const phoneResult = await signUp.verifications.verifyPhoneCode({
-        code: phoneCode,
-      });
-      if (phoneResult.error) {
-        setState({ error: toClerkErrorMessage(phoneResult.error, "Invalid phone code.") });
+      if (result.error) {
+        setState({ error: toClerkErrorMessage(result.error, "Invalid code.") });
         return;
       }
 
@@ -110,7 +119,7 @@ export const useSignUpForm = () => {
         return;
       }
 
-      setState({ error: "Verification is incomplete. Check both codes." });
+      setState({ error: "Verification is incomplete. Check the code." });
     } catch (error) {
       setState({ error: toClerkErrorMessage(error, "Invalid code.") });
     } finally {
@@ -120,8 +129,11 @@ export const useSignUpForm = () => {
 
   const resend = async () => {
     try {
-      await signUp.verifications.sendEmailCode();
-      await signUp.verifications.sendPhoneCode({});
+      if (verifyMethod === "email") {
+        await signUp.verifications.sendEmailCode();
+      } else {
+        await signUp.verifications.sendPhoneCode({});
+      }
     } catch (error) {
       setState({ error: toClerkErrorMessage(error) });
     }
@@ -133,12 +145,11 @@ export const useSignUpForm = () => {
     state,
     isPending,
     onSubmitDetails,
-    emailCode,
-    setEmailCode,
-    phoneCode,
-    setPhoneCode,
+    code,
+    setCode,
     onVerify,
     resend,
+    verifyMethod,
     contact,
   };
 };

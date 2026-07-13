@@ -32,7 +32,10 @@ export const SocialButtons = () => {
     try {
       const { error: ssoError } = await signIn.sso({
         strategy,
-        redirectUrl: "/",
+        // Funnel through the self-gating profile page: it forwards users whose
+        // profile is already complete and shows the form to those (e.g. new
+        // social sign-ups) who still need to add a location.
+        redirectUrl: "/complete-profile",
         redirectCallbackUrl: `${window.location.origin}/sso-callback`,
       });
 
