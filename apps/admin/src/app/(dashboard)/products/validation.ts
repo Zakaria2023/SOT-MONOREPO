@@ -1,6 +1,12 @@
-import { productStatuses } from "@/db/enum";
+import { aliasTermTypes, productStatuses } from "@/db/enum";
 import { highlightSchema, specGroupSchema } from "@/lib/specs";
 import { z } from "zod";
+
+export const aliasSchema = z.object({
+  searchTerm: z.string().min(1, "Required"),
+  termType: z.enum(aliasTermTypes),
+  label: z.string().optional(),
+});
 
 export const productFormSchema = z.object({
   categoryUuid: z.string().min(1, "Category is required"),
@@ -9,9 +15,7 @@ export const productFormSchema = z.object({
   model: z.string().optional(),
   productFamily: z.string().optional(),
   seriesCode: z.string().max(4, "Max 4 characters").optional(),
-  partNumber: z.string().optional(),
-  modelNumber: z.string().optional(),
-  bom: z.string().optional(),
+  aliases: z.array(aliasSchema),
   description: z.string().optional(),
   role: z.string().optional(),
   image: z.string().optional(),

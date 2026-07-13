@@ -56,3 +56,17 @@ export const cartItemKinds = [
 ] as const satisfies readonly string[];
 
 export type CartItemKind = (typeof cartItemKinds)[number];
+
+// The KIND of a product alias. "barcode" is the universal global standard
+// (EAN/GTIN). "manufacturer" is one vendor's identifier, labelled per vendor
+// (BOM / PID / Part Number) via the alias row's `label`. The rest are extra
+// searchable terms.
+export const aliasTermTypes = [
+  "barcode",
+  "manufacturer",
+  "vendor_sku",
+  "model",
+  "nickname",
+] as const satisfies readonly string[];
+
+export type AliasTermType = (typeof aliasTermTypes)[number];

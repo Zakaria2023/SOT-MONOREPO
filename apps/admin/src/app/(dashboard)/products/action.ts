@@ -4,18 +4,27 @@ import { db } from "@/db";
 import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
-import { generateProductSku } from "services";
+import {
+  generateProductSku,
+  setProductAliases,
+  type ProductAliasInput,
+} from "services";
 import { generateUuid, slugify } from "utils";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
+export type { ProductAliasInput };
 
 export type ProductFields = Omit<
   InsertProducts,
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
 
-export type ProductClientFields = Omit<ProductFields, "slug">;
+// The client also submits the alias rows, which live in their own table.
+export type ProductClientFields = Omit<ProductFields, "slug"> & {
+  aliases: ProductAliasInput[];
+};
 
 export type ProductActionResult = {
   productUuid?: string;
@@ -65,22 +74,24 @@ export const createProduct = async (
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
   const uuid = generateUuid();
+  const { aliases, ...productFields } = fields;
   try {
     const [{ total }] = await db.select({ total: count() }).from(Products);
     // The SKU is system-owned: assembled from the brand/category/series codes,
     // never taken from the client.
     const sku = await generateProductSku({
-      brandUuid: fields.brandUuid,
-      categoryUuid: fields.categoryUuid,
-      seriesCode: fields.seriesCode,
+      brandUuid: productFields.brandUuid,
+      categoryUuid: productFields.categoryUuid,
+      seriesCode: productFields.seriesCode,
     });
     await db.insert(Products).values({
-      ...fields,
+      ...productFields,
       sku,
       uuid,
       order: total,
-      slug: slugify(fields.name),
+      slug: slugify(productFields.name),
     });
+    await setProductAliases(uuid, aliases);
   } catch (error) {
     return {
       error:
@@ -97,18 +108,20 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
+  const { aliases, ...productFields } = fields;
   try {
     // Regenerate the SKU (stable when brand/category/series are unchanged).
     const sku = await generateProductSku({
-      brandUuid: fields.brandUuid,
-      categoryUuid: fields.categoryUuid,
-      seriesCode: fields.seriesCode,
+      brandUuid: productFields.brandUuid,
+      categoryUuid: productFields.categoryUuid,
+      seriesCode: productFields.seriesCode,
       productUuid: uuid,
     });
     await db
       .update(Products)
-      .set({ ...fields, sku, slug: slugify(fields.name) })
+      .set({ ...productFields, sku, slug: slugify(productFields.name) })
       .where(eq(Products.uuid, uuid));
+    await setProductAliases(uuid, aliases);
   } catch (error) {
     return {
       error:

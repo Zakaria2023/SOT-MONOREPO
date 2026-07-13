@@ -6,5 +6,6 @@ export * from "./categories";
 export * from "./government-requests";
 export * from "./offers";
 export * from "./partner-requests";
+export * from "./product-aliases";
 export * from "./products";
 export * from "./users";

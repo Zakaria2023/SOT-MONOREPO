@@ -1,6 +1,7 @@
 "use client";
 
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
+import { AliasesEditor } from "@/components/products/aliases-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { SpecsPreview } from "@/components/specs/specs-preview";
@@ -8,11 +9,11 @@ import { productStatuses } from "@/db/enum";
 import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
+import type { SelectProductAliases } from "@/db/schema/product-aliases";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
   ArrowUpDown,
-  Barcode,
   Boxes,
   Coins,
   Hash,
@@ -42,6 +43,7 @@ type ProductFormProps =
       categories: SelectCategories[];
       brands: SelectBrands[];
       product: SelectProducts;
+      aliases: SelectProductAliases[];
     };
 
 const statusOptions = productStatuses.map((status) => ({
@@ -53,8 +55,8 @@ export const ProductForm = (props: ProductFormProps) => {
   const { mode, categories, brands } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
-    mode === "edit"
-      ? { mode: "edit", product: props.product }
+    props.mode === "edit"
+      ? { mode: "edit", product: props.product, aliases: props.aliases }
       : { mode: "add" },
   );
   const {
@@ -148,19 +150,6 @@ export const ProductForm = (props: ProductFormProps) => {
             readOnly
             className="bg-page text-faint"
           />
-          <Input
-            label="Part Number (PN)"
-            labelIcon={<Barcode size={15} />}
-            type="text"
-            {...register("partNumber")}
-          />
-          <Input
-            label="Model Number (MN)"
-            labelIcon={<Barcode size={15} />}
-            type="text"
-            {...register("modelNumber")}
-          />
-
           <CategoryDropdown
             control={control}
             name="categoryUuid"
@@ -232,11 +221,8 @@ export const ProductForm = (props: ProductFormProps) => {
           )}
         </div>
 
-        <Textarea
-          label="Bill of Materials (BOM)"
-          rows={4}
-          {...register("bom")}
-        />
+        <AliasesEditor />
+
         <Textarea label="Description" rows={4} {...register("description")} />
 
         <Checkbox label="Featured product" {...register("isFeatured")} />
