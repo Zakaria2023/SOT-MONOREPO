@@ -372,31 +372,19 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
 ## Route Handlers
 
-- Prefer a Server Action. A mutation like a file upload is a Server Action that calls the package function directly (e.g. `storage`'s `uploadDocumentFile`) — do **not** create an `/api/.../upload` route for it.
-
-  ```ts
-  // ❌ Bad — a route handler for an upload
-  // app/api/documents/upload/route.ts
-  export const POST = (request: Request) => handleDocumentUpload(request);
-
-  // ✅ Good — a Server Action that calls storage directly
-  ("use server");
-  import { uploadDocumentFile } from "storage";
-
-  export const uploadCertificate = async (formData: FormData) => {
-    const file = formData.get("file");
-    if (!(file instanceof File)) return { error: "No file provided" };
-    return uploadDocumentFile(file);
-  };
-  ```
-
-- Only use a route handler when a Server Action genuinely can't do the job — e.g. a download the browser navigates to (an `<a href>` / `Image src` that 302-redirects to a presigned URL). When such a handler's logic is shared across apps, the body lives once in a package and each app's `route.ts` **imports and calls it**. Never use the `export { handler as METHOD } from "package"` re-export syntax — it's disallowed.
+- When a route handler's logic is shared across apps (e.g. the `/api/documents/*` upload/download/delete endpoints), the handler body lives once in a package (e.g. `packages/storage`) as a plain function taking the Web `Request` (and route `context`). Never duplicate the body across apps.
+- Each app's `route.ts` must **import and call** the shared handler from a normal handler export. Never use the `export { handler as METHOD } from "package"` re-export syntax — it's disallowed.
 
   ```ts
   // ❌ Bad — re-export syntax
-  export { handleDocumentDownload as GET } from "storage";
+  export { handleDocumentUpload as POST } from "storage";
 
   // ✅ Good — import and call the shared handler
+  import { handleDocumentUpload } from "storage";
+
+  export const POST = (request: Request) => handleDocumentUpload(request);
+
+  // ✅ Good — handler that needs the route context (dynamic segment)
   import { handleDocumentDownload } from "storage";
 
   export const GET = (

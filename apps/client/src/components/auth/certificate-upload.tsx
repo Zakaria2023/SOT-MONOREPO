@@ -1,6 +1,5 @@
 "use client";
 
-import { uploadCertificate } from "@/app/sign-up/actions";
 import { FileCheck2, Loader2, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { FormError } from "ui";
@@ -12,8 +11,14 @@ type CertificateUploadProps = {
   error?: string;
 };
 
-// Uploads a PDF/image via the uploadCertificate Server Action and hands the
-// returned document id back to the form. Used for the facility CR / VAT certs.
+type UploadResponse = {
+  documentId?: string;
+  fileName?: string;
+  error?: string;
+};
+
+// Uploads a PDF/image to /api/documents/upload and hands the returned document
+// id back to the form. Used for the facility CR / VAT certificates.
 export const CertificateUpload = ({
   label,
   value,
@@ -37,15 +42,19 @@ export const CertificateUpload = ({
     try {
       const body = new FormData();
       body.append("file", file);
-      const result = await uploadCertificate(body);
+      const response = await fetch("/api/documents/upload", {
+        method: "POST",
+        body,
+      });
+      const data = (await response.json()) as UploadResponse;
 
-      if (result.error || !result.documentId) {
-        setUploadError(result.error ?? "Upload failed. Try again.");
+      if (!response.ok || !data.documentId) {
+        setUploadError(data.error ?? "Upload failed. Try again.");
         return;
       }
 
-      onChange(result.documentId);
-      setFileName(result.fileName ?? file.name);
+      onChange(data.documentId);
+      setFileName(data.fileName ?? file.name);
     } catch {
       setUploadError("Upload failed. Try again.");
     } finally {
