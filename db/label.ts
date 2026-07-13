@@ -70,6 +70,6 @@ export const ALIAS_TERM_TYPE_LABELS: Record<AliasTermType, string> = {
 export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {
   consumer: "Consumer",
   smb_sme_channels: "SMB & SME Channels",
-  smb_sme_projects: "SMB & SME Projects (later)",
-  enterprise: "Enterprise (later)",
+  smb_sme_projects: "SMB & SME Projects",
+  enterprise: "Enterprise",
 };

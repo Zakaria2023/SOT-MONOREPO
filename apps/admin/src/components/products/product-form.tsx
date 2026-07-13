@@ -209,7 +209,7 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.priceSystemIntegrator?.message}
           />
           <Input
-            label="Sub-distributor price (later)"
+            label="Sub-distributor price"
             labelIcon={<Coins size={15} />}
             type="text"
             inputMode="decimal"
@@ -217,7 +217,7 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.priceSubDistributor?.message}
           />
           <Input
-            label="End-user price (later)"
+            label="End-user price"
             labelIcon={<Coins size={15} />}
             type="text"
             inputMode="decimal"
