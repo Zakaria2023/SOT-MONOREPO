@@ -370,6 +370,41 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   }
   ```
 
+## Route Handlers
+
+- Prefer a Server Action. A mutation like a file upload is a Server Action that calls the package function directly (e.g. `storage`'s `uploadDocumentFile`) — do **not** create an `/api/.../upload` route for it.
+
+  ```ts
+  // ❌ Bad — a route handler for an upload
+  // app/api/documents/upload/route.ts
+  export const POST = (request: Request) => handleDocumentUpload(request);
+
+  // ✅ Good — a Server Action that calls storage directly
+  ("use server");
+  import { uploadDocumentFile } from "storage";
+
+  export const uploadCertificate = async (formData: FormData) => {
+    const file = formData.get("file");
+    if (!(file instanceof File)) return { error: "No file provided" };
+    return uploadDocumentFile(file);
+  };
+  ```
+
+- Only use a route handler when a Server Action genuinely can't do the job — e.g. a download the browser navigates to (an `<a href>` / `Image src` that 302-redirects to a presigned URL). When such a handler's logic is shared across apps, the body lives once in a package and each app's `route.ts` **imports and calls it**. Never use the `export { handler as METHOD } from "package"` re-export syntax — it's disallowed.
+
+  ```ts
+  // ❌ Bad — re-export syntax
+  export { handleDocumentDownload as GET } from "storage";
+
+  // ✅ Good — import and call the shared handler
+  import { handleDocumentDownload } from "storage";
+
+  export const GET = (
+    request: Request,
+    context: { params: Promise<{ documentId: string }> },
+  ) => handleDocumentDownload(request, context);
+  ```
+
 ## Next.js Server Actions
 
 - Always use Next.js Server Actions for data mutations and queries. Never create a new route handler (route.ts) to duplicate something a Server Action could do.

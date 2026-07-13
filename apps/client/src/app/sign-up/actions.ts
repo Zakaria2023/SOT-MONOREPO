@@ -1,10 +1,36 @@
 "use server";
 
 import { createGovernmentRequest } from "services";
+import { uploadDocumentFile } from "storage";
 import {
   governmentRequestSchema,
   type GovernmentRequestInput,
 } from "validators";
+
+export type UploadCertificateResult = {
+  documentId?: string;
+  fileName?: string;
+  error?: string;
+};
+
+// Uploads a facility certificate straight to R2 via storage — no route handler.
+// Used by the CertificateUpload component during sign-up and complete-profile.
+export const uploadCertificate = async (
+  formData: FormData,
+): Promise<UploadCertificateResult> => {
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "No file provided" };
+  }
+
+  try {
+    return await uploadDocumentFile(file);
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Upload failed.",
+    };
+  }
+};
 
 export type GovernmentRequestState = {
   error?: string;
