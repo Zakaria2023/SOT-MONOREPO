@@ -1,5 +1,7 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
+  AliasTermType,
+  BusinessLine,
   BoqStatus,
   GovernmentRequestStatus,
   OfferStatus,
@@ -9,9 +11,9 @@ import {
 } from "./enum";
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
+  active: "Active",
   draft: "Draft",
-  published: "Published",
-  archived: "Archived",
+  discontinued: "Discontinued",
 };
 
 export const BOQ_STATUS_LABELS: Record<BoqStatus, string> = {
@@ -55,4 +57,19 @@ export const GOVERNMENT_REQUEST_STATUS_LABELS: Record<
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected",
+};
+
+export const ALIAS_TERM_TYPE_LABELS: Record<AliasTermType, string> = {
+  barcode: "Barcode (EAN/GTIN)",
+  manufacturer: "Manufacturer ID",
+  vendor_sku: "Vendor SKU",
+  model: "Model",
+  nickname: "Nickname",
+};
+
+export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {
+  consumer: "Consumer",
+  smb_sme_channels: "SMB & SME Channels",
+  smb_sme_projects: "SMB & SME Projects (later)",
+  enterprise: "Enterprise (later)",
 };

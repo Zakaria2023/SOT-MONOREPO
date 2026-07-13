@@ -1,17 +1,41 @@
 import type { ProductDetail } from "services";
 
-type ProductSpecsProps = {
-  specGroups: NonNullable<ProductDetail["specGroups"]>;
+type SpecAttribute = {
+  label: string;
+  value: string;
 };
 
-export const ProductSpecs = ({ specGroups }: ProductSpecsProps) => {
-  if (specGroups.length === 0) return null;
+type ProductSpecsProps = {
+  specGroups: NonNullable<ProductDetail["specGroups"]>;
+  attributes: SpecAttribute[];
+};
+
+export const ProductSpecs = ({ specGroups, attributes }: ProductSpecsProps) => {
+  if (specGroups.length === 0 && attributes.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
       <h2 className="font-heading text-3xl text-ink">
         Technical specifications
       </h2>
+
+      {attributes.length > 0 && (
+        <div className="mt-8 overflow-hidden rounded-card border border-hairline bg-surface">
+          <dl className="divide-y divide-hairline sm:grid sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3">
+            {attributes.map((attribute) => (
+              <div
+                key={attribute.label}
+                className="flex items-center justify-between gap-4 border-b border-hairline px-5 py-3.5"
+              >
+                <dt className="text-sm text-faint">{attribute.label}</dt>
+                <dd className="text-sm font-semibold text-ink">
+                  {attribute.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {specGroups.map((group) => (

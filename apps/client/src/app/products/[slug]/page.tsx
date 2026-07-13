@@ -35,11 +35,20 @@ const ProductPage = async ({ params }: Props) => {
       ? product.specGroups
       : product.category?.specGroups) ?? [];
 
+  // Machine-reasonable specs: the category template gives labels + order; the
+  // product's technicalAttributes gives the chosen values.
+  const attributes = (product.category?.specTemplate ?? [])
+    .map((field) => ({
+      label: field.label,
+      value: product.technicalAttributes?.[field.key] ?? "",
+    }))
+    .filter((attribute) => attribute.value.length > 0);
+
   return (
     <main className="min-h-screen bg-surface pb-16">
       <ProductHero product={product} highlights={highlights} />
       <ProductDetails product={product} />
-      <ProductSpecs specGroups={specGroups} />
+      <ProductSpecs specGroups={specGroups} attributes={attributes} />
       <ProductCompare
         current={product}
         others={comparables}

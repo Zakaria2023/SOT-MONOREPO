@@ -28,6 +28,7 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
     resolver: zodResolver(brandFormSchema),
     defaultValues: {
       name: brand?.name ?? "",
+      code: brand?.code ?? "",
       description: brand?.description ?? "",
       parentUuid: brand?.parentUuid ?? "",
       order: brand?.order ?? 0,
@@ -39,6 +40,7 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
     startTransition(() => {
       dispatch({
         name: values.name,
+        code: values.code ? values.code.toUpperCase() : null,
         description: values.description || null,
         parentUuid: values.parentUuid || null,
         order: values.order,

@@ -5,9 +5,12 @@ import { formatPrice } from "utils";
 import {
   ArrowLeft,
   Cpu,
+  FileText,
   Gauge,
+  Globe,
   Layers,
   Network,
+  PackageX,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -105,10 +108,26 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
             {product.name}
           </h1>
 
+          {product.shortDescription && (
+            <p className="mt-3 text-base font-medium text-ink">
+              {product.shortDescription}
+            </p>
+          )}
+
           {product.description && (
             <p className="mt-4 text-base leading-relaxed text-muted">
               {product.description}
             </p>
+          )}
+
+          {product.datasheet && (
+            <Link
+              href={documentDownloadUrl(product.datasheet)}
+              target="_blank"
+              className="mt-4 inline-flex w-fit items-center gap-2 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:border-primary"
+            >
+              <FileText size={16} /> Download datasheet (free)
+            </Link>
           )}
 
           <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-page/60 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -118,10 +137,16 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
               </p>
               <p className="mt-0.5 text-sm text-faint">per unit</p>
             </div>
-            <div className="flex items-center gap-2">
-              <BuyNowButton />
-              <AddToCartButton productUuid={product.uuid} />
-            </div>
+            {product.isAvailable ? (
+              <div className="flex items-center gap-2">
+                <BuyNowButton />
+                <AddToCartButton productUuid={product.uuid} />
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-faint">
+                <PackageX size={16} /> Currently unavailable
+              </span>
+            )}
           </div>
 
           {statHighlights.length > 0 && (
@@ -141,6 +166,37 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {(product.warrantyPeriod ||
+            product.warrantyRegion ||
+            product.countryOfOrigin) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {product.warrantyRegion && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <ShieldCheck size={14} className="text-primary" />
+                  Official {product.warrantyRegion} warranty
+                </span>
+              )}
+              {product.warrantyPeriod && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <ShieldCheck size={14} className="text-primary" />
+                  {product.warrantyPeriod} warranty
+                </span>
+              )}
+              {product.warrantyExtendable && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <Layers size={14} className="text-primary" />
+                  Extendable
+                </span>
+              )}
+              {product.countryOfOrigin && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <Globe size={14} className="text-primary" />
+                  Made in {product.countryOfOrigin}
+                </span>
+              )}
             </div>
           )}
 

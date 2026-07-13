@@ -17,18 +17,19 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
     fields.push({ label: "Category", value: product.categoryName });
   if (product.sku) fields.push({ label: "SKU", value: product.sku });
   if (product.model) fields.push({ label: "Model", value: product.model });
-  if (product.partNumber)
-    fields.push({ label: "Part Number (PN)", value: product.partNumber });
-  if (product.modelNumber)
-    fields.push({ label: "Model Number (MN)", value: product.modelNumber });
-  if (typeof product.stock === "number")
-    fields.push({ label: "Stock", value: `${product.stock} units` });
+  if (product.productFamily)
+    fields.push({ label: "Product Family", value: product.productFamily });
+  for (const alias of product.aliases) {
+    fields.push({
+      label: alias.label ?? capitalize(alias.termType),
+      value: alias.searchTerm,
+    });
+  }
   fields.push({ label: "Featured", value: product.isFeatured ? "Yes" : "No" });
   if (product.status)
     fields.push({ label: "Status", value: capitalize(product.status) });
 
-  const hasBom = Boolean(product.bom && product.bom.trim());
-  if (fields.length === 0 && !hasBom) return null;
+  if (fields.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
@@ -47,17 +48,6 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
             </div>
           ))}
         </dl>
-
-        {hasBom && (
-          <div className="mt-6 border-t border-hairline pt-5">
-            <p className="font-grotesk text-xs font-semibold uppercase tracking-wide text-faint">
-              Bill of Materials (BOM)
-            </p>
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted">
-              {product.bom}
-            </p>
-          </div>
-        )}
       </div>
     </section>
   );

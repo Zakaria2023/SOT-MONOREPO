@@ -12,7 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { productStatuses } from "../enum";
+import { businessLines, lifecycleStatuses, productStatuses } from "../enum";
 import { Highlight, SpecGroup } from "../types";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
@@ -34,36 +34,90 @@ export const Products = mysqlTable(
     // Identity
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
+    // Auto-generated smart SKU — assembled last from brand/category/series codes.
+    // Format: [BRAND-LINE][CATEGORY][SERIES]-[KEYSPECS]-[SEQ]. KEYSPECS is
+    // reserved until the structured spec template exists.
     sku: varchar("sku", { length: 100 }).unique(),
     model: varchar("model", { length: 255 }),
 
-    partNumber: varchar("part_number", { length: 255 }), // PN
-    modelNumber: varchar("model_number", { length: 255 }), // MN
-    bom: text("bom"), // BOM — Bill of Materials
+    // Vendor series/line — feeds the [SERIES] SKU segment and vendor mapping.
+    productFamily: varchar("product_family", { length: 255 }),
+    seriesCode: varchar("series_code", { length: 4 }),
 
+    // Identifiers (part number, model number, BOM, barcode, nicknames…) are not
+    // fixed columns — they live as searchable rows in ProductAliases.
+
+    // Vendor taxonomy tag (Vendor › Line › Sub-line) for mapping & rebate
+    // tracking. Phase 1 is a hand-entered tag; a full taxonomy table comes later.
+    vendorNode: varchar("vendor_node", { length: 255 }),
+
+    shortDescription: varchar("short_description", { length: 500 }), // vendor-neutral one-liner
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"
+
+    // Datasheet PDF (document id) — served free, no login, from the storefront.
+    datasheet: varchar("datasheet", { length: 64 }),
 
     // Media
     image: varchar("image", { length: 255 }),
     images: json("images").$type<string[]>(),
 
+    // Trust & warranty. warrantyRegion backs the "official / Saudi-warranty"
+    // anti-gray-market badge; warrantyExtendable gates the "extend warranty" CTA.
+    warrantyPeriod: varchar("warranty_period", { length: 50 }), // e.g. "24 months"
+    warrantyRegion: varchar("warranty_region", { length: 100 }),
+    warrantyExtendable: boolean("warranty_extendable").default(false).notNull(),
+    countryOfOrigin: varchar("country_of_origin", { length: 100 }),
+
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
 
-    // Pricing — optional; a partner can set the price when they quote the product.
-    price: decimal("price", { precision: 12, scale: 2 }),
-    currency: char("currency", { length: 3 }).default("SAR"),
+    // Anchor flag: the "brain" of a system (hub, NVR, IP PBX, core switch). A
+    // cart containing an anchor enters the solution-confirmation gate.
+    needsSolutionReview: boolean("needs_solution_review")
+      .default(false)
+      .notNull(),
 
-    // Inventory
+    // Price book. `price` is the public MSRP — the only price shown publicly.
+    // Cost + system-integrator define the internal margin pool. Sub-distributor
+    // and end-user tiers are dormant structure (not used in Phase 1).
+    price: decimal("price", { precision: 12, scale: 2 }), // public MSRP
+    priceCost: decimal("price_cost", { precision: 12, scale: 2 }),
+    priceSystemIntegrator: decimal("price_system_integrator", {
+      precision: 12,
+      scale: 2,
+    }),
+    priceSubDistributor: decimal("price_sub_distributor", {
+      precision: 12,
+      scale: 2,
+    }),
+    priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
+    currency: char("currency", { length: 3 }).default("SAR"),
+    businessLine: mysqlEnum("business_line", businessLines).default("consumer"),
+
+    // Inventory. `stock` is an internal count (never shown to customers).
+    // `isAvailable` is the manual Available/Unavailable storefront toggle — the
+    // Phase-1 signal until the real-time Odoo stock link arrives.
     stock: int("stock").default(0),
+    isAvailable: boolean("is_available").default(true).notNull(),
 
     highlights: json("highlights").$type<Highlight[]>(),
     specGroups: json("spec_groups").$type<SpecGroup[]>(),
+    // Dropdown-only values filled from the category's spec template, keyed by
+    // SpecField.key. Machine-reasonable specs for filtering and the AI builder.
+    technicalAttributes: json("technical_attributes").$type<
+      Record<string, string>
+    >(),
 
     // State & ordering
     status: mysqlEnum("status", productStatuses).default("draft"),
     order: int("order").default(0),
+
+    // RESERVED / dormant — for the EOL and cross-vendor-equivalence features
+    // later. No UI yet; the hooks exist so nothing needs retrofitting.
+    lifecycleStatus: mysqlEnum("lifecycle_status", lifecycleStatuses),
+    replacedBy: char("replaced_by", { length: 36 }), // successor product uuid
+    equivalents: json("equivalents").$type<string[]>(), // cross-vendor uuids
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
