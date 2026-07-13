@@ -15,8 +15,6 @@ import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-export type { ProductAliasInput };
-
 export type ProductFields = Omit<
   InsertProducts,
   "id" | "uuid" | "createdAt" | "updatedAt"
