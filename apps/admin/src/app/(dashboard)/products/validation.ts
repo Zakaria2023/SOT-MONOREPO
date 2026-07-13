@@ -36,6 +36,7 @@ export const productFormSchema = z.object({
   image: z.string().optional(),
   images: z.array(z.string()).optional(),
   isFeatured: z.boolean(),
+  needsSolutionReview: z.boolean(),
   price: priceField, // public MSRP
   priceCost: priceField,
   priceSystemIntegrator: priceField,

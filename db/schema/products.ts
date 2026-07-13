@@ -72,6 +72,12 @@ export const Products = mysqlTable(
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
 
+    // Anchor flag: the "brain" of a system (hub, NVR, IP PBX, core switch). A
+    // cart containing an anchor enters the solution-confirmation gate.
+    needsSolutionReview: boolean("needs_solution_review")
+      .default(false)
+      .notNull(),
+
     // Price book. `price` is the public MSRP — the only price shown publicly.
     // Cost + system-integrator define the internal margin pool. Sub-distributor
     // and end-user tiers are dormant structure (not used in Phase 1).

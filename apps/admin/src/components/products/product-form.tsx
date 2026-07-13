@@ -357,6 +357,10 @@ export const ProductForm = (props: ProductFormProps) => {
             label="Warranty extendable"
             {...register("warrantyExtendable")}
           />
+          <Checkbox
+            label="Anchor product (needs solution review)"
+            {...register("needsSolutionReview")}
+          />
         </div>
 
         <ImageUpload
