@@ -32,6 +32,7 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
       parentUuid: brand?.parentUuid ?? "",
       order: brand?.order ?? 0,
       image: brand?.image ?? "",
+      businessLines: brand?.businessLines ?? [],
     },
   });
 
@@ -43,6 +44,7 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
         parentUuid: values.parentUuid || null,
         order: values.order,
         image: values.image || null,
+        businessLines: values.businessLines,
       });
     });
   });

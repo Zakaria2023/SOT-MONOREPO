@@ -3,12 +3,14 @@ import {
   char,
   index,
   int,
+  json,
   mysqlTable,
   text,
   timestamp,
   varchar,
   type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
+import { BusinessLine } from "../enum";
 
 export const Brands = mysqlTable(
   "Brands",
@@ -26,6 +28,10 @@ export const Brands = mysqlTable(
     code: varchar("code", { length: 4 }),
     description: text("description"),
     order: int("order").default(0),
+
+    // Business lines this brand sells into. Products inherit these from their
+    // brand rather than carrying their own copy.
+    businessLines: json("business_lines").$type<BusinessLine[]>(),
 
     image: varchar("image", { length: 255 }),
 

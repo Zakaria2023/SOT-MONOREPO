@@ -1,4 +1,4 @@
-import { aliasTermTypes, businessLines, productStatuses } from "@/db/enum";
+import { aliasTermTypes, productStatuses } from "@/db/enum";
 import { z } from "zod";
 
 export const aliasSchema = z.object({
@@ -39,7 +39,6 @@ export const productFormSchema = z.object({
   priceSystemIntegrator: priceField,
   priceSubDistributor: priceField,
   priceEndUser: priceField,
-  businessLine: z.enum(businessLines),
   currency: z.string().min(1, "Required").max(3),
   stock: z.number().int().min(0).optional(),
   isAvailable: z.boolean(),

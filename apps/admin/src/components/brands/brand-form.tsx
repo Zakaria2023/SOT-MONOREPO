@@ -2,6 +2,7 @@
 
 import { useBrandForm } from "@/app/(dashboard)/brands/use-brand-form";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
+import { BusinessLinesField } from "@/components/brands/business-lines-field";
 import { Button } from "ui";
 import { FormError } from "ui";
 import { ImageUpload } from "ui";
@@ -78,6 +79,8 @@ export const BrandForm = (props: BrandFormProps) => {
           />
         )}
       </div>
+
+      <BusinessLinesField control={control} />
 
       <Textarea label="Description" rows={3} {...register("description")} />
 

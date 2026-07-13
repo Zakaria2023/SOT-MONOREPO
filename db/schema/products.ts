@@ -12,7 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { businessLines, lifecycleStatuses, productStatuses } from "../enum";
+import { lifecycleStatuses, productStatuses } from "../enum";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
 
@@ -88,7 +88,6 @@ export const Products = mysqlTable(
     }),
     priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
-    businessLine: mysqlEnum("business_line", businessLines).default("consumer"),
 
     // Inventory. `stock` is an internal count (never shown to customers).
     // `isAvailable` is the manual Available/Unavailable storefront toggle — the

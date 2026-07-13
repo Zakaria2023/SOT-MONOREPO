@@ -1,3 +1,4 @@
+import { businessLines } from "@/db/enum";
 import { z } from "zod";
 
 export const brandFormSchema = z.object({
@@ -6,6 +7,7 @@ export const brandFormSchema = z.object({
   parentUuid: z.string().optional(),
   order: z.number().int().min(0).optional(),
   image: z.string().optional(),
+  businessLines: z.array(z.enum(businessLines)),
 });
 
 export type BrandFormValues = z.infer<typeof brandFormSchema>;
