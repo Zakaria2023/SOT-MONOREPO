@@ -24,6 +24,8 @@ export const Categories = mysqlTable(
     ),
 
     name: varchar("name", { length: 255 }).notNull(),
+    // Category code — the [CATEGORY] segment of the smart SKU (e.g. "SW").
+    code: varchar("code", { length: 4 }),
     description: text("description"),
     order: int("order").default(0).notNull(),
 

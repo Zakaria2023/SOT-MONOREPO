@@ -16,6 +16,7 @@ import {
   Boxes,
   Coins,
   Hash,
+  Layers,
   Package,
   Tag,
   Waypoints,
@@ -59,9 +60,25 @@ export const ProductForm = (props: ProductFormProps) => {
   const {
     register,
     control,
+    watch,
     setValue,
     formState: { errors },
   } = form;
+
+  // The SKU is auto-assembled from the brand/category/series codes. We show a
+  // live preview here (SEQ shown as "##" until the server assigns it on save).
+  const selectedBrandCode =
+    brands.find((brand) => brand.uuid === watch("brandUuid"))?.code ?? "";
+  const selectedCategoryCode =
+    categories.find((category) => category.uuid === watch("categoryUuid"))
+      ?.code ?? "";
+  const seriesCode = watch("seriesCode") ?? "";
+  const existingSku = mode === "edit" ? props.product.sku : null;
+  const skuPreview =
+    selectedBrandCode && selectedCategoryCode
+      ? `${selectedBrandCode}${selectedCategoryCode}${seriesCode}-##`.toUpperCase()
+      : "Set brand & category codes first";
+  const skuDisplay = existingSku ?? skuPreview;
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
@@ -100,16 +117,36 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.name?.message}
           />
           <Input
-            label="SKU"
-            labelIcon={<Hash size={15} />}
-            type="text"
-            {...register("sku")}
-          />
-          <Input
             label="Model"
             labelIcon={<Tag size={15} />}
             type="text"
             {...register("model")}
+          />
+          <Input
+            label="Product Family"
+            labelIcon={<Layers size={15} />}
+            type="text"
+            placeholder="e.g. S500 Series"
+            {...register("productFamily")}
+          />
+          <Input
+            label="Series Code"
+            labelIcon={<Hash size={15} />}
+            type="text"
+            placeholder="e.g. 50"
+            {...register("seriesCode")}
+            error={errors.seriesCode?.message}
+          />
+          <Input
+            label="SKU"
+            labelIcon={<Hash size={15} />}
+            labelAccessory={
+              <span className="text-xs text-faint">Auto-generated</span>
+            }
+            type="text"
+            value={skuDisplay}
+            readOnly
+            className="bg-page text-faint"
           />
           <Input
             label="Part Number (PN)"

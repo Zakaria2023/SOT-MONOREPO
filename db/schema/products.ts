@@ -34,8 +34,15 @@ export const Products = mysqlTable(
     // Identity
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
+    // Auto-generated smart SKU — assembled last from brand/category/series codes.
+    // Format: [BRAND-LINE][CATEGORY][SERIES]-[KEYSPECS]-[SEQ]. KEYSPECS is
+    // reserved until the structured spec template exists.
     sku: varchar("sku", { length: 100 }).unique(),
     model: varchar("model", { length: 255 }),
+
+    // Vendor series/line — feeds the [SERIES] SKU segment and vendor mapping.
+    productFamily: varchar("product_family", { length: 255 }),
+    seriesCode: varchar("series_code", { length: 4 }),
 
     partNumber: varchar("part_number", { length: 255 }), // PN
     modelNumber: varchar("model_number", { length: 255 }), // MN

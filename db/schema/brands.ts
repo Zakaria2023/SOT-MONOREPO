@@ -22,6 +22,8 @@ export const Brands = mysqlTable(
     ),
 
     name: varchar("name", { length: 255 }).notNull(),
+    // Brand-line code — the [BRAND-LINE] segment of the smart SKU (e.g. "HE").
+    code: varchar("code", { length: 4 }),
     description: text("description"),
     order: int("order").default(0),
 

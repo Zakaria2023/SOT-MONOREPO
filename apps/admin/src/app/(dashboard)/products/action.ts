@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
+import { generateProductSku } from "services";
 import { generateUuid, slugify } from "utils";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -66,8 +67,16 @@ export const createProduct = async (
   const uuid = generateUuid();
   try {
     const [{ total }] = await db.select({ total: count() }).from(Products);
+    // The SKU is system-owned: assembled from the brand/category/series codes,
+    // never taken from the client.
+    const sku = await generateProductSku({
+      brandUuid: fields.brandUuid,
+      categoryUuid: fields.categoryUuid,
+      seriesCode: fields.seriesCode,
+    });
     await db.insert(Products).values({
       ...fields,
+      sku,
       uuid,
       order: total,
       slug: slugify(fields.name),
@@ -89,9 +98,16 @@ export const updateProduct = async (
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
   try {
+    // Regenerate the SKU (stable when brand/category/series are unchanged).
+    const sku = await generateProductSku({
+      brandUuid: fields.brandUuid,
+      categoryUuid: fields.categoryUuid,
+      seriesCode: fields.seriesCode,
+      productUuid: uuid,
+    });
     await db
       .update(Products)
-      .set({ ...fields, slug: slugify(fields.name) })
+      .set({ ...fields, sku, slug: slugify(fields.name) })
       .where(eq(Products.uuid, uuid));
   } catch (error) {
     return {

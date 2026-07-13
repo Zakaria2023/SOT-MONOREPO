@@ -51,6 +51,60 @@ const productOrder = (sort: ProductSort | undefined) => {
   }
 };
 
+/**
+ * Assemble the smart SKU: `[BRAND-LINE][CATEGORY][SERIES]-[SEQ]`.
+ * The KEYSPECS segment is reserved for when the structured spec template lands.
+ * Returns null when the brand or category has no code yet — nothing to assemble,
+ * so the product simply keeps a null SKU until the codes are set.
+ */
+export const generateProductSku = async (input: {
+  brandUuid: string;
+  categoryUuid: string;
+  seriesCode?: string | null;
+  productUuid?: string;
+}): Promise<string | null> => {
+  const [brand] = await db
+    .select({ code: Brands.code })
+    .from(Brands)
+    .where(eq(Brands.uuid, input.brandUuid));
+  const [category] = await db
+    .select({ code: Categories.code })
+    .from(Categories)
+    .where(eq(Categories.uuid, input.categoryUuid));
+
+  const brandCode = (brand?.code ?? "").toUpperCase();
+  const categoryCode = (category?.code ?? "").toUpperCase();
+  if (!brandCode || !categoryCode) {
+    return null;
+  }
+
+  const series = (input.seriesCode ?? "").toUpperCase();
+  const prefix = `${brandCode}${categoryCode}${series}`;
+
+  // Keep the code stable across edits when the prefix hasn't changed.
+  if (input.productUuid) {
+    const [existing] = await db
+      .select({ sku: Products.sku })
+      .from(Products)
+      .where(eq(Products.uuid, input.productUuid));
+    if (existing?.sku && existing.sku.startsWith(`${prefix}-`)) {
+      return existing.sku;
+    }
+  }
+
+  // SEQ = the highest existing sequence for this prefix + 1 (collision-breaker).
+  const rows = await db
+    .select({ sku: Products.sku })
+    .from(Products)
+    .where(like(Products.sku, `${prefix}-%`));
+  const used = rows
+    .map((row) => Number(row.sku?.split("-").pop()))
+    .filter((value) => Number.isInteger(value));
+  const seq = (used.length ? Math.max(...used) : 0) + 1;
+
+  return `${prefix}-${String(seq).padStart(2, "0")}`;
+};
+
 export const getProducts = async (
   filters: ProductFilters = {},
 ): Promise<ProductListItem[]> => {
