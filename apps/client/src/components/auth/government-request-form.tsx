@@ -1,13 +1,17 @@
 "use client";
 
+import { PhoneInput } from "@/components/auth/phone-input";
+import { LocationPicker } from "@/components/location/location-picker";
 import { useGovernmentForm } from "@/app/sign-up/use-government-form";
-import { ArrowRight, Building2, Mail, Phone, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, Mail, ShieldCheck, User } from "lucide-react";
+import { Controller } from "react-hook-form";
 import { Input } from "ui";
 
 export const GovernmentRequestForm = () => {
   const {
     form: {
       register,
+      control,
       formState: { errors },
     },
     state,
@@ -55,6 +59,15 @@ export const GovernmentRequestForm = () => {
       />
 
       <Input
+        label="Full name"
+        placeholder="Jane Doe"
+        icon={<User size={16} />}
+        autoComplete="name"
+        error={errors.fullName?.message}
+        {...register("fullName")}
+      />
+
+      <Input
         label="Official email"
         type="email"
         placeholder="name@entity.gov.sa"
@@ -64,14 +77,29 @@ export const GovernmentRequestForm = () => {
         {...register("officialEmail")}
       />
 
-      <Input
-        label="Contact number"
-        type="tel"
-        placeholder="+966 5X XXX XXXX"
-        icon={<Phone size={16} />}
-        autoComplete="tel"
-        error={errors.contactNumber?.message}
-        {...register("contactNumber")}
+      <Controller
+        control={control}
+        name="contactNumber"
+        render={({ field }) => (
+          <PhoneInput
+            label="Contact number"
+            value={field.value ?? ""}
+            onChange={field.onChange}
+            error={errors.contactNumber?.message}
+          />
+        )}
+      />
+
+      <Controller
+        control={control}
+        name="location"
+        render={({ field }) => (
+          <LocationPicker
+            value={field.value ?? ""}
+            onChange={field.onChange}
+            error={errors.location?.message}
+          />
+        )}
       />
 
       {state.error && (

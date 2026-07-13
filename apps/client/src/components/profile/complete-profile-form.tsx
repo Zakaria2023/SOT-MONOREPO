@@ -2,10 +2,11 @@
 
 import { useCompleteProfileForm } from "@/app/complete-profile/use-complete-profile-form";
 import { CertificateUpload } from "@/components/auth/certificate-upload";
+import { LocationPicker } from "@/components/location/location-picker";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Building2, Hash, Mail, Phone, Receipt, User } from "lucide-react";
 import { Controller } from "react-hook-form";
-import { Input, Textarea } from "ui";
+import { Input } from "ui";
 
 type CompleteProfileFormProps = {
   next: string;
@@ -93,11 +94,17 @@ export const CompleteProfileForm = ({
               error={errors.vatNumber?.message}
               {...register("vatNumber")}
             />
-            <Textarea
-              label="National address"
-              placeholder="For delivery + invoicing"
-              error={errors.nationalAddress?.message}
-              {...register("nationalAddress")}
+            <Controller
+              control={control}
+              name="nationalAddress"
+              render={({ field }) => (
+                <LocationPicker
+                  label="National address"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.nationalAddress?.message}
+                />
+              )}
             />
             <Controller
               control={control}
@@ -172,6 +179,17 @@ export const CompleteProfileForm = ({
               autoComplete="family-name"
               error={errors.lastName?.message}
               {...register("lastName")}
+            />
+            <Controller
+              control={control}
+              name="location"
+              render={({ field }) => (
+                <LocationPicker
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.location?.message}
+                />
+              )}
             />
           </>
         )}

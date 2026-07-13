@@ -29,6 +29,7 @@ export const useCompleteProfileForm = ({
       firstName,
       middleName: "",
       lastName,
+      location: "",
       unifiedNumber: "",
       crNumber: "",
       vatNumber: "",

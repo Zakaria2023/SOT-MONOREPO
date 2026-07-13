@@ -58,7 +58,9 @@ export const approveGovernmentRequestAction = async (
         role: "user",
         type: "government",
         entityName: request.entityName,
+        fullName: request.fullName,
         contactNumber: request.contactNumber,
+        location: request.location,
       },
     });
 

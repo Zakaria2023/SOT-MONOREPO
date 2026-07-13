@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
   experimental: {
     externalDir: true,
+    // Requests pass through proxy.ts (Clerk), where Next buffers the body with a
+    // 10MB default cap; raise it above the 20MB document upload limit so large
+    // uploads aren't truncated before reaching /api/documents/upload.
+    proxyClientMaxBodySize: "25mb",
   },
   transpilePackages: ["services", "storage", "auth", "validators"],
 };

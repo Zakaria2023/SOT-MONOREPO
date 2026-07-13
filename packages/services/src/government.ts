@@ -10,7 +10,9 @@ import { ConflictError, ValidationError } from "./errors";
 export type GovernmentRequestInput = {
   officialEmail: SelectGovernmentRequests["officialEmail"];
   entityName: SelectGovernmentRequests["entityName"];
+  fullName: SelectGovernmentRequests["fullName"];
   contactNumber: SelectGovernmentRequests["contactNumber"];
+  location: SelectGovernmentRequests["location"];
 };
 
 export type ApproveGovernmentRequestInput = {
@@ -65,7 +67,9 @@ export const createGovernmentRequest = async (
     uuid,
     officialEmail,
     entityName: input.entityName.trim(),
+    fullName: input.fullName.trim(),
     contactNumber: input.contactNumber.trim(),
+    location: input.location.trim(),
   });
 
   const [request] = await db

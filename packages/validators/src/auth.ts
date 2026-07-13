@@ -23,6 +23,8 @@ export const signUpSchema = z
     lastName: z.string().max(255).optional(),
     email: z.string().max(255).optional(),
     phone: z.string().max(30).optional(),
+    // City + country, captured for every account type.
+    location: z.string().max(255).optional(),
 
     // Facility business fields.
     unifiedNumber: z.string().max(30).optional(),
@@ -73,6 +75,7 @@ export const signUpSchema = z
     if (data.type === "individual") {
       requireText(data.firstName, "firstName");
       requireText(data.lastName, "lastName");
+      requireText(data.location, "location");
       if (data.method === "email") {
         requireEmail(data.email, "email");
       } else {

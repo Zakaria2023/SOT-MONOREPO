@@ -22,8 +22,10 @@ export const useGovernmentForm = () => {
     resolver: zodResolver(governmentRequestSchema),
     defaultValues: {
       entityName: "",
+      fullName: "",
       officialEmail: "",
       contactNumber: "",
+      location: "",
     },
   });
 

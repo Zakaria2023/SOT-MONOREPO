@@ -202,6 +202,10 @@ export const isProfileComplete = (user: AuthUser): boolean => {
         user.representativeName,
     );
   }
-  // Individuals and (approved) government users are complete once typed.
+  if (user.type === "individual") {
+    // Individuals are complete once typed and located.
+    return Boolean(user.location);
+  }
+  // (Approved) government users are complete once typed.
   return true;
 };
