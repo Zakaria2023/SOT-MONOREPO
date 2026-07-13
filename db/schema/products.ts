@@ -58,6 +58,13 @@ export const Products = mysqlTable(
     image: varchar("image", { length: 255 }),
     images: json("images").$type<string[]>(),
 
+    // Trust & warranty. warrantyRegion backs the "official / Saudi-warranty"
+    // anti-gray-market badge; warrantyExtendable gates the "extend warranty" CTA.
+    warrantyPeriod: varchar("warranty_period", { length: 50 }), // e.g. "24 months"
+    warrantyRegion: varchar("warranty_region", { length: 100 }),
+    warrantyExtendable: boolean("warranty_extendable").default(false).notNull(),
+    countryOfOrigin: varchar("country_of_origin", { length: 100 }),
+
     // Merchandising
     isFeatured: boolean("is_featured").default(false),
 

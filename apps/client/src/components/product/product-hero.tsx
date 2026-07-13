@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Cpu,
   Gauge,
+  Globe,
   Layers,
   Network,
   PackageX,
@@ -148,6 +149,37 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {(product.warrantyPeriod ||
+            product.warrantyRegion ||
+            product.countryOfOrigin) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {product.warrantyRegion && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <ShieldCheck size={14} className="text-primary" />
+                  Official {product.warrantyRegion} warranty
+                </span>
+              )}
+              {product.warrantyPeriod && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <ShieldCheck size={14} className="text-primary" />
+                  {product.warrantyPeriod} warranty
+                </span>
+              )}
+              {product.warrantyExtendable && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <Layers size={14} className="text-primary" />
+                  Extendable
+                </span>
+              )}
+              {product.countryOfOrigin && (
+                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
+                  <Globe size={14} className="text-primary" />
+                  Made in {product.countryOfOrigin}
+                </span>
+              )}
             </div>
           )}
 

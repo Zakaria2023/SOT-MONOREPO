@@ -41,6 +41,10 @@ export const useProductForm = (args: UseProductFormArgs) => {
       productFamily: product?.productFamily ?? "",
       seriesCode: product?.seriesCode ?? "",
       vendorNode: product?.vendorNode ?? "",
+      warrantyPeriod: product?.warrantyPeriod ?? "",
+      warrantyRegion: product?.warrantyRegion ?? "",
+      warrantyExtendable: product?.warrantyExtendable ?? false,
+      countryOfOrigin: product?.countryOfOrigin ?? "",
       aliases:
         args.mode === "edit"
           ? args.aliases.map((alias) => ({
@@ -86,6 +90,10 @@ export const useProductForm = (args: UseProductFormArgs) => {
         productFamily: values.productFamily || null,
         seriesCode: values.seriesCode || null,
         vendorNode: values.vendorNode || null,
+        warrantyPeriod: values.warrantyPeriod || null,
+        warrantyRegion: values.warrantyRegion || null,
+        warrantyExtendable: values.warrantyExtendable,
+        countryOfOrigin: values.countryOfOrigin || null,
         aliases: values.aliases.map((alias) => ({
           searchTerm: alias.searchTerm,
           termType: alias.termType,

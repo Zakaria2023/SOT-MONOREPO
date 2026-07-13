@@ -18,9 +18,11 @@ import {
   ArrowUpDown,
   Boxes,
   Coins,
+  Globe,
   Hash,
   Layers,
   Package,
+  ShieldCheck,
   Tag,
   Waypoints,
 } from "lucide-react";
@@ -278,6 +280,27 @@ export const ProductForm = (props: ProductFormProps) => {
             placeholder="e.g. Huawei › eKit › Datacom"
             {...register("vendorNode")}
           />
+          <Input
+            label="Warranty period"
+            labelIcon={<ShieldCheck size={15} />}
+            type="text"
+            placeholder="e.g. 24 months"
+            {...register("warrantyPeriod")}
+          />
+          <Input
+            label="Warranty region"
+            labelIcon={<ShieldCheck size={15} />}
+            type="text"
+            placeholder="e.g. Saudi Arabia"
+            {...register("warrantyRegion")}
+          />
+          <Input
+            label="Country of origin"
+            labelIcon={<Globe size={15} />}
+            type="text"
+            placeholder="e.g. China"
+            {...register("countryOfOrigin")}
+          />
           {mode === "edit" && (
             <Input
               label="Order"
@@ -300,6 +323,10 @@ export const ProductForm = (props: ProductFormProps) => {
           <Checkbox
             label="Available for purchase"
             {...register("isAvailable")}
+          />
+          <Checkbox
+            label="Warranty extendable"
+            {...register("warrantyExtendable")}
           />
         </div>
 
