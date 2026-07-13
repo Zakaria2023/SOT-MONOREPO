@@ -7,4 +7,6 @@ export * from "./government-requests";
 export * from "./offers";
 export * from "./partner-requests";
 export * from "./products";
+export * from "./specification-categories";
+export * from "./specifications";
 export * from "./users";

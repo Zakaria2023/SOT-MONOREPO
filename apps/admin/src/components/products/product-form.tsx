@@ -11,6 +11,7 @@ import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
+import type { SpecificationWithCategories } from "services";
 import {
   ArrowUpDown,
   Coins,
@@ -37,11 +38,17 @@ import {
 } from "ui";
 
 type ProductFormProps =
-  | { mode: "add"; categories: SelectCategories[]; brands: SelectBrands[] }
+  | {
+      mode: "add";
+      categories: SelectCategories[];
+      brands: SelectBrands[];
+      specifications: SpecificationWithCategories[];
+    }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      specifications: SpecificationWithCategories[];
       product: SelectProducts;
     };
 
@@ -56,7 +63,7 @@ const availabilityOptions = [
 ];
 
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands } = props;
+  const { mode, categories, brands, specifications } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -70,7 +77,6 @@ export const ProductForm = (props: ProductFormProps) => {
     register,
     control,
     setValue,
-    getValues,
     formState: { errors },
   } = form;
 
@@ -80,17 +86,9 @@ export const ProductForm = (props: ProductFormProps) => {
   const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
   const hasSubmittedRef = useRef(false);
 
-  const inheritCategorySpecs = (categoryUuid: string) => {
-    const category = categories.find((item) => item.uuid === categoryUuid);
-
-    // Rebuild the technical-attributes map to the new template's top-level
-    // fields, preserving any values whose field key still exists.
-    const current = getValues("technicalAttributes") ?? {};
-    const next: Record<string, string> = {};
-    for (const field of category?.specTemplate ?? []) {
-      next[field.key] = current[field.key] ?? "";
-    }
-    setValue("technicalAttributes", next);
+  // Applicable specs depend on the category, so clear chosen values on change.
+  const handleCategoryChange = () => {
+    setValue("technicalAttributes", {});
   };
 
   return (
@@ -148,7 +146,7 @@ export const ProductForm = (props: ProductFormProps) => {
             placeholder="Select a category"
             allowEmpty={false}
             error={errors.categoryUuid?.message}
-            onValueChange={inheritCategorySpecs}
+            onValueChange={handleCategoryChange}
           />
           <BrandDropdown
             control={control}
@@ -332,7 +330,10 @@ export const ProductForm = (props: ProductFormProps) => {
           )}
         />
 
-        <TechnicalSpecsEditor categories={categories} />
+        <TechnicalSpecsEditor
+          categories={categories}
+          specifications={specifications}
+        />
 
         <FormError message={state.error} />
 

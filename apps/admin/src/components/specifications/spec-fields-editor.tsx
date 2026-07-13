@@ -14,7 +14,53 @@ type SpecOptionListProps = {
   depth: number;
 };
 
-const SpecOptionList = ({ name, depth }: SpecOptionListProps) => {
+// Sub-fields revealed by a chosen option — a list of nested fields, each with
+// its own options. Mutually recursive with SpecOptionList.
+const SpecFieldList = ({ name, depth }: SpecFieldListProps) => {
+  const { control, register } = useFormContext();
+  const { fields, append, remove } = useFieldArray({ control, name });
+
+  return (
+    <div className="flex flex-col gap-3">
+      {fields.map((field, index) => (
+        <div
+          key={field.id}
+          className="flex flex-col gap-3 rounded-control border border-hairline p-4"
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Sub-field label (e.g. PoE Standard)"
+              {...register(`${name}.${index}.label`)}
+            />
+            <Button
+              type="button"
+              variant="icon"
+              className="shrink-0"
+              onClick={() => remove(index)}
+            >
+              <Trash2 size={16} />
+            </Button>
+          </div>
+
+          <SpecOptionList name={`${name}.${index}.options`} depth={depth + 1} />
+        </div>
+      ))}
+
+      <Button
+        type="button"
+        variant="outline"
+        className="self-start"
+        onClick={() => append({ label: "", options: [] })}
+      >
+        <Plus size={16} />
+        Add Sub-field
+      </Button>
+    </div>
+  );
+};
+
+// The dropdown options for a field. Each option can reveal its own sub-fields.
+export const SpecOptionList = ({ name, depth }: SpecOptionListProps) => {
   const { control, register } = useFormContext();
   const { fields, append, remove } = useFieldArray({ control, name });
 
@@ -46,7 +92,7 @@ const SpecOptionList = ({ name, depth }: SpecOptionListProps) => {
             <p className="mb-2 text-xs text-faint">
               Sub-fields shown on the product only when this option is selected.
             </p>
-            <SpecFieldList name={`${name}.${index}.children`} depth={depth + 1} />
+            <SpecFieldList name={`${name}.${index}.children`} depth={depth} />
           </div>
         </div>
       ))}
@@ -63,61 +109,3 @@ const SpecOptionList = ({ name, depth }: SpecOptionListProps) => {
     </div>
   );
 };
-
-const SpecFieldList = ({ name, depth }: SpecFieldListProps) => {
-  const { control, register } = useFormContext();
-  const { fields, append, remove } = useFieldArray({ control, name });
-
-  return (
-    <div className="flex flex-col gap-3">
-      {fields.map((field, index) => (
-        <div
-          key={field.id}
-          className="flex flex-col gap-3 rounded-control border border-hairline p-4"
-        >
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Field label (e.g. PoE)"
-              {...register(`${name}.${index}.label`)}
-            />
-            <Button
-              type="button"
-              variant="icon"
-              className="shrink-0"
-              onClick={() => remove(index)}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
-
-          <SpecOptionList name={`${name}.${index}.options`} depth={depth} />
-        </div>
-      ))}
-
-      <Button
-        type="button"
-        variant="outline"
-        className="self-start"
-        onClick={() => append({ label: "", options: [] })}
-      >
-        <Plus size={16} />
-        {depth === 0 ? "Add Spec Field" : "Add Sub-field"}
-      </Button>
-    </div>
-  );
-};
-
-export const SpecTemplateEditor = () => (
-  <div className="flex flex-col gap-3">
-    <div>
-      <label className="text-sm font-semibold text-ink">Spec template</label>
-      <p className="mt-1 text-xs text-muted">
-        Dropdown-only fields products in this category fill. Give each option its
-        own sub-fields to reveal follow-up questions — e.g. PoE → Yes reveals a
-        PoE standard field, No hides it.
-      </p>
-    </div>
-
-    <SpecFieldList name="specTemplate" depth={0} />
-  </div>
-);

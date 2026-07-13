@@ -8,6 +8,7 @@ import {
   getComparableProducts,
   getProductDetailBySlug,
   getRelatedProducts,
+  getSpecificationsForCategory,
 } from "services";
 
 type Props = {
@@ -53,15 +54,16 @@ const ProductPage = async ({ params }: Props) => {
   const product = await getProductDetailBySlug(slug);
   if (!product) notFound();
 
-  const [comparables, related] = await Promise.all([
+  const [comparables, related, specTemplate] = await Promise.all([
     getComparableProducts(product.categoryUuid, product.uuid),
     getRelatedProducts(product.uuid),
+    getSpecificationsForCategory(product.categoryUuid),
   ]);
 
-  // Products draw their spec structure from their category's spec template.
-  // `attributes` follows the product's selected path (skipping branches it
-  // didn't choose); `specFields` is every field, for the comparison columns.
-  const specTemplate = product.category?.specTemplate ?? [];
+  // Spec template = the specifications assigned to this product's category (and
+  // its ancestors). `attributes` follows the product's selected path (skipping
+  // branches it didn't choose); `specFields` is every field, for the compare
+  // columns.
   const attributes = flattenSpecAttributes(
     specTemplate,
     product.technicalAttributes,
