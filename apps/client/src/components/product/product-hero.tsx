@@ -1,4 +1,5 @@
 import { AddToCartButton } from "@/components/home/add-to-cart-button";
+import { BusinessLineChips } from "@/components/catalog/business-line-chips";
 import { BuyNowButton } from "@/components/product/buy-now-button";
 import { documentDownloadUrl } from "@/lib/documents";
 import { formatPrice } from "utils";
@@ -110,6 +111,8 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
               By {product.brandName}
             </p>
           )}
+
+          <BusinessLineChips lines={product.brandBusinessLines} className="mt-3" />
 
           <h1 className="mt-1 font-heading text-4xl leading-tight text-ink">
             {product.name}

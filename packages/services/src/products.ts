@@ -27,6 +27,7 @@ export type ProductListItem = SelectProducts & {
 export type ProductDetail = ProductListItem & {
   category: SelectCategories | null;
   aliases: SelectProductAliases[];
+  brandBusinessLines: SelectBrands["businessLines"];
 };
 
 export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
@@ -207,6 +208,7 @@ export const getProductDetailBySlug = async (
         ...getTableColumns(Products),
         categoryName: Categories.name,
         brandName: Brands.name,
+        brandBusinessLines: Brands.businessLines,
       })
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))

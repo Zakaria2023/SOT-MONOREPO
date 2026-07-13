@@ -1,3 +1,4 @@
+import { BusinessLineChips } from "@/components/catalog/business-line-chips";
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { documentDownloadUrl } from "@/lib/documents";
 import { Tag } from "lucide-react";
@@ -40,6 +41,7 @@ export const BrandProducts = ({ brand, products }: BrandProductsProps) => (
               {brand.description}
             </p>
           )}
+          <BusinessLineChips lines={brand.businessLines} className="mt-3" />
           <p className="font-grotesk mt-2 text-sm text-faint">
             {products.length} {products.length === 1 ? "product" : "products"}{" "}
             from this brand
