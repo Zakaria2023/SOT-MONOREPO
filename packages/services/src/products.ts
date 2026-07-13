@@ -17,7 +17,6 @@ import {
   ProductAliases,
   SelectProductAliases,
 } from "../../../db/schema/product-aliases";
-import { ProductCategories } from "../../../db/schema/product-categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
 
 export type ProductListItem = SelectProducts & {
@@ -147,13 +146,6 @@ export const getProductsByCategory = async (
   categoryUuid: string,
 ): Promise<ProductListItem[]> => {
   try {
-    // Products whose home category is this one, OR that are linked into it
-    // (shared-product rule) — one record can appear on several shelves.
-    const linked = db
-      .select({ productUuid: ProductCategories.productUuid })
-      .from(ProductCategories)
-      .where(eq(ProductCategories.categoryUuid, categoryUuid));
-
     return await db
       .select({
         ...getTableColumns(Products),
@@ -163,12 +155,7 @@ export const getProductsByCategory = async (
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
-      .where(
-        or(
-          eq(Products.categoryUuid, categoryUuid),
-          inArray(Products.uuid, linked),
-        ),
-      )
+      .where(eq(Products.categoryUuid, categoryUuid))
       .orderBy(asc(Products.order));
   } catch {
     throw new Error("Failed to fetch products for category");

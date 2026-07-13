@@ -3,7 +3,6 @@
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { AliasesEditor } from "@/components/products/aliases-editor";
 import { DatasheetUpload } from "@/components/products/datasheet-upload";
-import { LinkedCategoriesEditor } from "@/components/products/linked-categories-editor";
 import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
@@ -12,7 +11,6 @@ import { BUSINESS_LINE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProductAliases } from "@/db/schema/product-aliases";
-import type { SelectProductCategories } from "@/db/schema/product-categories";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
@@ -49,7 +47,6 @@ type ProductFormProps =
       brands: SelectBrands[];
       product: SelectProducts;
       aliases: SelectProductAliases[];
-      linkedCategories: SelectProductCategories[];
     };
 
 const statusOptions = productStatuses.map((status) => ({
@@ -71,7 +68,6 @@ export const ProductForm = (props: ProductFormProps) => {
           mode: "edit",
           product: props.product,
           aliases: props.aliases,
-          linkedCategories: props.linkedCategories,
         }
       : { mode: "add" },
   );
@@ -258,13 +254,6 @@ export const ProductForm = (props: ProductFormProps) => {
             {...register("role")}
           />
           <Input
-            label="Vendor node"
-            labelIcon={<Waypoints size={15} />}
-            type="text"
-            placeholder="e.g. Huawei › eKit › Datacom"
-            {...register("vendorNode")}
-          />
-          <Input
             label="Warranty period"
             labelIcon={<ShieldCheck size={15} />}
             type="text"
@@ -297,8 +286,6 @@ export const ProductForm = (props: ProductFormProps) => {
         </div>
 
         <AliasesEditor />
-
-        <LinkedCategoriesEditor categories={categories} />
 
         <Textarea
           label="Short description"

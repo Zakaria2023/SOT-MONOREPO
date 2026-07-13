@@ -8,5 +8,4 @@ export * from "./government";
 export * from "./offers";
 export * from "./partners";
 export * from "./product-aliases";
-export * from "./product-categories";
 export * from "./products";

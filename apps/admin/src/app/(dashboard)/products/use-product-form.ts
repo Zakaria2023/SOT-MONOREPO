@@ -9,7 +9,6 @@ import { productFormSchema } from "./validation";
 import type { ProductFormValues } from "./validation";
 import type { SelectProducts } from "@/db/schema/products";
 import type { SelectProductAliases } from "@/db/schema/product-aliases";
-import type { SelectProductCategories } from "@/db/schema/product-categories";
 
 type UseProductFormArgs =
   | { mode: "add" }
@@ -17,7 +16,6 @@ type UseProductFormArgs =
       mode: "edit";
       product: SelectProducts;
       aliases: SelectProductAliases[];
-      linkedCategories: SelectProductCategories[];
     };
 
 export const useProductForm = (args: UseProductFormArgs) => {
@@ -40,7 +38,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
       model: product?.model ?? "",
       productFamily: product?.productFamily ?? "",
       seriesCode: product?.seriesCode ?? "",
-      vendorNode: product?.vendorNode ?? "",
       warrantyPeriod: product?.warrantyPeriod ?? "",
       warrantyRegion: product?.warrantyRegion ?? "",
       warrantyExtendable: product?.warrantyExtendable ?? false,
@@ -53,12 +50,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
               searchTerm: alias.searchTerm,
               termType: alias.termType,
               label: alias.label ?? "",
-            }))
-          : [],
-      linkedCategories:
-        args.mode === "edit"
-          ? args.linkedCategories.map((link) => ({
-              categoryUuid: link.categoryUuid,
             }))
           : [],
       description: product?.description ?? "",
@@ -91,7 +82,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
         model: values.model || null,
         productFamily: values.productFamily || null,
         seriesCode: values.seriesCode || null,
-        vendorNode: values.vendorNode || null,
         warrantyPeriod: values.warrantyPeriod || null,
         warrantyRegion: values.warrantyRegion || null,
         warrantyExtendable: values.warrantyExtendable,
@@ -103,7 +93,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
           termType: alias.termType,
           label: alias.label || null,
         })),
-        linkedCategories: values.linkedCategories,
         description: values.description || null,
         role: values.role || null,
         image: values.image || null,
