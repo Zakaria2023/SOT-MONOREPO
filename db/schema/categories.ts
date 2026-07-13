@@ -10,7 +10,7 @@ import {
   varchar,
   type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
-import { Highlight, SpecField, SpecGroup } from "../types";
+import { SpecField } from "../types";
 
 export const Categories = mysqlTable(
   "Categories",
@@ -31,8 +31,6 @@ export const Categories = mysqlTable(
 
     image: varchar("image", { length: 255 }),
 
-    highlights: json("highlights").$type<Highlight[]>(),
-    specGroups: json("spec_groups").$type<SpecGroup[]>(),
     // Per-category spec template — the dropdown-only fields products fill.
     specTemplate: json("spec_template").$type<SpecField[]>(),
 

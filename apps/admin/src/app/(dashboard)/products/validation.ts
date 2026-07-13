@@ -1,5 +1,4 @@
 import { aliasTermTypes, businessLines, productStatuses } from "@/db/enum";
-import { highlightSchema, specGroupSchema } from "@/lib/specs";
 import { z } from "zod";
 
 export const aliasSchema = z.object({
@@ -46,8 +45,6 @@ export const productFormSchema = z.object({
   currency: z.string().min(1, "Required").max(3),
   stock: z.number().int().min(0).optional(),
   isAvailable: z.boolean(),
-  highlights: z.array(highlightSchema).optional(),
-  specGroups: z.array(specGroupSchema).optional(),
   technicalAttributes: z.record(z.string(), z.string()),
   status: z.enum(productStatuses),
   order: z.number().int().min(0).optional(),

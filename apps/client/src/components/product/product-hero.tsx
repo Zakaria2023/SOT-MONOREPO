@@ -19,16 +19,21 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ProductDetail } from "services";
 
+type SpecAttribute = {
+  label: string;
+  value: string;
+};
+
 type ProductHeroProps = {
   product: ProductDetail;
-  highlights: NonNullable<ProductDetail["highlights"]>;
+  attributes: SpecAttribute[];
 };
 
 const STAT_ICONS: LucideIcon[] = [Gauge, ShieldCheck, Users, Layers, Cpu, Network];
 
-export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
-  const chipHighlights = highlights.slice(0, 2);
-  const statHighlights = highlights.slice(0, 4);
+export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
+  const chipAttributes = attributes.slice(0, 2);
+  const statAttributes = attributes.slice(0, 4);
   const subImages = product.images ?? [];
 
   return (
@@ -55,16 +60,18 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
               <ShieldCheck size={96} className="text-primary/40" />
             )}
 
-            {chipHighlights.length > 0 && (
+            {chipAttributes.length > 0 && (
               <div className="absolute bottom-4 left-4 flex flex-col gap-2">
-                {chipHighlights.map((highlight) => (
+                {chipAttributes.map((attribute) => (
                   <span
-                    key={highlight.k}
+                    key={attribute.label}
                     className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface/90 px-3 py-1.5 text-sm shadow-sm backdrop-blur"
                   >
                     <Gauge size={14} className="text-primary" />
-                    <span className="font-semibold text-ink">{highlight.v}</span>
-                    <span className="text-faint">{highlight.k}</span>
+                    <span className="font-semibold text-ink">
+                      {attribute.value}
+                    </span>
+                    <span className="text-faint">{attribute.label}</span>
                   </span>
                 ))}
               </div>
@@ -149,20 +156,22 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
             )}
           </div>
 
-          {statHighlights.length > 0 && (
+          {statAttributes.length > 0 && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {statHighlights.map((highlight, index) => {
+              {statAttributes.map((attribute, index) => {
                 const Icon = STAT_ICONS[index % STAT_ICONS.length];
                 return (
                   <div
-                    key={highlight.k}
+                    key={attribute.label}
                     className="rounded-card border border-hairline bg-surface p-4"
                   >
                     <Icon size={18} className="text-primary" />
                     <p className="mt-3 font-heading text-2xl text-ink">
-                      {highlight.v}
+                      {attribute.value}
                     </p>
-                    <p className="mt-0.5 text-sm text-faint">{highlight.k}</p>
+                    <p className="mt-0.5 text-sm text-faint">
+                      {attribute.label}
+                    </p>
                   </div>
                 );
               })}

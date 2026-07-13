@@ -7,12 +7,34 @@ import { slugify } from "utils";
 import { createCategory, updateCategory } from "./action";
 import type { CategoryActionResult, CategoryFields } from "./action";
 import { categoryFormSchema } from "./validation";
-import type { CategoryFormValues } from "./validation";
+import type { CategoryFormValues, SpecFieldForm } from "./validation";
 import type { SelectCategories } from "@/db/schema/categories";
+import type { SpecField } from "@/db/types";
 
 type UseCategoryFormArgs =
   | { mode: "add" }
   | { mode: "edit"; category: SelectCategories };
+
+// Stored template (with derived keys) -> editable form tree (labels only).
+const toFormFields = (fields: SpecField[]): SpecFieldForm[] =>
+  fields.map((field) => ({
+    label: field.label,
+    options: field.options.map((option) => ({
+      value: option.value,
+      children: toFormFields(option.children),
+    })),
+  }));
+
+// Editable form tree -> stored template, deriving a stable key from each label.
+const toSpecFields = (fields: SpecFieldForm[]): SpecField[] =>
+  fields.map((field) => ({
+    key: slugify(field.label),
+    label: field.label,
+    options: field.options.map((option) => ({
+      value: option.value,
+      children: toSpecFields(option.children),
+    })),
+  }));
 
 export const useCategoryForm = (args: UseCategoryFormArgs) => {
   const action =
@@ -33,12 +55,7 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
       parentUuid: category?.parentUuid ?? "",
       order: category?.order ?? 0,
       image: category?.image ?? "",
-      highlights: category?.highlights ?? [],
-      specGroups: category?.specGroups ?? [],
-      specTemplate: (category?.specTemplate ?? []).map((field) => ({
-        label: field.label,
-        optionsText: field.options.join("\n"),
-      })),
+      specTemplate: toFormFields(category?.specTemplate ?? []),
     },
   });
 
@@ -50,16 +67,7 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
         parentUuid: values.parentUuid || null,
         order: values.order,
         image: values.image || null,
-        highlights: values.highlights,
-        specGroups: values.specGroups,
-        specTemplate: values.specTemplate.map((field) => ({
-          key: slugify(field.label),
-          label: field.label,
-          options: field.optionsText
-            .split("\n")
-            .map((option) => option.trim())
-            .filter((option) => option.length > 0),
-        })),
+        specTemplate: toSpecFields(values.specTemplate),
       });
     });
   });

@@ -2,8 +2,6 @@
 
 import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
-import { HighlightsEditor } from "@/components/specs/highlights-editor";
-import { SpecGroupsEditor } from "@/components/specs/spec-groups-editor";
 import { SpecTemplateEditor } from "@/components/categories/spec-template-editor";
 import { Button } from "ui";
 import { FormError } from "ui";
@@ -103,15 +101,8 @@ export const CategoryForm = (props: CategoryFormProps) => {
       />
 
       <div className="border-t border-hairline pt-6">
-        <p className="text-sm text-muted">
-          Highlights and spec groups defined here are inherited by default when a
-          product is assigned to this category.
-        </p>
+        <SpecTemplateEditor />
       </div>
-
-      <SpecTemplateEditor />
-      <HighlightsEditor />
-      <SpecGroupsEditor />
 
       <FormError message={state.error} />
 

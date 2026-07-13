@@ -7,7 +7,6 @@ import { LinkedCategoriesEditor } from "@/components/products/linked-categories-
 import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
-import { SpecsPreview } from "@/components/specs/specs-preview";
 import { businessLines, productStatuses } from "@/db/enum";
 import { BUSINESS_LINE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
@@ -92,11 +91,9 @@ export const ProductForm = (props: ProductFormProps) => {
 
   const inheritCategorySpecs = (categoryUuid: string) => {
     const category = categories.find((item) => item.uuid === categoryUuid);
-    setValue("highlights", category?.highlights ?? []);
-    setValue("specGroups", category?.specGroups ?? []);
 
-    // Rebuild the technical-attributes map to the new template's fields,
-    // preserving any values whose field key still exists.
+    // Rebuild the technical-attributes map to the new template's top-level
+    // fields, preserving any values whose field key still exists.
     const current = getValues("technicalAttributes") ?? {};
     const next: Record<string, string> = {};
     for (const field of category?.specTemplate ?? []) {
@@ -366,8 +363,6 @@ export const ProductForm = (props: ProductFormProps) => {
         />
 
         <TechnicalSpecsEditor categories={categories} />
-
-        <SpecsPreview />
 
         <FormError message={state.error} />
 

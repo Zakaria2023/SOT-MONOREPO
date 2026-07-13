@@ -13,7 +13,6 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { businessLines, lifecycleStatuses, productStatuses } from "../enum";
-import { Highlight, SpecGroup } from "../types";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
 
@@ -101,8 +100,6 @@ export const Products = mysqlTable(
     stock: int("stock").default(0),
     isAvailable: boolean("is_available").default(true).notNull(),
 
-    highlights: json("highlights").$type<Highlight[]>(),
-    specGroups: json("spec_groups").$type<SpecGroup[]>(),
     // Dropdown-only values filled from the category's spec template, keyed by
     // SpecField.key. Machine-reasonable specs for filtering and the AI builder.
     technicalAttributes: json("technical_attributes").$type<
