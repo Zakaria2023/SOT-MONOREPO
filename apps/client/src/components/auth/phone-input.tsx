@@ -14,11 +14,17 @@ type PhoneInputProps = {
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  label?: string;
 };
 
 // A country selector + local number field that always emits a valid E.164
 // string (what Clerk requires), so users can't submit a malformed number.
-export const PhoneInput = ({ value, onChange, error }: PhoneInputProps) => {
+export const PhoneInput = ({
+  value,
+  onChange,
+  error,
+  label = "Phone",
+}: PhoneInputProps) => {
   const initial = parseE164(value);
   const [iso, setIso] = useState(initial.iso || DEFAULT_PHONE_ISO);
   const [nationalNumber, setNationalNumber] = useState(initial.nationalNumber);
@@ -35,7 +41,7 @@ export const PhoneInput = ({ value, onChange, error }: PhoneInputProps) => {
         <span className="text-primary">
           <Phone size={16} />
         </span>
-        Phone
+        {label}
       </label>
 
       <Combobox

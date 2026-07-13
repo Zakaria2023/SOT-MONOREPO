@@ -13,6 +13,8 @@ export const completeProfileSchema = z
     firstName: z.string().max(255).optional(),
     middleName: z.string().max(255).optional(),
     lastName: z.string().max(255).optional(),
+    // City + country, captured for every account type.
+    location: z.string().max(255).optional(),
 
     unifiedNumber: z.string().max(30).optional(),
     crNumber: z.string().max(30).optional(),
@@ -37,6 +39,7 @@ export const completeProfileSchema = z
     if (data.type === "individual") {
       req(data.firstName, "firstName");
       req(data.lastName, "lastName");
+      req(data.location, "location");
       return;
     }
 

@@ -4,6 +4,7 @@ import { useSignUpForm } from "@/app/sign-up/use-sign-up-form";
 import { CertificateUpload } from "@/components/auth/certificate-upload";
 import { PhoneInput } from "@/components/auth/phone-input";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { LocationPicker } from "@/components/location/location-picker";
 import { cn } from "@/lib/utils";
 import {
   ArrowRight,
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Controller } from "react-hook-form";
-import { Input, Textarea } from "ui";
+import { Input } from "ui";
 import type { SignUpAccountType } from "validators";
 
 type AccountSignUpFormProps = {
@@ -148,11 +149,17 @@ export const AccountSignUpForm = ({ type }: AccountSignUpFormProps) => {
             error={errors.vatNumber?.message}
             {...register("vatNumber")}
           />
-          <Textarea
-            label="National address"
-            placeholder="For delivery + invoicing"
-            error={errors.nationalAddress?.message}
-            {...register("nationalAddress")}
+          <Controller
+            control={control}
+            name="nationalAddress"
+            render={({ field }) => (
+              <LocationPicker
+                label="National address"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                error={errors.nationalAddress?.message}
+              />
+            )}
           />
           <Controller
             control={control}
@@ -212,6 +219,17 @@ export const AccountSignUpForm = ({ type }: AccountSignUpFormProps) => {
             autoComplete="family-name"
             error={errors.lastName?.message}
             {...register("lastName")}
+          />
+          <Controller
+            control={control}
+            name="location"
+            render={({ field }) => (
+              <LocationPicker
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                error={errors.location?.message}
+              />
+            )}
           />
         </>
       )}
@@ -314,7 +332,7 @@ export const AccountSignUpForm = ({ type }: AccountSignUpFormProps) => {
         <ArrowRight size={18} />
       </button>
 
-      {!isFacility && <SocialButtons />}
+      <SocialButtons />
       </form>
     </>
   );

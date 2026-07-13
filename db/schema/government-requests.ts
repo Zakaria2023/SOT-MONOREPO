@@ -22,7 +22,10 @@ export const GovernmentRequests = mysqlTable(
 
     officialEmail: varchar("official_email", { length: 255 }).notNull(),
     entityName: varchar("entity_name", { length: 255 }).notNull(),
+    // The contact person submitting on the entity's behalf.
+    fullName: varchar("full_name", { length: 255 }).notNull(),
     contactNumber: varchar("contact_number", { length: 30 }).notNull(),
+    location: varchar("location", { length: 255 }).notNull(),
 
     status: mysqlEnum("status", governmentRequestStatuses)
       .default("pending")

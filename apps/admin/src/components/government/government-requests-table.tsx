@@ -24,6 +24,9 @@ const columns: TableColumn<GovernmentRequestListItem>[] = [
     render: (request) => (
       <div className="min-w-56 space-y-1">
         <p className="font-semibold text-ink">{request.entityName}</p>
+        <p className="text-muted">
+          {request.fullName} · {request.location}
+        </p>
         <a href={`mailto:${request.officialEmail}`} className="text-primary">
           {request.officialEmail}
         </a>

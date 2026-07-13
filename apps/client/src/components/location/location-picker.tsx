@@ -16,12 +16,14 @@ type LocationPickerProps = {
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  label?: string;
 };
 
 export const LocationPicker = ({
   value,
   onChange,
   error,
+  label = "Location",
 }: LocationPickerProps) => {
   const initial = parseLocation(value);
   const [countryIso, setCountryIso] = useState(() =>
@@ -52,7 +54,7 @@ export const LocationPicker = ({
         <span className="text-primary">
           <MapPin size={16} />
         </span>
-        Location
+        {label}
       </label>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

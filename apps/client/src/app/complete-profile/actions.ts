@@ -35,6 +35,7 @@ export const completeProfile = async (
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
+          location: data.location,
           fullName: [data.firstName, data.middleName, data.lastName]
             .filter(Boolean)
             .join(" ")
