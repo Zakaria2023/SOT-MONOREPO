@@ -89,10 +89,8 @@ export const Products = mysqlTable(
     priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
 
-    // Inventory. `stock` is an internal count (never shown to customers).
     // `isAvailable` is the manual Available/Unavailable storefront toggle — the
     // Phase-1 signal until the real-time Odoo stock link arrives.
-    stock: int("stock").default(0),
     isAvailable: boolean("is_available").default(true).notNull(),
 
     // Dropdown-only values filled from the category's spec template, keyed by

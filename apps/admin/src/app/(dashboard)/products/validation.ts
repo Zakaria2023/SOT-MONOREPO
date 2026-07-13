@@ -40,7 +40,6 @@ export const productFormSchema = z.object({
   priceSubDistributor: priceField,
   priceEndUser: priceField,
   currency: z.string().min(1, "Required").max(3),
-  stock: z.number().int().min(0).optional(),
   isAvailable: z.boolean(),
   technicalAttributes: z.record(z.string(), z.string()),
   status: z.enum(productStatuses),

@@ -15,7 +15,6 @@ import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
   ArrowUpDown,
-  Boxes,
   Coins,
   Globe,
   Hash,
@@ -53,6 +52,11 @@ const statusOptions = productStatuses.map((status) => ({
   value: status,
   label: PRODUCT_STATUS_LABELS[status],
 }));
+
+const availabilityOptions = [
+  { value: "available", label: "Available" },
+  { value: "unavailable", label: "Not available" },
+];
 
 export const ProductForm = (props: ProductFormProps) => {
   const { mode, categories, brands } = props;
@@ -220,12 +224,22 @@ export const ProductForm = (props: ProductFormProps) => {
             error={errors.priceEndUser?.message}
           />
 
-          <Input
-            label="Stock"
-            labelIcon={<Boxes size={15} />}
-            type="number"
-            {...register("stock", { valueAsNumber: true })}
-          />
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-ink">
+              Availability
+            </label>
+            <Controller
+              control={control}
+              name="isAvailable"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value ? "available" : "unavailable"}
+                  onChange={(value) => field.onChange(value === "available")}
+                  options={availabilityOptions}
+                />
+              )}
+            />
+          </div>
           <Input
             label="Role"
             labelIcon={<Waypoints size={15} />}
@@ -287,10 +301,6 @@ export const ProductForm = (props: ProductFormProps) => {
 
         <div className="flex flex-col gap-3">
           <Checkbox label="Featured product" {...register("isFeatured")} />
-          <Checkbox
-            label="Available for purchase"
-            {...register("isAvailable")}
-          />
           <Checkbox
             label="Warranty extendable"
             {...register("warrantyExtendable")}
