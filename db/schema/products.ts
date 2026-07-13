@@ -78,8 +78,11 @@ export const Products = mysqlTable(
     currency: char("currency", { length: 3 }).default("SAR"),
     businessLine: mysqlEnum("business_line", businessLines).default("consumer"),
 
-    // Inventory
+    // Inventory. `stock` is an internal count (never shown to customers).
+    // `isAvailable` is the manual Available/Unavailable storefront toggle — the
+    // Phase-1 signal until the real-time Odoo stock link arrives.
     stock: int("stock").default(0),
+    isAvailable: boolean("is_available").default(true).notNull(),
 
     highlights: json("highlights").$type<Highlight[]>(),
     specGroups: json("spec_groups").$type<SpecGroup[]>(),

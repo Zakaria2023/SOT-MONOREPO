@@ -295,7 +295,13 @@ export const ProductForm = (props: ProductFormProps) => {
 
         <Textarea label="Description" rows={4} {...register("description")} />
 
-        <Checkbox label="Featured product" {...register("isFeatured")} />
+        <div className="flex flex-col gap-3">
+          <Checkbox label="Featured product" {...register("isFeatured")} />
+          <Checkbox
+            label="Available for purchase"
+            {...register("isAvailable")}
+          />
+        </div>
 
         <ImageUpload
           label="Main image"

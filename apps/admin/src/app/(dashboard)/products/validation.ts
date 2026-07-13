@@ -38,6 +38,7 @@ export const productFormSchema = z.object({
   businessLine: z.enum(businessLines),
   currency: z.string().min(1, "Required").max(3),
   stock: z.number().int().min(0).optional(),
+  isAvailable: z.boolean(),
   highlights: z.array(highlightSchema).optional(),
   specGroups: z.array(specGroupSchema).optional(),
   status: z.enum(productStatuses),

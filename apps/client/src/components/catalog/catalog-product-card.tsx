@@ -5,7 +5,7 @@ import { documentDownloadUrl } from "@/lib/documents";
 import { addToGuestCart } from "@/lib/guest-cart";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@clerk/nextjs";
-import { Check, ImageOff, ShoppingCart } from "lucide-react";
+import { Check, ImageOff, PackageX, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -78,6 +78,14 @@ const AddButton = ({ product }: AddButtonProps) => {
   const { isSignedIn, isLoaded } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [added, setAdded] = useState(false);
+
+  if (!product.isAvailable) {
+    return (
+      <span className="font-grotesk relative z-20 inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline px-4 py-2 text-sm font-semibold text-faint">
+        <PackageX size={16} /> Unavailable
+      </span>
+    );
+  }
 
   const flashAdded = () => {
     setAdded(true);

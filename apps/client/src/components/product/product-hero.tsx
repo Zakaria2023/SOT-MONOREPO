@@ -8,6 +8,7 @@ import {
   Gauge,
   Layers,
   Network,
+  PackageX,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -118,10 +119,16 @@ export const ProductHero = ({ product, highlights }: ProductHeroProps) => {
               </p>
               <p className="mt-0.5 text-sm text-faint">per unit</p>
             </div>
-            <div className="flex items-center gap-2">
-              <BuyNowButton />
-              <AddToCartButton productUuid={product.uuid} />
-            </div>
+            {product.isAvailable ? (
+              <div className="flex items-center gap-2">
+                <BuyNowButton />
+                <AddToCartButton productUuid={product.uuid} />
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-faint">
+                <PackageX size={16} /> Currently unavailable
+              </span>
+            )}
           </div>
 
           {statHighlights.length > 0 && (
