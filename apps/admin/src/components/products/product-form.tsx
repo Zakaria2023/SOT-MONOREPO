@@ -79,7 +79,6 @@ export const ProductForm = (props: ProductFormProps) => {
   const {
     register,
     control,
-    watch,
     setValue,
     getValues,
     formState: { errors },
@@ -87,19 +86,6 @@ export const ProductForm = (props: ProductFormProps) => {
 
   // The SKU is auto-assembled from the brand/category/series codes. We show a
   // live preview here (SEQ shown as "##" until the server assigns it on save).
-  const selectedBrandCode =
-    brands.find((brand) => brand.uuid === watch("brandUuid"))?.code ?? "";
-  const selectedCategoryCode =
-    categories.find((category) => category.uuid === watch("categoryUuid"))
-      ?.code ?? "";
-  const seriesCode = watch("seriesCode") ?? "";
-  const existingSku = mode === "edit" ? props.product.sku : null;
-  const skuPreview =
-    selectedBrandCode && selectedCategoryCode
-      ? `${selectedBrandCode}${selectedCategoryCode}${seriesCode}-##`.toUpperCase()
-      : "Set brand & category codes first";
-  const skuDisplay = existingSku ?? skuPreview;
-
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
   const hasSubmittedRef = useRef(false);
@@ -165,17 +151,6 @@ export const ProductForm = (props: ProductFormProps) => {
             placeholder="e.g. 50"
             {...register("seriesCode")}
             error={errors.seriesCode?.message}
-          />
-          <Input
-            label="SKU"
-            labelIcon={<Hash size={15} />}
-            labelAccessory={
-              <span className="text-xs text-faint">Auto-generated</span>
-            }
-            type="text"
-            value={skuDisplay}
-            readOnly
-            className="bg-page text-faint"
           />
           <CategoryDropdown
             control={control}

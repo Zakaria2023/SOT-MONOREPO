@@ -12,7 +12,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowUpDown, Hash, Tags } from "lucide-react";
+import { ArrowUpDown, Tags } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { FormProvider } from "react-hook-form";
@@ -68,18 +68,6 @@ export const CategoryForm = (props: CategoryFormProps) => {
           type="text"
           {...register("name")}
           error={errors.name?.message}
-        />
-
-        <Input
-          label="Category code"
-          labelIcon={<Hash size={15} />}
-          labelAccessory={
-            <span className="text-xs text-faint">SKU segment</span>
-          }
-          type="text"
-          placeholder="e.g. SW"
-          {...register("code")}
-          error={errors.code?.message}
         />
 
         <CategoryDropdown

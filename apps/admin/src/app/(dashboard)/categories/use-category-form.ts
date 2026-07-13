@@ -29,7 +29,6 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       name: category?.name ?? "",
-      code: category?.code ?? "",
       description: category?.description ?? "",
       parentUuid: category?.parentUuid ?? "",
       order: category?.order ?? 0,
@@ -47,7 +46,6 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
     startTransition(() => {
       dispatch({
         name: values.name,
-        code: values.code ? values.code.toUpperCase() : null,
         description: values.description || null,
         parentUuid: values.parentUuid || null,
         order: values.order,

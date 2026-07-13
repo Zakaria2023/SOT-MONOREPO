@@ -9,7 +9,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowUpDown, Award, Hash } from "lucide-react";
+import { ArrowUpDown, Award } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -57,18 +57,6 @@ export const BrandForm = (props: BrandFormProps) => {
           type="text"
           {...register("name")}
           error={errors.name?.message}
-        />
-
-        <Input
-          label="Brand-line code"
-          labelIcon={<Hash size={15} />}
-          labelAccessory={
-            <span className="text-xs text-faint">SKU segment</span>
-          }
-          type="text"
-          placeholder="e.g. HE"
-          {...register("code")}
-          error={errors.code?.message}
         />
 
         <BrandDropdown
