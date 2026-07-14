@@ -2,8 +2,9 @@
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import type { SelectCategories } from "@/db/schema/categories";
-import type { SpecField, SpecOption } from "@/db/types";
-import { useMemo } from "react";
+import type { SpecField, SpecOption, SpecRule } from "@/db/types";
+import { Lock } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Dropdown } from "ui";
 
@@ -11,12 +12,17 @@ type SpecificationForCategory = {
   key: string;
   label: string;
   options: SpecOption[] | null;
+  rules: SpecRule[] | null;
   categoryUuids: string[];
 };
 
 type TechnicalSpecsEditorProps = {
   categories: SelectCategories[];
   specifications: SpecificationForCategory[];
+};
+
+type TemplateField = SpecField & {
+  rules: SpecRule[];
 };
 
 // Every key reachable below a field, across all of its options' subtrees.
@@ -40,6 +46,46 @@ const categoryChain = (
   return chain;
 };
 
+// A clause matches when the product's chosen value for that spec is one of the
+// clause's values. "all" = every clause must match; "any" = at least one.
+const ruleMatches = (
+  rule: SpecRule,
+  values: Record<string, string>,
+): boolean => {
+  if (rule.clauses.length === 0) {
+    return false;
+  }
+  const results = rule.clauses.map((clause) =>
+    clause.values.includes(values[clause.specKey] ?? ""),
+  );
+  return rule.match === "all" ? results.every(Boolean) : results.some(Boolean);
+};
+
+// The assignments a rule implies: the target field set to the forced value,
+// plus every parent option on the path to it (forcing a nested sub-field
+// only makes sense with its branch selected). Null when the target/value
+// doesn't exist in this field's tree.
+const forcedPath = (
+  field: SpecField,
+  targetKey: string,
+  targetValue: string,
+): Record<string, string> | null => {
+  if (field.key === targetKey) {
+    return field.options.some((option) => option.value === targetValue)
+      ? { [field.key]: targetValue }
+      : null;
+  }
+  for (const option of field.options) {
+    for (const child of option.children) {
+      const below = forcedPath(child, targetKey, targetValue);
+      if (below) {
+        return { [field.key]: option.value, ...below };
+      }
+    }
+  }
+  return null;
+};
+
 // Flatten to the fields currently visible: each field, plus the sub-fields
 // revealed by its chosen option (recursively). Rendered as a flat grid so a
 // revealed sub-field sits beside its parent rather than nested under it.
@@ -51,10 +97,7 @@ const visibleFields = (
     const option = field.options.find(
       (candidate) => candidate.value === (values[field.key] ?? ""),
     );
-    return [
-      field,
-      ...(option ? visibleFields(option.children, values) : []),
-    ];
+    return [field, ...(option ? visibleFields(option.children, values) : [])];
   });
 
 export const TechnicalSpecsEditor = ({
@@ -63,16 +106,18 @@ export const TechnicalSpecsEditor = ({
 }: TechnicalSpecsEditorProps) => {
   const { control, setValue } = useFormContext<ProductFormValues>();
   const categoryUuid = useWatch({ control, name: "categoryUuid" });
-  const values = useWatch({ control, name: "technicalAttributes" }) ?? {};
+  const watchedValues = useWatch({ control, name: "technicalAttributes" });
+  // Stable fallback so the memo/effect deps don't churn on every render.
+  const values = useMemo(() => watchedValues ?? {}, [watchedValues]);
 
-  // Specs assigned to the selected category or any ancestor, as SpecField[].
-  const template = useMemo<SpecField[]>(() => {
+  // Specs assigned to the selected category or any ancestor.
+  const template = useMemo<TemplateField[]>(() => {
     if (!categoryUuid) {
       return [];
     }
     const chain = categoryChain(categories, categoryUuid);
     const seen = new Set<string>();
-    const fields: SpecField[] = [];
+    const fields: TemplateField[] = [];
     for (const spec of specifications) {
       if (
         spec.categoryUuids.some((uuid) => chain.has(uuid)) &&
@@ -83,11 +128,72 @@ export const TechnicalSpecsEditor = ({
           key: spec.key,
           label: spec.label,
           options: spec.options ?? [],
+          rules: spec.rules ?? [],
         });
       }
     }
     return fields;
   }, [categoryUuid, categories, specifications]);
+
+  // Keys currently forced by a matching rule, with their forced values. A
+  // rule may target the spec itself or a nested sub-field — in the latter
+  // case every parent option on the path is forced too, so the sub-field is
+  // actually visible. First matching rule per spec wins.
+  const forcedByKey = useMemo(() => {
+    const forced: Record<string, string> = {};
+    for (const field of template) {
+      const rule = field.rules.find((candidate) =>
+        ruleMatches(candidate, values),
+      );
+      if (!rule) {
+        continue;
+      }
+      const path = forcedPath(
+        field,
+        rule.forcedKey ?? field.key,
+        rule.forcedValue,
+      );
+      if (!path) {
+        continue;
+      }
+      for (const [key, value] of Object.entries(path)) {
+        if (!(key in forced)) {
+          forced[key] = value;
+        }
+      }
+    }
+    return forced;
+  }, [template, values]);
+
+  // Apply forced values to the form whenever they change. Pruning the host
+  // field's descendants first keeps stale sub-values from a previous choice
+  // out of the map before the forced path is written back.
+  useEffect(() => {
+    let changed = false;
+    const next = { ...values };
+    for (const field of template) {
+      const treeKeys = [field.key, ...descendantKeys(field)];
+      const entries = treeKeys
+        .filter((key) => key in forcedByKey)
+        .map((key) => [key, forcedByKey[key]] as const);
+      if (entries.length === 0) {
+        continue;
+      }
+      if (entries.every(([key, value]) => next[key] === value)) {
+        continue;
+      }
+      for (const key of descendantKeys(field)) {
+        delete next[key];
+      }
+      for (const [key, value] of entries) {
+        next[key] = value;
+      }
+      changed = true;
+    }
+    if (changed) {
+      setValue("technicalAttributes", next, { shouldDirty: true });
+    }
+  }, [forcedByKey, template, values, setValue]);
 
   const visible = visibleFields(template, values);
 
@@ -114,7 +220,8 @@ export const TechnicalSpecsEditor = ({
         </label>
         <p className="mt-1 text-xs text-muted">
           Dropdown-only, from the specifications assigned to this category (and
-          its parents). Selecting an option can reveal follow-up fields.
+          its parents). Selecting an option can reveal follow-up fields; rules
+          may auto-set and lock a field based on other choices.
         </p>
       </div>
 
@@ -125,25 +232,42 @@ export const TechnicalSpecsEditor = ({
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {visible.map((field) => (
-            <div key={field.key} className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-ink">
-                {field.label}
-              </label>
-              <Dropdown
-                value={values[field.key] ?? ""}
-                onChange={(value) => handleChange(field, value)}
-                placeholder="Select"
-                options={[
-                  { value: "", label: "—" },
-                  ...field.options.map((option) => ({
-                    value: option.value,
-                    label: option.value,
-                  })),
-                ]}
-              />
-            </div>
-          ))}
+          {visible.map((field) => {
+            const forced = forcedByKey[field.key];
+
+            return (
+              <div key={field.key} className="flex flex-col gap-2">
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                  {field.label}
+                  {forced && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary-tint px-2 py-0.5 text-xs font-medium text-primary">
+                      <Lock size={11} />
+                      Set by rule
+                    </span>
+                  )}
+                </label>
+                {forced ? (
+                  <div className="flex items-center justify-between rounded-control border border-hairline bg-page px-4 py-2.5 text-sm text-faint">
+                    {forced}
+                    <Lock size={14} />
+                  </div>
+                ) : (
+                  <Dropdown
+                    value={values[field.key] ?? ""}
+                    onChange={(value) => handleChange(field, value)}
+                    placeholder="Select"
+                    options={[
+                      { value: "", label: "—" },
+                      ...field.options.map((option) => ({
+                        value: option.value,
+                        label: option.value,
+                      })),
+                    ]}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

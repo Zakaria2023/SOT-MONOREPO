@@ -26,9 +26,22 @@ const specOptionSchema: z.ZodType<SpecOptionForm, SpecOptionForm> = z.lazy(() =>
   }),
 );
 
+const ruleClauseSchema = z.object({
+  specKey: z.string().min(1, "Pick a specification"),
+  values: z.array(z.string()).min(1, "Pick at least one value"),
+});
+
+const ruleSchema = z.object({
+  match: z.enum(["all", "any"]),
+  clauses: z.array(ruleClauseSchema).min(1, "Add at least one condition"),
+  forcedKey: z.string().min(1, "Pick the field to force"),
+  forcedValue: z.string().min(1, "Pick the value to force"),
+});
+
 export const specificationFormSchema = z.object({
   label: z.string().min(1, "Label is required").max(255),
   options: z.array(specOptionSchema),
+  rules: z.array(ruleSchema),
   categoryUuids: z.array(z.string()).min(1, "Pick at least one category"),
 });
 

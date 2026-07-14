@@ -71,6 +71,11 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
     defaultValues: {
       label: specification?.label ?? "",
       options: toFormOptions(specification?.options ?? []),
+      // Rules saved before forcedKey existed targeted the spec itself.
+      rules: (specification?.rules ?? []).map((rule) => ({
+        ...rule,
+        forcedKey: rule.forcedKey ?? specification?.key ?? "",
+      })),
       categoryUuids: specification?.categoryUuids ?? [],
     },
   });
@@ -81,6 +86,7 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
         label: values.label,
         key: slugify(values.label),
         options: toSpecOptions(values.options),
+        rules: values.rules,
         categoryUuids: values.categoryUuids,
       });
     });

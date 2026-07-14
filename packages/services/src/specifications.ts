@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import {
@@ -93,15 +93,11 @@ export const getSpecification = async (
   }
 };
 
-/** Replace a specification's category assignments. */
-export const setSpecificationCategories = async (
+// Insert category links for a specification (no delete — caller decides).
+const insertSpecificationCategories = async (
   specificationUuid: string,
   categoryUuids: string[],
 ): Promise<void> => {
-  await db
-    .delete(SpecificationCategories)
-    .where(eq(SpecificationCategories.specificationUuid, specificationUuid));
-
   const unique = [...new Set(categoryUuids.filter((uuid) => uuid.length > 0))];
   if (unique.length > 0) {
     await db.insert(SpecificationCategories).values(
@@ -119,14 +115,13 @@ export const createSpecification = async (
   categoryUuids: string[],
 ): Promise<string> => {
   const uuid = randomUUID();
-  const existing = await db
-    .select({ uuid: Specifications.uuid })
+  const [{ total }] = await db
+    .select({ total: count() })
     .from(Specifications);
 
-  await db
-    .insert(Specifications)
-    .values({ ...fields, uuid, order: existing.length });
-  await setSpecificationCategories(uuid, categoryUuids);
+  await db.insert(Specifications).values({ ...fields, uuid, order: total });
+  // Fresh uuid — no existing links to clear, insert directly.
+  await insertSpecificationCategories(uuid, categoryUuids);
   return uuid;
 };
 
@@ -135,11 +130,15 @@ export const updateSpecification = async (
   fields: SpecificationFields,
   categoryUuids: string[],
 ): Promise<void> => {
-  await db
-    .update(Specifications)
-    .set(fields)
-    .where(eq(Specifications.uuid, uuid));
-  await setSpecificationCategories(uuid, categoryUuids);
+  // The spec update and the old-links delete touch different tables — run
+  // them in parallel, then write the new links.
+  await Promise.all([
+    db.update(Specifications).set(fields).where(eq(Specifications.uuid, uuid)),
+    db
+      .delete(SpecificationCategories)
+      .where(eq(SpecificationCategories.specificationUuid, uuid)),
+  ]);
+  await insertSpecificationCategories(uuid, categoryUuids);
 };
 
 export const deleteSpecification = async (uuid: string): Promise<void> => {

@@ -7,7 +7,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { SpecOption } from "../types";
+import { SpecOption, SpecRule } from "../types";
 
 // A single specification field (e.g. "PoE") with its dropdown options. Each
 // option can reveal nested child fields (the conditional tree) stored as JSON.
@@ -21,6 +21,10 @@ export const Specifications = mysqlTable("Specifications", {
   // Stable key derived from the label — products store chosen values under it.
   key: varchar("key", { length: 255 }).notNull(),
   options: json("options").$type<SpecOption[]>(),
+
+  // Rules that force this specification's value when other specs' chosen
+  // values match — evaluated live in the admin product form.
+  rules: json("rules").$type<SpecRule[]>(),
 
   order: int("order").default(0).notNull(),
 

@@ -1,6 +1,6 @@
 "use server";
 
-import type { SpecOption } from "@/db/types";
+import type { SpecOption, SpecRule } from "@/db/types";
 import {
   createSpecification,
   deleteSpecification,
@@ -13,6 +13,7 @@ export type SpecificationActionInput = {
   label: string;
   key: string;
   options: SpecOption[];
+  rules: SpecRule[];
   categoryUuids: string[];
 };
 

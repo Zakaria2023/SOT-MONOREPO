@@ -15,3 +15,26 @@ export type SpecField = {
   label: string;
   options: SpecOption[];
 };
+
+// A rule stored on a specification. When the clauses match the product's
+// chosen spec values, this specification's value is forced to `forcedValue`
+// and locked in the admin product form. e.g. on "Uplink": if Power is 40W
+// AND PoE is PoE++, force Uplink = 40G.
+export type SpecRuleClause = {
+  // Key of the OTHER specification this clause inspects.
+  specKey: string;
+  // The clause matches when the chosen value is one of these.
+  values: string[];
+};
+
+export type SpecRule = {
+  // "all" = every clause must match (AND); "any" = at least one (OR).
+  match: "all" | "any";
+  clauses: SpecRuleClause[];
+  // Key of the field being forced — the host specification itself or any
+  // sub-field in its option tree. Absent on old rows = the host spec.
+  forcedKey?: string;
+  // One of the forced field's own option values. Forcing a nested sub-field
+  // also forces the parent options on the path leading to it.
+  forcedValue: string;
+};
