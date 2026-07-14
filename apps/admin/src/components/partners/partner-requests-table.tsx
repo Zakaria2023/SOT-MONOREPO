@@ -1,18 +1,24 @@
 "use client";
 
 import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
+import { PartnerRequestDetailsDialog } from "@/components/partners/partner-request-details-dialog";
 import { PartnerRequestRowActions } from "@/components/partners/partner-request-row-actions";
 import type { PartnerRequestStatus } from "@/db/enum";
 import {
   PARTNER_REQUEST_STATUS_LABELS,
-  PARTNER_SERVICE_SCOPE_LABELS,
+  PARTNER_TYPE_LABELS,
 } from "@/db/label";
+import { Eye } from "lucide-react";
+import { useState } from "react";
 import type { TableColumn } from "ui";
-import { Table } from "ui";
-import type { PartnerServiceScope } from "validators";
+import { Button, Table } from "ui";
 
 type PartnerRequestsTableProps = {
   requests: PartnerRequestListItem[];
+};
+
+type DetailsCellProps = {
+  request: PartnerRequestListItem;
 };
 
 const STATUS_BADGE_CLASSES: Record<PartnerRequestStatus, string> = {
@@ -21,94 +27,98 @@ const STATUS_BADGE_CLASSES: Record<PartnerRequestStatus, string> = {
   rejected: "bg-danger-tint text-danger",
 };
 
+// The table shows only the shared fields — the dialog has the full record.
+const DetailsCell = ({ request }: DetailsCellProps) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="px-3"
+        onClick={() => setOpen(true)}
+      >
+        <Eye size={15} />
+        Details
+      </Button>
+      {open && (
+        <PartnerRequestDetailsDialog
+          request={request}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+};
+
 const columns: TableColumn<PartnerRequestListItem>[] = [
   {
-    key: "applicant",
-    header: "Applicant",
+    key: "name",
+    header: "Name",
     render: (request) => (
-      <div className="min-w-56 space-y-1">
-        <p className="font-semibold text-ink">{request.fullName}</p>
-        <p className="text-muted">{request.companyName}</p>
-        <a href={`mailto:${request.email}`} className="text-primary">
-          {request.email}
-        </a>
-        <p className="text-muted">{request.location ?? "-"}</p>
-        <p className="text-xs text-faint">
-          {PARTNER_SERVICE_SCOPE_LABELS[
-            request.serviceScope as PartnerServiceScope
-          ] ?? request.serviceScope}
+      <div className="min-w-48 space-y-1">
+        <p className="font-semibold text-ink">
+          {request.companyName ?? request.fullName}
         </p>
+        {request.companyName && (
+          <p className="text-muted">{request.fullName}</p>
+        )}
       </div>
     ),
   },
   {
-    key: "details",
-    header: "Details",
+    key: "type",
+    header: "Type",
     render: (request) => (
-      <div className="min-w-96 space-y-3">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold tracking-wide text-faint uppercase">
-            About
-          </p>
-          <p className="whitespace-pre-wrap wrap-break-word text-sm text-ink">
-            {request.about ?? "-"}
-          </p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-semibold tracking-wide text-faint uppercase">
-            Offer
-          </p>
-          <p className="whitespace-pre-wrap wrap-break-word text-sm text-ink">
-            {request.offer ?? "-"}
-          </p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-semibold tracking-wide text-faint uppercase">
-            Special
-          </p>
-          <p className="whitespace-pre-wrap wrap-break-word text-sm text-ink">
-            {request.special ?? "-"}
-          </p>
-        </div>
+      <span className="inline-flex rounded-full bg-primary-tint px-2 py-0.5 text-xs font-medium text-primary">
+        {PARTNER_TYPE_LABELS[request.type]}
+      </span>
+    ),
+  },
+  {
+    key: "contact",
+    header: "Contact",
+    render: (request) => (
+      <div className="min-w-48 space-y-1">
+        <a href={`mailto:${request.email}`} className="text-primary">
+          {request.email}
+        </a>
+        <p className="text-muted">{request.contactNumber}</p>
       </div>
+    ),
+  },
+  {
+    key: "location",
+    header: "Location",
+    render: (request) => (
+      <span className="text-muted">{request.location}</span>
     ),
   },
   {
     key: "status",
     header: "Status",
     render: (request) => (
-      <div className="min-w-56 space-y-2">
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[request.status]}`}
-        >
-          {PARTNER_REQUEST_STATUS_LABELS[request.status]}
-        </span>
-        {request.rejectionReason && (
-          <p className="whitespace-pre-wrap wrap-break-word text-sm text-muted">
-            {request.rejectionReason}
-          </p>
-        )}
-        {request.approvedClerkUserId && (
-          <p className="text-sm text-muted">
-            Clerk user: {request.approvedClerkUserId}
-          </p>
-        )}
-        {request.reviewedByName && (
-          <p className="text-sm text-muted">
-            Reviewed by {request.reviewedByName}
-          </p>
-        )}
-      </div>
+      <span
+        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[request.status]}`}
+      >
+        {PARTNER_REQUEST_STATUS_LABELS[request.status]}
+      </span>
     ),
   },
   {
     key: "createdAt",
     header: "Submitted",
     render: (request) => (
-      <div className="min-w-28 text-sm text-ink">
+      <div className="min-w-24 text-sm text-ink">
         {new Date(request.createdAt).toLocaleDateString()}
       </div>
     ),
+  },
+  {
+    key: "details",
+    header: "Details",
+    render: (request) => <DetailsCell request={request} />,
   },
   {
     key: "actions",

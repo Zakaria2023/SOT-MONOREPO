@@ -27,6 +27,16 @@ export const boqStatuses = [
 
 export type BoqStatus = (typeof boqStatuses)[number];
 
+// Which kind of applicant a partner request comes from — mirrors the client
+// sign-up account types. Every type submits a request for admin review.
+export const partnerTypes = [
+  "individual",
+  "facility",
+  "government",
+] as const satisfies readonly string[];
+
+export type PartnerType = (typeof partnerTypes)[number];
+
 export const partnerRequestStatuses = [
   "pending",
   "approved",

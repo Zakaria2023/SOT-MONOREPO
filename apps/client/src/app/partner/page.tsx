@@ -1,5 +1,5 @@
 import { PartnerForm } from "@/components/partner/partner-form";
-import { PartnerPitchPanel } from "@/components/partner/partner-pitch-panel";
+import { AuthShell } from "@/components/auth/auth-shell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -9,25 +9,11 @@ export const metadata: Metadata = {
 };
 
 const PartnerPage = () => (
-  <main className="flex min-h-[calc(100dvh-4.5rem)] w-full items-stretch justify-center bg-page px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-    <div className="grid w-full max-w-[1220px] grid-cols-1 overflow-hidden rounded-[28px] bg-surface shadow-[0_40px_120px_-40px_rgba(20,22,27,0.45)] min-[940px]:grid-cols-[38fr_62fr]">
-      <PartnerPitchPanel />
-
-      <div className="relative flex flex-col overflow-y-auto bg-surface p-8 sm:p-12 lg:p-14">
-        <div>
-          <h2 className="font-heading text-3xl text-ink">
-            Join us as a partner
-          </h2>
-          <p className="font-grotesk mt-2 text-sm text-muted">
-            Tell us who you are and what you deliver. Fields marked{" "}
-            <span className="text-primary">*</span> are required.
-          </p>
-        </div>
-
-        <PartnerForm />
-      </div>
+  <AuthShell>
+    <div className="relative w-full max-w-md rounded-3xl bg-surface p-9 shadow-[0_30px_80px_-24px_rgba(20,22,27,0.2),0_24px_70px_-34px_rgba(124,58,237,0.5)]">
+      <PartnerForm />
     </div>
-  </main>
+  </AuthShell>
 );
 
 export default PartnerPage;

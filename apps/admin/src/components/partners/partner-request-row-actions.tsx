@@ -20,14 +20,12 @@ export const PartnerRequestRowActions = ({
 }: PartnerRequestRowActionsProps) => {
   const router = useRouter();
   const [mode, setMode] = useState<"approve" | "reject" | null>(null);
-  const [password, setPassword] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [error, setError] = useState<string | undefined>(undefined);
   const [isSubmitting, startTransition] = useTransition();
 
   const resetDialog = () => {
     setMode(null);
-    setPassword("");
     setRejectionReason("");
     setError(undefined);
   };
@@ -39,9 +37,7 @@ export const PartnerRequestRowActions = ({
 
   const handleApprove = () => {
     startTransition(async () => {
-      const result = await approvePartnerRequestAction(request.uuid, {
-        password,
-      });
+      const result = await approvePartnerRequestAction(request.uuid);
 
       if (result.error) {
         setError(result.error);
@@ -82,7 +78,6 @@ export const PartnerRequestRowActions = ({
           className="px-3"
           onClick={() => {
             setError(undefined);
-            setPassword("");
             setMode("approve");
           }}
         >
@@ -110,11 +105,10 @@ export const PartnerRequestRowActions = ({
           open
           mode={mode}
           partnerName={request.fullName}
-          password={password}
+          email={request.email}
           rejectionReason={rejectionReason}
           isSubmitting={isSubmitting}
           error={error}
-          onPasswordChange={setPassword}
           onRejectionReasonChange={setRejectionReason}
           onConfirm={mode === "approve" ? handleApprove : handleReject}
           onCancel={closeDialog}

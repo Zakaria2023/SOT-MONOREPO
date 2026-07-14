@@ -5,6 +5,7 @@ import {
   GovernmentRequestStatus,
   OfferStatus,
   PartnerRequestStatus,
+  PartnerType,
   ProductStatus,
   UserType,
 } from "./enum";
@@ -45,6 +46,12 @@ export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   approved: "Approved",
   rejected: "Rejected",
   selected: "Selected by customer",
+};
+
+export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
+  individual: "Individual / Freelancer",
+  facility: "Private Facility",
+  government: "Government",
 };
 
 export const USER_TYPE_LABELS: Record<UserType, string> = {
