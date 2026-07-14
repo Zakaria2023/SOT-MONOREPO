@@ -16,9 +16,13 @@ type ProductsTableProps = {
 };
 
 const STATUS_BADGE_CLASSES: Record<ProductStatus, string> = {
-  active: "bg-success-tint text-success",
-  draft: "bg-warning-tint text-warning",
-  discontinued: "bg-hover text-faint",
+  in_stock: "bg-success-tint text-success",
+  out_of_stock: "bg-danger-tint text-danger",
+  limited_stock: "bg-warning-tint text-warning",
+  pre_order: "bg-primary-tint text-primary",
+  in_order: "bg-primary-tint text-primary",
+  end_of_sale: "bg-hover text-faint",
+  end_of_life: "bg-hover text-faint",
 };
 
 const columns: TableColumn<ProductListItem>[] = [
@@ -75,7 +79,7 @@ const columns: TableColumn<ProductListItem>[] = [
     key: "status",
     header: "Status",
     render: (product) => {
-      const status = product.status ?? "draft";
+      const status = product.status ?? "in_stock";
       return (
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[status]}`}

@@ -4,36 +4,38 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ProductDetail, ProductListItem } from "services";
 
+type SpecField = {
+  key: string;
+  label: string;
+};
+
 type ProductCompareProps = {
   current: ProductDetail;
   others: ProductListItem[];
-  categoryHighlights: NonNullable<ProductDetail["highlights"]>;
+  specFields: SpecField[];
 };
 
 export const ProductCompare = ({
   current,
   others,
-  categoryHighlights,
+  specFields,
 }: ProductCompareProps) => {
-  if (others.length === 0) return null;
+  if (others.length === 0) {
+    return null;
+  }
 
   const products = [current, ...others];
 
-  // Products share their category's spec structure, so fall back to the
-  // category highlights for any product that has none of its own.
-  const highlightsFor = (product: ProductListItem) =>
-    product.highlights?.length ? product.highlights : categoryHighlights;
-
   const valueFor = (product: ProductListItem, key: string): string =>
-    highlightsFor(product).find((highlight) => highlight.k === key)?.v ?? "—";
+    product.technicalAttributes?.[key] || "—";
 
-  const keys: string[] = [];
-  for (const product of products) {
-    for (const highlight of highlightsFor(product)) {
-      if (!keys.includes(highlight.k)) keys.push(highlight.k);
-    }
+  // Only show rows where at least one product has a value to compare.
+  const rows = specFields.filter((field) =>
+    products.some((product) => product.technicalAttributes?.[field.key]),
+  );
+  if (rows.length === 0) {
+    return null;
   }
-  if (keys.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
@@ -87,9 +89,11 @@ export const ProductCompare = ({
             </tr>
           </thead>
           <tbody>
-            {keys.map((key) => (
-              <tr key={key} className="border-t border-hairline">
-                <td className="py-3.5 pr-4 text-sm text-faint">{key}</td>
+            {rows.map((field) => (
+              <tr key={field.key} className="border-t border-hairline">
+                <td className="py-3.5 pr-4 text-sm text-faint">
+                  {field.label}
+                </td>
                 {products.map((product) => {
                   const isCurrent = product.uuid === current.uuid;
                   return (
@@ -97,7 +101,7 @@ export const ProductCompare = ({
                       key={product.uuid}
                       className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary-tint/30 font-semibold text-ink" : "text-muted"}`}
                     >
-                      {valueFor(product, key)}
+                      {valueFor(product, field.key)}
                     </td>
                   );
                 })}

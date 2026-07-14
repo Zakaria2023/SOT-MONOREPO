@@ -2,8 +2,8 @@
 
 import { db } from "@/db";
 import { Brands, InsertBrands, SelectBrands } from "@/db/schema/brands";
-import { generateUuid } from "utils";
-import { asc, count, eq, getTableColumns } from "drizzle-orm";
+import { deriveCode, generateUuid, resolveUniqueCode } from "utils";
+import { asc, eq, getTableColumns } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -58,8 +58,16 @@ export const createBrand = async (
 ): Promise<BrandActionResult> => {
   const uuid = generateUuid();
   try {
-    const [{ total }] = await db.select({ total: count() }).from(Brands);
-    await db.insert(Brands).values({ ...fields, uuid, order: total });
+    const existing = await db.select({ code: Brands.code }).from(Brands);
+    const taken = new Set(
+      existing.map((row) => row.code).filter((code): code is string =>
+        Boolean(code),
+      ),
+    );
+    const code = resolveUniqueCode(deriveCode(fields.name), taken);
+    await db
+      .insert(Brands)
+      .values({ ...fields, uuid, order: existing.length, code });
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to create brand",

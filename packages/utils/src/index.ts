@@ -97,6 +97,50 @@ export const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+/**
+ * Derives a short uppercase SKU segment from a name, e.g. "Switches" -> "SW",
+ * "Hyundai Electric" -> "HE". Prefers word initials, falling back to the first
+ * letters of a single word. Returns "XX" when the name has no letters or digits.
+ * The result is at most `length` characters.
+ */
+export const deriveCode = (name: string, length = 2): string => {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.replace(/[^A-Za-z0-9]/g, "").charAt(0))
+    .join("")
+    .toUpperCase();
+  if (initials.length >= length) {
+    return initials.slice(0, length);
+  }
+  const cleaned = name.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return cleaned.slice(0, length) || "XX";
+};
+
+/**
+ * Picks a code that isn't already in `taken`, staying within `maxLength`
+ * characters. Starts from `base`, then appends an incrementing numeric suffix
+ * (SW -> SW2 -> SW3 ...) until a free code is found.
+ */
+export const resolveUniqueCode = (
+  base: string,
+  taken: Set<string>,
+  maxLength = 4,
+): string => {
+  const start = base.slice(0, maxLength);
+  if (!taken.has(start)) {
+    return start;
+  }
+  for (let n = 2; ; n++) {
+    const suffix = String(n);
+    const candidate = start.slice(0, maxLength - suffix.length) + suffix;
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+};
+
 /** Two-letter initials from a full name, e.g. "Zakaria Asad" -> "ZA". */
 export const getInitials = (fullName: string): string => {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);

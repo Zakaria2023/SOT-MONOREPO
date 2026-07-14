@@ -1,19 +1,23 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
-  AliasTermType,
   BusinessLine,
   BoqStatus,
   GovernmentRequestStatus,
   OfferStatus,
   PartnerRequestStatus,
+  PartnerType,
   ProductStatus,
   UserType,
 } from "./enum";
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
-  active: "Active",
-  draft: "Draft",
-  discontinued: "Discontinued",
+  in_stock: "In Stock",
+  out_of_stock: "Out of Stock",
+  limited_stock: "Limited Stock",
+  pre_order: "Pre Order",
+  in_order: "In Order",
+  end_of_sale: "End of Sale (EOS)",
+  end_of_life: "End of Life (EOL)",
 };
 
 export const BOQ_STATUS_LABELS: Record<BoqStatus, string> = {
@@ -44,6 +48,12 @@ export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   selected: "Selected by customer",
 };
 
+export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
+  individual: "Individual / Freelancer",
+  facility: "Private Facility",
+  government: "Government",
+};
+
 export const USER_TYPE_LABELS: Record<UserType, string> = {
   individual: "Individual / Freelancer",
   facility: "Private Facility",
@@ -59,17 +69,9 @@ export const GOVERNMENT_REQUEST_STATUS_LABELS: Record<
   rejected: "Rejected",
 };
 
-export const ALIAS_TERM_TYPE_LABELS: Record<AliasTermType, string> = {
-  barcode: "Barcode (EAN/GTIN)",
-  manufacturer: "Manufacturer ID",
-  vendor_sku: "Vendor SKU",
-  model: "Model",
-  nickname: "Nickname",
-};
-
 export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {
   consumer: "Consumer",
   smb_sme_channels: "SMB & SME Channels",
-  smb_sme_projects: "SMB & SME Projects (later)",
-  enterprise: "Enterprise (later)",
+  smb_sme_projects: "SMB & SME Projects",
+  enterprise: "Enterprise",
 };

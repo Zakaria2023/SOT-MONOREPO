@@ -518,7 +518,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 - Never define an enum inline inside a database schema file (e.g. inline in the array argument to `mysqlEnum(...)`). Define it in `db/enum.ts` and import the const array into the schema file instead.
 - All enums for the app live together in the single `db/enum.ts` file — not scattered across one-file-per-enum.
 - Labels never live in `enum.ts`. All label maps live together in the single `db/label.ts` file instead, each exported as a `Record<EnumType, string>`.
-- Shared JSON-column shape types (e.g. `Highlight`, `SpecGroup`) live in `db/types.ts` and are imported by the schema files via a relative path (e.g. `../types`) rather than redefined inline.
+- Shared JSON-column shape types (e.g. `SpecField`, `SpecOption`) live in `db/types.ts` and are imported by the schema files via a relative path (e.g. `../types`) rather than redefined inline.
 
   ```ts
   // ✅ Good — db/enum.ts

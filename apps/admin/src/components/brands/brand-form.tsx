@@ -2,6 +2,7 @@
 
 import { useBrandForm } from "@/app/(dashboard)/brands/use-brand-form";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
+import { BusinessLinesField } from "@/components/brands/business-lines-field";
 import { Button } from "ui";
 import { FormError } from "ui";
 import { ImageUpload } from "ui";
@@ -9,7 +10,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowUpDown, Award, Hash } from "lucide-react";
+import { ArrowUpDown, Award } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -59,18 +60,6 @@ export const BrandForm = (props: BrandFormProps) => {
           error={errors.name?.message}
         />
 
-        <Input
-          label="Brand-line code"
-          labelIcon={<Hash size={15} />}
-          labelAccessory={
-            <span className="text-xs text-faint">SKU segment</span>
-          }
-          type="text"
-          placeholder="e.g. HE"
-          {...register("code")}
-          error={errors.code?.message}
-        />
-
         <BrandDropdown
           control={control}
           name="parentUuid"
@@ -90,6 +79,8 @@ export const BrandForm = (props: BrandFormProps) => {
           />
         )}
       </div>
+
+      <BusinessLinesField control={control} />
 
       <Textarea label="Description" rows={3} {...register("description")} />
 

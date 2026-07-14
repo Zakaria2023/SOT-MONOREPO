@@ -7,6 +7,7 @@ import {
   Landmark,
   Layers,
   LayoutDashboard,
+  ListChecks,
   Network,
   Package,
   Search,
@@ -38,6 +39,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: Award, label: "Brands", href: "/brands" },
       { icon: Tags, label: "Categories", href: "/categories" },
+      { icon: ListChecks, label: "Specifications", href: "/specifications" },
       { icon: Package, label: "Products", href: "/products" },
     ],
   },

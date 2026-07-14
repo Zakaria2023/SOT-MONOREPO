@@ -16,14 +16,26 @@ export type DbExecutor =
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PartnerRequestInput = {
-  fullName: SelectPartnerRequests["fullName"];
-  companyName: SelectPartnerRequests["companyName"];
+  type: SelectPartnerRequests["type"];
   email: SelectPartnerRequests["email"];
-  location?: NonNullable<SelectPartnerRequests["location"]>;
-  about?: NonNullable<SelectPartnerRequests["about"]>;
-  offer?: NonNullable<SelectPartnerRequests["offer"]>;
-  special?: NonNullable<SelectPartnerRequests["special"]>;
-  serviceScope: SelectPartnerRequests["serviceScope"];
+  contactNumber: SelectPartnerRequests["contactNumber"];
+  location: SelectPartnerRequests["location"];
+  // Individual identity + name (null/absent for other types).
+  firstName?: SelectPartnerRequests["firstName"];
+  middleName?: SelectPartnerRequests["middleName"];
+  lastName?: SelectPartnerRequests["lastName"];
+  // Government contact person, submitted directly (other types compose it).
+  fullName?: SelectPartnerRequests["fullName"];
+  // Facility business fields (companyName doubles as the government entity
+  // name; the rest are null/absent for other types).
+  companyName?: SelectPartnerRequests["companyName"];
+  unifiedNumber?: SelectPartnerRequests["unifiedNumber"];
+  crNumber?: SelectPartnerRequests["crNumber"];
+  vatNumber?: SelectPartnerRequests["vatNumber"];
+  nationalAddress?: SelectPartnerRequests["nationalAddress"];
+  crCertificate?: SelectPartnerRequests["crCertificate"];
+  vatCertificate?: SelectPartnerRequests["vatCertificate"];
+  representativeName?: SelectPartnerRequests["representativeName"];
 };
 
 export type ApprovePartnerRequestInput = {
@@ -40,12 +52,12 @@ export type RejectPartnerRequestInput = {
   reviewedByName?: SelectPartnerRequests["reviewedByName"];
 };
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 const normalizeText = (value?: string | null): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 };
-
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 /** Create a pending partner request, rejecting a duplicate active email. */
 export const createPartnerRequest = async (
@@ -77,16 +89,41 @@ export const createPartnerRequest = async (
 
   const uuid = randomUUID();
 
+  // Display name: the composed name parts for individuals, the
+  // representative's name for facilities, the submitted contact person for
+  // government entities.
+  const fullName =
+    input.type === "individual"
+      ? [input.firstName, input.middleName, input.lastName]
+          .map((part) => part?.trim())
+          .filter(Boolean)
+          .join(" ")
+      : input.type === "government"
+        ? (input.fullName?.trim() ?? "")
+        : (input.representativeName?.trim() ?? "");
+
+  if (!fullName) {
+    throw new ValidationError("A name is required");
+  }
+
   await db.insert(PartnerRequests).values({
     uuid,
-    fullName: input.fullName.trim(),
-    companyName: input.companyName.trim(),
+    type: input.type,
+    fullName,
     email,
-    location: normalizeText(input.location),
-    about: normalizeText(input.about),
-    offer: normalizeText(input.offer),
-    special: normalizeText(input.special),
-    serviceScope: input.serviceScope,
+    contactNumber: input.contactNumber.trim(),
+    location: input.location.trim(),
+    firstName: normalizeText(input.firstName),
+    middleName: normalizeText(input.middleName),
+    lastName: normalizeText(input.lastName),
+    companyName: normalizeText(input.companyName),
+    unifiedNumber: normalizeText(input.unifiedNumber),
+    crNumber: normalizeText(input.crNumber),
+    vatNumber: normalizeText(input.vatNumber),
+    nationalAddress: normalizeText(input.nationalAddress),
+    crCertificate: normalizeText(input.crCertificate),
+    vatCertificate: normalizeText(input.vatCertificate),
+    representativeName: normalizeText(input.representativeName),
   });
 
   const [request] = await db

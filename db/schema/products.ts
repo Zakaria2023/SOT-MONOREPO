@@ -12,8 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { businessLines, lifecycleStatuses, productStatuses } from "../enum";
-import { Highlight, SpecGroup } from "../types";
+import { lifecycleStatuses, productStatuses } from "../enum";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
 
@@ -43,13 +42,6 @@ export const Products = mysqlTable(
     // Vendor series/line — feeds the [SERIES] SKU segment and vendor mapping.
     productFamily: varchar("product_family", { length: 255 }),
     seriesCode: varchar("series_code", { length: 4 }),
-
-    // Identifiers (part number, model number, BOM, barcode, nicknames…) are not
-    // fixed columns — they live as searchable rows in ProductAliases.
-
-    // Vendor taxonomy tag (Vendor › Line › Sub-line) for mapping & rebate
-    // tracking. Phase 1 is a hand-entered tag; a full taxonomy table comes later.
-    vendorNode: varchar("vendor_node", { length: 255 }),
 
     shortDescription: varchar("short_description", { length: 500 }), // vendor-neutral one-liner
     description: text("description"), // long detail description
@@ -93,16 +85,11 @@ export const Products = mysqlTable(
     }),
     priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
-    businessLine: mysqlEnum("business_line", businessLines).default("consumer"),
 
-    // Inventory. `stock` is an internal count (never shown to customers).
     // `isAvailable` is the manual Available/Unavailable storefront toggle — the
     // Phase-1 signal until the real-time Odoo stock link arrives.
-    stock: int("stock").default(0),
     isAvailable: boolean("is_available").default(true).notNull(),
 
-    highlights: json("highlights").$type<Highlight[]>(),
-    specGroups: json("spec_groups").$type<SpecGroup[]>(),
     // Dropdown-only values filled from the category's spec template, keyed by
     // SpecField.key. Machine-reasonable specs for filtering and the AI builder.
     technicalAttributes: json("technical_attributes").$type<
@@ -110,7 +97,7 @@ export const Products = mysqlTable(
     >(),
 
     // State & ordering
-    status: mysqlEnum("status", productStatuses).default("draft"),
+    status: mysqlEnum("status", productStatuses).default("in_stock"),
     order: int("order").default(0),
 
     // RESERVED / dormant — for the EOL and cross-vendor-equivalence features

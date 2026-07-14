@@ -1,12 +1,5 @@
-import { aliasTermTypes, businessLines, productStatuses } from "@/db/enum";
-import { highlightSchema, specGroupSchema } from "@/lib/specs";
+import { productStatuses } from "@/db/enum";
 import { z } from "zod";
-
-export const aliasSchema = z.object({
-  searchTerm: z.string().min(1, "Required"),
-  termType: z.enum(aliasTermTypes),
-  label: z.string().optional(),
-});
 
 const priceField = z
   .union([
@@ -22,9 +15,6 @@ export const productFormSchema = z.object({
   model: z.string().optional(),
   productFamily: z.string().optional(),
   seriesCode: z.string().max(4, "Max 4 characters").optional(),
-  vendorNode: z.string().optional(),
-  aliases: z.array(aliasSchema),
-  linkedCategories: z.array(z.object({ categoryUuid: z.string().min(1) })),
   warrantyPeriod: z.string().optional(),
   warrantyRegion: z.string().optional(),
   warrantyExtendable: z.boolean(),
@@ -42,12 +32,8 @@ export const productFormSchema = z.object({
   priceSystemIntegrator: priceField,
   priceSubDistributor: priceField,
   priceEndUser: priceField,
-  businessLine: z.enum(businessLines),
   currency: z.string().min(1, "Required").max(3),
-  stock: z.number().int().min(0).optional(),
   isAvailable: z.boolean(),
-  highlights: z.array(highlightSchema).optional(),
-  specGroups: z.array(specGroupSchema).optional(),
   technicalAttributes: z.record(z.string(), z.string()),
   status: z.enum(productStatuses),
   order: z.number().int().min(0).optional(),

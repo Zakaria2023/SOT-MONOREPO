@@ -1,18 +1,16 @@
 "use client";
 
-import { Button, FormError, Input, Textarea } from "ui";
-import { Eye, EyeOff, ShieldCheck, TriangleAlert, X } from "lucide-react";
-import { useState } from "react";
+import { ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Button, FormError, Textarea } from "ui";
 
 type PartnerRequestReviewDialogProps = {
   open: boolean;
   mode: "approve" | "reject";
   partnerName: string;
-  password: string;
+  email: string;
   rejectionReason: string;
   isSubmitting: boolean;
   error?: string;
-  onPasswordChange: (value: string) => void;
   onRejectionReasonChange: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -22,17 +20,14 @@ export const PartnerRequestReviewDialog = ({
   open,
   mode,
   partnerName,
-  password,
+  email,
   rejectionReason,
   isSubmitting,
   error,
-  onPasswordChange,
   onRejectionReasonChange,
   onConfirm,
   onCancel,
 }: PartnerRequestReviewDialogProps) => {
-  const [showPassword, setShowPassword] = useState(false);
-
   if (!open) return null;
 
   const approve = mode === "approve";
@@ -57,34 +52,14 @@ export const PartnerRequestReviewDialog = ({
             </h2>
             <p className="text-sm text-muted">
               {approve
-                ? `Create a pre-seller account for "${partnerName}" using the password below.`
+                ? `Send a Clerk invitation to "${partnerName}" (${email}) so they can set up their partner account.`
                 : `Reject "${partnerName}" and save the reason in the request.`}
             </p>
           </div>
         </div>
 
-        <div className="mt-5">
-          {approve ? (
-            <Input
-              type={showPassword ? "text" : "password"}
-              label="Password"
-              placeholder="Create a password"
-              value={password}
-              onChange={(event) => onPasswordChange(event.target.value)}
-              disabled={isSubmitting}
-              rightSlot={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  disabled={isSubmitting}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="text-faint transition-colors hover:text-ink"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              }
-            />
-          ) : (
+        {!approve && (
+          <div className="mt-5">
             <Textarea
               label="Reject reason"
               placeholder="Explain why this request was rejected"
@@ -93,8 +68,8 @@ export const PartnerRequestReviewDialog = ({
               onChange={(event) => onRejectionReasonChange(event.target.value)}
               disabled={isSubmitting}
             />
-          )}
-        </div>
+          </div>
+        )}
 
         <FormError message={error} />
 
@@ -113,17 +88,16 @@ export const PartnerRequestReviewDialog = ({
             variant={approve ? "primary" : "danger"}
             onClick={onConfirm}
             disabled={
-              isSubmitting ||
-              (approve ? password.trim().length === 0 : rejectionReason.trim().length === 0)
+              isSubmitting || (!approve && rejectionReason.trim().length === 0)
             }
           >
             {approve ? <ShieldCheck size={16} /> : <TriangleAlert size={16} />}
             {isSubmitting
               ? approve
-                ? "Approving..."
+                ? "Inviting..."
                 : "Rejecting..."
               : approve
-                ? "Approve"
+                ? "Approve & invite"
                 : "Reject"}
           </Button>
         </div>

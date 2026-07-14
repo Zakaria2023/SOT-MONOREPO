@@ -1,7 +1,11 @@
 export const productStatuses = [
-  "active",
-  "draft",
-  "discontinued",
+  "in_stock",
+  "out_of_stock",
+  "limited_stock",
+  "pre_order",
+  "in_order",
+  "end_of_sale",
+  "end_of_life",
 ] as const satisfies readonly string[];
 
 export type ProductStatus = (typeof productStatuses)[number];
@@ -22,6 +26,16 @@ export const boqStatuses = [
 ] as const satisfies readonly string[];
 
 export type BoqStatus = (typeof boqStatuses)[number];
+
+// Which kind of applicant a partner request comes from — mirrors the client
+// sign-up account types. Every type submits a request for admin review.
+export const partnerTypes = [
+  "individual",
+  "facility",
+  "government",
+] as const satisfies readonly string[];
+
+export type PartnerType = (typeof partnerTypes)[number];
 
 export const partnerRequestStatuses = [
   "pending",
@@ -65,20 +79,6 @@ export const cartItemKinds = [
 ] as const satisfies readonly string[];
 
 export type CartItemKind = (typeof cartItemKinds)[number];
-
-// The KIND of a product alias. "barcode" is the universal global standard
-// (EAN/GTIN). "manufacturer" is one vendor's identifier, labelled per vendor
-// (BOM / PID / Part Number) via the alias row's `label`. The rest are extra
-// searchable terms.
-export const aliasTermTypes = [
-  "barcode",
-  "manufacturer",
-  "vendor_sku",
-  "model",
-  "nickname",
-] as const satisfies readonly string[];
-
-export type AliasTermType = (typeof aliasTermTypes)[number];
 
 // Which business line a product sells under. Phase 1 runs the first two
 // (fixed price, buy now); "projects" and "enterprise" are dormant (pre-order,

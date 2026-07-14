@@ -13,11 +13,6 @@ import {
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
-import {
-  ProductAliases,
-  SelectProductAliases,
-} from "../../../db/schema/product-aliases";
-import { ProductCategories } from "../../../db/schema/product-categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
 
 export type ProductListItem = SelectProducts & {
@@ -27,7 +22,7 @@ export type ProductListItem = SelectProducts & {
 
 export type ProductDetail = ProductListItem & {
   category: SelectCategories | null;
-  aliases: SelectProductAliases[];
+  brandBusinessLines: SelectBrands["businessLines"];
 };
 
 export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
@@ -118,7 +113,20 @@ export const getProducts = async (
     const conditions: (SQL | undefined)[] = [];
     if (filters.search) {
       const term = `%${filters.search}%`;
-      conditions.push(or(like(Products.name, term), like(Brands.name, term)));
+      // Flexible match across every field a product might be found by.
+      conditions.push(
+        or(
+          like(Products.name, term),
+          like(Products.model, term),
+          like(Products.sku, term),
+          like(Products.productFamily, term),
+          like(Products.seriesCode, term),
+          like(Products.shortDescription, term),
+          like(Products.description, term),
+          like(Brands.name, term),
+          like(Categories.name, term),
+        ),
+      );
     }
     if (filters.categoryUuids && filters.categoryUuids.length > 0) {
       conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
@@ -147,13 +155,6 @@ export const getProductsByCategory = async (
   categoryUuid: string,
 ): Promise<ProductListItem[]> => {
   try {
-    // Products whose home category is this one, OR that are linked into it
-    // (shared-product rule) — one record can appear on several shelves.
-    const linked = db
-      .select({ productUuid: ProductCategories.productUuid })
-      .from(ProductCategories)
-      .where(eq(ProductCategories.categoryUuid, categoryUuid));
-
     return await db
       .select({
         ...getTableColumns(Products),
@@ -163,12 +164,7 @@ export const getProductsByCategory = async (
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
-      .where(
-        or(
-          eq(Products.categoryUuid, categoryUuid),
-          inArray(Products.uuid, linked),
-        ),
-      )
+      .where(eq(Products.categoryUuid, categoryUuid))
       .orderBy(asc(Products.order));
   } catch {
     throw new Error("Failed to fetch products for category");
@@ -220,6 +216,7 @@ export const getProductDetailBySlug = async (
         ...getTableColumns(Products),
         categoryName: Categories.name,
         brandName: Brands.name,
+        brandBusinessLines: Brands.businessLines,
       })
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
@@ -233,12 +230,7 @@ export const getProductDetailBySlug = async (
       .from(Categories)
       .where(eq(Categories.uuid, product.categoryUuid));
 
-    const aliases = await db
-      .select()
-      .from(ProductAliases)
-      .where(eq(ProductAliases.productUuid, product.uuid));
-
-    return { ...product, category: category ?? null, aliases };
+    return { ...product, category: category ?? null };
   } catch {
     throw new Error("Failed to fetch product");
   }

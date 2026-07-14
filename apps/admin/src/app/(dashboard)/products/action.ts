@@ -4,12 +4,7 @@ import { db } from "@/db";
 import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
-import {
-  generateProductSku,
-  setProductAliases,
-  setProductLinkedCategories,
-  type ProductAliasInput,
-} from "services";
+import { generateProductSku } from "services";
 import { generateUuid, slugify } from "utils";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -20,12 +15,7 @@ export type ProductFields = Omit<
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
 
-// The client also submits alias rows and linked categories, which live in
-// their own tables.
-export type ProductClientFields = Omit<ProductFields, "slug"> & {
-  aliases: ProductAliasInput[];
-  linkedCategories: { categoryUuid: string }[];
-};
+export type ProductClientFields = Omit<ProductFields, "slug">;
 
 export type ProductActionResult = {
   productUuid?: string;
@@ -75,7 +65,7 @@ export const createProduct = async (
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
   const uuid = generateUuid();
-  const { aliases, linkedCategories, ...productFields } = fields;
+  const productFields = fields;
   try {
     const [{ total }] = await db.select({ total: count() }).from(Products);
     // The SKU is system-owned: assembled from the brand/category/series codes,
@@ -92,11 +82,6 @@ export const createProduct = async (
       order: total,
       slug: slugify(productFields.name),
     });
-    await setProductAliases(uuid, aliases);
-    await setProductLinkedCategories(
-      uuid,
-      linkedCategories.map((entry) => entry.categoryUuid),
-    );
   } catch (error) {
     return {
       error:
@@ -113,7 +98,7 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  const { aliases, linkedCategories, ...productFields } = fields;
+  const productFields = fields;
   try {
     // Regenerate the SKU (stable when brand/category/series are unchanged).
     const sku = await generateProductSku({
@@ -126,11 +111,6 @@ export const updateProduct = async (
       .update(Products)
       .set({ ...productFields, sku, slug: slugify(productFields.name) })
       .where(eq(Products.uuid, uuid));
-    await setProductAliases(uuid, aliases);
-    await setProductLinkedCategories(
-      uuid,
-      linkedCategories.map((entry) => entry.categoryUuid),
-    );
   } catch (error) {
     return {
       error:
