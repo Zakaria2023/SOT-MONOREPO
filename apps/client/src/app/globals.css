@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @source "../../../../packages/ui/src";
 
@@ -18,9 +18,15 @@
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
   --color-primary-tint: #f4f1fb;
+  --color-primary-tint-border: #ece6fb;
   --color-accent-cyan: #22d3ee;
   --color-accent-violet: #8b7bff;
   --color-success: #34e29b;
+  --color-success-tint: #e9f7f0;
+  --color-warning: #9a6b00;
+  --color-warning-tint: #fdf4e3;
+  --color-danger: #b23a28;
+  --color-danger-tint: #fceae8;
 
   /* Text — light */
   --color-ink: #14161b;
