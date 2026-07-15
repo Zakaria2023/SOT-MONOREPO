@@ -40,7 +40,6 @@ const NAV_GROUPS: NavGroup[] = [
     title: "Catalog",
     links: [
       { icon: Award, label: "Brands", href: "/brands" },
-      { icon: Building2, label: "Vendors", href: "/vendors" },
       { icon: Tags, label: "Categories", href: "/categories" },
       { icon: ListChecks, label: "Specifications", href: "/specifications" },
       { icon: GitCompare, label: "Compatibility Rules", href: "/rules" },

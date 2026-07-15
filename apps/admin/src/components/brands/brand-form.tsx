@@ -80,9 +80,26 @@ export const BrandForm = (props: BrandFormProps) => {
         )}
       </div>
 
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <Input
+          label="Product ID label"
+          placeholder='What this brand calls its product code — e.g. "BOM", "PID", "Part Number"'
+          type="text"
+          {...register("idLabel")}
+          error={errors.idLabel?.message}
+        />
+      </div>
+
       <BusinessLinesField control={control} />
 
       <Textarea label="Description" rows={3} {...register("description")} />
+
+      <Textarea
+        label="Internal note"
+        placeholder="Enrollment details, contacts, quirks — internal only"
+        rows={3}
+        {...register("note")}
+      />
 
       <ImageUpload
         label="Image"

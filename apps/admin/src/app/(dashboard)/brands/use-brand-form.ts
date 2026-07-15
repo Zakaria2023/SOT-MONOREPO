@@ -28,6 +28,8 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
     resolver: zodResolver(brandFormSchema),
     defaultValues: {
       name: brand?.name ?? "",
+      idLabel: brand?.idLabel ?? "",
+      note: brand?.note ?? "",
       description: brand?.description ?? "",
       parentUuid: brand?.parentUuid ?? "",
       order: brand?.order ?? 0,
@@ -40,6 +42,8 @@ export const useBrandForm = (args: UseBrandFormArgs) => {
     startTransition(() => {
       dispatch({
         name: values.name,
+        idLabel: values.idLabel?.trim() || null,
+        note: values.note?.trim() || null,
         description: values.description || null,
         parentUuid: values.parentUuid || null,
         order: values.order,

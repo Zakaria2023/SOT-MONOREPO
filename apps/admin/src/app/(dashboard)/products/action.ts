@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
-import { SelectVendors, Vendors } from "@/db/schema/vendors";
 import { generateProductSku } from "services";
 import { generateUuid, slugify } from "utils";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
@@ -27,7 +26,6 @@ export type ProductActionResult = {
 export type ProductListItem = SelectProducts & {
   categoryName: SelectCategories["name"] | null;
   brandName: SelectBrands["name"] | null;
-  vendorName: SelectVendors["name"] | null;
 };
 
 export const getProducts = async (): Promise<ProductListItem[]> => {
@@ -37,12 +35,10 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
         ...getTableColumns(Products),
         categoryName: Categories.name,
         brandName: Brands.name,
-        vendorName: Vendors.name,
       })
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
-      .leftJoin(Vendors, eq(Products.vendorUuid, Vendors.uuid))
       .orderBy(asc(Products.order));
   } catch {
     throw new Error("Failed to fetch products");

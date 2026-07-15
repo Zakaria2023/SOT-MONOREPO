@@ -11,7 +11,6 @@ const priceField = z
 export const productFormSchema = z.object({
   categoryUuid: z.string().min(1, "Category is required"),
   brandUuid: z.string().min(1, "Brand is required"),
-  vendorUuid: z.string().optional(),
   name: z.string().min(1, "Name is required").max(255),
   model: z.string().optional(),
   productFamily: z.string().optional(),

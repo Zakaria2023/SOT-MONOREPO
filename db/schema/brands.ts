@@ -26,6 +26,11 @@ export const Brands = mysqlTable(
     name: varchar("name", { length: 255 }).notNull(),
     // Brand-line code — the [BRAND-LINE] segment of the smart SKU (e.g. "HE").
     code: varchar("code", { length: 4 }),
+    // What this brand calls its product code — e.g. "BOM" (Huawei), "PID"
+    // (Cisco), "SKU", "Part Number" — used as the alias/ID column label.
+    idLabel: varchar("id_label", { length: 100 }),
+    // Internal note about the brand (enrollment details, contacts, quirks).
+    note: text("note"),
     description: text("description"),
     order: int("order").default(0),
 

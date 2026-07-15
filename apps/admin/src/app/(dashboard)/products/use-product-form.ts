@@ -32,7 +32,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
     defaultValues: {
       categoryUuid: product?.categoryUuid ?? "",
       brandUuid: product?.brandUuid ?? "",
-      vendorUuid: product?.vendorUuid ?? "",
       name: product?.name ?? "",
       model: product?.model ?? "",
       productFamily: product?.productFamily ?? "",
@@ -67,7 +66,6 @@ export const useProductForm = (args: UseProductFormArgs) => {
       dispatch({
         categoryUuid: values.categoryUuid,
         brandUuid: values.brandUuid,
-        vendorUuid: values.vendorUuid || null,
         name: values.name,
         model: values.model || null,
         productFamily: values.productFamily || null,
