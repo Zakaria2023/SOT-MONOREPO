@@ -150,7 +150,7 @@ export const Combobox = ({
               left: position.left,
               width: position.width,
             }}
-            className="z-50 overflow-hidden rounded-control border border-hairline bg-surface-2 shadow-lg"
+            className="z-50 overflow-hidden rounded-control border border-hairline bg-surface shadow-lg"
           >
             <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
               <Search size={15} className="shrink-0 text-faint" />
