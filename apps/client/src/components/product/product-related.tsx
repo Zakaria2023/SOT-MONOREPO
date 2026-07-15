@@ -24,9 +24,14 @@ export const ProductRelated = ({ products }: ProductRelatedProps) => {
           <Link
             key={product.uuid}
             href={`/products/${product.slug}`}
-            className="group relative flex h-44 flex-col justify-between overflow-hidden rounded-card border border-hairline bg-linear-to-br from-primary-tint to-[#efe9fb] p-5 transition-shadow hover:shadow-lg"
+            className="group relative flex h-44 flex-col justify-between overflow-hidden rounded-2xl border border-hairline bg-surface p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
           >
-            <div className="flex items-start justify-between">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(139,123,255,0.16),transparent_60%),radial-gradient(circle_at_85%_85%,rgba(34,211,238,0.14),transparent_55%)]"
+            />
+
+            <div className="relative flex items-start justify-between">
               {product.image ? (
                 <div className="relative h-10 w-10">
                   <Image
@@ -40,12 +45,12 @@ export const ProductRelated = ({ products }: ProductRelatedProps) => {
               ) : (
                 <ShieldCheck size={22} className="text-primary" />
               )}
-              <span className="rounded-full border border-hairline bg-surface px-2.5 py-1 text-xs font-semibold text-ink">
+              <span className="rounded-full border border-hairline bg-surface-2 px-2.5 py-1 text-xs font-semibold text-ink">
                 {formatPrice(product.price, product.currency)}
               </span>
             </div>
 
-            <div>
+            <div className="relative">
               {product.categoryName && (
                 <p className="font-grotesk text-xs font-semibold uppercase tracking-wide text-primary">
                   {product.categoryName}

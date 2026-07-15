@@ -34,6 +34,10 @@
   --color-page: #f5f4fa;
   --color-surface: #ffffff;
   --color-surface-2: #f4f3f8;
+  /* Always-opaque panel for portaled popovers/menus (Dropdown, Combobox) —
+     distinct from --color-surface, which turns near-transparent "glass" in
+     dark mode and would let page content show through a floating menu. */
+  --color-overlay: #ffffff;
   --color-hover: rgba(0, 0, 0, 0.04);
 
   /* Borders — light */
@@ -66,6 +70,7 @@
   --color-page: #060a14;
   --color-surface: rgba(255, 255, 255, 0.035);
   --color-surface-2: #0a1020;
+  --color-overlay: #10152a;
   --color-hover: rgba(255, 255, 255, 0.06);
 
   --color-hairline: rgba(255, 255, 255, 0.09);

@@ -1,5 +1,5 @@
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowRight, Layers } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -38,42 +38,46 @@ const CategoriesPage = async () => {
               <li key={category.uuid}>
                 <Link
                   href={`/categories/${category.uuid}`}
-                  className="group relative flex h-64 flex-col justify-end overflow-hidden rounded-2xl border border-hairline bg-surface-2 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40"
+                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
                 >
-                  {category.image ? (
-                    <Image
-                      src={documentDownloadUrl(category.image)}
-                      alt={category.name}
-                      fill
-                      unoptimized
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  <div className="relative h-40 w-full shrink-0 overflow-hidden bg-surface-2">
+                    {category.image ? (
+                      <Image
+                        src={documentDownloadUrl(category.image)}
+                        alt={category.name}
+                        fill
+                        unoptimized
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(139,123,255,0.3),transparent_60%),radial-gradient(circle_at_75%_70%,rgba(34,211,238,0.25),transparent_55%)]"
+                      />
+                    )}
+
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-linear-to-t from-black/80 via-black/10 to-transparent"
                     />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-primary/30">
-                      <Layers size={44} />
-                    </div>
-                  )}
 
-                  <div
-                    aria-hidden="true"
-                    className="absolute inset-0 bg-linear-to-t from-black/85 via-black/40 to-transparent"
-                  />
+                    <span className="font-grotesk absolute top-3 right-3 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
+                      {category.productCount}{" "}
+                      {category.productCount === 1 ? "product" : "products"}
+                    </span>
 
-                  <span className="absolute top-4 left-4 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white backdrop-blur">
-                    {category.productCount}{" "}
-                    {category.productCount === 1 ? "product" : "products"}
-                  </span>
-
-                  <div className="relative p-6">
-                    <h3 className="font-heading text-2xl leading-tight text-white">
+                    <h3 className="font-heading absolute right-4 bottom-3 left-4 text-xl leading-tight text-white">
                       {category.name}
                     </h3>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-5">
                     {category.description && (
-                      <p className="font-grotesk mt-1 line-clamp-2 text-sm leading-relaxed text-white/60">
+                      <p className="font-grotesk line-clamp-2 text-sm leading-relaxed text-muted">
                         {category.description}
                       </p>
                     )}
-                    <span className="font-grotesk mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-accent-cyan">
+                    <span className="font-grotesk mt-auto flex items-center gap-1.5 pt-3 text-sm font-semibold text-primary">
                       Shop solution
                       <ArrowRight
                         size={15}
