@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { getBrands } from "@/app/(dashboard)/brands/action";
 import { getCategories } from "@/app/(dashboard)/categories/action";
+import { getVendors } from "@/app/(dashboard)/vendors/action";
 import { ProductForm } from "@/components/products/product-form";
+import { getSpecifications } from "services";
 import { getProduct } from "../../action";
 
 type Props = {
@@ -11,11 +13,14 @@ type Props = {
 const EditProductPage = async ({ params }: Props) => {
   const { uuid } = await params;
 
-  const [product, categories, brands] = await Promise.all([
-    getProduct(uuid),
-    getCategories(),
-    getBrands(),
-  ]);
+  const [product, categories, brands, vendors, specifications] =
+    await Promise.all([
+      getProduct(uuid),
+      getCategories(),
+      getBrands(),
+      getVendors(),
+      getSpecifications(),
+    ]);
 
   if (!product) {
     notFound();
@@ -27,6 +32,8 @@ const EditProductPage = async ({ params }: Props) => {
       product={product}
       categories={categories}
       brands={brands}
+      vendors={vendors}
+      specifications={specifications}
     />
   );
 };

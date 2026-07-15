@@ -12,17 +12,10 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { productStatuses } from "../../apps/admin/src/lib/enum";
-
-export type ProductHighlight = {
-  k: string;
-  v: string;
-};
-
-export type ProductSpecGroup = {
-  title: string;
-  rows: { k: string; v: string }[];
-};
+import { lifecycleStatuses, productStatuses } from "../enum";
+import { Brands } from "./brands";
+import { Categories } from "./categories";
+import { Vendors } from "./vendors";
 
 export const Products = mysqlTable(
   "Products",
@@ -31,40 +24,94 @@ export const Products = mysqlTable(
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
     // Relations
-    categoryUuid: char("category_uuid", { length: 36 }).notNull(),
-    brandUuid: char("brand_uuid", { length: 36 }).notNull(),
+    categoryUuid: char("category_uuid", { length: 36 })
+      .notNull()
+      .references(() => Categories.uuid, { onDelete: "restrict" }),
+    brandUuid: char("brand_uuid", { length: 36 })
+      .notNull()
+      .references(() => Brands.uuid, { onDelete: "restrict" }),
+    // Optional — not every product is tied to a single vendor entry (e.g.
+    // generic/unbranded catalog items).
+    vendorUuid: char("vendor_uuid", { length: 36 }).references(
+      () => Vendors.uuid,
+      { onDelete: "set null" },
+    ),
 
     // Identity
     name: varchar("name", { length: 255 }).notNull(),
     slug: varchar("slug", { length: 255 }).notNull().unique(),
-    sku: varchar("sku", { length: 100 }).unique(), // e.g. model / part number
-    model: varchar("model", { length: 255 }), // "Meridian Gateway Pro X"
+    // Auto-generated smart SKU — assembled last from brand/category/series codes.
+    // Format: [BRAND-LINE][CATEGORY][SERIES]-[KEYSPECS]-[SEQ]. KEYSPECS is
+    // reserved until the structured spec template exists.
+    sku: varchar("sku", { length: 100 }).unique(),
+    model: varchar("model", { length: 255 }),
 
-    blurb: varchar("blurb", { length: 500 }), // short line on the card
+    // Vendor series/line — feeds the [SERIES] SKU segment and vendor mapping.
+    productFamily: varchar("product_family", { length: 255 }),
+    seriesCode: varchar("series_code", { length: 4 }),
+
+    shortDescription: varchar("short_description", { length: 500 }), // vendor-neutral one-liner
     description: text("description"), // long detail description
     role: varchar("role", { length: 500 }), // "role in your network"
 
+    // Datasheet PDF (document id) — served free, no login, from the storefront.
+    datasheet: varchar("datasheet", { length: 64 }),
+
     // Media
     image: varchar("image", { length: 255 }),
-    iconKey: varchar("icon_key", { length: 100 }), // lucide/glyph key used in UI
+    images: json("images").$type<string[]>(),
+
+    // Trust & warranty. warrantyRegion backs the "official / Saudi-warranty"
+    // anti-gray-market badge; warrantyExtendable gates the "extend warranty" CTA.
+    warrantyPeriod: varchar("warranty_period", { length: 50 }), // e.g. "24 months"
+    warrantyRegion: varchar("warranty_region", { length: 100 }),
+    warrantyExtendable: boolean("warranty_extendable").default(false).notNull(),
+    countryOfOrigin: varchar("country_of_origin", { length: 100 }),
 
     // Merchandising
-    ribbon: varchar("ribbon", { length: 100 }), // "Recommended", "New" badge
     isFeatured: boolean("is_featured").default(false),
 
-    // Pricing
-    price: decimal("price", { precision: 12, scale: 2 }).notNull(),
+    // Anchor flag: the "brain" of a system (hub, NVR, IP PBX, core switch). A
+    // cart containing an anchor enters the solution-confirmation gate.
+    needsSolutionReview: boolean("needs_solution_review")
+      .default(false)
+      .notNull(),
+
+    // Price book. `price` is the public MSRP — the only price shown publicly.
+    // Cost + system-integrator define the internal margin pool. Sub-distributor
+    // and end-user tiers are dormant structure (not used in Phase 1).
+    price: decimal("price", { precision: 12, scale: 2 }), // public MSRP
+    priceCost: decimal("price_cost", { precision: 12, scale: 2 }),
+    priceSystemIntegrator: decimal("price_system_integrator", {
+      precision: 12,
+      scale: 2,
+    }),
+    priceSubDistributor: decimal("price_sub_distributor", {
+      precision: 12,
+      scale: 2,
+    }),
+    priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
 
-    // Inventory
-    stock: int("stock").default(0),
+    // `isAvailable` is the manual Available/Unavailable storefront toggle — the
+    // Phase-1 signal until the real-time Odoo stock link arrives.
+    isAvailable: boolean("is_available").default(true).notNull(),
 
-    highlights: json("highlights").$type<ProductHighlight[]>(), // [{ k: "Throughput", v: "10 Gbps" }, ...]
-    specGroups: json("spec_groups").$type<ProductSpecGroup[]>(), // [{ title, rows: [{ k, v }] }, ...]
+    // Dropdown-only values filled from the category's spec template, keyed by
+    // SpecField.key. Machine-reasonable specs for filtering and the AI builder.
+    technicalAttributes: json("technical_attributes").$type<
+      Record<string, string>
+    >(),
 
     // State & ordering
-    status: mysqlEnum("status", productStatuses).default("draft"),
+    status: mysqlEnum("status", productStatuses).default("in_stock"),
     order: int("order").default(0),
+
+    // RESERVED / dormant — for the EOL and cross-vendor-equivalence features
+    // later. No UI yet; the hooks exist so nothing needs retrofitting.
+    lifecycleStatus: mysqlEnum("lifecycle_status", lifecycleStatuses),
+    replacedBy: char("replaced_by", { length: 36 }), // successor product uuid
+    equivalents: json("equivalents").$type<string[]>(), // cross-vendor uuids
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -72,6 +119,7 @@ export const Products = mysqlTable(
   (table) => [
     index("idx_products_category_uuid").on(table.categoryUuid),
     index("idx_products_brand_uuid").on(table.brandUuid),
+    index("idx_products_vendor_uuid").on(table.vendorUuid),
     index("idx_products_status").on(table.status),
   ],
 );

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteBrand } from "@/app/(dashboard)/brands/action";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "ui";
+import { ConfirmDialog } from "ui";
 
 type BrandRowActionsProps = {
   uuid: string;

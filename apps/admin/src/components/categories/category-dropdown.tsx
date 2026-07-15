@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import { Controller } from "react-hook-form";
 import type { Control, FieldValues, Path } from "react-hook-form";
-import { Dropdown } from "@/components/ui/dropdown";
-import type { DropdownOption } from "@/components/ui/dropdown";
-import { FormError } from "@/components/ui/form-error";
+import { Dropdown } from "ui";
+import type { DropdownOption } from "ui";
+import { FormError } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
 
 type CategoryDropdownProps<TFieldValues extends FieldValues> = {
@@ -16,6 +16,7 @@ type CategoryDropdownProps<TFieldValues extends FieldValues> = {
   placeholder?: string;
   allowEmpty?: boolean;
   error?: string;
+  onValueChange?: (value: string) => void;
 };
 
 const buildCategoryTreeOptions = (
@@ -52,6 +53,7 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
   placeholder = "No parent",
   allowEmpty = true,
   error,
+  onValueChange,
 }: CategoryDropdownProps<TFieldValues>) => {
   const options = useMemo(
     () => buildCategoryTreeOptions(categories),
@@ -67,7 +69,10 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
         render={({ field }) => (
           <Dropdown
             value={typeof field.value === "string" ? field.value : ""}
-            onChange={field.onChange}
+            onChange={(value) => {
+              field.onChange(value);
+              onValueChange?.(value);
+            }}
             placeholder={placeholder}
             options={
               allowEmpty

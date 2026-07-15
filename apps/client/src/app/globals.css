@@ -1,68 +1,108 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@source "../../../../packages/ui/src";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Cairo", sans-serif;
+  /* "Twemoji Country Flags" (injected by the flag-emoji polyfill) only contains
+     flag glyphs, so listing it first renders flags on Windows while all other
+     text falls through to the real family. */
+  --font-sans: "Twemoji Country Flags", "Cairo", sans-serif;
   --font-heading: "Newsreader", serif;
-  --font-grotesk: "Hanken Grotesk", sans-serif;
+  --font-grotesk: "Twemoji Country Flags", "Hanken Grotesk", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
+  /* Accent (shared across themes) */
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
   --color-primary-tint: #f4f1fb;
   --color-primary-tint-border: #ece6fb;
-
-  --color-ink: #14161b;
-  --color-muted: #5a6068;
-  --color-faint: #a7a2b4;
-  --color-secondary: #5a6068;
-
-  --color-page: #f5f4fa;
-  --color-surface: #ffffff;
-  --color-hairline: #eceaf2;
-  --color-hairline-soft: #f0eef5;
-  --color-hover: #faf9fd;
-  --color-search-border: #e7e2f2;
-
-  --color-success: #127a4e;
+  --color-accent-cyan: #22d3ee;
+  --color-accent-violet: #8b7bff;
+  --color-success: #34e29b;
   --color-success-tint: #e9f7f0;
   --color-warning: #9a6b00;
   --color-warning-tint: #fdf4e3;
   --color-danger: #b23a28;
   --color-danger-tint: #fceae8;
-  --color-info: #2a6fdb;
-  --color-info-tint: #eaf1fc;
+
+  /* Text — light */
+  --color-ink: #14161b;
+  --color-secondary: #5a6068;
+  --color-muted: #5a6068;
+  --color-faint: #8a8f98;
+  --color-dim: #8a8f98;
+  --color-placeholder: #9aa0aa;
+
+  /* Surfaces — light */
+  --color-page: #f5f4fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f4f3f8;
+  /* Always-opaque panel for portaled popovers/menus (Dropdown, Combobox) —
+     distinct from --color-surface, which turns near-transparent "glass" in
+     dark mode and would let page content show through a floating menu. */
+  --color-overlay: #ffffff;
+  --color-hover: rgba(0, 0, 0, 0.04);
+
+  /* Borders — light */
+  --color-hairline: #eceaf2;
+  --color-search-border: #e3e4e9;
 
   --radius-card: 16px;
-  --radius-control: 11px;
+  --radius-control: 12px;
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  --animate-fade-in: fade-in 0.15s ease-out;
-  --animate-scale-in: scale-in 0.15s ease-out;
   --animate-spotlight-sweep: spotlight-sweep 2.6s ease-out both;
   --animate-orb-pulse: orb-pulse 6s ease-in-out infinite;
   --animate-spotlight: spotlight 2s ease 0.75s 1 forwards;
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Dark theme — token overrides applied when <html> has the .dark class. */
+.dark {
+  --color-primary: #8b7bff;
+  --color-primary-hover: #7e8dff;
+  --color-primary-tint: rgba(124, 110, 255, 0.14);
+
+  --color-ink: #eaf0fb;
+  --color-secondary: #9198ac;
+  --color-muted: #9198ac;
+  --color-faint: #606a80;
+  --color-dim: #606a80;
+  --color-placeholder: #586074;
+
+  --color-page: #060a14;
+  --color-surface: rgba(255, 255, 255, 0.035);
+  --color-surface-2: #0a1020;
+  --color-overlay: #10152a;
+  --color-hover: rgba(255, 255, 255, 0.06);
+
+  --color-hairline: rgba(255, 255, 255, 0.09);
+  --color-search-border: rgba(255, 255, 255, 0.16);
 }
 
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+:root {
+  --gradient-accent: linear-gradient(
+    115deg,
+    #22d3ee 0%,
+    #7e8dff 52%,
+    #b77cff 100%
+  );
+}
+
+/* Signature accent gradient — buttons, active icons. */
+.bg-accent-gradient {
+  background-image: var(--gradient-accent);
+}
+
+/* Gradient-clipped text — headlines. */
+.text-accent-gradient {
+  background-image: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @keyframes spotlight-sweep {
@@ -100,11 +140,6 @@
   }
 }
 
-body {
-  background: var(--color-page);
-  color: var(--color-ink);
-}
-
 .loader {
   width: 32px;
   height: 32px;
@@ -117,5 +152,17 @@ body {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@layer base {
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }

@@ -10,11 +10,13 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/backend": "^1.21.0",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "services": "workspace:*",
-    "storage": "workspace:*"
+    "storage": "workspace:*",
+    "validators": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20",

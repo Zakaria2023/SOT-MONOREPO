@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
   varchar,
+  type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
 
 export const Categories = mysqlTable(
@@ -15,9 +16,14 @@ export const Categories = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-    parentUuid: char("parent_uuid", { length: 36 }),
+    parentUuid: char("parent_uuid", { length: 36 }).references(
+      (): AnyMySqlColumn => Categories.uuid,
+      { onDelete: "set null" },
+    ),
 
     name: varchar("name", { length: 255 }).notNull(),
+    // Category code — the [CATEGORY] segment of the smart SKU (e.g. "SW").
+    code: varchar("code", { length: 4 }),
     description: text("description"),
     order: int("order").default(0).notNull(),
 

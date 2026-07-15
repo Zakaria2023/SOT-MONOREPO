@@ -17,8 +17,8 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 - `packages/services` — all business logic lives here as plain, framework-agnostic async functions. No `"use server"`, no request/response objects, no auth checks inside these functions. Every operation (create user, place order, etc.) exists as exactly one function here, called by both Server Actions and Route Handlers.
 - `packages/database` — the only place Drizzle is imported and the only place a DB connection is opened. Nothing outside this package — not the client browser code, not the mobile app — ever talks to the database directly.
 - `packages/validators` — zod schemas shared between Server Actions and Route Handlers so input validation never drifts between the two.
-- `packages/auth` — one shared identity-verification module used by both transports.
 - `packages/types` — shared TypeScript types/DTOs.
+- `packages/utils` — framework-agnostic helper functions (formatters, `slugify`, `generateUuid`, etc.) shared across apps, imported from `"utils"`.
 
 **Calling convention**
 
@@ -28,18 +28,18 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
 **Auth**
 
-- `apps/admin` uses Clerk. Do not change this or add a second identity table for it.
-- `apps/client` and the mobile app share one custom identity system backed by a `users` table and a `sessions` table (for refresh tokens) in `packages/database` via Drizzle. Do not use Clerk for these.
-- On login, issue a short-lived JWT access token plus a longer-lived refresh token (stored hashed in the sessions table).
-- The web client receives tokens as httpOnly, secure cookies. Server Actions read the cookie automatically — a token is never passed manually from client-side JS.
-- The mobile app receives tokens in the JSON response body, stores them in secure device storage, and sends the access token as an `Authorization: Bearer` header on every request to `apps/api`.
-- Both transports resolve to the same verify function in `packages/auth` before any service function runs.
+- Clerk is the identity provider for **all** consumer surfaces: `apps/admin`, `apps/client`, and the mobile app. Do not reintroduce a custom password/JWT/session system.
+- The `Users` table is **not** an identity store — it is a profile store. Clerk owns credentials, email/phone verification, and sessions. Each `Users` row is linked to Clerk by `clerkUserId` and is kept in sync by the Clerk webhook (`apps/client/src/app/api/webhooks/clerk/route.ts` → `syncClerkUser`). Extra profile fields (location, image, company, etc.) live on this row, not in Clerk.
+- The web client uses `@clerk/nextjs`: `clerkMiddleware` in `proxy.ts`, `<ClerkProvider>` in the root layout. Sign-in/sign-up are custom-styled forms driven by Clerk's `useSignIn`/`useSignUp` hooks (email code + phone code verification) — Clerk sets the session cookie in the browser, so these run client-side rather than through a Server Action. `getCurrentUser` resolves the cookie session via Clerk's `auth()` then maps `userId → getUserByClerkId`.
+- The mobile app authenticates directly with Clerk via the Clerk Flutter SDK and sends its session token as an `Authorization: Bearer` header to `apps/api`. `apps/api` verifies it networklessly with `@clerk/backend`'s `verifyToken`, then maps `sub → getUserByClerkId`. `apps/api` no longer exposes login/register/refresh/logout routes.
+- Both transports resolve the caller to the same `AuthUser` (via `getUserByClerkId` in `packages/services`) before any service function runs. There is no password column, no `Sessions` table, and no `packages/auth` — Clerk owns credentials, verification, and session/refresh-token lifecycle entirely.
 
 **Hard rules**
 
 - No business logic inside a Server Action or Route Handler — only in `packages/services`.
 - No direct database access from client components, the mobile app, or anywhere outside `packages/database`.
 - Mobile never touches Drizzle or the database — only the versioned REST API.
+- Never modify `db/index.ts` (the database connection/pool setup). Leave this file exactly as-is under all circumstances unless the user explicitly asks to change it.
 
 ## Package Manager
 
@@ -224,7 +224,9 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   ```tsx
   // ❌ Bad — imperative navigation for a plain link
   const openProduct = (slug: string) => router.push(`/products/${slug}`);
-  <article role="button" onClick={() => openProduct(slug)}>...</article>;
+  <article role="button" onClick={() => openProduct(slug)}>
+    ...
+  </article>;
 
   // ✅ Good — stretched Link overlay, buttons sit above it
   <article className="relative">
@@ -285,6 +287,18 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   <p className="line-clamp-1" />
   ```
 
+- Never use extra-bold or heavier font weights (`font-extrabold`, `font-black`). Keep text at `font-normal`, `font-medium`, or at most `font-semibold` for emphasis.
+
+  ```tsx
+  // ❌ Bad
+  <span className="font-extrabold" />
+
+  // ✅ Good
+  <h3 className="font-bold" />
+  <h3 className="font-semibold" />
+  <span className="font-medium" />
+  ```
+
 ## Exports
 
 - Regular components use **named exports** — inline on the declaration is fine, just never `export default`.
@@ -333,6 +347,50 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
     }
     return data.value;
   };
+  ```
+
+## Control Flow
+
+- Never write a brace-less `if`. Every `if` (and `else`) body must be wrapped in `{}`, even when it's a single statement on its own line or an early `return`/`throw`.
+
+  ```ts
+  // ❌ Bad — brace-less single-statement if
+  if (!boq) throw new Error("BOQ not found");
+
+  // ❌ Also bad — brace-less early return
+  if (!first) return null;
+
+  // ✅ Good
+  if (!boq) {
+    throw new Error("BOQ not found");
+  }
+
+  if (!first) {
+    return null;
+  }
+  ```
+
+## Route Handlers
+
+- When a route handler's logic is shared across apps (e.g. the `/api/documents/*` upload/download/delete endpoints), the handler body lives once in a package (e.g. `packages/storage`) as a plain function taking the Web `Request` (and route `context`). Never duplicate the body across apps.
+- Each app's `route.ts` must **import and call** the shared handler from a normal handler export. Never use the `export { handler as METHOD } from "package"` re-export syntax — it's disallowed.
+
+  ```ts
+  // ❌ Bad — re-export syntax
+  export { handleDocumentUpload as POST } from "storage";
+
+  // ✅ Good — import and call the shared handler
+  import { handleDocumentUpload } from "storage";
+
+  export const POST = (request: Request) => handleDocumentUpload(request);
+
+  // ✅ Good — handler that needs the route context (dynamic segment)
+  import { handleDocumentDownload } from "storage";
+
+  export const GET = (
+    request: Request,
+    context: { params: Promise<{ documentId: string }> },
+  ) => handleDocumentDownload(request, context);
   ```
 
 ## Next.js Server Actions
@@ -457,12 +515,13 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 ## Enums
 
 - Never use TypeScript's `enum`. Always define enums as a `const` array typed with `as const satisfies readonly string[]`, and derive the union type from it with `(typeof arr)[number]`.
-- Never define an enum inline inside a database schema file (e.g. inline in the array argument to `mysqlEnum(...)`). Define it in `apps/admin/src/lib/enum.ts` and import the const array into the schema file instead.
-- All enums for the app live together in the single `apps/admin/src/lib/enum.ts` file — not scattered across one-file-per-enum.
-- Labels never live in `enum.ts`. All label maps live together in the single `apps/admin/src/lib/label.ts` file instead, each exported as a `Record<EnumType, string>`.
+- Never define an enum inline inside a database schema file (e.g. inline in the array argument to `mysqlEnum(...)`). Define it in `db/enum.ts` and import the const array into the schema file instead.
+- All enums for the app live together in the single `db/enum.ts` file — not scattered across one-file-per-enum.
+- Labels never live in `enum.ts`. All label maps live together in the single `db/label.ts` file instead, each exported as a `Record<EnumType, string>`.
+- Shared JSON-column shape types (e.g. `SpecField`, `SpecOption`) live in `db/types.ts` and are imported by the schema files via a relative path (e.g. `../types`) rather than redefined inline.
 
   ```ts
-  // ✅ Good — apps/admin/src/lib/enum.ts
+  // ✅ Good — db/enum.ts
   export const productStatuses = [
     "draft",
     "published",
@@ -473,7 +532,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   ```
 
   ```ts
-  // ✅ Good — apps/admin/src/lib/label.ts
+  // ✅ Good — db/label.ts
   import { ProductStatus } from "./enum";
 
   export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
@@ -488,9 +547,9 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   // db/schema/products.ts
   status: mysqlEnum("status", ["draft", "published", "archived"]);
 
-  // ✅ Good — import the const array from apps/admin/src/lib/enum.ts
+  // ✅ Good — import the const array from db/enum.ts
   // db/schema/products.ts
-  import { productStatuses } from "../../apps/admin/src/lib/enum";
+  import { productStatuses } from "../enum";
 
   status: mysqlEnum("status", productStatuses);
   ```
@@ -534,7 +593,9 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
 ## Helpers
 
-- Reusable helper/utility functions (formatters, parsers, URL builders, etc.) must live in a dedicated helpers file — `src/lib/helpers.ts` (or another focused `src/lib/*.ts` module) — never defined inline at the top of a component file. Import them into the component.
+- Reusable helper/utility functions (formatters, parsers, URL builders, etc.) must never be defined inline at the top of a component file. Import them instead.
+- Framework-agnostic helpers shared across apps (formatters like `formatMoney`/`formatPrice`, `slugify`, `generateUuid`, etc.) live in the shared `packages/utils` package and are imported from `"utils"`. This is the single home for cross-app helpers — do not re-add a per-app `src/lib/helpers.ts` that duplicates them.
+- Only helpers that are genuinely specific to one app **and** tied to that app's transport/runtime (e.g. `apps/api`'s request/auth helpers that import `next/server`) stay in that app's `src/lib/*.ts`. Never put `next/server`-bound or otherwise app-specific code into `packages/utils`, since that package is imported by browser (client) code too.
 
   ```tsx
   // ❌ Bad — helper defined inline in the component file
@@ -545,13 +606,18 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
     <span>{formatPrice(product.price, product.currency)}</span>
   );
 
-  // ✅ Good — helper lives in src/lib/helpers.ts
-  // src/lib/helpers.ts
+  // ❌ Also bad — re-defining a shared helper in a per-app src/lib/helpers.ts
+  // apps/client/src/lib/helpers.ts
+  export const formatPrice = (price: string, currency: string | null): string =>
+    `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
+
+  // ✅ Good — shared helper lives in packages/utils, imported from "utils"
+  // packages/utils/src/index.ts
   export const formatPrice = (price: string, currency: string | null): string =>
     `${currency ?? "SAR"} ${Number(price).toLocaleString("en-US")}`;
 
   // product-card.tsx
-  import { formatPrice } from "@/lib/helpers";
+  import { formatPrice } from "utils";
 
   export const ProductCard = ({ product }: ProductCardProps) => (
     <span>{formatPrice(product.price, product.currency)}</span>
@@ -594,4 +660,35 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
     "CommunicationSettings",
     // ...columns
   );
+  ```
+
+## Service DTO Types
+
+- Service DTO/list/detail types must derive every field that maps to a database column from the table's `Select*` type — via indexed access (`SelectX["field"]`), `Pick`, or `Omit` — never hand-typed. This keeps them in sync with the schema automatically. Add `| null` for a left-joined column, and wrap in `NonNullable<...>` for a column the query coalesces to non-null.
+- Only genuinely computed values — SQL aggregates (`SUM`/`COUNT`, e.g. `itemCount`, `subtotal`) or composed values (e.g. `companyName || fullName`) — may be plain types, since no single column backs them.
+
+  ```ts
+  // ❌ Bad — passthrough columns re-typed by hand
+  export type OfferListItem = SelectOffers & {
+    boqReference: string | null;
+    customerName: string | null;
+  };
+
+  // ✅ Good — each column-backed field derived from its DB type
+  export type OfferListItem = SelectOffers & {
+    boqReference: SelectBoqs["reference"] | null; // left-joined
+    customerName: SelectUsers["fullName"] | null;
+  };
+
+  // ✅ Good — aggregates stay plain; coalesced column uses NonNullable
+  export type PartnerBoqListItem = SelectBoqs & {
+    matchRank: NonNullable<SelectBoqPartners["matchRank"]>;
+    dispatchedAt: SelectBoqPartners["createdAt"];
+  };
+
+  export type BoqListItem = SelectBoqs & {
+    customerName: SelectUsers["fullName"] | null;
+    itemCount: number; // SUM(...) — no single column backs it
+    subtotal: number; // SUM(...)
+  };
   ```

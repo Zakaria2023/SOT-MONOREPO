@@ -1,4 +1,15 @@
-import { asc, eq, getTableColumns } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  ne,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
@@ -9,7 +20,140 @@ export type ProductListItem = SelectProducts & {
   brandName: SelectBrands["name"] | null;
 };
 
-export const getProducts = async (): Promise<ProductListItem[]> => {
+export type ProductDetail = ProductListItem & {
+  category: SelectCategories | null;
+  brandBusinessLines: SelectBrands["businessLines"];
+};
+
+export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
+
+export type ProductFilters = {
+  /** Case-insensitive match against product name or brand name. */
+  search?: string;
+  /** Restrict to these category uuids (pass a whole subtree to include children). */
+  categoryUuids?: string[];
+  /** Restrict to these brand uuids (pass a whole subtree to include children). */
+  brandUuids?: string[];
+  /** Column ordering applied in SQL. */
+  sort?: ProductSort;
+};
+
+// SQL ordering for each sort option.
+const productOrder = (sort: ProductSort | undefined) => {
+  switch (sort) {
+    case "price-asc":
+      return [asc(Products.price)];
+    case "price-desc":
+      return [desc(Products.price)];
+    case "name":
+      return [asc(Products.name)];
+    default:
+      return [desc(Products.isFeatured), asc(Products.order)];
+  }
+};
+
+/**
+ * Assemble the smart SKU: `[BRAND-LINE][CATEGORY][SERIES]-[SEQ]`.
+ * The KEYSPECS segment is reserved for when the structured spec template lands.
+ * Returns null when the brand or category has no code yet — nothing to assemble,
+ * so the product simply keeps a null SKU until the codes are set.
+ */
+export const generateProductSku = async (input: {
+  brandUuid: string;
+  categoryUuid: string;
+  seriesCode?: string | null;
+  productUuid?: string;
+}): Promise<string | null> => {
+  const [brand] = await db
+    .select({ code: Brands.code })
+    .from(Brands)
+    .where(eq(Brands.uuid, input.brandUuid));
+  const [category] = await db
+    .select({ code: Categories.code })
+    .from(Categories)
+    .where(eq(Categories.uuid, input.categoryUuid));
+
+  const brandCode = (brand?.code ?? "").toUpperCase();
+  const categoryCode = (category?.code ?? "").toUpperCase();
+  if (!brandCode || !categoryCode) {
+    return null;
+  }
+
+  const series = (input.seriesCode ?? "").toUpperCase();
+  const prefix = `${brandCode}${categoryCode}${series}`;
+
+  // Keep the code stable across edits when the prefix hasn't changed.
+  if (input.productUuid) {
+    const [existing] = await db
+      .select({ sku: Products.sku })
+      .from(Products)
+      .where(eq(Products.uuid, input.productUuid));
+    if (existing?.sku && existing.sku.startsWith(`${prefix}-`)) {
+      return existing.sku;
+    }
+  }
+
+  // SEQ = the highest existing sequence for this prefix + 1 (collision-breaker).
+  const rows = await db
+    .select({ sku: Products.sku })
+    .from(Products)
+    .where(like(Products.sku, `${prefix}-%`));
+  const used = rows
+    .map((row) => Number(row.sku?.split("-").pop()))
+    .filter((value) => Number.isInteger(value));
+  const seq = (used.length ? Math.max(...used) : 0) + 1;
+
+  return `${prefix}-${String(seq).padStart(2, "0")}`;
+};
+
+export const getProducts = async (
+  filters: ProductFilters = {},
+): Promise<ProductListItem[]> => {
+  try {
+    const conditions: (SQL | undefined)[] = [];
+    if (filters.search) {
+      const term = `%${filters.search}%`;
+      // Flexible match across every field a product might be found by.
+      conditions.push(
+        or(
+          like(Products.name, term),
+          like(Products.model, term),
+          like(Products.sku, term),
+          like(Products.productFamily, term),
+          like(Products.seriesCode, term),
+          like(Products.shortDescription, term),
+          like(Products.description, term),
+          like(Brands.name, term),
+          like(Categories.name, term),
+        ),
+      );
+    }
+    if (filters.categoryUuids && filters.categoryUuids.length > 0) {
+      conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
+    }
+    if (filters.brandUuids && filters.brandUuids.length > 0) {
+      conditions.push(inArray(Products.brandUuid, filters.brandUuids));
+    }
+
+    return await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(...productOrder(filters.sort));
+  } catch {
+    throw new Error("Failed to fetch products");
+  }
+};
+
+export const getProductsByCategory = async (
+  categoryUuid: string,
+): Promise<ProductListItem[]> => {
   try {
     return await db
       .select({
@@ -20,9 +164,30 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(Products.categoryUuid, categoryUuid))
       .orderBy(asc(Products.order));
   } catch {
-    throw new Error("Failed to fetch products");
+    throw new Error("Failed to fetch products for category");
+  }
+};
+
+export const getProductsByBrand = async (
+  brandUuid: string,
+): Promise<ProductListItem[]> => {
+  try {
+    return await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(Products.brandUuid, brandUuid))
+      .orderBy(asc(Products.order));
+  } catch {
+    throw new Error("Failed to fetch products for brand");
   }
 };
 
@@ -38,5 +203,116 @@ export const getProduct = async (
     return product ?? null;
   } catch {
     throw new Error("Failed to fetch product");
+  }
+};
+
+/** A product resolved by its slug, enriched with its category for the detail page. */
+export const getProductDetailBySlug = async (
+  slug: string,
+): Promise<ProductDetail | null> => {
+  try {
+    const [product] = await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+        brandBusinessLines: Brands.businessLines,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(Products.slug, slug));
+
+    if (!product) return null;
+
+    const [category] = await db
+      .select()
+      .from(Categories)
+      .where(eq(Categories.uuid, product.categoryUuid));
+
+    return { ...product, category: category ?? null };
+  } catch {
+    throw new Error("Failed to fetch product");
+  }
+};
+
+/** Other products in the same category, for the side-by-side comparison. */
+export const getComparableProducts = async (
+  categoryUuid: string,
+  excludeProductUuid: string,
+  limit = 2,
+): Promise<ProductListItem[]> => {
+  try {
+    return await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(
+        and(
+          eq(Products.categoryUuid, categoryUuid),
+          ne(Products.uuid, excludeProductUuid),
+        ),
+      )
+      .orderBy(asc(Products.order))
+      .limit(limit);
+  } catch {
+    throw new Error("Failed to fetch comparable products");
+  }
+};
+
+/**
+ * Products related to the given one: those in the same category, plus siblings
+ * under the same parent category (and the parent itself), excluding the product.
+ */
+export const getRelatedProducts = async (
+  productUuid: string,
+  limit = 6,
+): Promise<ProductListItem[]> => {
+  try {
+    const [product] = await db
+      .select({ categoryUuid: Products.categoryUuid })
+      .from(Products)
+      .where(eq(Products.uuid, productUuid));
+    if (!product) return [];
+
+    const [category] = await db
+      .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
+      .from(Categories)
+      .where(eq(Categories.uuid, product.categoryUuid));
+
+    const categoryUuids = new Set<string>([product.categoryUuid]);
+    if (category?.parentUuid) {
+      categoryUuids.add(category.parentUuid);
+      const siblings = await db
+        .select({ uuid: Categories.uuid })
+        .from(Categories)
+        .where(eq(Categories.parentUuid, category.parentUuid));
+      for (const sibling of siblings) categoryUuids.add(sibling.uuid);
+    }
+
+    return await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(
+        and(
+          inArray(Products.categoryUuid, [...categoryUuids]),
+          ne(Products.uuid, productUuid),
+        ),
+      )
+      .orderBy(asc(Products.order))
+      .limit(limit);
+  } catch {
+    throw new Error("Failed to fetch related products");
   }
 };

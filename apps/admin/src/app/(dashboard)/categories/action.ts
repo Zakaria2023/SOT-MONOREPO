@@ -6,9 +6,9 @@ import {
   InsertCategories,
   SelectCategories,
 } from "@/db/schema/categories";
-import { generateUuid } from "@/lib/helpers";
+import { deriveCode, generateUuid, resolveUniqueCode } from "utils";
 import { alias } from "drizzle-orm/mysql-core";
-import { asc, count, eq, getTableColumns } from "drizzle-orm";
+import { asc, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -65,8 +65,16 @@ export const createCategory = async (
 ): Promise<CategoryActionResult> => {
   const uuid = generateUuid();
   try {
-    const [{ total }] = await db.select({ total: count() }).from(Categories);
-    await db.insert(Categories).values({ ...fields, uuid, order: total });
+    const existing = await db.select({ code: Categories.code }).from(Categories);
+    const taken = new Set(
+      existing.map((row) => row.code).filter((code): code is string =>
+        Boolean(code),
+      ),
+    );
+    const code = resolveUniqueCode(deriveCode(fields.name), taken);
+    await db
+      .insert(Categories)
+      .values({ ...fields, uuid, order: existing.length, code });
   } catch (error) {
     return {
       error:

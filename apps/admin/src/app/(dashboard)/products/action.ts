@@ -4,7 +4,9 @@ import { db } from "@/db";
 import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
-import { generateUuid, slugify } from "@/lib/helpers";
+import { SelectVendors, Vendors } from "@/db/schema/vendors";
+import { generateProductSku } from "services";
+import { generateUuid, slugify } from "utils";
 import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -25,6 +27,7 @@ export type ProductActionResult = {
 export type ProductListItem = SelectProducts & {
   categoryName: SelectCategories["name"] | null;
   brandName: SelectBrands["name"] | null;
+  vendorName: SelectVendors["name"] | null;
 };
 
 export const getProducts = async (): Promise<ProductListItem[]> => {
@@ -34,10 +37,12 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
         ...getTableColumns(Products),
         categoryName: Categories.name,
         brandName: Brands.name,
+        vendorName: Vendors.name,
       })
       .from(Products)
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .leftJoin(Vendors, eq(Products.vendorUuid, Vendors.uuid))
       .orderBy(asc(Products.order));
   } catch {
     throw new Error("Failed to fetch products");
@@ -64,13 +69,22 @@ export const createProduct = async (
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
   const uuid = generateUuid();
+  const productFields = fields;
   try {
     const [{ total }] = await db.select({ total: count() }).from(Products);
+    // The SKU is system-owned: assembled from the brand/category/series codes,
+    // never taken from the client.
+    const sku = await generateProductSku({
+      brandUuid: productFields.brandUuid,
+      categoryUuid: productFields.categoryUuid,
+      seriesCode: productFields.seriesCode,
+    });
     await db.insert(Products).values({
-      ...fields,
+      ...productFields,
+      sku,
       uuid,
       order: total,
-      slug: slugify(fields.name),
+      slug: slugify(productFields.name),
     });
   } catch (error) {
     return {
@@ -88,10 +102,18 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
+  const productFields = fields;
   try {
+    // Regenerate the SKU (stable when brand/category/series are unchanged).
+    const sku = await generateProductSku({
+      brandUuid: productFields.brandUuid,
+      categoryUuid: productFields.categoryUuid,
+      seriesCode: productFields.seriesCode,
+      productUuid: uuid,
+    });
     await db
       .update(Products)
-      .set({ ...fields, slug: slugify(fields.name) })
+      .set({ ...productFields, sku, slug: slugify(productFields.name) })
       .where(eq(Products.uuid, uuid));
   } catch (error) {
     return {

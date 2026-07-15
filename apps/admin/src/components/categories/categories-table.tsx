@@ -4,8 +4,8 @@ import { ImageOff } from "lucide-react";
 import Image from "next/image";
 import { documentDownloadUrl } from "@/lib/documents";
 import { CategoryRowActions } from "@/components/categories/category-row-actions";
-import { Table } from "@/components/ui/table";
-import type { TableColumn } from "@/components/ui/table";
+import { Table } from "ui";
+import type { TableColumn } from "ui";
 import type { CategoryListItem } from "@/app/(dashboard)/categories/action";
 
 type CategoriesTableProps = {

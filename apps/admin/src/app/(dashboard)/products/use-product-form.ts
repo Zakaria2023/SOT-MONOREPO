@@ -11,7 +11,10 @@ import type { SelectProducts } from "@/db/schema/products";
 
 type UseProductFormArgs =
   | { mode: "add" }
-  | { mode: "edit"; product: SelectProducts };
+  | {
+      mode: "edit";
+      product: SelectProducts;
+    };
 
 export const useProductForm = (args: UseProductFormArgs) => {
   const action =
@@ -29,22 +32,32 @@ export const useProductForm = (args: UseProductFormArgs) => {
     defaultValues: {
       categoryUuid: product?.categoryUuid ?? "",
       brandUuid: product?.brandUuid ?? "",
+      vendorUuid: product?.vendorUuid ?? "",
       name: product?.name ?? "",
-      sku: product?.sku ?? "",
       model: product?.model ?? "",
-      blurb: product?.blurb ?? "",
+      productFamily: product?.productFamily ?? "",
+      seriesCode: product?.seriesCode ?? "",
+      warrantyPeriod: product?.warrantyPeriod ?? "",
+      warrantyRegion: product?.warrantyRegion ?? "",
+      warrantyExtendable: product?.warrantyExtendable ?? false,
+      countryOfOrigin: product?.countryOfOrigin ?? "",
+      shortDescription: product?.shortDescription ?? "",
+      datasheet: product?.datasheet ?? "",
       description: product?.description ?? "",
       role: product?.role ?? "",
       image: product?.image ?? "",
-      iconKey: product?.iconKey ?? "",
-      ribbon: product?.ribbon ?? "",
+      images: product?.images ?? [],
       isFeatured: product?.isFeatured ?? false,
+      needsSolutionReview: product?.needsSolutionReview ?? false,
       price: product?.price ?? "",
+      priceCost: product?.priceCost ?? "",
+      priceSystemIntegrator: product?.priceSystemIntegrator ?? "",
+      priceSubDistributor: product?.priceSubDistributor ?? "",
+      priceEndUser: product?.priceEndUser ?? "",
       currency: product?.currency ?? "SAR",
-      stock: product?.stock ?? 0,
-      highlights: product?.highlights ?? [],
-      specGroups: product?.specGroups ?? [],
-      status: product?.status ?? "draft",
+      isAvailable: product?.isAvailable ?? true,
+      technicalAttributes: product?.technicalAttributes ?? {},
+      status: product?.status ?? "in_stock",
       order: product?.order ?? 0,
     },
   });
@@ -54,21 +67,31 @@ export const useProductForm = (args: UseProductFormArgs) => {
       dispatch({
         categoryUuid: values.categoryUuid,
         brandUuid: values.brandUuid,
+        vendorUuid: values.vendorUuid || null,
         name: values.name,
-        sku: values.sku || null,
         model: values.model || null,
-        blurb: values.blurb || null,
+        productFamily: values.productFamily || null,
+        seriesCode: values.seriesCode || null,
+        warrantyPeriod: values.warrantyPeriod || null,
+        warrantyRegion: values.warrantyRegion || null,
+        warrantyExtendable: values.warrantyExtendable,
+        countryOfOrigin: values.countryOfOrigin || null,
+        shortDescription: values.shortDescription || null,
+        datasheet: values.datasheet || null,
         description: values.description || null,
         role: values.role || null,
         image: values.image || null,
-        iconKey: values.iconKey || null,
-        ribbon: values.ribbon || null,
+        images: values.images ?? [],
         isFeatured: values.isFeatured,
-        price: values.price,
+        needsSolutionReview: values.needsSolutionReview,
+        price: values.price || null,
+        priceCost: values.priceCost || null,
+        priceSystemIntegrator: values.priceSystemIntegrator || null,
+        priceSubDistributor: values.priceSubDistributor || null,
+        priceEndUser: values.priceEndUser || null,
         currency: values.currency,
-        stock: values.stock,
-        highlights: values.highlights ?? [],
-        specGroups: values.specGroups ?? [],
+        isAvailable: values.isAvailable,
+        technicalAttributes: values.technicalAttributes,
         status: values.status,
         order: values.order,
       });
