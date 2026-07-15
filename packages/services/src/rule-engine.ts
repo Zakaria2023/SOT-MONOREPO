@@ -130,7 +130,37 @@ const compare = (
   demand: number,
   limit: number,
   comparator: EngineRule["comparator"],
-): boolean => (comparator === "lte" ? demand <= limit : demand >= limit);
+): boolean => {
+  if (comparator === "lte") {
+    return demand <= limit;
+  }
+  if (comparator === "gte") {
+    return demand >= limit;
+  }
+  return demand === limit;
+};
+
+// How a violated comparison reads in a message: over the limit, under it, or
+// simply not the exact required value.
+const violationWord = (comparator: EngineRule["comparator"]): string => {
+  if (comparator === "lte") {
+    return "exceeds";
+  }
+  if (comparator === "gte") {
+    return "falls below";
+  }
+  return "does not match";
+};
+
+const gapWord = (comparator: EngineRule["comparator"]): string => {
+  if (comparator === "lte") {
+    return "over";
+  }
+  if (comparator === "gte") {
+    return "short";
+  }
+  return "off";
+};
 
 const formatValue = (value: number, unit: EngineSpec["unit"]): string =>
   unit ? `${round2(value)} ${unit}` : `${round2(value)}`;
@@ -143,7 +173,8 @@ const findSuggestions = (
   demand: number,
   catalog: EngineCatalogProduct[],
 ): RuleSuggestion[] => {
-  if (rule.comparator !== "lte") {
+  // "At least" rules have no meaningful single-product fix to suggest.
+  if (rule.comparator === "gte") {
     return [];
   }
   return catalog
@@ -153,7 +184,9 @@ const findSuggestions = (
         return [];
       }
       const usable = (capacity * rule.headroomPercent) / 100;
-      return usable >= demand
+      const satisfies =
+        rule.comparator === "eq" ? usable === demand : usable >= demand;
+      return satisfies
         ? [{ productUuid: product.productUuid, name: product.name, capacity }]
         : [];
     })
@@ -316,7 +349,7 @@ export const evaluateRule = (
     demand,
     capacity,
     effectiveCapacity: effective,
-    message: `Total "${rule.consumerSpec.label}" of ${demandLabel} ${rule.comparator === "lte" ? "exceeds" : "falls below"} the usable "${rule.providerSpec.label}" of ${formatValue(effective, rule.providerSpec.unit)}${headroomNote} — ${rule.comparator === "lte" ? "over" : "short"} by ${formatValue(gap, rule.providerSpec.unit)}.`,
+    message: `Total "${rule.consumerSpec.label}" of ${demandLabel} ${violationWord(rule.comparator)} the usable "${rule.providerSpec.label}" of ${formatValue(effective, rule.providerSpec.unit)}${headroomNote} — ${gapWord(rule.comparator)} by ${formatValue(gap, rule.providerSpec.unit)}.`,
     suggestions: findSuggestions(rule, demand, catalog),
   };
 };

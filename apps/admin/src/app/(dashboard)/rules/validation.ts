@@ -6,7 +6,7 @@ export const ruleFormSchema = z.object({
   kind: z.enum(["sum_budget", "count_limit", "per_item_threshold"]),
   consumerSpecUuid: z.string().min(1, "Pick the consumed specification"),
   providerSpecUuid: z.string().min(1, "Pick the capacity specification"),
-  comparator: z.enum(["lte", "gte"]),
+  comparator: z.enum(["lte", "gte", "eq"]),
   // Registered with valueAsNumber — arrives here as a number already.
   headroomPercent: z
     .number("Enter a percent between 1 and 100")

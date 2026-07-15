@@ -29,6 +29,7 @@ export const RULE_KIND_LABELS: Record<RuleKind, string> = {
 export const RULE_COMPARATOR_LABELS: Record<RuleComparator, string> = {
   lte: "must be ≤",
   gte: "must be ≥",
+  eq: "must be =",
 };
 
 export const RULE_SEVERITY_LABELS: Record<RuleSeverity, string> = {

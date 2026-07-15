@@ -77,6 +77,7 @@ export type RuleKind = (typeof ruleKinds)[number];
 export const ruleComparators = [
   "lte",
   "gte",
+  "eq",
 ] as const satisfies readonly string[];
 
 export type RuleComparator = (typeof ruleComparators)[number];

@@ -232,6 +232,7 @@ export const RuleForm = (props: RuleFormProps) => {
                 options={[
                   { value: "lte", label: "must fit within (≤)" },
                   { value: "gte", label: "must be at least (≥)" },
+                  { value: "eq", label: "must equal (=)" },
                 ]}
               />
             )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { RuleRowActions } from "@/components/rules/rule-row-actions";
+import type { RuleComparator } from "@/db/enum";
 import { RULE_KIND_LABELS, RULE_SEVERITY_LABELS } from "@/db/label";
 import { Table } from "ui";
 import type { TableColumn } from "ui";
@@ -8,6 +9,12 @@ import type { CompatibilityRuleListItem } from "services";
 
 type RulesTableProps = {
   rules: CompatibilityRuleListItem[];
+};
+
+const COMPARATOR_SYMBOLS: Record<RuleComparator, string> = {
+  lte: "≤",
+  gte: "≥",
+  eq: "=",
 };
 
 const specLabel = (label: string | null, unit: string | null): string =>
@@ -41,7 +48,7 @@ const columns: TableColumn<CompatibilityRuleListItem>[] = [
     render: (rule) => (
       <span className="text-muted">
         {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)}{" "}
-        {rule.comparator === "lte" ? "≤" : "≥"}{" "}
+        {COMPARATOR_SYMBOLS[rule.comparator]}{" "}
         {rule.headroomPercent < 100 ? `${rule.headroomPercent}% of ` : ""}
         {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)}
       </span>

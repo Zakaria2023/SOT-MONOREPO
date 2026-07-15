@@ -153,6 +153,45 @@ describe("evaluateRule — count_limit", () => {
   });
 });
 
+describe("evaluateRule — eq comparator", () => {
+  const voltageRule: EngineRule = {
+    ...poeBudgetRule,
+    uuid: "rule-eq",
+    name: "Exact voltage match",
+    kind: "per_item_threshold",
+    comparator: "eq",
+    headroomPercent: 100,
+    condition: null,
+    consumerSpec: { key: "input-voltage", label: "Input Voltage", unit: "V" },
+    providerSpec: { key: "output-voltage", label: "Output Voltage", unit: "V" },
+  };
+
+  const psu: EngineItem = {
+    productUuid: "psu-12",
+    name: "12 V PSU",
+    quantity: 1,
+    attributes: { "output-voltage": "12" },
+  };
+
+  it("passes only on an exact match", () => {
+    const device = (volts: string): EngineItem => ({
+      productUuid: `dev-${volts}`,
+      name: `Device ${volts} V`,
+      quantity: 1,
+      attributes: { "input-voltage": volts },
+    });
+    expect(evaluateRule(voltageRule, [psu, device("12")], []).status).toBe(
+      "pass",
+    );
+    expect(evaluateRule(voltageRule, [psu, device("24")], []).status).toBe(
+      "fail",
+    );
+    expect(evaluateRule(voltageRule, [psu, device("5")], []).status).toBe(
+      "fail",
+    );
+  });
+});
+
 describe("evaluateRule — per_item_threshold", () => {
   it("flags only the items above the per-item limit", () => {
     const heavyPtz = camera("ptz", "45", 1); // above the 30 W per-port max
