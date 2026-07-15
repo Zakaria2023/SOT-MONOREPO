@@ -8,6 +8,10 @@ import {
   Specifications,
 } from "../../../db/schema/specifications";
 import { SpecificationCategories } from "../../../db/schema/specification-categories";
+import {
+  SelectSpecificationGroups,
+  SpecificationGroups,
+} from "../../../db/schema/specification-groups";
 import { SpecField } from "../../../db/types";
 
 export type { SelectSpecifications };
@@ -19,6 +23,7 @@ export type SpecificationFields = Omit<
 
 // A specification enriched with the categories it's directly assigned to.
 export type SpecificationWithCategories = SelectSpecifications & {
+  groupName: SelectSpecificationGroups["name"] | null;
   categoryUuids: string[];
   categoryNames: string[];
 };
@@ -28,10 +33,21 @@ export const getSpecifications = async (): Promise<
   SpecificationWithCategories[]
 > => {
   try {
-    const specs = await db
-      .select()
+    const specRows = await db
+      .select({
+        spec: Specifications,
+        groupName: SpecificationGroups.name,
+      })
       .from(Specifications)
+      .leftJoin(
+        SpecificationGroups,
+        eq(Specifications.groupUuid, SpecificationGroups.uuid),
+      )
       .orderBy(asc(Specifications.order));
+    const specs = specRows.map((row) => ({
+      ...row.spec,
+      groupName: row.groupName,
+    }));
 
     const links = await db
       .select({
@@ -63,13 +79,21 @@ export const getSpecification = async (
   uuid: string,
 ): Promise<SpecificationWithCategories | null> => {
   try {
-    const [spec] = await db
-      .select()
+    const [row] = await db
+      .select({
+        spec: Specifications,
+        groupName: SpecificationGroups.name,
+      })
       .from(Specifications)
+      .leftJoin(
+        SpecificationGroups,
+        eq(Specifications.groupUuid, SpecificationGroups.uuid),
+      )
       .where(eq(Specifications.uuid, uuid));
-    if (!spec) {
+    if (!row) {
       return null;
     }
+    const spec = { ...row.spec, groupName: row.groupName };
 
     const links = await db
       .select({
@@ -184,6 +208,8 @@ export const getSpecificationsForCategory = async (
         uuid: Specifications.uuid,
         key: Specifications.key,
         label: Specifications.label,
+        valueType: Specifications.valueType,
+        unit: Specifications.unit,
         options: Specifications.options,
         order: Specifications.order,
       })
@@ -203,7 +229,13 @@ export const getSpecificationsForCategory = async (
         continue;
       }
       seen.add(row.uuid);
-      specs.push({ key: row.key, label: row.label, options: row.options ?? [] });
+      specs.push({
+        key: row.key,
+        label: row.label,
+        options: row.options ?? [],
+        valueType: row.valueType,
+        unit: row.unit,
+      });
     }
     return specs;
   } catch {

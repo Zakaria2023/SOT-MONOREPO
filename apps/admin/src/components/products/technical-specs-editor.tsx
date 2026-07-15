@@ -11,6 +11,8 @@ import { Dropdown } from "ui";
 type SpecificationForCategory = {
   key: string;
   label: string;
+  valueType: SpecField["valueType"];
+  unit: SpecField["unit"];
   options: SpecOption[] | null;
   rules: SpecRule[] | null;
   categoryUuids: string[];
@@ -127,6 +129,8 @@ export const TechnicalSpecsEditor = ({
         fields.push({
           key: spec.key,
           label: spec.label,
+          valueType: spec.valueType,
+          unit: spec.unit,
           options: spec.options ?? [],
           rules: spec.rules ?? [],
         });
@@ -250,6 +254,24 @@ export const TechnicalSpecsEditor = ({
                   <div className="flex items-center justify-between rounded-control border border-hairline bg-page px-4 py-2.5 text-sm text-faint">
                     {forced}
                     <Lock size={14} />
+                  </div>
+                ) : field.valueType === "number" ? (
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      value={values[field.key] ?? ""}
+                      onChange={(event) =>
+                        handleChange(field, event.target.value)
+                      }
+                      placeholder="0"
+                      className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 pr-14 text-sm text-ink outline-none focus:border-primary"
+                    />
+                    {field.unit && (
+                      <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs font-medium text-faint">
+                        {field.unit}
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <Dropdown

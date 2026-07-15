@@ -7,8 +7,33 @@ import {
   PartnerRequestStatus,
   PartnerType,
   ProductStatus,
+  RuleComparator,
+  RuleKind,
+  RuleSeverity,
+  SpecValueType,
   UserType,
 } from "./enum";
+
+export const SPEC_VALUE_TYPE_LABELS: Record<SpecValueType, string> = {
+  select: "Dropdown",
+  number: "Number",
+};
+
+export const RULE_KIND_LABELS: Record<RuleKind, string> = {
+  sum_budget: "Sum vs budget",
+  count_limit: "Count vs limit",
+  per_item_threshold: "Per-item threshold",
+};
+
+export const RULE_COMPARATOR_LABELS: Record<RuleComparator, string> = {
+  lte: "must be ≤",
+  gte: "must be ≥",
+};
+
+export const RULE_SEVERITY_LABELS: Record<RuleSeverity, string> = {
+  block: "Block",
+  warn: "Warn",
+};
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
   in_stock: "In Stock",

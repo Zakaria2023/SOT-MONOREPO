@@ -38,11 +38,23 @@ const ruleSchema = z.object({
   forcedValue: z.string().min(1, "Pick the value to force"),
 });
 
-export const specificationFormSchema = z.object({
-  label: z.string().min(1, "Label is required").max(255),
-  options: z.array(specOptionSchema),
-  rules: z.array(ruleSchema),
-  categoryUuids: z.array(z.string()).min(1, "Pick at least one category"),
-});
+export const specificationFormSchema = z
+  .object({
+    label: z.string().min(1, "Label is required").max(255),
+    groupUuid: z.string(),
+    newGroupName: z.string().max(255),
+    valueType: z.enum(["select", "number"]),
+    unit: z.string().max(32),
+    options: z.array(specOptionSchema),
+    rules: z.array(ruleSchema),
+    categoryUuids: z.array(z.string()).min(1, "Pick at least one category"),
+  })
+  .refine(
+    (values) => values.valueType !== "number" || values.unit.trim().length > 0,
+    {
+      message: "A numeric specification needs a unit (e.g. W, ports, m)",
+      path: ["unit"],
+    },
+  );
 
 export type SpecificationFormValues = z.infer<typeof specificationFormSchema>;

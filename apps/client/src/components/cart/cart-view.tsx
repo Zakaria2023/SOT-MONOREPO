@@ -1,6 +1,9 @@
 "use client";
 
 import { checkout, removeItem, updateQuantity } from "@/app/cart/actions";
+import { useCompatibility } from "@/app/cart/use-compatibility";
+import { CompatibilityGateModal } from "@/components/cart/compatibility-gate-modal";
+import { CompatibilityWarnings } from "@/components/cart/compatibility-warnings";
 import { ProfileGateModal } from "@/components/profile/profile-gate-modal";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
@@ -15,7 +18,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import type { CartLineItem } from "services";
 import { formatMoney, lineTotal, summarizeCart } from "utils";
 
@@ -197,6 +200,15 @@ export const CartView = ({
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [, startTransition] = useTransition();
 
+  // Advisory compatibility check over everything in the cart, re-run
+  // (debounced) whenever lines or quantities change.
+  const warnings = useCompatibility(items);
+  // The BOQ form intercepted before checkout; "Continue anyway" re-submits it
+  // with the gate bypassed.
+  const [pendingCheckout, setPendingCheckout] =
+    useState<HTMLFormElement | null>(null);
+  const bypassCompatibilityGate = useRef(false);
+
   const onQuantity = (uuid: string, nextQuantity: number) => {
     if (nextQuantity < 1) {
       return;
@@ -256,6 +268,8 @@ export const CartView = ({
           </p>
         ) : (
           <div className="mt-8 flex flex-col gap-6">
+            <CompatibilityWarnings warnings={warnings} />
+
             {[...solutionGroups.entries()].map(([categoryUuid, groupItems]) => (
               <CartSection
                 key={categoryUuid}
@@ -273,6 +287,16 @@ export const CartView = ({
                       if (needsProfile) {
                         event.preventDefault();
                         setShowProfileGate(true);
+                        return;
+                      }
+                      // Final look at the rule warnings before the order goes
+                      // out — agreed flow: warn again at checkout, never block.
+                      if (
+                        warnings.length > 0 &&
+                        !bypassCompatibilityGate.current
+                      ) {
+                        event.preventDefault();
+                        setPendingCheckout(event.currentTarget);
                       }
                     }}
                   >
@@ -312,6 +336,19 @@ export const CartView = ({
         <ProfileGateModal
           next="/cart"
           onClose={() => setShowProfileGate(false)}
+        />
+      )}
+
+      {pendingCheckout && (
+        <CompatibilityGateModal
+          warnings={warnings}
+          onContinue={() => {
+            bypassCompatibilityGate.current = true;
+            pendingCheckout.requestSubmit();
+            bypassCompatibilityGate.current = false;
+            setPendingCheckout(null);
+          }}
+          onClose={() => setPendingCheckout(null)}
         />
       )}
     </main>

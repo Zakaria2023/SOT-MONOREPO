@@ -8,20 +8,26 @@ import type { SelectCategories } from "@/db/schema/categories";
 import { ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
-import { FormProvider, useWatch } from "react-hook-form";
-import { Button, FormError, Input } from "ui";
-import type { SpecificationWithCategories } from "services";
+import { measurementUnits } from "@/db/enum";
+import { Controller, FormProvider, useWatch } from "react-hook-form";
+import { Button, Combobox, Dropdown, FormError, Input } from "ui";
+import type {
+  SelectSpecificationGroups,
+  SpecificationWithCategories,
+} from "services";
 
 type SpecificationFormProps =
   | {
       mode: "add";
       categories: SelectCategories[];
       specifications: SpecificationWithCategories[];
+      groups: SelectSpecificationGroups[];
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       specifications: SpecificationWithCategories[];
+      groups: SelectSpecificationGroups[];
       specification: SpecificationWithCategories;
     };
 
@@ -65,7 +71,7 @@ const categoryTree = (
 };
 
 export const SpecificationForm = (props: SpecificationFormProps) => {
-  const { mode, categories, specifications } = props;
+  const { mode, categories, specifications, groups } = props;
   const editingUuid = props.mode === "edit" ? props.specification.uuid : null;
 
   const { form, state, isPending, onSubmit } = useSpecificationForm(
@@ -80,6 +86,7 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
   } = form;
 
   const watchedCategoryUuids = useWatch({ control, name: "categoryUuids" });
+  const valueType = useWatch({ control, name: "valueType" });
   // Stable fallback so the memo deps don't churn on every render.
   const selectedCategoryUuids = useMemo(
     () => watchedCategoryUuids ?? [],
@@ -122,23 +129,105 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
           error={errors.label?.message}
         />
 
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-ink">Group</label>
+            <Controller
+              control={control}
+              name="groupUuid"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="No group"
+                  options={[
+                    { value: "", label: "No group" },
+                    ...groups.map((group) => ({
+                      value: group.uuid,
+                      label: group.name,
+                    })),
+                  ]}
+                />
+              )}
+            />
+            <Input
+              placeholder="...or create a new group"
+              {...register("newGroupName")}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-ink">Value type</label>
+            <Controller
+              control={control}
+              name="valueType"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={[
+                    { value: "select", label: "Dropdown options" },
+                    { value: "number", label: "Number (for rules)" },
+                  ]}
+                />
+              )}
+            />
+          </div>
+
+          {valueType === "number" && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-ink">Unit</label>
+              <Controller
+                control={control}
+                name="unit"
+                render={({ field }) => (
+                  <Combobox
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Pick a unit"
+                    searchPlaceholder="Search units..."
+                    options={measurementUnits.map((unit) => ({
+                      value: unit,
+                      label: unit,
+                    }))}
+                  />
+                )}
+              />
+              <FormError message={errors.unit?.message} />
+            </div>
+          )}
+        </div>
+
         <CategoryMultiSelect control={control} categories={categories} />
 
-        <div className="flex flex-col gap-2 border-t border-hairline pt-6">
-          <label className="text-sm font-semibold text-ink">Options</label>
-          <p className="text-xs text-muted">
-            Dropdown values products pick from. An option can reveal its own
-            sub-fields when selected.
-          </p>
-          <SpecOptionList name="options" depth={0} />
-        </div>
+        {valueType === "select" && (
+          <>
+            <div className="flex flex-col gap-2 border-t border-hairline pt-6">
+              <label className="text-sm font-semibold text-ink">Options</label>
+              <p className="text-xs text-muted">
+                Dropdown values products pick from. An option can reveal its
+                own sub-fields when selected.
+              </p>
+              <SpecOptionList name="options" depth={0} />
+            </div>
 
-        <div className="border-t border-hairline pt-6">
-          <RulesEditor
-            specifications={eligibleSpecifications}
-            hasCategories={selectedCategoryUuids.length > 0}
-          />
-        </div>
+            <div className="border-t border-hairline pt-6">
+              <RulesEditor
+                specifications={eligibleSpecifications}
+                hasCategories={selectedCategoryUuids.length > 0}
+              />
+            </div>
+          </>
+        )}
+
+        {valueType === "number" && (
+          <p className="rounded-control border border-dashed border-hairline p-4 text-xs text-muted">
+            Products type a numeric value for this specification (in the unit
+            above). Numeric specifications are what compatibility rules
+            aggregate and compare — e.g. summing every device&apos;s power
+            consumption against a switch&apos;s PoE budget.
+          </p>
+        )}
 
         <FormError message={state.error} />
 

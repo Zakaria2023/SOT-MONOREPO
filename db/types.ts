@@ -1,10 +1,16 @@
+import { SpecValueType } from "./enum";
+
 // A per-category spec-template field: a stable key, a display label, and the
-// editable set of allowed dropdown values. Products fill these (dropdown-only)
-// into their `technicalAttributes` map, keyed by `key`.
+// editable set of allowed dropdown values. Products fill these into their
+// `technicalAttributes` map, keyed by `key`.
 //
 // The template is a tree: each option can carry its own child fields that only
 // apply when that option is chosen. e.g. a "PoE" field with options Yes/No,
 // where the "Yes" option reveals a "PoE Standard" child field on the product.
+//
+// `valueType` "number" marks a numeric spec (typed value + unit instead of
+// dropdown options) — the inputs the compatibility rule engine computes over.
+// Absent on old rows = "select".
 export type SpecOption = {
   value: string;
   children: SpecField[];
@@ -14,6 +20,16 @@ export type SpecField = {
   key: string;
   label: string;
   options: SpecOption[];
+  valueType?: SpecValueType;
+  unit?: string | null;
+};
+
+// Optional consumer-side filter on a compatibility rule: only selection items
+// whose chosen value for `specKey` is one of `values` participate as
+// consumers. e.g. only devices with PoE = "Yes" count toward a PoE budget.
+export type RuleCondition = {
+  specKey: string;
+  values: string[];
 };
 
 // A rule stored on a specification. When the clauses match the product's

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   addToCart,
+  checkCompatibility,
   createBoqFromCart,
   getCartPreview,
   isProfileComplete,
@@ -12,6 +13,8 @@ import {
   updateCartItemQuantity,
   type CartLineItem,
   type GuestCartItem,
+  type RuleEvaluation,
+  type SelectionInput,
 } from "services";
 
 export type AddToCartResult = {
@@ -81,6 +84,29 @@ export const removeItem = async (cartItemUuid: string) => {
   if (!user) throw new Error("Not authenticated");
 
   await removeCartItem({ userUuid: user.uuid, cartItemUuid });
+};
+
+// Runs the compatibility rule engine over the cart. Advisory only — it never
+// blocks a purchase. Results are filtered to violations where the cart holds
+// BOTH sides of the rule: a customer buying only cameras (no switch) is left
+// alone, since the provider may already exist on their site.
+export const checkCartCompatibility = async (
+  selection: SelectionInput[],
+): Promise<RuleEvaluation[]> => {
+  if (selection.length < 2) {
+    return [];
+  }
+  try {
+    const report = await checkCompatibility(selection);
+    return report.results.filter(
+      (result) =>
+        (result.status === "fail" || result.status === "warn") &&
+        result.providers.length > 0,
+    );
+  } catch {
+    // The check is a courtesy — a failure here must never break the cart.
+    return [];
+  }
 };
 
 // Checkout turns one solution in the cart into a draft BOQ. The category comes

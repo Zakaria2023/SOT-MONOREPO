@@ -70,6 +70,10 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
     resolver: zodResolver(specificationFormSchema),
     defaultValues: {
       label: specification?.label ?? "",
+      groupUuid: specification?.groupUuid ?? "",
+      newGroupName: "",
+      valueType: specification?.valueType ?? "select",
+      unit: specification?.unit ?? "",
       options: toFormOptions(specification?.options ?? []),
       // Rules saved before forcedKey existed targeted the spec itself.
       rules: (specification?.rules ?? []).map((rule) => ({
@@ -85,6 +89,10 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
       dispatch({
         label: values.label,
         key: slugify(values.label),
+        groupUuid: values.groupUuid,
+        newGroupName: values.newGroupName,
+        valueType: values.valueType,
+        unit: values.unit,
         options: toSpecOptions(values.options),
         rules: values.rules,
         categoryUuids: values.categoryUuids,

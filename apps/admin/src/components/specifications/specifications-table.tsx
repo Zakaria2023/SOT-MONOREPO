@@ -18,14 +18,32 @@ const columns: TableColumn<SpecificationWithCategories>[] = [
     ),
   },
   {
+    key: "group",
+    header: "Group",
+    render: (specification) =>
+      specification.groupName ? (
+        <span className="rounded-full bg-hover px-2 py-0.5 text-xs font-medium text-secondary">
+          {specification.groupName}
+        </span>
+      ) : (
+        <span className="text-faint">—</span>
+      ),
+  },
+  {
     key: "options",
-    header: "Options",
-    render: (specification) => (
-      <span className="text-muted">
-        {(specification.options ?? []).map((option) => option.value).join(", ") ||
-          "—"}
-      </span>
-    ),
+    header: "Values",
+    render: (specification) =>
+      specification.valueType === "number" ? (
+        <span className="text-muted">
+          Number{specification.unit ? ` (${specification.unit})` : ""}
+        </span>
+      ) : (
+        <span className="text-muted">
+          {(specification.options ?? [])
+            .map((option) => option.value)
+            .join(", ") || "—"}
+        </span>
+      ),
   },
   {
     key: "categories",

@@ -1,3 +1,93 @@
+// The fixed list of measurement units numeric specifications pick from
+// (searchable dropdown in the spec form). Physical units are a stable
+// universe, so they live in code, not in an admin-managed table — adding an
+// exotic new unit is a one-line change here.
+export const measurementUnits = [
+  // Power & electrical
+  "W",
+  "kW",
+  "VA",
+  "V",
+  "A",
+  "mA",
+  "Ah",
+  "mAh",
+  // Counts
+  "ports",
+  "channels",
+  "devices",
+  "users",
+  "licenses",
+  // Distance & physical
+  "m",
+  "cm",
+  "mm",
+  "km",
+  "kg",
+  "g",
+  // Data & network
+  "GB",
+  "TB",
+  "MB",
+  "Mbps",
+  "Gbps",
+  "MHz",
+  "GHz",
+  // Imaging & misc
+  "MP",
+  "fps",
+  "lm",
+  "dB",
+  "dBm",
+  "°C",
+  "%",
+  "min",
+  "h",
+] as const satisfies readonly string[];
+
+export type MeasurementUnit = (typeof measurementUnits)[number];
+
+// How a specification's value is entered on a product: picked from dropdown
+// options, or typed as a number (with a unit). Numeric specs are what the
+// compatibility rule engine aggregates and compares.
+export const specValueTypes = [
+  "select",
+  "number",
+] as const satisfies readonly string[];
+
+export type SpecValueType = (typeof specValueTypes)[number];
+
+// Compatibility rule families. Rules bind to specifications, never to
+// products: any product carrying the consumer spec participates, any product
+// carrying the provider spec supplies capacity.
+// - sum_budget: SUM(consumer value x qty) vs pooled provider capacity
+//   (e.g. total PoE draw vs switch PoE budget).
+// - count_limit: SUM(qty) of consumer items vs pooled provider capacity
+//   (e.g. device count vs switch port count).
+// - per_item_threshold: each consumer item's own value vs the best provider
+//   value (e.g. one camera's draw vs the switch per-port maximum).
+export const ruleKinds = [
+  "sum_budget",
+  "count_limit",
+  "per_item_threshold",
+] as const satisfies readonly string[];
+
+export type RuleKind = (typeof ruleKinds)[number];
+
+export const ruleComparators = [
+  "lte",
+  "gte",
+] as const satisfies readonly string[];
+
+export type RuleComparator = (typeof ruleComparators)[number];
+
+export const ruleSeverities = [
+  "block",
+  "warn",
+] as const satisfies readonly string[];
+
+export type RuleSeverity = (typeof ruleSeverities)[number];
+
 export const productStatuses = [
   "in_stock",
   "out_of_stock",
