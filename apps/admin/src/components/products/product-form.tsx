@@ -5,11 +5,13 @@ import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
+import { VendorDropdown } from "@/components/vendors/vendor-dropdown";
 import { productStatuses } from "@/db/enum";
 import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
+import type { SelectVendors } from "@/db/schema/vendors";
 import { documentDownloadUrl } from "@/lib/documents";
 import type { SpecificationWithCategories } from "services";
 import {
@@ -42,12 +44,14 @@ type ProductFormProps =
       mode: "add";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      vendors: SelectVendors[];
       specifications: SpecificationWithCategories[];
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      vendors: SelectVendors[];
       specifications: SpecificationWithCategories[];
       product: SelectProducts;
     };
@@ -63,7 +67,7 @@ const availabilityOptions = [
 ];
 
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands, specifications } = props;
+  const { mode, categories, brands, vendors, specifications } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -153,6 +157,13 @@ export const ProductForm = (props: ProductFormProps) => {
             name="brandUuid"
             brands={brands}
             error={errors.brandUuid?.message}
+          />
+          <VendorDropdown
+            control={control}
+            name="vendorUuid"
+            vendors={vendors}
+            placeholder="No vendor"
+            allowEmpty
           />
 
           <div className="flex flex-col gap-2">

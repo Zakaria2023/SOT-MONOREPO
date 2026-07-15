@@ -150,7 +150,7 @@ export const Dropdown = (props: DropdownProps) => {
               left: position.left,
               width: position.width,
             }}
-            className="z-50 max-h-72 overflow-y-auto rounded-control border border-hairline bg-surface shadow-lg"
+            className="z-50 max-h-72 overflow-y-auto rounded-control border border-hairline bg-overlay shadow-lg"
           >
             {options.map((option) => {
               const selected = isSelected(option.value);

@@ -21,6 +21,10 @@
 
   --color-page: #f6f8fb;
   --color-surface: #ffffff;
+  /* Always-opaque panel for portaled popovers/menus (Dropdown, Combobox) —
+     distinct from --color-surface, which is translucent in client's dark
+     theme and would let page content show through a floating menu. */
+  --color-overlay: #ffffff;
   --color-hairline: #e7ebf1;
   --color-hairline-soft: #eef1f6;
   --color-hover: #f4f7fb;

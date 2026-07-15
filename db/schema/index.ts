@@ -12,3 +12,4 @@ export * from "./specification-categories";
 export * from "./specification-groups";
 export * from "./specifications";
 export * from "./users";
+export * from "./vendors";

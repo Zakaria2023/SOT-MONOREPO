@@ -42,7 +42,7 @@ export const ProfileMenu = ({ fullName }: ProfileMenuProps) => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-[14px] border border-hairline bg-surface shadow-[0_24px_48px_-24px_rgba(20,22,27,0.25)]">
+        <div className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-[14px] border border-hairline bg-overlay shadow-[0_24px_48px_-24px_rgba(20,22,27,0.25)]">
           <div className="border-b border-hairline px-4 py-3">
             <p className="font-grotesk text-sm font-semibold text-ink">
               {fullName}

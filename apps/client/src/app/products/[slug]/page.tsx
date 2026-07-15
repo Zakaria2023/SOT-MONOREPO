@@ -71,7 +71,7 @@ const ProductPage = async ({ params }: Props) => {
   const specFields = collectSpecFields(specTemplate);
 
   return (
-    <main className="min-h-screen bg-surface pb-16">
+    <main className="min-h-screen bg-page pb-16">
       <ProductHero product={product} attributes={attributes} />
       <ProductDetails product={product} />
       <ProductSpecs attributes={attributes} />

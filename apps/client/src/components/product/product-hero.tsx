@@ -48,7 +48,11 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
 
       <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
-          <div className="relative flex h-105 items-center justify-center overflow-hidden rounded-card border border-hairline bg-linear-to-br from-primary-tint to-[#efe9fb]">
+          <div className="relative flex h-105 items-center justify-center overflow-hidden rounded-card border border-hairline bg-surface-2">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(139,123,255,0.28),transparent_60%),radial-gradient(circle_at_75%_75%,rgba(34,211,238,0.22),transparent_55%)]"
+            />
             {product.image ? (
               <Image
                 src={documentDownloadUrl(product.image)}
@@ -140,7 +144,7 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
             </Link>
           )}
 
-          <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-page/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-surface-2 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-heading text-3xl text-ink">
                 {formatPrice(product.price, product.currency)}

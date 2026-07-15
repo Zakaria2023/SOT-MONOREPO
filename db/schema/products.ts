@@ -15,6 +15,7 @@ import {
 import { lifecycleStatuses, productStatuses } from "../enum";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
+import { Vendors } from "./vendors";
 
 export const Products = mysqlTable(
   "Products",
@@ -29,6 +30,12 @@ export const Products = mysqlTable(
     brandUuid: char("brand_uuid", { length: 36 })
       .notNull()
       .references(() => Brands.uuid, { onDelete: "restrict" }),
+    // Optional — not every product is tied to a single vendor entry (e.g.
+    // generic/unbranded catalog items).
+    vendorUuid: char("vendor_uuid", { length: 36 }).references(
+      () => Vendors.uuid,
+      { onDelete: "set null" },
+    ),
 
     // Identity
     name: varchar("name", { length: 255 }).notNull(),
@@ -112,6 +119,7 @@ export const Products = mysqlTable(
   (table) => [
     index("idx_products_category_uuid").on(table.categoryUuid),
     index("idx_products_brand_uuid").on(table.brandUuid),
+    index("idx_products_vendor_uuid").on(table.vendorUuid),
     index("idx_products_status").on(table.status),
   ],
 );
