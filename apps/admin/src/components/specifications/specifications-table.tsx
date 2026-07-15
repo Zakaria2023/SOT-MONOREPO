@@ -36,6 +36,10 @@ const columns: TableColumn<SpecificationWithCategories>[] = [
       specification.valueType === "number" ? (
         <span className="text-muted">
           Number{specification.unit ? ` (${specification.unit})` : ""}
+          {(specification.options ?? []).length > 0 &&
+            `: ${(specification.options ?? [])
+              .map((option) => option.value)
+              .join(", ")}`}
         </span>
       ) : (
         <span className="text-muted">

@@ -46,6 +46,17 @@ export const specificationFormSchema = z
     valueType: z.enum(["select", "number"]),
     unit: z.string().max(32),
     options: z.array(specOptionSchema),
+    // Optional fixed choices for a numeric spec (e.g. 24 / 32 / 52 ports).
+    // Products then pick from a dropdown instead of typing a free number.
+    numericValues: z.array(
+      z
+        .string()
+        .refine(
+          (value) =>
+            value.trim() !== "" && Number.isFinite(Number(value.trim())),
+          "Must be a number",
+        ),
+    ),
     rules: z.array(ruleSchema),
     categoryUuids: z.array(z.string()).min(1, "Pick at least one category"),
   })

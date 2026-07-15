@@ -74,7 +74,16 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
       newGroupName: "",
       valueType: specification?.valueType ?? "select",
       unit: specification?.unit ?? "",
-      options: toFormOptions(specification?.options ?? []),
+      options:
+        specification?.valueType === "number"
+          ? []
+          : toFormOptions(specification?.options ?? []),
+      // A numeric spec stores its allowed choices in the same options column
+      // (flat, no children) — split them back out for the form.
+      numericValues:
+        specification?.valueType === "number"
+          ? (specification.options ?? []).map((option) => option.value)
+          : [],
       // Rules saved before forcedKey existed targeted the spec itself.
       rules: (specification?.rules ?? []).map((rule) => ({
         ...rule,
@@ -93,7 +102,13 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
         newGroupName: values.newGroupName,
         valueType: values.valueType,
         unit: values.unit,
-        options: toSpecOptions(values.options),
+        options:
+          values.valueType === "number"
+            ? values.numericValues.map((value) => ({
+                value: value.trim(),
+                children: [],
+              }))
+            : toSpecOptions(values.options),
         rules: values.rules,
         categoryUuids: values.categoryUuids,
       });

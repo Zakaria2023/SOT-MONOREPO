@@ -256,23 +256,42 @@ export const TechnicalSpecsEditor = ({
                     <Lock size={14} />
                   </div>
                 ) : field.valueType === "number" ? (
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="any"
+                  field.options.length > 0 ? (
+                    // Fixed numeric choices — picked, not typed, so no typos
+                    // can reach the rule engine.
+                    <Dropdown
                       value={values[field.key] ?? ""}
-                      onChange={(event) =>
-                        handleChange(field, event.target.value)
-                      }
-                      placeholder="0"
-                      className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 pr-14 text-sm text-ink outline-none focus:border-primary"
+                      onChange={(value) => handleChange(field, value)}
+                      placeholder="Select"
+                      options={[
+                        { value: "", label: "—" },
+                        ...field.options.map((option) => ({
+                          value: option.value,
+                          label: field.unit
+                            ? `${option.value} ${field.unit}`
+                            : option.value,
+                        })),
+                      ]}
                     />
-                    {field.unit && (
-                      <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs font-medium text-faint">
-                        {field.unit}
-                      </span>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        value={values[field.key] ?? ""}
+                        onChange={(event) =>
+                          handleChange(field, event.target.value)
+                        }
+                        placeholder="0"
+                        className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 pr-14 text-sm text-ink outline-none focus:border-primary"
+                      />
+                      {field.unit && (
+                        <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs font-medium text-faint">
+                          {field.unit}
+                        </span>
+                      )}
+                    </div>
+                  )
                 ) : (
                   <Dropdown
                     value={values[field.key] ?? ""}

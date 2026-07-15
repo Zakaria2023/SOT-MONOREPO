@@ -31,7 +31,7 @@ Because of that:
 
 | Table | Purpose |
 | --- | --- |
-| `Specifications` | One row per spec. `valueType` is `select` (dropdown options) or `number` (typed value + `unit`). Numeric specs are what rules compute over. |
+| `Specifications` | One row per spec. `valueType` is `select` (dropdown options) or `number` (value + `unit`). Numeric specs are what rules compute over. A numeric spec may optionally carry **allowed values** (fixed choices like 24 / 32 / 52, stored flat in the same `options` column) — the product form then shows a dropdown instead of a free number input, so no typo can reach the engine. |
 | `SpecificationGroups` | Folders for the spec library (Power, Connectivity, ...). Organizational only — no behavior. Created inline from the spec form. |
 | `SpecificationCategories` | Which categories (and their descendants) show a spec on the product form. |
 | `CompatibilityRules` | One row per rule — the whole rule engine's content. |
