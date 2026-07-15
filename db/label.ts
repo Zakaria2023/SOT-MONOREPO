@@ -12,6 +12,7 @@ import {
   RuleSeverity,
   SpecValueType,
   UserType,
+  VendorStatus,
 } from "./enum";
 
 export const SPEC_VALUE_TYPE_LABELS: Record<SpecValueType, string> = {
@@ -92,6 +93,11 @@ export const GOVERNMENT_REQUEST_STATUS_LABELS: Record<
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected",
+};
+
+export const VENDOR_STATUS_LABELS: Record<VendorStatus, string> = {
+  active: "Active",
+  inactive: "Inactive",
 };
 
 export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {

@@ -173,6 +173,15 @@ export type CartItemKind = (typeof cartItemKinds)[number];
 // Which business line a product sells under. Phase 1 runs the first two
 // (fixed price, buy now); "projects" and "enterprise" are dormant (pre-order,
 // vendor approval) — structure built now, activated later.
+// Vendor rollout staging — Active vendors appear throughout the catalog;
+// Inactive ones are kept for historical/alias data but hidden from pickers.
+export const vendorStatuses = [
+  "active",
+  "inactive",
+] as const satisfies readonly string[];
+
+export type VendorStatus = (typeof vendorStatuses)[number];
+
 export const businessLines = [
   "consumer",
   "smb_sme_channels",
