@@ -1,18 +1,18 @@
 "use client";
 
 import { useRuleForm } from "@/app/(dashboard)/rules/use-rule-form";
-import { RULE_KIND_LABELS } from "@/db/label";
-import { ruleKinds } from "@/db/enum";
 import type { RuleKind } from "@/db/enum";
+import { ruleKinds } from "@/db/enum";
+import { RULE_KIND_LABELS } from "@/db/label";
 import { GitCompare } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Controller, useWatch } from "react-hook-form";
-import { Button, Checkbox, Dropdown, FormError, Input, Textarea } from "ui";
 import type {
   CompatibilityRuleListItem,
   SpecificationWithCategories,
 } from "services";
+import { Button, Checkbox, Dropdown, FormError, Input, Textarea } from "ui";
 
 type RuleFormProps =
   | {
@@ -60,14 +60,39 @@ export const RuleForm = (props: RuleFormProps) => {
     [specifications],
   );
 
-  // Conditions filter on chosen dropdown values.
-  const selectSpecs = useMemo(
-    () =>
-      specifications.filter(
-        (specification) => specification.valueType === "select",
-      ),
-    [specifications],
-  );
+  // Conditions filter on chosen dropdown values. The engine reads conditions
+  // by spec KEY, so several specs sharing one key (e.g. two "POE" specs on
+  // different categories) are one logical field — merge them into a single
+  // option, combining their categories and option values.
+  const selectSpecs = useMemo(() => {
+    const byKey = new Map<
+      string,
+      (typeof specifications)[number] & { categoryNames: string[] }
+    >();
+    for (const specification of specifications) {
+      if (specification.valueType !== "select") {
+        continue;
+      }
+      const existing = byKey.get(specification.key);
+      if (!existing) {
+        byKey.set(specification.key, { ...specification });
+        continue;
+      }
+      existing.categoryNames = [
+        ...new Set([...existing.categoryNames, ...specification.categoryNames]),
+      ];
+      const knownValues = new Set(
+        (existing.options ?? []).map((option) => option.value),
+      );
+      existing.options = [
+        ...(existing.options ?? []),
+        ...(specification.options ?? []).filter(
+          (option) => !knownValues.has(option.value),
+        ),
+      ];
+    }
+    return [...byKey.values()];
+  }, [specifications]);
 
   const conditionSpec = selectSpecs.find(
     (specification) => specification.key === conditionSpecKey,
@@ -115,7 +140,7 @@ export const RuleForm = (props: RuleFormProps) => {
         </h2>
       </div>
 
-      <p className="rounded-control bg-primary-tint p-4 text-xs text-secondary">
+      {/* <p className="rounded-control bg-primary-tint p-4 text-xs text-secondary">
         Rules are global: they bind specifications, never categories. The two
         specifications may come from completely different category trees — e.g.
         Power Consumption lives on IP Cameras (Security tree) while PoE Budget
@@ -129,7 +154,7 @@ export const RuleForm = (props: RuleFormProps) => {
           one). Create numeric specifications first — e.g. &quot;Power
           Consumption (W)&quot; and &quot;PoE Budget (W)&quot;.
         </p>
-      )}
+      )} */}
 
       <Input
         label="Name"
@@ -248,8 +273,8 @@ export const RuleForm = (props: RuleFormProps) => {
             Condition (optional)
           </label>
           <p className="mt-1 text-xs text-muted">
-            Only count items whose chosen value matches — e.g. only devices
-            with PoE = Yes draw from the PoE budget.
+            Only count items whose chosen value matches — e.g. only devices with
+            PoE = Yes draw from the PoE budget.
           </p>
         </div>
 
