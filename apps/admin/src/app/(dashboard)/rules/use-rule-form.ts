@@ -33,6 +33,7 @@ export const useRuleForm = (args: UseRuleFormArgs) => {
       consumerSpecUuid: rule?.consumerSpecUuid ?? "",
       providerSpecUuid: rule?.providerSpecUuid ?? "",
       comparator: rule?.comparator ?? "lte",
+      allocation: rule?.allocation ?? "pooled",
       headroomPercent: rule?.headroomPercent ?? 100,
       conditionSpecKey: rule?.condition?.specKey ?? "",
       conditionValue: rule?.condition?.values[0] ?? "",

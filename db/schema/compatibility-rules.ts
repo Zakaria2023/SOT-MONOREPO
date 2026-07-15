@@ -12,7 +12,12 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { ruleComparators, ruleKinds, ruleSeverities } from "../enum";
+import {
+  ruleAllocations,
+  ruleComparators,
+  ruleKinds,
+  ruleSeverities,
+} from "../enum";
 import { RuleCondition } from "../types";
 import { Specifications } from "./specifications";
 
@@ -45,6 +50,12 @@ export const CompatibilityRules = mysqlTable(
     // Usable share of the provider capacity, in percent — real designs never
     // load to 100% (e.g. 90 = demand must fit within 90% of the budget).
     headroomPercent: int("headroom_percent").default(100).notNull(),
+
+    // pooled: providers act as one pool; per_provider: consumers are
+    // distributed across provider units and each unit must fit its share.
+    allocation: mysqlEnum("allocation", ruleAllocations)
+      .default("pooled")
+      .notNull(),
 
     // Optional consumer-side filter (e.g. only items with PoE = "Yes").
     condition: json("condition").$type<RuleCondition | null>(),

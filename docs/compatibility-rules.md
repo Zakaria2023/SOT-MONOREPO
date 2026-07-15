@@ -49,8 +49,9 @@ an exotic unit is a one-line code change.
 | `kind` | Rule family (see below) | `sum_budget` |
 | `consumerSpecUuid` | The measured spec on consuming items | Power Consumption (W) |
 | `providerSpecUuid` | The capacity spec | PoE Power Budget (W) |
-| `comparator` | `lte` (must fit within) or `gte` (must be at least) | `lte` |
+| `comparator` | `lte` (must fit within), `gte` (must be at least), or `eq` (must equal) | `lte` |
 | `headroomPercent` | Usable share of capacity — real designs never load 100% | `90` |
+| `allocation` | `pooled` (all provider units act as one capacity pool) or `per_provider` (consumers are distributed across the individual units — first-fit-decreasing — and every unit must fit its share; results include per-unit bins). Per-provider requires `lte` and a sum/count kind. | `pooled` |
 | `condition` | Optional consumer filter `{ specKey, values }` | only items with `poe-powered = Yes` |
 | `severity` | `block` or `warn` on violation | `block` |
 | `enabled` | Rule on/off | `true` |

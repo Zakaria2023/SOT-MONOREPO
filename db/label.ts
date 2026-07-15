@@ -7,6 +7,7 @@ import {
   PartnerRequestStatus,
   PartnerType,
   ProductStatus,
+  RuleAllocation,
   RuleComparator,
   RuleKind,
   RuleSeverity,
@@ -35,6 +36,11 @@ export const RULE_COMPARATOR_LABELS: Record<RuleComparator, string> = {
 export const RULE_SEVERITY_LABELS: Record<RuleSeverity, string> = {
   block: "Block",
   warn: "Warn",
+};
+
+export const RULE_ALLOCATION_LABELS: Record<RuleAllocation, string> = {
+  pooled: "Shared pool",
+  per_provider: "Per device",
 };
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {

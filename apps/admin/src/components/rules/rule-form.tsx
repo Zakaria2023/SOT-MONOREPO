@@ -47,9 +47,15 @@ export const RuleForm = (props: RuleFormProps) => {
   } = form;
 
   const kind = useWatch({ control, name: "kind" });
+  const comparator = useWatch({ control, name: "comparator" });
   const conditionSpecKey = useWatch({ control, name: "conditionSpecKey" });
   const consumerSpecUuid = useWatch({ control, name: "consumerSpecUuid" });
   const providerSpecUuid = useWatch({ control, name: "providerSpecUuid" });
+
+  // Per-device distribution only applies to aggregating rules with "fit
+  // within" — anything else silently means pooled.
+  const allocationApplies =
+    kind !== "per_item_threshold" && comparator === "lte";
 
   // Rules aggregate numbers — only numeric specs can be bound.
   const numericSpecs = useMemo(
@@ -199,6 +205,42 @@ export const RuleForm = (props: RuleFormProps) => {
           error={errors.headroomPercent?.message}
         />
       </div>
+
+      {allocationApplies && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-ink">
+              Capacity sharing
+            </label>
+            <Controller
+              control={control}
+              name="allocation"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={[
+                    {
+                      value: "pooled",
+                      label: "Shared pool — all providers together",
+                    },
+                    {
+                      value: "per_provider",
+                      label: "Per device — each provider unit checked alone",
+                    },
+                  ]}
+                />
+              )}
+            />
+            <p className="text-xs text-muted">
+              Shared pool adds all capacities into one total. Per device
+              distributes the items across the individual units (two 300 W
+              switches are two separate 300 W bins, not one 600 W pool) and
+              every unit must fit its share.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="flex flex-col gap-2">

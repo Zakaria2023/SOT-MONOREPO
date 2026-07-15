@@ -82,6 +82,18 @@ export const ruleComparators = [
 
 export type RuleComparator = (typeof ruleComparators)[number];
 
+// How provider capacity is applied in sum/count rules:
+// - pooled: all provider units act as one big pool (SUM of capacities).
+// - per_provider: each provider unit is its own bin — consumers are
+//   distributed across units and every unit must fit its share (e.g. each
+//   switch's own PoE budget, not the fleet total).
+export const ruleAllocations = [
+  "pooled",
+  "per_provider",
+] as const satisfies readonly string[];
+
+export type RuleAllocation = (typeof ruleAllocations)[number];
+
 export const ruleSeverities = [
   "block",
   "warn",

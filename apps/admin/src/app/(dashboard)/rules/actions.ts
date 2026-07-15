@@ -1,6 +1,11 @@
 "use server";
 
-import type { RuleComparator, RuleKind, RuleSeverity } from "@/db/enum";
+import type {
+  RuleAllocation,
+  RuleComparator,
+  RuleKind,
+  RuleSeverity,
+} from "@/db/enum";
 import {
   checkCompatibility,
   createCompatibilityRule,
@@ -18,6 +23,7 @@ export type RuleActionInput = {
   consumerSpecUuid: string;
   providerSpecUuid: string;
   comparator: RuleComparator;
+  allocation: RuleAllocation;
   headroomPercent: number;
   conditionSpecKey: string;
   conditionValue: string;
@@ -43,6 +49,7 @@ const toFields = (input: RuleActionInput) => ({
   consumerSpecUuid: input.consumerSpecUuid,
   providerSpecUuid: input.providerSpecUuid,
   comparator: input.comparator,
+  allocation: input.allocation,
   headroomPercent: input.headroomPercent,
   condition:
     input.conditionSpecKey && input.conditionValue
