@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray, isNotNull, or } from "drizzle-orm";
 import { db } from "../../../db";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
 import { Products } from "../../../db/schema/products";
@@ -43,13 +43,24 @@ export const checkCompatibility = async (
         unit: Specifications.unit,
       })
       .from(Specifications),
+    // Only products with attributes can satisfy a rule or be suggested; the
+    // selected products are always included so the report covers all of them.
     db
       .select({
         uuid: Products.uuid,
         name: Products.name,
         technicalAttributes: Products.technicalAttributes,
       })
-      .from(Products),
+      .from(Products)
+      .where(
+        or(
+          isNotNull(Products.technicalAttributes),
+          inArray(
+            Products.uuid,
+            items.map((item) => item.productUuid),
+          ),
+        ),
+      ),
   ]);
 
   const specByUuid = new Map(specRows.map((spec) => [spec.uuid, spec]));

@@ -26,8 +26,9 @@ export const getBrands = async (): Promise<BrandListItem[]> => {
       .leftJoin(Products, eq(Products.brandUuid, Brands.uuid))
       .groupBy(Brands.id)
       .orderBy(asc(Brands.order));
-  } catch {
-    throw new Error("Failed to fetch brands");
+  } catch (error) {
+    console.error("getBrands failed:", error);
+    throw new Error("Failed to fetch brands", { cause: error });
   }
 };
 
@@ -38,7 +39,8 @@ export const getBrand = async (
     const [brand] = await db.select().from(Brands).where(eq(Brands.uuid, uuid));
 
     return brand ?? null;
-  } catch {
-    throw new Error("Failed to fetch brand");
+  } catch (error) {
+    console.error("getBrand failed:", error);
+    throw new Error("Failed to fetch brand", { cause: error });
   }
 };

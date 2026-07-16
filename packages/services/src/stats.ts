@@ -103,7 +103,8 @@ export const getAdminDashboardStats =
         partnerRequests: toSectionStats(partnerRequests),
         governmentRequests: toSectionStats(governmentRequests),
       };
-    } catch {
-      throw new Error("Failed to fetch dashboard statistics");
+    } catch (error) {
+      console.error("getAdminDashboardStats failed:", error);
+      throw new Error("Failed to fetch dashboard statistics", { cause: error });
     }
   };

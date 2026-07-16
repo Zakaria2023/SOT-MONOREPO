@@ -64,14 +64,16 @@ export const generateProductSku = async (input: {
   seriesCode?: string | null;
   productUuid?: string;
 }): Promise<string | null> => {
-  const [brand] = await db
-    .select({ code: Brands.code })
-    .from(Brands)
-    .where(eq(Brands.uuid, input.brandUuid));
-  const [category] = await db
-    .select({ code: Categories.code })
-    .from(Categories)
-    .where(eq(Categories.uuid, input.categoryUuid));
+  const [[brand], [category]] = await Promise.all([
+    db
+      .select({ code: Brands.code })
+      .from(Brands)
+      .where(eq(Brands.uuid, input.brandUuid)),
+    db
+      .select({ code: Categories.code })
+      .from(Categories)
+      .where(eq(Categories.uuid, input.categoryUuid)),
+  ]);
 
   const brandCode = (brand?.code ?? "").toUpperCase();
   const categoryCode = (category?.code ?? "").toUpperCase();
@@ -146,8 +148,9 @@ export const getProducts = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(...productOrder(filters.sort));
-  } catch {
-    throw new Error("Failed to fetch products");
+  } catch (error) {
+    console.error("getProducts failed:", error);
+    throw new Error("Failed to fetch products", { cause: error });
   }
 };
 
@@ -166,8 +169,9 @@ export const getProductsByCategory = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(eq(Products.categoryUuid, categoryUuid))
       .orderBy(asc(Products.order));
-  } catch {
-    throw new Error("Failed to fetch products for category");
+  } catch (error) {
+    console.error("getProductsByCategory failed:", error);
+    throw new Error("Failed to fetch products for category", { cause: error });
   }
 };
 
@@ -186,8 +190,9 @@ export const getProductsByBrand = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(eq(Products.brandUuid, brandUuid))
       .orderBy(asc(Products.order));
-  } catch {
-    throw new Error("Failed to fetch products for brand");
+  } catch (error) {
+    console.error("getProductsByBrand failed:", error);
+    throw new Error("Failed to fetch products for brand", { cause: error });
   }
 };
 
@@ -201,8 +206,9 @@ export const getProduct = async (
       .where(eq(Products.uuid, uuid));
 
     return product ?? null;
-  } catch {
-    throw new Error("Failed to fetch product");
+  } catch (error) {
+    console.error("getProduct failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
   }
 };
 
@@ -231,8 +237,9 @@ export const getProductDetailBySlug = async (
       .where(eq(Categories.uuid, product.categoryUuid));
 
     return { ...product, category: category ?? null };
-  } catch {
-    throw new Error("Failed to fetch product");
+  } catch (error) {
+    console.error("getProductDetailBySlug failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
   }
 };
 
@@ -260,8 +267,9 @@ export const getComparableProducts = async (
       )
       .orderBy(asc(Products.order))
       .limit(limit);
-  } catch {
-    throw new Error("Failed to fetch comparable products");
+  } catch (error) {
+    console.error("getComparableProducts failed:", error);
+    throw new Error("Failed to fetch comparable products", { cause: error });
   }
 };
 
@@ -312,7 +320,8 @@ export const getRelatedProducts = async (
       )
       .orderBy(asc(Products.order))
       .limit(limit);
-  } catch {
-    throw new Error("Failed to fetch related products");
+  } catch (error) {
+    console.error("getRelatedProducts failed:", error);
+    throw new Error("Failed to fetch related products", { cause: error });
   }
 };
