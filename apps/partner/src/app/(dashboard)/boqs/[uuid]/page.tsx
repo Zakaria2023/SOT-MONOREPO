@@ -1,3 +1,4 @@
+import { InstallProgress } from "@/components/boqs/install-progress";
 import { OfferForm } from "@/components/offers/offer-form";
 import { formatMoney, lineTotal, offerTotal, summarizeCart } from "utils";
 import { requirePartner } from "@/lib/server/auth";
@@ -72,6 +73,17 @@ const BoqDetailPage = async ({ params }: Props) => {
           {items.length} {items.length === 1 ? "item" : "items"}
         </p>
       </div>
+
+      {[
+        "ordered",
+        "assigned",
+        "installing",
+        "installed",
+        "verified",
+        "handed_over",
+      ].includes(boq.status ?? "") && (
+        <InstallProgress boqUuid={boq.uuid} status={boq.status ?? "draft"} />
+      )}
 
       <div className="overflow-hidden rounded-card border border-hairline bg-surface shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
         {items.map((item, index) => (

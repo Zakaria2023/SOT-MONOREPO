@@ -1,5 +1,6 @@
 import { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
+  boolean,
   char,
   index,
   int,
@@ -59,6 +60,11 @@ export const PartnerRequests = mysqlTable(
     // reseller; an admin can promote them. Drives both their buy-in price and
     // the margin pool (one number, see BADGE_DISCOUNTS).
     badge: mysqlEnum("badge", partnerBadges).default("reseller").notNull(),
+
+    // Integrated partners (accounting system bound to SOT) are auto-invoiced
+    // and paid the instant handover completes; non-integrated partners submit a
+    // manual invoice and wait. Integration is the faster-paid path.
+    isIntegrated: boolean("is_integrated").default(false).notNull(),
 
     status: mysqlEnum("status", partnerRequestStatuses)
       .default("pending")

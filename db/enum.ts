@@ -249,6 +249,63 @@ export const partnerBadges = [
 
 export type PartnerBadge = (typeof partnerBadges)[number];
 
+// The QA lifecycle of a handover pack (Service & Handover, stages 6–7). The
+// partner assembles it (draft), submits it, the customer tests their own
+// access and confirms, SOT does a remote completeness check (verified). A
+// failed check or a customer complaint puts it in dispute.
+export const handoverStatuses = [
+  "draft",
+  "submitted",
+  "customer_confirmed",
+  "verified",
+  "disputed",
+] as const satisfies readonly string[];
+
+export type HandoverStatus = (typeof handoverStatuses)[number];
+
+// What kind of control a handover credential transfers. offline_access = the
+// user/password that reaches the system with no internet; cloud_admin = full
+// owner rights on the vendor cloud project; device_access = a single device's
+// static/configured login.
+export const handoverCredentialTypes = [
+  "offline_access",
+  "cloud_admin",
+  "device_access",
+] as const satisfies readonly string[];
+
+export type HandoverCredentialType = (typeof handoverCredentialTypes)[number];
+
+// A partner earning is a PAYABLE (money SOT owes the partner for verified
+// service), NOT a stored wallet balance — the distinction is legally
+// meaningful (SAMA). accrued = owed after verified handover; invoiced = the
+// partner has raised their ZATCA invoice to cash out; paid = transferred.
+export const partnerEarningStatuses = [
+  "accrued",
+  "invoiced",
+  "paid",
+] as const satisfies readonly string[];
+
+export type PartnerEarningStatus = (typeof partnerEarningStatuses)[number];
+
+export const partnerPayoutStatuses = [
+  "requested",
+  "paid",
+] as const satisfies readonly string[];
+
+export type PartnerPayoutStatus = (typeof partnerPayoutStatuses)[number];
+
+// How an offer's price is SHOWN — the flexibility is presentation only, the
+// money always flows through SOT. all_in = one total; itemized = products +
+// service broken out (same transaction as all_in); products_only = genuine
+// hardware-only sale, no SOT service and NO handover guarantee.
+export const offerPresentationModes = [
+  "all_in",
+  "itemized",
+  "products_only",
+] as const satisfies readonly string[];
+
+export type OfferPresentationMode = (typeof offerPresentationModes)[number];
+
 export const cartItemKinds = [
   "solution",
   "product",

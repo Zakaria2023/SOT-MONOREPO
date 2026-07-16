@@ -31,6 +31,7 @@ export type CreateOfferInput = {
   installPrice: SelectOffers["installPrice"];
   programmingPrice?: NonNullable<SelectOffers["programmingPrice"]>;
   description: SelectOffers["description"];
+  presentationMode?: SelectOffers["presentationMode"];
 };
 
 export type OfferReviewInput = {
@@ -152,6 +153,7 @@ export const createOrUpdateOffer = async (
     installPrice: input.installPrice,
     programmingPrice: programmingPrice ?? null,
     description: input.description.trim(),
+    presentationMode: input.presentationMode ?? "itemized",
   };
 
   if (existing) {

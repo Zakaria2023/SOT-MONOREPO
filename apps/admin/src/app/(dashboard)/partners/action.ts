@@ -6,11 +6,13 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import type { PartnerBadge } from "@/db/enum";
 import {
   approvePartnerRequest as approvePartnerRequestRecord,
   getPartnerRequestByUuid,
   listPartnerRequests,
   rejectPartnerRequest as rejectPartnerRequestRecord,
+  setPartnerCommercialProfile,
 } from "services";
 import {
   partnerRejectionSchema,
@@ -101,6 +103,32 @@ export const approvePartnerRequestAction = async (
         error instanceof Error
           ? error.message
           : "Failed to approve partner request.",
+    };
+  }
+
+  revalidatePath("/partners");
+  return { success: true };
+};
+
+export const setPartnerCommercialAction = async (
+  partnerRequestUuid: string,
+  badge: PartnerBadge,
+  isIntegrated: boolean,
+): Promise<PartnerReviewResult> => {
+  await requireAdmin();
+
+  try {
+    await setPartnerCommercialProfile({
+      partnerRequestUuid,
+      badge,
+      isIntegrated,
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update partner profile.",
     };
   }
 

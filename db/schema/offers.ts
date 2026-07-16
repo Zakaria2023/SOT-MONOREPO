@@ -11,7 +11,7 @@ import {
   unique,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { offerStatuses } from "../enum";
+import { offerPresentationModes, offerStatuses } from "../enum";
 import { Boqs } from "./boqs";
 import { PartnerRequests } from "./partner-requests";
 
@@ -47,6 +47,13 @@ export const Offers = mysqlTable(
     currency: char("currency", { length: 3 }).default("SAR"),
 
     description: text("description").notNull(),
+
+    // How the price is shown to the customer. Presentation only — the money
+    // still flows through SOT — except products_only, which is a genuine
+    // hardware-only sale with no SOT service and no handover.
+    presentationMode: mysqlEnum("presentation_mode", offerPresentationModes)
+      .default("itemized")
+      .notNull(),
 
     status: mysqlEnum("status", offerStatuses).default("pending").notNull(),
     rejectionReason: text("rejection_reason"),

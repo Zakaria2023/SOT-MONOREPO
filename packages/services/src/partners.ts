@@ -337,3 +337,28 @@ export const getApprovedPartnerOptions = async (
     others: otherEntries.map((entry) => toMatched(entry, 0)),
   };
 };
+
+// Set a partner's commercial profile — their badge (discount ladder tier) and
+// whether they're an integrated partner (auto-paid at handover). Admin only.
+export const setPartnerCommercialProfile = async ({
+  partnerRequestUuid,
+  badge,
+  isIntegrated,
+}: {
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  badge: SelectPartnerRequests["badge"];
+  isIntegrated: SelectPartnerRequests["isIntegrated"];
+}): Promise<void> => {
+  const [existing] = await db
+    .select({ id: PartnerRequests.id })
+    .from(PartnerRequests)
+    .where(eq(PartnerRequests.uuid, partnerRequestUuid));
+  if (!existing) {
+    throw new ValidationError("Partner not found");
+  }
+
+  await db
+    .update(PartnerRequests)
+    .set({ badge, isIntegrated })
+    .where(eq(PartnerRequests.uuid, partnerRequestUuid));
+};
