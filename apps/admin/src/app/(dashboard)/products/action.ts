@@ -40,8 +40,9 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .orderBy(asc(Products.order));
-  } catch {
-    throw new Error("Failed to fetch products");
+  } catch (error) {
+    console.error("getProducts failed:", error);
+    throw new Error("Failed to fetch products", { cause: error });
   }
 };
 
@@ -55,8 +56,9 @@ export const getProduct = async (
       .where(eq(Products.uuid, uuid));
 
     return product ?? null;
-  } catch {
-    throw new Error("Failed to fetch product");
+  } catch (error) {
+    console.error("getProduct failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
   }
 };
 

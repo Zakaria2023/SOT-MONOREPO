@@ -39,8 +39,9 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
       .from(Categories)
       .leftJoin(ParentCategories, eq(Categories.parentUuid, ParentCategories.uuid))
       .orderBy(asc(Categories.order));
-  } catch {
-    throw new Error("Failed to fetch categories");
+  } catch (error) {
+    console.error("getCategories failed:", error);
+    throw new Error("Failed to fetch categories", { cause: error });
   }
 };
 
@@ -54,8 +55,9 @@ export const getCategory = async (
       .where(eq(Categories.uuid, uuid));
 
     return category ?? null;
-  } catch {
-    throw new Error("Failed to fetch category");
+  } catch (error) {
+    console.error("getCategory failed:", error);
+    throw new Error("Failed to fetch category", { cause: error });
   }
 };
 

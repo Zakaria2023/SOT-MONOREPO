@@ -69,8 +69,9 @@ export const getSpecifications = async (): Promise<
         categoryNames: own.map((link) => link.categoryName ?? ""),
       };
     });
-  } catch {
-    throw new Error("Failed to fetch specifications");
+  } catch (error) {
+    console.error("getSpecifications failed:", error);
+    throw new Error("Failed to fetch specifications", { cause: error });
   }
 };
 
@@ -112,8 +113,9 @@ export const getSpecification = async (
       categoryUuids: links.map((link) => link.categoryUuid),
       categoryNames: links.map((link) => link.categoryName ?? ""),
     };
-  } catch {
-    throw new Error("Failed to fetch specification");
+  } catch (error) {
+    console.error("getSpecification failed:", error);
+    throw new Error("Failed to fetch specification", { cause: error });
   }
 };
 
@@ -238,7 +240,10 @@ export const getSpecificationsForCategory = async (
       });
     }
     return specs;
-  } catch {
-    throw new Error("Failed to fetch specifications for category");
+  } catch (error) {
+    console.error("getSpecificationsForCategory failed:", error);
+    throw new Error("Failed to fetch specifications for category", {
+      cause: error,
+    });
   }
 };

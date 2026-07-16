@@ -70,8 +70,9 @@ export const getCompatibilityRules = async (): Promise<
       .orderBy(desc(CompatibilityRules.createdAt));
 
     return rows.map(toListItem);
-  } catch {
-    throw new Error("Failed to fetch compatibility rules");
+  } catch (error) {
+    console.error("getCompatibilityRules failed:", error);
+    throw new Error("Failed to fetch compatibility rules", { cause: error });
   }
 };
 
@@ -93,8 +94,9 @@ export const getCompatibilityRule = async (
       .where(eq(CompatibilityRules.uuid, uuid));
 
     return row ? toListItem(row) : null;
-  } catch {
-    throw new Error("Failed to fetch compatibility rule");
+  } catch (error) {
+    console.error("getCompatibilityRule failed:", error);
+    throw new Error("Failed to fetch compatibility rule", { cause: error });
   }
 };
 

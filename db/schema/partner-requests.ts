@@ -73,6 +73,10 @@ export const PartnerRequests = mysqlTable(
     index("idx_partner_requests_email").on(table.email),
     index("idx_partner_requests_status").on(table.status),
     index("idx_partner_requests_created_at").on(table.createdAt),
+    // getApprovedPartnerByClerkId resolves every partner request by this column.
+    index("idx_partner_requests_approved_clerk_user_id").on(
+      table.approvedClerkUserId,
+    ),
   ],
 );
 

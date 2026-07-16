@@ -16,8 +16,9 @@ export const getSpecificationGroups = async (): Promise<
       .select()
       .from(SpecificationGroups)
       .orderBy(asc(SpecificationGroups.order));
-  } catch {
-    throw new Error("Failed to fetch specification groups");
+  } catch (error) {
+    console.error("getSpecificationGroups failed:", error);
+    throw new Error("Failed to fetch specification groups", { cause: error });
   }
 };
 

@@ -190,8 +190,11 @@ const attachBoqTotals = async <T extends { uuid: string }>(
   const totals = await db
     .select({
       boqUuid: BoqItems.boqUuid,
-      itemCount: sql<number>`sum(${BoqItems.quantity})`,
-      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`,
+      // MySQL returns SUM() as a decimal string — map it to a real number.
+      itemCount: sql<number>`sum(${BoqItems.quantity})`.mapWith(Number),
+      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`.mapWith(
+        Number,
+      ),
     })
     .from(BoqItems)
     .where(

@@ -103,8 +103,9 @@ export const checkCartCompatibility = async (
         (result.status === "fail" || result.status === "warn") &&
         result.providers.length > 0,
     );
-  } catch {
+  } catch (error) {
     // The check is a courtesy — a failure here must never break the cart.
+    console.error("checkCartCompatibility failed:", error);
     return [];
   }
 };
