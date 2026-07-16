@@ -1,13 +1,33 @@
-"use client";
-
-import { payOrder } from "@/app/orders/[uuid]/actions";
-import { CreditCard, ShieldCheck } from "lucide-react";
-import { useState, useTransition } from "react";
+import { Clock } from "lucide-react";
 
 type OrderPaymentProps = {
   orderUuid: string;
   total: string;
 };
+
+// Payment is not available yet — there is no gateway. This renders a
+// "coming soon" placeholder. The real pay flow is commented out at the bottom
+// of this file; restore it (and payOrder in the actions) when a licensed
+// provider (SAMA) is wired.
+export const OrderPayment = ({ total }: OrderPaymentProps) => (
+  <div className="flex flex-col items-start gap-3">
+    <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
+      <Clock size={16} className="text-primary" />
+      Payment is coming soon. Your order ({total}) is reserved — you'll be able
+      to pay securely through SOT once checkout is live.
+    </p>
+    <span className="inline-flex items-center gap-2 rounded-xl bg-hover px-6 py-3 text-sm font-semibold text-faint">
+      Payment coming soon
+    </span>
+  </div>
+);
+
+/* ── Real payment flow — restore when a payment gateway is wired ──────────────
+"use client";
+
+import { payOrder } from "@/app/orders/[uuid]/actions";
+import { CreditCard, ShieldCheck } from "lucide-react";
+import { useState, useTransition } from "react";
 
 export const OrderPayment = ({ orderUuid, total }: OrderPaymentProps) => {
   const [isPending, startTransition] = useTransition();
@@ -44,3 +64,4 @@ export const OrderPayment = ({ orderUuid, total }: OrderPaymentProps) => {
     </div>
   );
 };
+──────────────────────────────────────────────────────────────────────────── */

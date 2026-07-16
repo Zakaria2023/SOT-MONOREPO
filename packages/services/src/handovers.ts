@@ -418,8 +418,8 @@ export const verifyHandover = async ({
  * Complete the handover — the escrow release. The BOQ moves `verified →
  * handed_over`, and the partner's service earning is accrued as a PAYABLE.
  * Integrated partners are settled immediately (auto invoice + pay); others see
- * the amount as owed and cash out later. Requires the order to be paid, so SOT
- * only releases money it has actually received.
+ * the amount as owed and cash out later. (The "order must be paid" guard is
+ * commented out while payment is disabled — restore it when a gateway is wired.)
  */
 export const completeHandover = async ({
   boqUuid,
@@ -451,9 +451,12 @@ export const completeHandover = async ({
   if (!order) {
     throw new ValidationError("No order backs this handover");
   }
-  if (order.status !== "paid") {
-    throw new ConflictError("The order must be paid before handover completes");
-  }
+  // Payment is disabled for now (coming soon), so orders never reach "paid".
+  // Restore this guard when a payment gateway is wired — SOT should only
+  // release money it has actually received.
+  // if (order.status !== "paid") {
+  //   throw new ConflictError("The order must be paid before handover completes");
+  // }
 
   const [partnerRequest] = await db
     .select({ isIntegrated: PartnerRequests.isIntegrated })

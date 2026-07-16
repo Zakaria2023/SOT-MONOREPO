@@ -4,9 +4,9 @@ import { ORDER_STATUS_LABELS } from "@/db/label";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { formatMoney } from "utils";
-import { getInvoiceForOrder, getUserOrder } from "services";
+import { getUserOrder } from "services";
 
 export const metadata: Metadata = {
   title: "Your order · Stratum",
@@ -30,7 +30,6 @@ const OrderPage = async ({ params }: Props) => {
   }
 
   const currency = order.currency ?? "SAR";
-  const invoice = order.status === "paid" ? await getInvoiceForOrder(uuid) : null;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12 lg:px-8">
@@ -60,29 +59,20 @@ const OrderPage = async ({ params }: Props) => {
         </div>
       </div>
 
-      <div className="mt-8">
-        {order.status === "awaiting_payment" && (
-          <OrderPayment
-            orderUuid={order.uuid}
-            total={formatMoney(Number(order.grandTotal), currency)}
-          />
-        )}
-
-        {order.status === "paid" && (
-          <div className="flex flex-col gap-3">
-            <p className="flex items-center gap-2 text-sm text-green-600">
-              <CheckCircle2 size={16} />
-              Paid{invoice ? ` — invoice ${invoice.number}` : ""}.
-            </p>
-            <Link
-              href={`/boq/${order.boqUuid}/handover`}
-              className="inline-flex w-fit items-center gap-2 rounded-xl border border-search-border px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-hover"
-            >
-              <FileText size={16} />
-              View handover
-            </Link>
-          </div>
-        )}
+      {/* Payment is disabled for now (coming soon). The order is reserved; the
+          paid/invoice branch is removed until a gateway is wired. */}
+      <div className="mt-8 flex flex-col gap-4">
+        <OrderPayment
+          orderUuid={order.uuid}
+          total={formatMoney(Number(order.grandTotal), currency)}
+        />
+        <Link
+          href={`/boq/${order.boqUuid}/handover`}
+          className="inline-flex w-fit items-center gap-2 rounded-xl border border-search-border px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-hover"
+        >
+          <FileText size={16} />
+          View handover
+        </Link>
       </div>
     </main>
   );

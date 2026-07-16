@@ -1,18 +1,21 @@
 "use server";
 
-import { getCurrentUser } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
-import { getUserOrder, markOrderPaid } from "services";
-
 export type PayOrderResult = {
   error?: string;
 };
 
-/**
- * Stand-in for the payment gateway callback. A real licensed provider will
- * call the equivalent of markOrderPaid on a successful charge; until then this
- * action settles the order after an ownership check so the flow is walkable.
- */
+// Payment is disabled for now — there is no gateway yet. Kept as a dormant stub
+// so the UI import stays valid and the flow can be restored quickly. The real
+// implementation (markOrderPaid + ownership check) is commented out below.
+export const payOrder = async (
+  _orderUuid: string,
+): Promise<PayOrderResult> => ({ error: "Payment is coming soon" });
+
+/* ── Real pay flow — restore when a payment gateway is wired ──────────────────
+import { getCurrentUser } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { getUserOrder, markOrderPaid } from "services";
+
 export const payOrder = async (orderUuid: string): Promise<PayOrderResult> => {
   const user = await getCurrentUser();
   if (!user) return { error: "Not authenticated" };
@@ -32,3 +35,4 @@ export const payOrder = async (orderUuid: string): Promise<PayOrderResult> => {
   revalidatePath("/orders");
   return {};
 };
+──────────────────────────────────────────────────────────────────────────── */
