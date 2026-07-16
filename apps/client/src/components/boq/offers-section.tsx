@@ -1,8 +1,8 @@
 "use client";
 
-import { chooseOffer } from "@/app/boq/[uuid]/actions";
+import { chooseOffer, confirmOrder } from "@/app/boq/[uuid]/actions";
 import { OfferCard } from "@/components/offers/offer-card";
-import { Package } from "lucide-react";
+import { ArrowRight, Package } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { SelectOffers } from "services";
 
@@ -23,6 +23,8 @@ export const OffersSection = ({
   const [error, setError] = useState<string | undefined>(undefined);
   const [pendingUuid, setPendingUuid] = useState<string | null>(null);
 
+  const selected = offers.find((offer) => offer.status === "selected");
+
   const onSelect = (offerUuid: string) => {
     setPendingUuid(offerUuid);
     startTransition(async () => {
@@ -30,6 +32,15 @@ export const OffersSection = ({
       const result = await chooseOffer(boqUuid, offerUuid);
       if (result.error) setError(result.error);
       setPendingUuid(null);
+    });
+  };
+
+  const onConfirm = () => {
+    startTransition(async () => {
+      setError(undefined);
+      // On success this redirects to the order page; only errors return here.
+      const result = await confirmOrder(boqUuid);
+      if (result.error) setError(result.error);
     });
   };
 
@@ -71,11 +82,30 @@ export const OffersSection = ({
         ))}
       </div>
 
-      <p className="font-grotesk mt-6 flex items-center gap-2 text-xs text-faint">
-        <Package size={14} />
-        Payment is coming soon — selecting an offer just reserves your choice
-        for now.
-      </p>
+      {selected ? (
+        <div className="mt-8 flex flex-col items-start gap-3 rounded-[18px] border border-search-border bg-hover/40 p-6">
+          <p className="font-grotesk text-sm text-secondary">
+            You picked <span className="font-semibold text-ink">this offer</span>
+            . Confirm to place your order — you'll pay securely through SOT, and
+            the amount is held until your system is installed and handed over.
+          </p>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+          >
+            {isPending ? "Confirming…" : "Confirm & order"}
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      ) : (
+        <p className="font-grotesk mt-6 flex items-center gap-2 text-xs text-faint">
+          <Package size={14} />
+          Pick the offer that fits you, then confirm to order and pay through
+          SOT.
+        </p>
+      )}
     </div>
   );
 };

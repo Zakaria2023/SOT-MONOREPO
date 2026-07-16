@@ -2,12 +2,42 @@
 
 import { requirePartner } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
-import { createOrUpdateOffer } from "services";
+import { advanceBoqFulfilment, createOrUpdateOffer, getPartnerBoq } from "services";
+import type { BoqStatus } from "@/db/enum";
 import { offerSchema, type OfferInput } from "validators";
 
 export type OfferActionState = {
   error?: string;
   success?: boolean;
+};
+
+export type StageActionState = {
+  error?: string;
+};
+
+// Step the BOQ one fulfilment stage forward (assigned → installing →
+// installed). Guarded so a partner can only advance a BOQ dispatched to them.
+export const advanceStage = async (
+  boqUuid: string,
+  next: BoqStatus,
+): Promise<StageActionState> => {
+  const user = await requirePartner();
+
+  const detail = await getPartnerBoq(user.id, boqUuid);
+  if (!detail) {
+    return { error: "This BOQ wasn't dispatched to you" };
+  }
+
+  try {
+    await advanceBoqFulfilment(boqUuid, next);
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to update stage",
+    };
+  }
+
+  revalidatePath(`/boqs/${boqUuid}`);
+  return {};
 };
 
 export const submitOffer = async (

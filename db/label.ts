@@ -1,9 +1,19 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
   BusinessLine,
+  BoqItemRole,
+  BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
+  HandoverCredentialType,
+  HandoverStatus,
+  InvoiceStatus,
+  OfferPresentationMode,
   OfferStatus,
+  OrderStatus,
+  PartnerBadge,
+  PartnerEarningStatus,
+  PartnerPayoutStatus,
   PartnerRequestStatus,
   PartnerType,
   ProductStatus,
@@ -54,8 +64,27 @@ export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
 
 export const BOQ_STATUS_LABELS: Record<BoqStatus, string> = {
   draft: "Draft",
+  validated: "Validated",
   submitted: "Submitted",
   reviewed: "Reviewed",
+  offered: "Offered",
+  ordered: "Ordered",
+  assigned: "Assigned",
+  installing: "Installing",
+  installed: "Installed",
+  verified: "Verified",
+  handed_over: "Handed over",
+};
+
+export const BOQ_ITEM_ROLE_LABELS: Record<BoqItemRole, string> = {
+  anchor: "Anchor",
+  peripheral: "Peripheral",
+  accessory: "Accessory",
+};
+
+export const BOQ_LINE_TYPE_LABELS: Record<BoqLineType, string> = {
+  product: "Product",
+  service: "Service",
 };
 
 export const PARTNER_REQUEST_STATUS_LABELS: Record<
@@ -78,6 +107,67 @@ export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   approved: "Approved",
   rejected: "Rejected",
   selected: "Selected by customer",
+  expired: "Expired",
+};
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  awaiting_payment: "Awaiting payment",
+  paid: "Paid",
+  cancelled: "Cancelled",
+  refunded: "Refunded",
+};
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  issued: "Issued",
+  paid: "Paid",
+  void: "Void",
+};
+
+export const PARTNER_BADGE_LABELS: Record<PartnerBadge, string> = {
+  reseller: "Reseller (Stock partner)",
+  system_integrator: "System Integrator",
+  cabling: "Cabling (Technician)",
+};
+
+export const HANDOVER_STATUS_LABELS: Record<HandoverStatus, string> = {
+  draft: "Draft",
+  submitted: "Awaiting your confirmation",
+  customer_confirmed: "Confirmed by customer",
+  verified: "Verified",
+  disputed: "Disputed",
+};
+
+export const HANDOVER_CREDENTIAL_TYPE_LABELS: Record<
+  HandoverCredentialType,
+  string
+> = {
+  offline_access: "Offline access (user + password)",
+  cloud_admin: "Cloud project (admin / owner)",
+  device_access: "Device access",
+};
+
+export const PARTNER_EARNING_STATUS_LABELS: Record<
+  PartnerEarningStatus,
+  string
+> = {
+  accrued: "Owed to you",
+  invoiced: "Invoiced",
+  paid: "Paid",
+};
+
+export const PARTNER_PAYOUT_STATUS_LABELS: Record<PartnerPayoutStatus, string> =
+  {
+    requested: "Requested",
+    paid: "Paid",
+  };
+
+export const OFFER_PRESENTATION_MODE_LABELS: Record<
+  OfferPresentationMode,
+  string
+> = {
+  all_in: "All-in (one total)",
+  itemized: "Itemized (products + service)",
+  products_only: "Products only",
 };
 
 export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {

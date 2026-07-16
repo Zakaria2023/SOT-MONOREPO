@@ -1,5 +1,6 @@
 import { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
+  boolean,
   char,
   index,
   int,
@@ -9,7 +10,8 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { partnerRequestStatuses, partnerTypes } from "../enum";
+// partnerBadges powers the one discount ladder (see BADGE_DISCOUNTS).
+import { partnerBadges, partnerRequestStatuses, partnerTypes } from "../enum";
 
 // Partners can't self-serve a login — every type submits a request that an
 // admin reviews. On approval the admin sends a Clerk invitation to the email
@@ -53,6 +55,16 @@ export const PartnerRequests = mysqlTable(
     serviceScope: varchar("service_scope", { length: 50 })
       .default("install-program")
       .notNull(),
+
+    // The partner's tier on the discount ladder. Every new partner starts as a
+    // reseller; an admin can promote them. Drives both their buy-in price and
+    // the margin pool (one number, see BADGE_DISCOUNTS).
+    badge: mysqlEnum("badge", partnerBadges).default("reseller").notNull(),
+
+    // Integrated partners (accounting system bound to SOT) are auto-invoiced
+    // and paid the instant handover completes; non-integrated partners submit a
+    // manual invoice and wait. Integration is the faster-paid path.
+    isIntegrated: boolean("is_integrated").default(false).notNull(),
 
     status: mysqlEnum("status", partnerRequestStatuses)
       .default("pending")

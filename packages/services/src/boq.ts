@@ -1,21 +1,26 @@
 import { and, asc, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
+import { BoqStatus } from "../../../db/enum";
 import {
   BoqPartners,
   SelectBoqPartners,
 } from "../../../db/schema/boq-partners";
 import {
   BoqItems,
+  BoqSections,
   Boqs,
   SelectBoqItems,
   SelectBoqs,
+  SelectBoqSections,
 } from "../../../db/schema/boqs";
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
+import { checkCompatibility } from "./check-compatibility";
 import { ConflictError, ValidationError } from "./errors";
+import type { CompatibilityReport } from "./rule-engine";
 import {
   getApprovedPartnerOptions,
   type BoqPartnerOptions,
@@ -23,11 +28,18 @@ import {
   type MatchedPartner,
 } from "./partners";
 
-export type { SelectBoqItems, SelectBoqs };
+export type { SelectBoqItems, SelectBoqs, SelectBoqSections };
 
 export type BoqDetail = {
   boq: SelectBoqs;
+  sections: SelectBoqSections[];
   items: SelectBoqItems[];
+};
+
+export type ValidateBoqResult = {
+  boq: SelectBoqs;
+  report: CompatibilityReport;
+  validated: boolean;
 };
 
 export type BoqListItem = SelectBoqs & {
@@ -71,6 +83,7 @@ export const createBoqFromCart = async (
       productUuid: CartItems.productUuid,
       name: Products.name,
       categoryName: Categories.name,
+      systemRole: Products.systemRole,
       unitPrice: Products.price,
       currency: Products.currency,
       quantity: CartItems.quantity,
@@ -92,14 +105,25 @@ export const createBoqFromCart = async (
   const productUuids = lines.map((line) => line.productUuid);
   const boqUuid = randomUUID();
   const reference = `BOQ-${boqUuid.slice(0, 8).toUpperCase()}`;
+  // One solution = one category = one system, so the whole BOQ is a single
+  // section named after that system.
+  const sectionUuid = randomUUID();
+  const [firstLine] = lines;
+  const sectionName = firstLine?.categoryName ?? "System";
 
   return db.transaction(async (tx) => {
     await tx.insert(Boqs).values({ uuid: boqUuid, userUuid, reference });
+    await tx
+      .insert(BoqSections)
+      .values({ uuid: sectionUuid, boqUuid, name: sectionName, order: 0 });
     await tx.insert(BoqItems).values(
       lines.map((line) => ({
         uuid: randomUUID(),
         boqUuid,
+        sectionUuid,
         productUuid: line.productUuid,
+        lineType: "product" as const,
+        role: line.systemRole,
         name: line.name,
         categoryName: line.categoryName,
         unitPrice: line.unitPrice ?? "0",
@@ -142,8 +166,13 @@ const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   }
 
   const items = rows.flatMap((row) => (row.item ? [row.item] : []));
+  const sections = await db
+    .select()
+    .from(BoqSections)
+    .where(eq(BoqSections.boqUuid, boqUuid))
+    .orderBy(asc(BoqSections.order));
 
-  return { boq: first.boq, items };
+  return { boq: first.boq, sections, items };
 };
 
 /** A BOQ with its items, but only if it belongs to this customer. */
@@ -177,6 +206,82 @@ export const getUserBoqs = async (userUuid: string): Promise<SelectBoqs[]> =>
     .from(Boqs)
     .where(eq(Boqs.userUuid, userUuid))
     .orderBy(desc(Boqs.createdAt));
+
+// Run the compatibility rules over a draft BOQ (stage 2, "validated"). A
+// blocking failure keeps it a draft and returns the report so the customer can
+// fix it; a clean pass promotes it to `validated`. Phase 1: a human still
+// confirms downstream — this feeds validation, it is not the final authority.
+export const validateBoq = async (
+  userUuid: string,
+  boqUuid: string,
+): Promise<ValidateBoqResult> => {
+  const detail = await getUserBoq(userUuid, boqUuid);
+  if (!detail) {
+    throw new ValidationError("BOQ not found");
+  }
+  if (detail.boq.status !== "draft") {
+    throw new ConflictError("This BOQ has already been validated");
+  }
+
+  const selection = detail.items.flatMap((item) =>
+    item.productUuid
+      ? [{ productUuid: item.productUuid, quantity: item.quantity }]
+      : [],
+  );
+  const report = await checkCompatibility(selection);
+  const validated = report.failures === 0;
+
+  if (validated) {
+    await db
+      .update(Boqs)
+      .set({ status: "validated" })
+      .where(eq(Boqs.uuid, boqUuid));
+  }
+
+  const [boq] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
+  if (!boq) {
+    throw new Error("Failed to load BOQ after validation");
+  }
+  return { boq, report, validated };
+};
+
+// The fulfilment stages, in order — the Service & Handover progression. Each
+// call may only move a BOQ to the immediately next stage.
+const FULFILMENT_ORDER: BoqStatus[] = [
+  "ordered",
+  "assigned",
+  "installing",
+  "installed",
+  "verified",
+  "handed_over",
+];
+
+// Advance a BOQ one fulfilment stage forward (assigned → … → handed_over),
+// rejecting skips and backward moves so the lifecycle can't jump states.
+export const advanceBoqFulfilment = async (
+  boqUuid: string,
+  next: BoqStatus,
+): Promise<SelectBoqs> => {
+  const [boq] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
+  if (!boq) {
+    throw new ValidationError("BOQ not found");
+  }
+
+  const currentIndex = FULFILMENT_ORDER.indexOf(boq.status ?? "draft");
+  const nextIndex = FULFILMENT_ORDER.indexOf(next);
+  if (nextIndex <= 0 || nextIndex !== currentIndex + 1) {
+    throw new ConflictError(
+      `A BOQ at "${boq.status}" can't move to "${next}"`,
+    );
+  }
+
+  await db.update(Boqs).set({ status: next }).where(eq(Boqs.uuid, boqUuid));
+  const [updated] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
+  if (!updated) {
+    throw new Error("Failed to advance BOQ");
+  }
+  return updated;
+};
 
 // Attach item count and subtotal (summed from BoqItems) to each BOQ, keying the
 // aggregate to just these BOQs instead of scanning the whole table.
