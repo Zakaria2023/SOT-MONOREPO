@@ -18,6 +18,7 @@ const STATUS_BADGE_CLASSES: Record<OfferStatus, string> = {
   approved: "bg-success-tint text-success",
   rejected: "bg-danger-tint text-danger",
   selected: "bg-primary-tint text-primary",
+  expired: "bg-hover text-faint",
 };
 
 const columns: TableColumn<OfferRow>[] = [

@@ -12,7 +12,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { lifecycleStatuses, productStatuses } from "../enum";
+import { boqItemRoles, lifecycleStatuses, productStatuses } from "../enum";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
 
@@ -69,6 +69,11 @@ export const Products = mysqlTable(
     needsSolutionReview: boolean("needs_solution_review")
       .default(false)
       .notNull(),
+
+    // Structured place in a system — anchor / peripheral / accessory. Distinct
+    // from the free-text `role` marketing line above. Snapshotted onto each BOQ
+    // line so completeness/requires-companion validation can key off it.
+    systemRole: mysqlEnum("system_role", boqItemRoles),
 
     // Price book. `price` is the public MSRP — the only price shown publicly.
     // Cost + system-integrator define the internal margin pool. Sub-distributor

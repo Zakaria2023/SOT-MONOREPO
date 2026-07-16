@@ -6,6 +6,7 @@ export * from "./categories";
 export * from "./compatibility-rules";
 export * from "./government-requests";
 export * from "./offers";
+export * from "./orders";
 export * from "./partner-requests";
 export * from "./products";
 export * from "./specification-categories";

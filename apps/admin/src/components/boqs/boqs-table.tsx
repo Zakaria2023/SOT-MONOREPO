@@ -16,8 +16,16 @@ type BoqsTableProps = {
 
 const STATUS_BADGE_CLASSES: Record<BoqStatus, string> = {
   draft: "bg-hover text-faint",
+  validated: "bg-primary-tint text-primary",
   submitted: "bg-warning-tint text-warning",
   reviewed: "bg-success-tint text-success",
+  offered: "bg-primary-tint text-primary",
+  ordered: "bg-success-tint text-success",
+  assigned: "bg-primary-tint text-primary",
+  installing: "bg-warning-tint text-warning",
+  installed: "bg-primary-tint text-primary",
+  verified: "bg-success-tint text-success",
+  handed_over: "bg-success-tint text-success",
 };
 
 const buildColumns = (

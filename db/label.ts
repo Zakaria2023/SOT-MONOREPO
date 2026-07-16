@@ -1,9 +1,14 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
   BusinessLine,
+  BoqItemRole,
+  BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
+  InvoiceStatus,
   OfferStatus,
+  OrderStatus,
+  PartnerBadge,
   PartnerRequestStatus,
   PartnerType,
   ProductStatus,
@@ -54,8 +59,27 @@ export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
 
 export const BOQ_STATUS_LABELS: Record<BoqStatus, string> = {
   draft: "Draft",
+  validated: "Validated",
   submitted: "Submitted",
   reviewed: "Reviewed",
+  offered: "Offered",
+  ordered: "Ordered",
+  assigned: "Assigned",
+  installing: "Installing",
+  installed: "Installed",
+  verified: "Verified",
+  handed_over: "Handed over",
+};
+
+export const BOQ_ITEM_ROLE_LABELS: Record<BoqItemRole, string> = {
+  anchor: "Anchor",
+  peripheral: "Peripheral",
+  accessory: "Accessory",
+};
+
+export const BOQ_LINE_TYPE_LABELS: Record<BoqLineType, string> = {
+  product: "Product",
+  service: "Service",
 };
 
 export const PARTNER_REQUEST_STATUS_LABELS: Record<
@@ -78,6 +102,26 @@ export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   approved: "Approved",
   rejected: "Rejected",
   selected: "Selected by customer",
+  expired: "Expired",
+};
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  awaiting_payment: "Awaiting payment",
+  paid: "Paid",
+  cancelled: "Cancelled",
+  refunded: "Refunded",
+};
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  issued: "Issued",
+  paid: "Paid",
+  void: "Void",
+};
+
+export const PARTNER_BADGE_LABELS: Record<PartnerBadge, string> = {
+  reseller: "Reseller (Stock partner)",
+  system_integrator: "System Integrator",
+  cabling: "Cabling (Technician)",
 };
 
 export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {

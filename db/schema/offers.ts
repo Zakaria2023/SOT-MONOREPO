@@ -54,6 +54,9 @@ export const Offers = mysqlTable(
     reviewedByClerkUserId: varchar("reviewed_by_clerk_user_id", { length: 64 }),
     reviewedByName: varchar("reviewed_by_name", { length: 255 }),
 
+    // When an approved offer stops being selectable. Null = no expiry set yet.
+    expiresAt: timestamp("expires_at"),
+
     approvedAt: timestamp("approved_at"),
     rejectedAt: timestamp("rejected_at"),
     selectedAt: timestamp("selected_at"),
