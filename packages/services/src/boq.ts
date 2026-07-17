@@ -14,9 +14,10 @@ import {
   SelectBoqs,
   SelectBoqSections,
 } from "../../../db/schema/boqs";
+import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
-import { Products } from "../../../db/schema/products";
+import { Products, SelectProducts } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
 import { checkCompatibility } from "./check-compatibility";
 import { ConflictError, ValidationError } from "./errors";
@@ -60,6 +61,26 @@ export type SubmitBoqResult = {
 
 export type PartnerBoqDetail = BoqDetail & {
   preSellerComment: SelectBoqPartners["preSellerComment"];
+};
+
+// A BOQ line enriched with the live product's fields (for the admin detail
+// view). Left-joined, so every product-backed column is nullable; service
+// lines have no product at all.
+export type AdminBoqItem = SelectBoqItems & {
+  productImage: SelectProducts["image"] | null;
+  productSku: SelectProducts["sku"] | null;
+  productModel: SelectProducts["model"] | null;
+  productSlug: SelectProducts["slug"] | null;
+  productStatus: SelectProducts["status"] | null;
+  productPrice: SelectProducts["price"] | null;
+  brandName: SelectBrands["name"] | null;
+};
+
+export type AdminBoqDetail = {
+  boq: SelectBoqs;
+  customerName: SelectUsers["fullName"] | null;
+  sections: SelectBoqSections[];
+  items: AdminBoqItem[];
 };
 
 // Create a draft BOQ from one solution in the user's cart — the solution lines
@@ -334,6 +355,48 @@ export const getAllBoqs = async (): Promise<BoqListItem[]> => {
     .orderBy(desc(Boqs.createdAt));
 
   return attachBoqTotals(boqs);
+};
+
+// Load one BOQ for the admin detail view: the BOQ, its customer, its sections,
+// and every line enriched with the live product's fields. Not ownership-scoped
+// — admin-only.
+export const getAdminBoq = async (
+  boqUuid: string,
+): Promise<AdminBoqDetail | null> => {
+  const [row] = await db
+    .select({ boq: getTableColumns(Boqs), customerName: Users.fullName })
+    .from(Boqs)
+    .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+    .where(eq(Boqs.uuid, boqUuid));
+  if (!row) {
+    return null;
+  }
+
+  const [items, sections] = await Promise.all([
+    db
+      .select({
+        ...getTableColumns(BoqItems),
+        productImage: Products.image,
+        productSku: Products.sku,
+        productModel: Products.model,
+        productSlug: Products.slug,
+        productStatus: Products.status,
+        productPrice: Products.price,
+        brandName: Brands.name,
+      })
+      .from(BoqItems)
+      .leftJoin(Products, eq(BoqItems.productUuid, Products.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(BoqItems.boqUuid, boqUuid))
+      .orderBy(asc(BoqItems.createdAt)),
+    db
+      .select()
+      .from(BoqSections)
+      .where(eq(BoqSections.boqUuid, boqUuid))
+      .orderBy(asc(BoqSections.order)),
+  ]);
+
+  return { boq: row.boq, customerName: row.customerName, sections, items };
 };
 
 // Assign a BOQ to a pre-seller for review, or unassign it when given null.
