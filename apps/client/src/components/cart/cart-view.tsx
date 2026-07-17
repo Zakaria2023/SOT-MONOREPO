@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Clock,
   CreditCard,
+  Loader2,
   Minus,
   Package,
   Plus,
@@ -19,6 +20,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useFormStatus } from "react-dom";
 import type { CartLineItem } from "services";
 import { formatMoney, lineTotal, summarizeCart } from "utils";
 
@@ -177,6 +179,33 @@ const CartSection = ({
   );
 };
 
+// Submit button for the "Send as BOQ" form. useFormStatus reports the server
+// action's pending state, so the button shows a spinner and stays disabled from
+// click until the redirect lands — the user never sees a dead moment.
+const BoqSubmitButton = () => {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-70"
+    >
+      {pending ? (
+        <>
+          <Loader2 size={17} className="animate-spin" />
+          Sending…
+        </>
+      ) : (
+        <>
+          Send as BOQ
+          <ArrowRight size={17} />
+        </>
+      )}
+    </button>
+  );
+};
+
 const ProductCheckout = () => {
   const [soon, setSoon] = useState(false);
 
@@ -305,13 +334,7 @@ export const CartView = ({
                       name="categoryUuid"
                       value={categoryUuid}
                     />
-                    <button
-                      type="submit"
-                      className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
-                    >
-                      Send as BOQ
-                      <ArrowRight size={17} />
-                    </button>
+                    <BoqSubmitButton />
                   </form>
                 }
               />
