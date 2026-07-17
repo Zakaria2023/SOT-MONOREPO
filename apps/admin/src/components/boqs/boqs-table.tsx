@@ -4,6 +4,7 @@ import type { PreSellerOption } from "@/app/(dashboard)/boqs/action";
 import { AssignPreSeller } from "@/components/boqs/assign-pre-seller";
 import type { BoqStatus } from "@/db/enum";
 import { BOQ_STATUS_LABELS } from "@/db/label";
+import Link from "next/link";
 import { formatSar } from "utils";
 import type { BoqListItem } from "services";
 import type { TableColumn } from "ui";
@@ -35,7 +36,12 @@ const buildColumns = (
     key: "reference",
     header: "Reference",
     render: (boq) => (
-      <span className="font-semibold text-ink">{boq.reference}</span>
+      <Link
+        href={`/boqs/${boq.uuid}`}
+        className="font-semibold text-primary hover:underline"
+      >
+        {boq.reference}
+      </Link>
     ),
   },
   {
