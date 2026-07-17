@@ -16,6 +16,7 @@ export type DbExecutor =
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PartnerRequestInput = {
+  capabilities?: SelectPartnerRequests["capabilities"];
   type: SelectPartnerRequests["type"];
   email: SelectPartnerRequests["email"];
   contactNumber: SelectPartnerRequests["contactNumber"];
@@ -108,6 +109,7 @@ export const createPartnerRequest = async (
 
   await db.insert(PartnerRequests).values({
     uuid,
+    capabilities: input.capabilities ?? [],
     type: input.type,
     fullName,
     email,
