@@ -71,21 +71,42 @@ export const approvePartnerRequestAction = async (
       representativeName: request.representativeName,
     };
 
-    const invitation = await client.invitations.createInvitation({
-      emailAddress: request.email,
-      ignoreExisting: true,
-      publicMetadata: {
-        role: "partner",
-        type: "partner",
-        ...Object.fromEntries(
-          Object.entries(metadataFields).filter(([, value]) => value != null),
-        ),
-      },
+    const publicMetadata = {
+      role: "partner",
+      type: "partner",
+      ...Object.fromEntries(
+        Object.entries(metadataFields).filter(([, value]) => value != null),
+      ),
+    };
+
+    // If a Clerk account with this email already exists (e.g. the partner
+    // signed up as a customer first), an invitation would never apply this
+    // metadata — invitations only seed brand-new signups, so the account would
+    // keep role=undefined and be bounced by the partner app's role gate. So set
+    // the partner role directly on the existing user; otherwise invite them.
+    const { data: existingUsers } = await client.users.getUserList({
+      emailAddress: [request.email],
     });
+    const [existingUser] = existingUsers;
+
+    let approvedClerkUserId: string;
+    if (existingUser) {
+      await client.users.updateUserMetadata(existingUser.id, {
+        publicMetadata: { ...existingUser.publicMetadata, ...publicMetadata },
+      });
+      approvedClerkUserId = existingUser.id;
+    } else {
+      const invitation = await client.invitations.createInvitation({
+        emailAddress: request.email,
+        ignoreExisting: true,
+        publicMetadata,
+      });
+      approvedClerkUserId = invitation.id;
+    }
 
     await approvePartnerRequestRecord({
       partnerRequestUuid,
-      approvedClerkUserId: invitation.id,
+      approvedClerkUserId,
       reviewedByClerkUserId: userId,
       reviewedByName: getReviewerName(user),
     });

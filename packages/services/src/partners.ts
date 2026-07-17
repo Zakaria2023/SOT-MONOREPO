@@ -340,6 +340,28 @@ export const getApprovedPartnerOptions = async (
   };
 };
 
+// Point an approved partner request at the real Clerk user id once that account
+// exists. Approval may store an invitation id (for a brand-new signup); when
+// the user is created/updated the webhook calls this so getApprovedPartnerByClerkId
+// resolves by the signed-in user's id. Matches by email; a no-op if none.
+export const linkPartnerRequestToClerkUser = async ({
+  email,
+  clerkUserId,
+}: {
+  email: string;
+  clerkUserId: string;
+}): Promise<void> => {
+  await db
+    .update(PartnerRequests)
+    .set({ approvedClerkUserId: clerkUserId })
+    .where(
+      and(
+        eq(PartnerRequests.email, normalizeEmail(email)),
+        eq(PartnerRequests.status, "approved"),
+      ),
+    );
+};
+
 // Set a partner's commercial profile — their badge (discount ladder tier) and
 // whether they're an integrated partner (auto-paid at handover). Admin only.
 export const setPartnerCommercialProfile = async ({
