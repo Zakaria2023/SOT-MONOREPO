@@ -85,6 +85,26 @@ export const offerTotal = (offer: SelectOffers): number =>
       toMinorUnits(offer.programmingPrice ?? 0),
   );
 
+/**
+ * Groups card digits into blocks of four for display, e.g.
+ * "4242424242424242" -> "4242 4242 4242 4242". Caps at 19 digits.
+ */
+export const formatCardNumber = (value: string): string =>
+  value
+    .replace(/\D/g, "")
+    .slice(0, 19)
+    .replace(/(.{4})/g, "$1 ")
+    .trim();
+
+/** Formats a card expiry as MM/YY while typing, e.g. "1230" -> "12/30". */
+export const formatCardExpiry = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) {
+    return digits;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
+
 /** Capitalizes the first letter of a string, e.g. "published" -> "Published". */
 export const capitalize = (value: string): string =>
   value.charAt(0).toUpperCase() + value.slice(1);

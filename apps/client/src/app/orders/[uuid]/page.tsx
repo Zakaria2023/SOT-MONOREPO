@@ -4,9 +4,9 @@ import { ORDER_STATUS_LABELS } from "@/db/label";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { FileText } from "lucide-react";
+import { CheckCircle2, Clock, FileText } from "lucide-react";
 import { formatMoney } from "utils";
-import { getUserOrder } from "services";
+import { getInvoiceForOrder, getUserOrder } from "services";
 
 export const metadata: Metadata = {
   title: "Your order · Stratum",
@@ -30,6 +30,8 @@ const OrderPage = async ({ params }: Props) => {
   }
 
   const currency = order.currency ?? "SAR";
+  const invoice =
+    order.status === "paid" ? await getInvoiceForOrder(order.uuid) : null;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12 lg:px-8">
@@ -59,13 +61,24 @@ const OrderPage = async ({ params }: Props) => {
         </div>
       </div>
 
-      {/* Payment is disabled for now (coming soon). The order is reserved; the
-          paid/invoice branch is removed until a gateway is wired. */}
       <div className="mt-8 flex flex-col gap-4">
-        <OrderPayment
-          orderUuid={order.uuid}
-          total={formatMoney(Number(order.grandTotal), currency)}
-        />
+        {order.status === "awaiting_payment" ? (
+          <OrderPayment
+            orderUuid={order.uuid}
+            total={formatMoney(Number(order.grandTotal), currency)}
+          />
+        ) : order.status === "paid" ? (
+          <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
+            <CheckCircle2 size={16} className="text-primary" />
+            Payment received{invoice ? ` — invoice ${invoice.number}` : ""}. Your
+            funds are held by SOT until your system is handed over and verified.
+          </p>
+        ) : (
+          <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
+            <Clock size={16} className="text-primary" />
+            {ORDER_STATUS_LABELS[order.status]}.
+          </p>
+        )}
         <Link
           href={`/boq/${order.boqUuid}/handover`}
           className="inline-flex w-fit items-center gap-2 rounded-xl border border-search-border px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-hover"

@@ -1,67 +1,107 @@
-import { Clock } from "lucide-react";
+"use client";
+
+import { useFakePayment } from "@/app/orders/[uuid]/use-fake-payment";
+import { CreditCard, Lock, ShieldCheck } from "lucide-react";
+import { Controller } from "react-hook-form";
+import { Input } from "ui";
+import { formatCardExpiry, formatCardNumber } from "utils";
 
 type OrderPaymentProps = {
   orderUuid: string;
   total: string;
 };
 
-// Payment is not available yet — there is no gateway. This renders a
-// "coming soon" placeholder. The real pay flow is commented out at the bottom
-// of this file; restore it (and payOrder in the actions) when a licensed
-// provider (SAMA) is wired.
-export const OrderPayment = ({ total }: OrderPaymentProps) => (
-  <div className="flex flex-col items-start gap-3">
-    <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
-      <Clock size={16} className="text-primary" />
-      Payment is coming soon. Your order ({total}) is reserved — you'll be able
-      to pay securely through SOT once checkout is live.
-    </p>
-    <span className="inline-flex items-center gap-2 rounded-xl bg-hover px-6 py-3 text-sm font-semibold text-faint">
-      Payment coming soon
-    </span>
-  </div>
-);
-
-/* ── Real payment flow — restore when a payment gateway is wired ──────────────
-"use client";
-
-import { payOrder } from "@/app/orders/[uuid]/actions";
-import { CreditCard, ShieldCheck } from "lucide-react";
-import { useState, useTransition } from "react";
-
 export const OrderPayment = ({ orderUuid, total }: OrderPaymentProps) => {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | undefined>(undefined);
-
-  const onPay = () => {
-    startTransition(async () => {
-      setError(undefined);
-      const result = await payOrder(orderUuid);
-      if (result.error) setError(result.error);
-    });
-  };
+  const {
+    form: {
+      register,
+      control,
+      formState: { errors },
+    },
+    state,
+    isPending,
+    onSubmit,
+  } = useFakePayment(orderUuid);
 
   return (
-    <div className="flex flex-col items-start gap-3">
+    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
       <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
         <ShieldCheck size={16} className="text-primary" />
         Your payment is held by SOT and only released to the installer once your
         system is verified and handed over.
       </p>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+
+      <Input
+        label="Name on card"
+        placeholder="Jane Doe"
+        autoComplete="cc-name"
+        error={errors.cardName?.message}
+        {...register("cardName")}
+      />
+
+      <Controller
+        control={control}
+        name="cardNumber"
+        render={({ field }) => (
+          <Input
+            label="Card number"
+            placeholder="4242 4242 4242 4242"
+            inputMode="numeric"
+            autoComplete="cc-number"
+            icon={<CreditCard size={16} />}
+            value={field.value}
+            onChange={(event) =>
+              field.onChange(formatCardNumber(event.target.value))
+            }
+            error={errors.cardNumber?.message}
+          />
+        )}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <Controller
+          control={control}
+          name="expiry"
+          render={({ field }) => (
+            <Input
+              label="Expiry"
+              placeholder="MM/YY"
+              inputMode="numeric"
+              autoComplete="cc-exp"
+              value={field.value}
+              onChange={(event) =>
+                field.onChange(formatCardExpiry(event.target.value))
+              }
+              error={errors.expiry?.message}
+            />
+          )}
+        />
+        <Input
+          label="CVC"
+          placeholder="123"
+          inputMode="numeric"
+          autoComplete="cc-csc"
+          maxLength={4}
+          error={errors.cvc?.message}
+          {...register("cvc")}
+        />
+      </div>
+
+      {state.error && <p className="text-sm text-red-500">{state.error}</p>}
+
       <button
-        type="button"
-        onClick={onPay}
+        type="submit"
         disabled={isPending}
-        className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+        className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
       >
-        <CreditCard size={16} />
+        <Lock size={16} />
         {isPending ? "Processing…" : `Pay ${total}`}
       </button>
+
       <p className="text-xs text-faint">
-        Demo checkout — a licensed payment gateway is wired here at launch.
+        Demo checkout — no real card is charged. Enter any test card details. A
+        licensed payment gateway is wired here at launch.
       </p>
-    </div>
+    </form>
   );
 };
-──────────────────────────────────────────────────────────────────────────── */

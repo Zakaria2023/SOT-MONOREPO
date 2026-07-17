@@ -1,27 +1,33 @@
 "use server";
 
-export type PayOrderResult = {
-  error?: string;
-};
-
-// Payment is disabled for now — there is no gateway yet. Kept as a dormant stub
-// so the UI import stays valid and the flow can be restored quickly. The real
-// implementation (markOrderPaid + ownership check) is commented out below.
-export const payOrder = async (
-  _orderUuid: string,
-): Promise<PayOrderResult> => ({ error: "Payment is coming soon" });
-
-/* ── Real pay flow — restore when a payment gateway is wired ──────────────────
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getUserOrder, markOrderPaid } from "services";
 
-export const payOrder = async (orderUuid: string): Promise<PayOrderResult> => {
+export type PayOrderResult = {
+  error?: string;
+};
+
+// Fake payment — no gateway, no API keys, no card ever charged. It simulates the
+// round-trip to a provider (a short delay) then settles the order and raises its
+// invoice via the already-real markOrderPaid. Swap the delay for a licensed
+// provider (SAMA) callback when the real gateway is wired.
+export const payOrder = async (
+  _prevState: PayOrderResult,
+  orderUuid: string,
+): Promise<PayOrderResult> => {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not authenticated" };
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
 
   const owned = await getUserOrder(user.uuid, orderUuid);
-  if (!owned) return { error: "Order not found" };
+  if (!owned) {
+    return { error: "Order not found" };
+  }
+
+  // Simulate the gateway round-trip so the flow feels like a real charge.
+  await new Promise((resolve) => setTimeout(resolve, 1200));
 
   try {
     await markOrderPaid(orderUuid);
@@ -35,4 +41,3 @@ export const payOrder = async (orderUuid: string): Promise<PayOrderResult> => {
   revalidatePath("/orders");
   return {};
 };
-──────────────────────────────────────────────────────────────────────────── */
