@@ -33,6 +33,8 @@ export const getPartnerRequests = async (): Promise<PartnerRequestListItem[]> =>
 
 export const approvePartnerRequestAction = async (
   partnerRequestUuid: string,
+  badge: PartnerBadge,
+  isIntegrated: boolean,
 ): Promise<PartnerReviewResult> => {
   const { userId, user } = await requireAdmin();
 
@@ -87,6 +89,13 @@ export const approvePartnerRequestAction = async (
       reviewedByClerkUserId: userId,
       reviewedByName: getReviewerName(user),
     });
+
+    // Set the commercial profile (badge + integration) chosen at approval.
+    await setPartnerCommercialProfile({
+      partnerRequestUuid,
+      badge,
+      isIntegrated,
+    });
   } catch (error) {
     if (isClerkAPIResponseError(error)) {
       const [firstError] = error.errors;
@@ -103,32 +112,6 @@ export const approvePartnerRequestAction = async (
         error instanceof Error
           ? error.message
           : "Failed to approve partner request.",
-    };
-  }
-
-  revalidatePath("/partners");
-  return { success: true };
-};
-
-export const setPartnerCommercialAction = async (
-  partnerRequestUuid: string,
-  badge: PartnerBadge,
-  isIntegrated: boolean,
-): Promise<PartnerReviewResult> => {
-  await requireAdmin();
-
-  try {
-    await setPartnerCommercialProfile({
-      partnerRequestUuid,
-      badge,
-      isIntegrated,
-    });
-  } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update partner profile.",
     };
   }
 

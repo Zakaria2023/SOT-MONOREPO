@@ -1,7 +1,6 @@
 "use client";
 
 import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
-import { PartnerCommercialControl } from "@/components/partners/partner-commercial-control";
 import { PARTNER_TYPE_LABELS } from "@/db/label";
 import { documentDownloadUrl } from "@/lib/documents";
 import { FileText, X } from "lucide-react";
@@ -144,16 +143,6 @@ export const PartnerRequestDetailsDialog = ({
             </div>
           ))}
         </dl>
-
-        {request.status === "approved" && (
-          <div className="mt-5">
-            <PartnerCommercialControl
-              partnerRequestUuid={request.uuid}
-              badge={request.badge}
-              isIntegrated={request.isIntegrated}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import {
   rejectPartnerRequestAction,
 } from "@/app/(dashboard)/partners/action";
 import { PartnerRequestReviewDialog } from "@/components/partners/partner-request-review-dialog";
+import type { PartnerBadge } from "@/db/enum";
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -21,12 +22,16 @@ export const PartnerRequestRowActions = ({
   const router = useRouter();
   const [mode, setMode] = useState<"approve" | "reject" | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [badge, setBadge] = useState<PartnerBadge>("reseller");
+  const [isIntegrated, setIsIntegrated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isSubmitting, startTransition] = useTransition();
 
   const resetDialog = () => {
     setMode(null);
     setRejectionReason("");
+    setBadge("reseller");
+    setIsIntegrated(false);
     setError(undefined);
   };
 
@@ -37,7 +42,11 @@ export const PartnerRequestRowActions = ({
 
   const handleApprove = () => {
     startTransition(async () => {
-      const result = await approvePartnerRequestAction(request.uuid);
+      const result = await approvePartnerRequestAction(
+        request.uuid,
+        badge,
+        isIntegrated,
+      );
 
       if (result.error) {
         setError(result.error);
@@ -107,9 +116,13 @@ export const PartnerRequestRowActions = ({
           partnerName={request.fullName}
           email={request.email}
           rejectionReason={rejectionReason}
+          badge={badge}
+          isIntegrated={isIntegrated}
           isSubmitting={isSubmitting}
           error={error}
           onRejectionReasonChange={setRejectionReason}
+          onBadgeChange={setBadge}
+          onIntegratedChange={setIsIntegrated}
           onConfirm={mode === "approve" ? handleApprove : handleReject}
           onCancel={closeDialog}
         />
