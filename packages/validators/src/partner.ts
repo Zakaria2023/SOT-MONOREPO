@@ -10,6 +10,7 @@ export type PartnerServiceScope = (typeof partnerServiceScopes)[number];
 // What a partner can do — chosen first, before their applicant type. A partner
 // picks one or more of these.
 export const partnerCapabilities = [
+  "system_integrator",
   "stock",
   "install_program",
   "install_only",
@@ -20,6 +21,7 @@ export const partnerCapabilities = [
 export type PartnerCapability = (typeof partnerCapabilities)[number];
 
 export const PARTNER_CAPABILITY_LABELS: Record<PartnerCapability, string> = {
+  system_integrator: "System Integrator",
   stock: "Have stock",
   install_program: "Install & program the network",
   install_only: "Install the network only",

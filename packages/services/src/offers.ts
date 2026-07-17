@@ -21,7 +21,6 @@ export type ApprovedPartner = {
   partnerRequestUuid: SelectPartnerRequests["uuid"];
   name: string; // companyName || fullName — composed, no single column
   serviceScope: SelectPartnerRequests["serviceScope"];
-  badge: SelectPartnerRequests["badge"];
 };
 
 export type CreateOfferInput = {
@@ -59,7 +58,6 @@ export const getApprovedPartnerByClerkId = async (
       fullName: PartnerRequests.fullName,
       companyName: PartnerRequests.companyName,
       serviceScope: PartnerRequests.serviceScope,
-      badge: PartnerRequests.badge,
     })
     .from(PartnerRequests)
     .where(
@@ -74,7 +72,6 @@ export const getApprovedPartnerByClerkId = async (
     partnerRequestUuid: row.uuid,
     name: row.companyName || row.fullName,
     serviceScope: row.serviceScope,
-    badge: row.badge,
   };
 };
 

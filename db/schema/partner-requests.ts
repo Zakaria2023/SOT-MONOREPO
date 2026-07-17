@@ -11,8 +11,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-// partnerBadges powers the one discount ladder (see BADGE_DISCOUNTS).
-import { partnerBadges, partnerRequestStatuses, partnerTypes } from "../enum";
+import { partnerRequestStatuses, partnerTypes } from "../enum";
 
 // Partners can't self-serve a login — every type submits a request that an
 // admin reviews. On approval the admin sends a Clerk invitation to the email
@@ -59,13 +58,6 @@ export const PartnerRequests = mysqlTable(
     // on it ("install-program" may quote programming, "installation" may not).
     serviceScope: varchar("service_scope", { length: 50 })
       .default("install-program")
-      .notNull(),
-
-    // Pricing tier — every partner prices at the System Integrator rate. Not
-    // chosen in the UI (what a partner does is captured by their capabilities);
-    // kept so pricing can derive the SI price.
-    badge: mysqlEnum("badge", partnerBadges)
-      .default("system_integrator")
       .notNull(),
 
     // Integrated partners (accounting system bound to SOT) are auto-invoiced

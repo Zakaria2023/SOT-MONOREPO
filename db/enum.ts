@@ -234,17 +234,6 @@ export const invoiceStatuses = [
 
 export type InvoiceStatus = (typeof invoiceStatuses)[number];
 
-// The partner's pricing tier. What a partner *does* is captured by their
-// capabilities (chosen at request time), so there is no badge ladder to pick —
-// every partner prices at the System Integrator rate (the "SI price" the margin
-// pool references). Kept as a single-value enum so pricing (BADGE_DISCOUNTS)
-// stays typed.
-export const partnerBadges = [
-  "system_integrator",
-] as const satisfies readonly string[];
-
-export type PartnerBadge = (typeof partnerBadges)[number];
-
 // The QA lifecycle of a handover pack (Service & Handover, stages 6–7). The
 // partner assembles it (draft), submits it, the customer tests their own
 // access and confirms, SOT does a remote completeness check (verified). A

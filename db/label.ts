@@ -11,7 +11,6 @@ import {
   OfferPresentationMode,
   OfferStatus,
   OrderStatus,
-  PartnerBadge,
   PartnerEarningStatus,
   PartnerPayoutStatus,
   PartnerRequestStatus,
@@ -121,10 +120,6 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   issued: "Issued",
   paid: "Paid",
   void: "Void",
-};
-
-export const PARTNER_BADGE_LABELS: Record<PartnerBadge, string> = {
-  system_integrator: "System Integrator",
 };
 
 export const HANDOVER_STATUS_LABELS: Record<HandoverStatus, string> = {

@@ -16,6 +16,7 @@ import {
   Handshake,
   Hash,
   Landmark,
+  Layers,
   LifeBuoy,
   Mail,
   Receipt,
@@ -42,6 +43,12 @@ type CapabilityOption = {
 };
 
 const CAPABILITY_OPTIONS: CapabilityOption[] = [
+  {
+    value: "system_integrator",
+    label: "System Integrator",
+    description: "You design and deliver complete solutions end to end",
+    icon: <Layers size={20} />,
+  },
   {
     value: "stock",
     label: "Have stock",
