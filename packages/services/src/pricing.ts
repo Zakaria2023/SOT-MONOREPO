@@ -1,14 +1,10 @@
 import { PartnerBadge } from "../../../db/enum";
 
-// The ONE discount ladder. Each badge's percentage off MSRP is both the
-// partner's buy-in discount AND their margin pool — there is no second system.
-// Percentages are set by SOT and adjustable in Phase 1; they live here in code
-// (not an admin table) until pricing needs to move at runtime. Cabling is half
-// the integrator's rate by design.
+// The System Integrator discount off MSRP — both the partner's buy-in discount
+// and the margin pool. Set by SOT and adjustable in Phase 1; lives here in code
+// (not an admin table) until pricing needs to move at runtime.
 export const BADGE_DISCOUNTS: Record<PartnerBadge, number> = {
-  reseller: 20,
   system_integrator: 12,
-  cabling: 6,
 };
 
 export const discountPercentForBadge = (badge: PartnerBadge): number =>

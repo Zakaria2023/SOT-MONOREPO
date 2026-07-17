@@ -61,10 +61,12 @@ export const PartnerRequests = mysqlTable(
       .default("install-program")
       .notNull(),
 
-    // The partner's tier on the discount ladder. Every new partner starts as a
-    // reseller; an admin can promote them. Drives both their buy-in price and
-    // the margin pool (one number, see BADGE_DISCOUNTS).
-    badge: mysqlEnum("badge", partnerBadges).default("reseller").notNull(),
+    // Pricing tier — every partner prices at the System Integrator rate. Not
+    // chosen in the UI (what a partner does is captured by their capabilities);
+    // kept so pricing can derive the SI price.
+    badge: mysqlEnum("badge", partnerBadges)
+      .default("system_integrator")
+      .notNull(),
 
     // Integrated partners (accounting system bound to SOT) are auto-invoiced
     // and paid the instant handover completes; non-integrated partners submit a

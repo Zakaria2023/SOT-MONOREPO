@@ -396,15 +396,13 @@ export const linkPartnerRequestToClerkUser = async ({
   });
 };
 
-// Set a partner's commercial profile — their badge (discount ladder tier) and
-// whether they're an integrated partner (auto-paid at handover). Admin only.
-export const setPartnerCommercialProfile = async ({
+// Set whether a partner is integrated (auto-invoiced & paid at handover).
+// Admin only. Badge isn't set here — every partner prices at the SI rate.
+export const setPartnerIntegration = async ({
   partnerRequestUuid,
-  badge,
   isIntegrated,
 }: {
   partnerRequestUuid: SelectPartnerRequests["uuid"];
-  badge: SelectPartnerRequests["badge"];
   isIntegrated: SelectPartnerRequests["isIntegrated"];
 }): Promise<void> => {
   const [existing] = await db
@@ -417,6 +415,6 @@ export const setPartnerCommercialProfile = async ({
 
   await db
     .update(PartnerRequests)
-    .set({ badge, isIntegrated })
+    .set({ isIntegrated })
     .where(eq(PartnerRequests.uuid, partnerRequestUuid));
 };

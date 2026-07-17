@@ -1,9 +1,7 @@
 "use client";
 
-import { PARTNER_BADGE_LABELS } from "@/db/label";
-import { partnerBadges, type PartnerBadge } from "@/db/enum";
 import { ShieldCheck, TriangleAlert, X } from "lucide-react";
-import { Button, Checkbox, Dropdown, FormError, Textarea } from "ui";
+import { Button, Checkbox, FormError, Textarea } from "ui";
 
 type PartnerRequestReviewDialogProps = {
   open: boolean;
@@ -11,21 +9,14 @@ type PartnerRequestReviewDialogProps = {
   partnerName: string;
   email: string;
   rejectionReason: string;
-  badge: PartnerBadge;
   isIntegrated: boolean;
   isSubmitting: boolean;
   error?: string;
   onRejectionReasonChange: (value: string) => void;
-  onBadgeChange: (value: PartnerBadge) => void;
   onIntegratedChange: (value: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
 };
-
-const badgeOptions = partnerBadges.map((badge) => ({
-  value: badge,
-  label: PARTNER_BADGE_LABELS[badge],
-}));
 
 export const PartnerRequestReviewDialog = ({
   open,
@@ -33,12 +24,10 @@ export const PartnerRequestReviewDialog = ({
   partnerName,
   email,
   rejectionReason,
-  badge,
   isIntegrated,
   isSubmitting,
   error,
   onRejectionReasonChange,
-  onBadgeChange,
   onIntegratedChange,
   onConfirm,
   onCancel,
@@ -74,17 +63,7 @@ export const PartnerRequestReviewDialog = ({
         </div>
 
         {approve && (
-          <div className="mt-5 flex flex-col gap-4">
-            <div>
-              <span className="mb-1.5 block text-sm font-medium text-ink">
-                Badge
-              </span>
-              <Dropdown
-                options={badgeOptions}
-                value={badge}
-                onChange={(value) => onBadgeChange(value as PartnerBadge)}
-              />
-            </div>
+          <div className="mt-5">
             <Checkbox
               label="Integrated partner (auto-invoiced & paid at handover)"
               checked={isIntegrated}

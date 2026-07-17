@@ -124,9 +124,7 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
 };
 
 export const PARTNER_BADGE_LABELS: Record<PartnerBadge, string> = {
-  reseller: "Reseller (Stock partner)",
   system_integrator: "System Integrator",
-  cabling: "Cabling (Technician)",
 };
 
 export const HANDOVER_STATUS_LABELS: Record<HandoverStatus, string> = {
