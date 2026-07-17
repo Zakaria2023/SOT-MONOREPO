@@ -6,13 +6,12 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import type { PartnerBadge } from "@/db/enum";
 import {
   approvePartnerRequest as approvePartnerRequestRecord,
   getPartnerRequestByUuid,
   listPartnerRequests,
   rejectPartnerRequest as rejectPartnerRequestRecord,
-  setPartnerCommercialProfile,
+  setPartnerIntegration,
 } from "services";
 import {
   partnerRejectionSchema,
@@ -33,7 +32,6 @@ export const getPartnerRequests = async (): Promise<PartnerRequestListItem[]> =>
 
 export const approvePartnerRequestAction = async (
   partnerRequestUuid: string,
-  badge: PartnerBadge,
   isIntegrated: boolean,
 ): Promise<PartnerReviewResult> => {
   const { userId, user } = await requireAdmin();
@@ -111,12 +109,8 @@ export const approvePartnerRequestAction = async (
       reviewedByName: getReviewerName(user),
     });
 
-    // Set the commercial profile (badge + integration) chosen at approval.
-    await setPartnerCommercialProfile({
-      partnerRequestUuid,
-      badge,
-      isIntegrated,
-    });
+    // Set whether the partner is integrated (chosen at approval).
+    await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
   } catch (error) {
     if (isClerkAPIResponseError(error)) {
       const [firstError] = error.errors;
@@ -140,20 +134,15 @@ export const approvePartnerRequestAction = async (
   return { success: true };
 };
 
-// Edit an already-approved partner's commercial profile (badge + integration).
-export const setPartnerCommercialAction = async (
+// Edit an already-approved partner's integration setting.
+export const setPartnerIntegrationAction = async (
   partnerRequestUuid: string,
-  badge: PartnerBadge,
   isIntegrated: boolean,
 ): Promise<PartnerReviewResult> => {
   await requireAdmin();
 
   try {
-    await setPartnerCommercialProfile({
-      partnerRequestUuid,
-      badge,
-      isIntegrated,
-    });
+    await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
   } catch (error) {
     return {
       error:

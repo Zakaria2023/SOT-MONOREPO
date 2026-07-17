@@ -234,21 +234,6 @@ export const invoiceStatuses = [
 
 export type InvoiceStatus = (typeof invoiceStatuses)[number];
 
-// Partner badges form ONE discount ladder off MSRP — bigger discount = lower
-// buy-in = more margin. The same percentage is both the partner's price and
-// the margin pool. Percentages live in code (adjustable in Phase 1); see
-// BADGE_DISCOUNTS in packages/services.
-// - reseller (Stock partner): highest discount, cheapest buy-in.
-// - system_integrator: the "SI price" the margin pool references.
-// - cabling (Technician): half the integrator's discount.
-export const partnerBadges = [
-  "reseller",
-  "system_integrator",
-  "cabling",
-] as const satisfies readonly string[];
-
-export type PartnerBadge = (typeof partnerBadges)[number];
-
 // The QA lifecycle of a handover pack (Service & Handover, stages 6–7). The
 // partner assembles it (draft), submits it, the customer tests their own
 // access and confirms, SOT does a remote completeness check (verified). A

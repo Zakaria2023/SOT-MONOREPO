@@ -4,11 +4,10 @@ import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
 import {
   approvePartnerRequestAction,
   rejectPartnerRequestAction,
-  setPartnerCommercialAction,
+  setPartnerIntegrationAction,
 } from "@/app/(dashboard)/partners/action";
 import { PartnerCommercialDialog } from "@/components/partners/partner-commercial-dialog";
 import { PartnerRequestReviewDialog } from "@/components/partners/partner-request-review-dialog";
-import type { PartnerBadge } from "@/db/enum";
 import { Check, SlidersHorizontal, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -24,7 +23,6 @@ export const PartnerRequestRowActions = ({
   const router = useRouter();
   const [mode, setMode] = useState<"approve" | "reject" | "edit" | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [badge, setBadge] = useState<PartnerBadge>("reseller");
   const [isIntegrated, setIsIntegrated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isSubmitting, startTransition] = useTransition();
@@ -32,7 +30,6 @@ export const PartnerRequestRowActions = ({
   const resetDialog = () => {
     setMode(null);
     setRejectionReason("");
-    setBadge("reseller");
     setIsIntegrated(false);
     setError(undefined);
   };
@@ -46,7 +43,6 @@ export const PartnerRequestRowActions = ({
     startTransition(async () => {
       const result = await approvePartnerRequestAction(
         request.uuid,
-        badge,
         isIntegrated,
       );
 
@@ -78,9 +74,8 @@ export const PartnerRequestRowActions = ({
 
   const handleSaveProfile = () => {
     startTransition(async () => {
-      const result = await setPartnerCommercialAction(
+      const result = await setPartnerIntegrationAction(
         request.uuid,
-        badge,
         isIntegrated,
       );
 
@@ -106,7 +101,6 @@ export const PartnerRequestRowActions = ({
             className="px-3"
             onClick={() => {
               setError(undefined);
-              setBadge(request.badge);
               setIsIntegrated(request.isIntegrated);
               setMode("edit");
             }}
@@ -119,11 +113,9 @@ export const PartnerRequestRowActions = ({
         {mode === "edit" && (
           <PartnerCommercialDialog
             partnerName={request.fullName}
-            badge={badge}
             isIntegrated={isIntegrated}
             isSubmitting={isSubmitting}
             error={error}
-            onBadgeChange={setBadge}
             onIntegratedChange={setIsIntegrated}
             onConfirm={handleSaveProfile}
             onCancel={closeDialog}
@@ -175,12 +167,10 @@ export const PartnerRequestRowActions = ({
           partnerName={request.fullName}
           email={request.email}
           rejectionReason={rejectionReason}
-          badge={badge}
           isIntegrated={isIntegrated}
           isSubmitting={isSubmitting}
           error={error}
           onRejectionReasonChange={setRejectionReason}
-          onBadgeChange={setBadge}
           onIntegratedChange={setIsIntegrated}
           onConfirm={mode === "approve" ? handleApprove : handleReject}
           onCancel={closeDialog}

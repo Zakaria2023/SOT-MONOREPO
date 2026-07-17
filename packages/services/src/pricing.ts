@@ -1,18 +1,9 @@
-import { PartnerBadge } from "../../../db/enum";
-
-// The ONE discount ladder. Each badge's percentage off MSRP is both the
-// partner's buy-in discount AND their margin pool — there is no second system.
-// Percentages are set by SOT and adjustable in Phase 1; they live here in code
-// (not an admin table) until pricing needs to move at runtime. Cabling is half
-// the integrator's rate by design.
-export const BADGE_DISCOUNTS: Record<PartnerBadge, number> = {
-  reseller: 20,
-  system_integrator: 12,
-  cabling: 6,
-};
-
-export const discountPercentForBadge = (badge: PartnerBadge): number =>
-  BADGE_DISCOUNTS[badge];
+// The partner discount off MSRP — both the partner's buy-in discount and the
+// margin pool (one number, no ladder). What a partner does is captured by their
+// capabilities, so every partner prices at this System Integrator rate. Set by
+// SOT and adjustable in Phase 1; lives here in code (not an admin table) until
+// pricing needs to move at runtime.
+export const PARTNER_DISCOUNT_PERCENT = 12;
 
 export type PartnerCartPricing = {
   // Cart totals at MSRP; the discount is presented as ONE lump sum at the cart,
@@ -23,18 +14,17 @@ export type PartnerCartPricing = {
   total: number;
 };
 
-// Given a partner's MSRP subtotal and badge, compute the cart-level lump-sum
-// discount and their real total. Fees (delivery/pickup) are layered on by the
-// caller, not here.
+// Given a partner's MSRP subtotal, compute the cart-level lump-sum discount and
+// their real total. Fees (delivery/pickup) are layered on by the caller, not
+// here.
 export const computePartnerCartPricing = (
   subtotalMsrp: number,
-  badge: PartnerBadge,
 ): PartnerCartPricing => {
-  const discountPercent = discountPercentForBadge(badge);
-  const discountAmount = Math.round(subtotalMsrp * discountPercent) / 100;
+  const discountAmount =
+    Math.round(subtotalMsrp * PARTNER_DISCOUNT_PERCENT) / 100;
   return {
     subtotal: subtotalMsrp,
-    discountPercent,
+    discountPercent: PARTNER_DISCOUNT_PERCENT,
     discountAmount,
     total: subtotalMsrp - discountAmount,
   };

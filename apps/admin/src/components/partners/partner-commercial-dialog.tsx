@@ -1,34 +1,23 @@
 "use client";
 
-import { PARTNER_BADGE_LABELS } from "@/db/label";
-import { partnerBadges, type PartnerBadge } from "@/db/enum";
 import { SlidersHorizontal, X } from "lucide-react";
-import { Button, Checkbox, Dropdown, FormError } from "ui";
+import { Button, Checkbox, FormError } from "ui";
 
 type PartnerCommercialDialogProps = {
   partnerName: string;
-  badge: PartnerBadge;
   isIntegrated: boolean;
   isSubmitting: boolean;
   error?: string;
-  onBadgeChange: (value: PartnerBadge) => void;
   onIntegratedChange: (value: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-const badgeOptions = partnerBadges.map((badge) => ({
-  value: badge,
-  label: PARTNER_BADGE_LABELS[badge],
-}));
-
 export const PartnerCommercialDialog = ({
   partnerName,
-  badge,
   isIntegrated,
   isSubmitting,
   error,
-  onBadgeChange,
   onIntegratedChange,
   onConfirm,
   onCancel,
@@ -41,25 +30,15 @@ export const PartnerCommercialDialog = ({
         </div>
         <div className="flex flex-col gap-1 text-left">
           <h2 className="font-heading text-lg font-semibold text-ink">
-            Commercial profile
+            Partner integration
           </h2>
           <p className="text-sm text-muted">
-            Update the badge and integration for &ldquo;{partnerName}&rdquo;.
+            Update how &ldquo;{partnerName}&rdquo; is paid at handover.
           </p>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col gap-4">
-        <div>
-          <span className="mb-1.5 block text-sm font-medium text-ink">
-            Badge
-          </span>
-          <Dropdown
-            options={badgeOptions}
-            value={badge}
-            onChange={(value) => onBadgeChange(value as PartnerBadge)}
-          />
-        </div>
+      <div className="mt-5">
         <Checkbox
           label="Integrated partner (auto-invoiced & paid at handover)"
           checked={isIntegrated}
@@ -86,7 +65,7 @@ export const PartnerCommercialDialog = ({
           onClick={onConfirm}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Saving..." : "Save profile"}
+          {isSubmitting ? "Saving..." : "Save"}
         </Button>
       </div>
     </div>
