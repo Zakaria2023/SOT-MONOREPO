@@ -7,6 +7,26 @@ export const partnerServiceScopes = [
 
 export type PartnerServiceScope = (typeof partnerServiceScopes)[number];
 
+// What a partner can do — chosen first, before their applicant type. A partner
+// picks one or more of these.
+export const partnerCapabilities = [
+  "stock",
+  "install_program",
+  "install_only",
+  "pre_sell",
+  "post_sell",
+] as const satisfies readonly string[];
+
+export type PartnerCapability = (typeof partnerCapabilities)[number];
+
+export const PARTNER_CAPABILITY_LABELS: Record<PartnerCapability, string> = {
+  stock: "Have stock",
+  install_program: "Install & program the network",
+  install_only: "Install the network only",
+  pre_sell: "Pre-sell partner",
+  post_sell: "Post-sell partner",
+};
+
 // Which kind of applicant is applying — mirrors the client sign-up account
 // types. Every type submits a request that an admin reviews.
 export const partnerApplicantTypes = [
@@ -20,6 +40,11 @@ const digits = (value: string | undefined) => (value ?? "").replace(/\D/g, "");
 
 export const partnerRequestSchema = z
   .object({
+    // Chosen first — one or more capabilities.
+    capabilities: z
+      .array(z.enum(partnerCapabilities))
+      .min(1, "Select at least one option"),
+
     type: z.enum(partnerApplicantTypes),
 
     // Shared contact identity. The email receives the Clerk invitation.

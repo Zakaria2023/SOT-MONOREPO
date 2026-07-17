@@ -7,6 +7,7 @@ import { documentDownloadUrl } from "@/lib/documents";
 import { FileText, X } from "lucide-react";
 import Link from "next/link";
 import { Button } from "ui";
+import { PARTNER_CAPABILITY_LABELS, type PartnerCapability } from "validators";
 
 type PartnerRequestDetailsDialogProps = {
   request: PartnerRequestListItem;
@@ -22,8 +23,19 @@ export const PartnerRequestDetailsDialog = ({
   request,
   onClose,
 }: PartnerRequestDetailsDialogProps) => {
+  const capabilities = (request.capabilities ?? []) as PartnerCapability[];
+
   const fields: DetailField[] = [
     { label: "Type", value: PARTNER_TYPE_LABELS[request.type] },
+    {
+      label: "Capabilities",
+      value:
+        capabilities.length > 0
+          ? capabilities
+              .map((capability) => PARTNER_CAPABILITY_LABELS[capability])
+              .join(", ")
+          : "—",
+    },
     { label: "Full name", value: request.fullName },
     { label: "Email", value: request.email },
     { label: "Contact number", value: request.contactNumber },

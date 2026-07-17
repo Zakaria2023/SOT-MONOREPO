@@ -4,6 +4,7 @@ import {
   char,
   index,
   int,
+  json,
   mysqlEnum,
   mysqlTable,
   text,
@@ -22,6 +23,10 @@ export const PartnerRequests = mysqlTable(
   {
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
+
+    // What the partner can do — chosen first, one or more (stock, install +
+    // program, install only, pre-sell, post-sell). Stored as a JSON array.
+    capabilities: json("capabilities").$type<string[]>(),
 
     // Which sign-up-style applicant this is; drives the type-specific fields.
     type: mysqlEnum("type", partnerTypes).notNull(),
