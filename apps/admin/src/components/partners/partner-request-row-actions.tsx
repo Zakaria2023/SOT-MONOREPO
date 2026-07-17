@@ -4,10 +4,12 @@ import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
 import {
   approvePartnerRequestAction,
   rejectPartnerRequestAction,
+  setPartnerCommercialAction,
 } from "@/app/(dashboard)/partners/action";
+import { PartnerCommercialDialog } from "@/components/partners/partner-commercial-dialog";
 import { PartnerRequestReviewDialog } from "@/components/partners/partner-request-review-dialog";
 import type { PartnerBadge } from "@/db/enum";
-import { Check, X } from "lucide-react";
+import { Check, SlidersHorizontal, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "ui";
@@ -20,7 +22,7 @@ export const PartnerRequestRowActions = ({
   request,
 }: PartnerRequestRowActionsProps) => {
   const router = useRouter();
-  const [mode, setMode] = useState<"approve" | "reject" | null>(null);
+  const [mode, setMode] = useState<"approve" | "reject" | "edit" | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [badge, setBadge] = useState<PartnerBadge>("reseller");
   const [isIntegrated, setIsIntegrated] = useState(false);
@@ -74,6 +76,63 @@ export const PartnerRequestRowActions = ({
     });
   };
 
+  const handleSaveProfile = () => {
+    startTransition(async () => {
+      const result = await setPartnerCommercialAction(
+        request.uuid,
+        badge,
+        isIntegrated,
+      );
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      resetDialog();
+      router.refresh();
+    });
+  };
+
+  // Approved partners get an Edit button for their commercial profile; other
+  // non-pending states have no row action.
+  if (request.status === "approved") {
+    return (
+      <>
+        <div className="flex items-center justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            className="px-3"
+            onClick={() => {
+              setError(undefined);
+              setBadge(request.badge);
+              setIsIntegrated(request.isIntegrated);
+              setMode("edit");
+            }}
+          >
+            <SlidersHorizontal size={16} />
+            Edit
+          </Button>
+        </div>
+
+        {mode === "edit" && (
+          <PartnerCommercialDialog
+            partnerName={request.fullName}
+            badge={badge}
+            isIntegrated={isIntegrated}
+            isSubmitting={isSubmitting}
+            error={error}
+            onBadgeChange={setBadge}
+            onIntegratedChange={setIsIntegrated}
+            onConfirm={handleSaveProfile}
+            onCancel={closeDialog}
+          />
+        )}
+      </>
+    );
+  }
+
   if (request.status !== "pending") {
     return <span className="text-faint">-</span>;
   }
@@ -109,7 +168,7 @@ export const PartnerRequestRowActions = ({
         </Button>
       </div>
 
-      {mode && (
+      {(mode === "approve" || mode === "reject") && (
         <PartnerRequestReviewDialog
           open
           mode={mode}

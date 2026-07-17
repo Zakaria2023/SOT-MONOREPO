@@ -119,6 +119,33 @@ export const approvePartnerRequestAction = async (
   return { success: true };
 };
 
+// Edit an already-approved partner's commercial profile (badge + integration).
+export const setPartnerCommercialAction = async (
+  partnerRequestUuid: string,
+  badge: PartnerBadge,
+  isIntegrated: boolean,
+): Promise<PartnerReviewResult> => {
+  await requireAdmin();
+
+  try {
+    await setPartnerCommercialProfile({
+      partnerRequestUuid,
+      badge,
+      isIntegrated,
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update partner profile.",
+    };
+  }
+
+  revalidatePath("/partners");
+  return { success: true };
+};
+
 export const rejectPartnerRequestAction = async (
   partnerRequestUuid: string,
   input: PartnerRejectionInput,
