@@ -11,7 +11,7 @@ export type GovernmentRequestInput = {
   officialEmail: SelectGovernmentRequests["officialEmail"];
   entityName: SelectGovernmentRequests["entityName"];
   fullName: SelectGovernmentRequests["fullName"];
-  contactNumber: SelectGovernmentRequests["contactNumber"];
+  contactNumber?: SelectGovernmentRequests["contactNumber"];
   location: SelectGovernmentRequests["location"];
 };
 
@@ -32,6 +32,11 @@ export type RejectGovernmentRequestInput = {
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const normalizeText = (value?: string | null): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
 
 /** Create a pending government request, rejecting a duplicate active email. */
 export const createGovernmentRequest = async (
@@ -68,7 +73,7 @@ export const createGovernmentRequest = async (
     officialEmail,
     entityName: input.entityName.trim(),
     fullName: input.fullName.trim(),
-    contactNumber: input.contactNumber.trim(),
+    contactNumber: normalizeText(input.contactNumber),
     location: input.location.trim(),
   });
 

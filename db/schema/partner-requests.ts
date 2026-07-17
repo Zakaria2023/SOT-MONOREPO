@@ -34,7 +34,9 @@ export const PartnerRequests = mysqlTable(
     // parts for individuals, the representative name for facilities.
     fullName: varchar("full_name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
-    contactNumber: varchar("contact_number", { length: 30 }).notNull(),
+    // Email is the required identifier (invitation + linking key); phone is an
+    // optional secondary contact.
+    contactNumber: varchar("contact_number", { length: 30 }),
     location: varchar("location", { length: 255 }).notNull(),
 
     // ── Individual fields (null for facilities) ───────────────────────────

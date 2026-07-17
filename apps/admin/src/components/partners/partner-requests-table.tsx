@@ -107,7 +107,9 @@ const columns: TableColumn<PartnerRequestListItem>[] = [
         <a href={`mailto:${request.email}`} className="text-primary">
           {request.email}
         </a>
-        <p className="text-muted">{request.contactNumber}</p>
+        {request.contactNumber && (
+          <p className="text-muted">{request.contactNumber}</p>
+        )}
       </div>
     ),
   },

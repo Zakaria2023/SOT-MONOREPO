@@ -51,7 +51,7 @@ export const partnerRequestSchema = z
 
     // Shared contact identity. The email receives the Clerk invitation.
     email: z.string().email("Enter a valid email address").max(255),
-    contactNumber: z.string().min(1, "Contact number is required").max(30),
+    contactNumber: z.string().max(30).optional(),
     location: z.string().min(1, "Location is required").max(255),
 
     // Individual identity + name.

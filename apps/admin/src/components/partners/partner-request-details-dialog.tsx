@@ -37,7 +37,7 @@ export const PartnerRequestDetailsDialog = ({
     },
     { label: "Full name", value: request.fullName },
     { label: "Email", value: request.email },
-    { label: "Contact number", value: request.contactNumber },
+    { label: "Contact number", value: request.contactNumber ?? "—" },
     { label: "Location", value: request.location },
   ];
 

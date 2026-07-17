@@ -21,7 +21,7 @@ export type PartnerRequestInput = {
   capabilities?: SelectPartnerRequests["capabilities"];
   type: SelectPartnerRequests["type"];
   email: SelectPartnerRequests["email"];
-  contactNumber: SelectPartnerRequests["contactNumber"];
+  contactNumber?: SelectPartnerRequests["contactNumber"];
   location: SelectPartnerRequests["location"];
   // Individual identity + name (null/absent for other types).
   firstName?: SelectPartnerRequests["firstName"];
@@ -115,7 +115,7 @@ export const createPartnerRequest = async (
     type: input.type,
     fullName,
     email,
-    contactNumber: input.contactNumber.trim(),
+    contactNumber: normalizeText(input.contactNumber),
     location: input.location.trim(),
     firstName: normalizeText(input.firstName),
     middleName: normalizeText(input.middleName),
