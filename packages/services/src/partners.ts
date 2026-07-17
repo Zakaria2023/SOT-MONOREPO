@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
+import { BoqPartners } from "../../../db/schema/boq-partners";
+import { Offers } from "../../../db/schema/offers";
 import {
   PartnerRequests,
   SelectPartnerRequests,
@@ -351,15 +353,47 @@ export const linkPartnerRequestToClerkUser = async ({
   email: string;
   clerkUserId: string;
 }): Promise<void> => {
-  await db
-    .update(PartnerRequests)
-    .set({ approvedClerkUserId: clerkUserId })
+  const normalized = normalizeEmail(email);
+
+  const [request] = await db
+    .select({ oldId: PartnerRequests.approvedClerkUserId })
+    .from(PartnerRequests)
     .where(
       and(
-        eq(PartnerRequests.email, normalizeEmail(email)),
+        eq(PartnerRequests.email, normalized),
         eq(PartnerRequests.status, "approved"),
       ),
     );
+  // No approved request, or already linked to this user — nothing to do.
+  if (!request || request.oldId === clerkUserId) {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(PartnerRequests)
+      .set({ approvedClerkUserId: clerkUserId })
+      .where(
+        and(
+          eq(PartnerRequests.email, normalized),
+          eq(PartnerRequests.status, "approved"),
+        ),
+      );
+
+    // Re-point anything dispatched/quoted under the old id (e.g. an invitation
+    // id used before the partner signed up) to the real user id, so their
+    // incoming BOQs and offers resolve.
+    if (request.oldId) {
+      await tx
+        .update(BoqPartners)
+        .set({ partnerClerkUserId: clerkUserId })
+        .where(eq(BoqPartners.partnerClerkUserId, request.oldId));
+      await tx
+        .update(Offers)
+        .set({ partnerClerkUserId: clerkUserId })
+        .where(eq(Offers.partnerClerkUserId, request.oldId));
+    }
+  });
 };
 
 // Set a partner's commercial profile — their badge (discount ladder tier) and

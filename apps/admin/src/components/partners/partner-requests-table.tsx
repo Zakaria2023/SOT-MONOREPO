@@ -12,6 +12,7 @@ import { Eye } from "lucide-react";
 import { useState } from "react";
 import type { TableColumn } from "ui";
 import { Button, Table } from "ui";
+import { PARTNER_CAPABILITY_LABELS, type PartnerCapability } from "validators";
 
 type PartnerRequestsTableProps = {
   requests: PartnerRequestListItem[];
@@ -75,6 +76,28 @@ const columns: TableColumn<PartnerRequestListItem>[] = [
         {PARTNER_TYPE_LABELS[request.type]}
       </span>
     ),
+  },
+  {
+    key: "capabilities",
+    header: "Capabilities",
+    render: (request) => {
+      const capabilities = (request.capabilities ?? []) as PartnerCapability[];
+      if (capabilities.length === 0) {
+        return <span className="text-faint">—</span>;
+      }
+      return (
+        <div className="flex min-w-44 flex-wrap gap-1">
+          {capabilities.map((capability) => (
+            <span
+              key={capability}
+              className="inline-flex rounded-full bg-hover px-2 py-0.5 text-xs text-muted"
+            >
+              {PARTNER_CAPABILITY_LABELS[capability]}
+            </span>
+          ))}
+        </div>
+      );
+    },
   },
   {
     key: "contact",
