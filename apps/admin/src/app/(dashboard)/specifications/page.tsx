@@ -1,17 +1,38 @@
 import { SpecificationsTable } from "@/components/specifications/specifications-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { getSpecificationsPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
+type SpecificationsListProps = {
+  search?: string;
+  page?: string;
+};
+
+const SpecificationsList = async ({ search, page }: SpecificationsListProps) => {
+  const result = await getSpecificationsPage({ search, page });
+  return (
+    <>
+      <SpecificationsTable specifications={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
 const SpecificationsPage = async ({ searchParams }: Props) => {
   const { search, page } = await searchParams;
-  const result = await getSpecificationsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -29,14 +50,9 @@ const SpecificationsPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search specifications..." />
 
-      <SpecificationsTable specifications={result.items} />
-
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
+      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+        <SpecificationsList search={search} page={page} />
+      </Suspense>
     </div>
   );
 };

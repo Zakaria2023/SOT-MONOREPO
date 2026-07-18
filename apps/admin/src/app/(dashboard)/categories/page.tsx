@@ -3,26 +3,48 @@ import { CategoriesTable } from "@/components/categories/categories-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
 import { ParentFilter } from "@/components/shared/parent-filter";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { getCategories, getCategoriesPage, getCategoryChildren } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string; parent?: string }>;
 };
 
+type BrowseProps = {
+  search?: string;
+  page?: string;
+};
+
+type ReorderProps = {
+  parent: string;
+};
+
+const CategoriesBrowseList = async ({ search, page }: BrowseProps) => {
+  const result = await getCategoriesPage({ search, page });
+  return (
+    <>
+      <CategoriesTable categories={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
+const CategoriesReorderList = async ({ parent }: ReorderProps) => {
+  const children = await getCategoryChildren(parent === "root" ? null : parent);
+  return <CategoriesReorderTable categories={children} />;
+};
+
 const CategoriesPage = async ({ searchParams }: Props) => {
   const { search, page, parent } = await searchParams;
   const allCategories = await getCategories();
-
-  // A `parent` filter switches to reorder mode: show every child of that
-  // parent (or the top-level categories for "root"), draggable to set their
-  // order within that parent. Otherwise it's the normal searched/paged list.
-  const isReorder = Boolean(parent);
-  const children = isReorder
-    ? await getCategoryChildren(parent === "root" ? null : (parent ?? null))
-    : [];
-  const result = isReorder ? null : await getCategoriesPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -40,29 +62,26 @@ const CategoriesPage = async ({ searchParams }: Props) => {
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <ParentFilter items={allCategories} browseLabel="All (browse)" />
-        {!isReorder && <ListSearch placeholder="Search categories..." />}
+        {!parent && <ListSearch placeholder="Search categories..." />}
       </div>
 
-      {isReorder ? (
+      {parent ? (
         <>
           <p className="text-sm text-muted">
             Drag rows to set their order within this parent. Changes save
             automatically.
           </p>
-          <CategoriesReorderTable categories={children} />
+          <Suspense key={`reorder-${parent}`} fallback={<TableSkeleton />}>
+            <CategoriesReorderList parent={parent} />
+          </Suspense>
         </>
       ) : (
-        result && (
-          <>
-            <CategoriesTable categories={result.items} />
-            <Pagination
-              page={result.page}
-              totalPages={result.totalPages}
-              total={result.total}
-              pageSize={result.pageSize}
-            />
-          </>
-        )
+        <Suspense
+          key={`${search ?? ""}-${page ?? ""}`}
+          fallback={<TableSkeleton />}
+        >
+          <CategoriesBrowseList search={search} page={page} />
+        </Suspense>
       )}
     </div>
   );

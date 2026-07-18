@@ -3,26 +3,48 @@ import { BrandsTable } from "@/components/brands/brands-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
 import { ParentFilter } from "@/components/shared/parent-filter";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { getBrandChildren, getBrands, getBrandsPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string; parent?: string }>;
 };
 
+type BrowseProps = {
+  search?: string;
+  page?: string;
+};
+
+type ReorderProps = {
+  parent: string;
+};
+
+const BrandsBrowseList = async ({ search, page }: BrowseProps) => {
+  const result = await getBrandsPage({ search, page });
+  return (
+    <>
+      <BrandsTable brands={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
+const BrandsReorderList = async ({ parent }: ReorderProps) => {
+  const children = await getBrandChildren(parent === "root" ? null : parent);
+  return <BrandsReorderTable brands={children} />;
+};
+
 const BrandsPage = async ({ searchParams }: Props) => {
   const { search, page, parent } = await searchParams;
   const allBrands = await getBrands();
-
-  // A `parent` filter switches to reorder mode: show every child of that
-  // parent (or the top-level brands for "root"), draggable to set their order
-  // within that parent. Otherwise it's the normal searched/paged list.
-  const isReorder = Boolean(parent);
-  const children = isReorder
-    ? await getBrandChildren(parent === "root" ? null : (parent ?? null))
-    : [];
-  const result = isReorder ? null : await getBrandsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -40,29 +62,26 @@ const BrandsPage = async ({ searchParams }: Props) => {
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <ParentFilter items={allBrands} browseLabel="All (browse)" />
-        {!isReorder && <ListSearch placeholder="Search brands..." />}
+        {!parent && <ListSearch placeholder="Search brands..." />}
       </div>
 
-      {isReorder ? (
+      {parent ? (
         <>
           <p className="text-sm text-muted">
             Drag rows to set their order within this parent. Changes save
             automatically.
           </p>
-          <BrandsReorderTable brands={children} />
+          <Suspense key={`reorder-${parent}`} fallback={<TableSkeleton />}>
+            <BrandsReorderList parent={parent} />
+          </Suspense>
         </>
       ) : (
-        result && (
-          <>
-            <BrandsTable brands={result.items} />
-            <Pagination
-              page={result.page}
-              totalPages={result.totalPages}
-              total={result.total}
-              pageSize={result.pageSize}
-            />
-          </>
-        )
+        <Suspense
+          key={`${search ?? ""}-${page ?? ""}`}
+          fallback={<TableSkeleton />}
+        >
+          <BrandsBrowseList search={search} page={page} />
+        </Suspense>
       )}
     </div>
   );

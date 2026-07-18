@@ -1,19 +1,12 @@
 type TableSkeletonProps = {
-  title?: string;
   rows?: number;
 };
 
-// A static placeholder that mirrors the list-page layout (heading, toolbar,
-// table) so route navigations show structure instead of a blank screen.
-export const TableSkeleton = ({ title = "Loading", rows = 8 }: TableSkeletonProps) => (
-  <div className="flex flex-col gap-5">
-    <div className="flex items-center justify-between">
-      <div className="h-8 w-48 animate-pulse rounded-control bg-hover" />
-      <div className="h-9 w-32 animate-pulse rounded-control bg-hover" />
-    </div>
-
-    <div className="h-11 w-full max-w-sm animate-pulse rounded-control bg-hover" />
-
+// Static placeholder for the table area, used as a <Suspense> fallback while a
+// searched/paginated list streams in. The page chrome (heading, toolbar,
+// filters) stays mounted outside the boundary, so this renders the table only.
+export const TableSkeleton = ({ rows = 8 }: TableSkeletonProps) => (
+  <div className="flex flex-col gap-2">
     <div className="overflow-hidden rounded-card border border-hairline bg-surface">
       <div className="h-12 border-b border-hairline bg-hover" />
       <div className="divide-y divide-hairline-soft">
@@ -27,7 +20,6 @@ export const TableSkeleton = ({ title = "Loading", rows = 8 }: TableSkeletonProp
         ))}
       </div>
     </div>
-
-    <span className="sr-only">{title}</span>
+    <span className="sr-only">Loading…</span>
   </div>
 );

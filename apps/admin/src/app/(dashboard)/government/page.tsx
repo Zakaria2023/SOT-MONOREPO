@@ -1,17 +1,38 @@
 import { GovernmentRequestsTable } from "@/components/government/government-requests-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { requireAdmin } from "@/lib/server/auth";
+import { Suspense } from "react";
 import { getGovernmentRequestsPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
+type GovernmentListProps = {
+  search?: string;
+  page?: string;
+};
+
+const GovernmentList = async ({ search, page }: GovernmentListProps) => {
+  const result = await getGovernmentRequestsPage({ search, page });
+  return (
+    <>
+      <GovernmentRequestsTable requests={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
 const GovernmentPage = async ({ searchParams }: Props) => {
   await requireAdmin();
   const { search, page } = await searchParams;
-  const result = await getGovernmentRequestsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -24,14 +45,9 @@ const GovernmentPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search by entity, name, or email..." />
 
-      <GovernmentRequestsTable requests={result.items} />
-
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
+      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+        <GovernmentList search={search} page={page} />
+      </Suspense>
     </div>
   );
 };

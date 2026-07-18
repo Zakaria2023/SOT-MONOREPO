@@ -1,17 +1,38 @@
 import { RulesTable } from "@/components/rules/rules-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { FlaskConical, Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { getRulesPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
+type RulesListProps = {
+  search?: string;
+  page?: string;
+};
+
+const RulesList = async ({ search, page }: RulesListProps) => {
+  const result = await getRulesPage({ search, page });
+  return (
+    <>
+      <RulesTable rules={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
 const RulesPage = async ({ searchParams }: Props) => {
   const { search, page } = await searchParams;
-  const result = await getRulesPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -42,14 +63,9 @@ const RulesPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search by rule name or spec..." />
 
-      <RulesTable rules={result.items} />
-
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
+      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+        <RulesList search={search} page={page} />
+      </Suspense>
     </div>
   );
 };

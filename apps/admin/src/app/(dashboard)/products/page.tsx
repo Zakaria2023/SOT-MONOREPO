@@ -1,17 +1,38 @@
 import { ProductsTable } from "@/components/products/products-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { getProductsPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
+type ProductsListProps = {
+  search?: string;
+  page?: string;
+};
+
+const ProductsList = async ({ search, page }: ProductsListProps) => {
+  const result = await getProductsPage({ search, page });
+  return (
+    <>
+      <ProductsTable products={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
 const ProductsPage = async ({ searchParams }: Props) => {
   const { search, page } = await searchParams;
-  const result = await getProductsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -29,14 +50,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search products..." />
 
-      <ProductsTable products={result.items} />
-
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
+      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+        <ProductsList search={search} page={page} />
+      </Suspense>
     </div>
   );
 };
