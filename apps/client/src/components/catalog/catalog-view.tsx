@@ -14,7 +14,7 @@ import type {
   ProductListItem,
   ProductSort,
 } from "services";
-import { Dropdown, useDebouncedCallback } from "ui";
+import { Dropdown, useDebouncedCallback, useFocusTrap } from "ui";
 
 type CatalogViewProps = {
   products: ProductListItem[];
@@ -44,6 +44,9 @@ export const CatalogView = ({
   const [searchInput, setSearchInput] = useState(search);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const drawerRef = useFocusTrap<HTMLDivElement>(filtersOpen, () =>
+    setFiltersOpen(false),
+  );
 
   const selectedBrandSet = new Set(selectedBrands);
 
@@ -138,7 +141,14 @@ export const CatalogView = ({
                 className="absolute inset-0 bg-black/50"
                 onClick={() => setFiltersOpen(false)}
               />
-              <div className="absolute inset-y-0 left-0 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto bg-page p-4 shadow-2xl">
+              <div
+                ref={drawerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Filters"
+                tabIndex={-1}
+                className="absolute inset-y-0 left-0 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto bg-page p-4 shadow-2xl outline-none"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-heading text-lg text-ink">Filters</span>
                   <button
