@@ -137,12 +137,20 @@ export const getBrandChildren = async (
 export const reorderBrands = async (
   orderedUuids: string[],
 ): Promise<{ error?: string }> => {
+  if (orderedUuids.length === 0) {
+    return {};
+  }
   try {
-    await Promise.all(
-      orderedUuids.map((uuid, index) =>
-        db.update(Brands).set({ order: index }).where(eq(Brands.uuid, uuid)),
-      ),
-    );
+    // One transaction so the whole reorder applies atomically — a mid-way
+    // failure rolls back instead of leaving a half-applied order.
+    await db.transaction(async (tx) => {
+      for (let index = 0; index < orderedUuids.length; index++) {
+        await tx
+          .update(Brands)
+          .set({ order: index })
+          .where(eq(Brands.uuid, orderedUuids[index]));
+      }
+    });
     revalidatePath("/brands");
     return {};
   } catch (error) {
