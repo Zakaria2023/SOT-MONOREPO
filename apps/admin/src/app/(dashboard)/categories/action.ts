@@ -6,9 +6,16 @@ import {
   InsertCategories,
   SelectCategories,
 } from "@/db/schema/categories";
-import { deriveCode, generateUuid, resolveUniqueCode } from "utils";
+import type { PaginatedResult } from "utils";
+import {
+  buildPaginatedResult,
+  deriveCode,
+  generateUuid,
+  resolvePagination,
+  resolveUniqueCode,
+} from "utils";
 import { alias } from "drizzle-orm/mysql-core";
-import { asc, eq, getTableColumns } from "drizzle-orm";
+import { asc, count, eq, getTableColumns, like, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -27,8 +34,28 @@ export type CategoryListItem = SelectCategories & {
   parentName: SelectCategories["name"] | null;
 };
 
+export type CategoryListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
 const ParentCategories = alias(Categories, "parent_categories");
 
+// Match a search term against the category name or its generated code.
+const categorySearchFilter = (search?: string) => {
+  const term = search?.trim();
+  if (!term) {
+    return undefined;
+  }
+  return or(
+    like(Categories.name, `%${term}%`),
+    like(Categories.code, `%${term}%`),
+  );
+};
+
+// Full, unpaginated list — used to populate the parent-category dropdowns on
+// the category/product/specification forms, which need every category.
 export const getCategories = async (): Promise<CategoryListItem[]> => {
   try {
     return await db
@@ -41,6 +68,43 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
       .orderBy(asc(Categories.order));
   } catch (error) {
     console.error("getCategories failed:", error);
+    throw new Error("Failed to fetch categories", { cause: error });
+  }
+};
+
+// Searched + paginated page of categories for the list table. The frontend
+// drives `search`/`page` through URL search params.
+export const getCategoriesPage = async (
+  params: CategoryListParams = {},
+): Promise<PaginatedResult<CategoryListItem>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const where = categorySearchFilter(params.search);
+
+  try {
+    const [rows, [totals]] = await Promise.all([
+      db
+        .select({
+          ...getTableColumns(Categories),
+          parentName: ParentCategories.name,
+        })
+        .from(Categories)
+        .leftJoin(
+          ParentCategories,
+          eq(Categories.parentUuid, ParentCategories.uuid),
+        )
+        .where(where)
+        .orderBy(asc(Categories.order))
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(Categories).where(where),
+    ]);
+
+    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+  } catch (error) {
+    console.error("getCategoriesPage failed:", error);
     throw new Error("Failed to fetch categories", { cause: error });
   }
 };

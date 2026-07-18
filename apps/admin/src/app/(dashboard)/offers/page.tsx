@@ -1,10 +1,17 @@
 import { OffersTable } from "@/components/offers/offers-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { requireAdmin } from "@/lib/server/auth";
-import { getOffers } from "./action";
+import { getOffersPage } from "./action";
 
-const OffersPage = async () => {
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+const OffersPage = async ({ searchParams }: Props) => {
   await requireAdmin();
-  const offers = await getOffers();
+  const { search, page } = await searchParams;
+  const result = await getOffersPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -15,7 +22,16 @@ const OffersPage = async () => {
         </p>
       </div>
 
-      <OffersTable offers={offers} />
+      <ListSearch placeholder="Search by BOQ reference or customer..." />
+
+      <OffersTable offers={result.items} />
+
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 };

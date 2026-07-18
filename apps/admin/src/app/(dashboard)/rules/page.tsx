@@ -1,10 +1,17 @@
 import { RulesTable } from "@/components/rules/rules-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { FlaskConical, Plus } from "lucide-react";
 import Link from "next/link";
-import { getCompatibilityRules } from "services";
+import { getRulesPage } from "./action";
 
-const RulesPage = async () => {
-  const rules = await getCompatibilityRules();
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+const RulesPage = async ({ searchParams }: Props) => {
+  const { search, page } = await searchParams;
+  const result = await getRulesPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -33,7 +40,16 @@ const RulesPage = async () => {
         </div>
       </div>
 
-      <RulesTable rules={rules} />
+      <ListSearch placeholder="Search by rule name or spec..." />
+
+      <RulesTable rules={result.items} />
+
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 };

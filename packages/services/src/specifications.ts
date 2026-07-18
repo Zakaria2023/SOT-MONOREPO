@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, count, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray, like, or } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import {
@@ -71,6 +71,84 @@ export const getSpecifications = async (): Promise<
     });
   } catch (error) {
     console.error("getSpecifications failed:", error);
+    throw new Error("Failed to fetch specifications", { cause: error });
+  }
+};
+
+export type SpecificationListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+// A searched + paginated page of specifications, each enriched with the
+// categories it's directly assigned to, plus the unfiltered total for that
+// search. Returns raw rows + total; the caller assembles the page metadata.
+export const getSpecificationsList = async (
+  params: SpecificationListParams,
+): Promise<{ items: SpecificationWithCategories[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(Specifications.label, `%${term}%`),
+        like(Specifications.key, `%${term}%`),
+      )
+    : undefined;
+
+  try {
+    const [specRows, [totals]] = await Promise.all([
+      db
+        .select({
+          spec: Specifications,
+          groupName: SpecificationGroups.name,
+        })
+        .from(Specifications)
+        .leftJoin(
+          SpecificationGroups,
+          eq(Specifications.groupUuid, SpecificationGroups.uuid),
+        )
+        .where(where)
+        .orderBy(asc(Specifications.order))
+        .limit(params.limit)
+        .offset(params.offset),
+      db.select({ total: count() }).from(Specifications).where(where),
+    ]);
+
+    const specs = specRows.map((row) => ({
+      ...row.spec,
+      groupName: row.groupName,
+    }));
+
+    // Only fetch category links for the specs on this page.
+    const specUuids = specs.map((spec) => spec.uuid);
+    const links =
+      specUuids.length > 0
+        ? await db
+            .select({
+              specificationUuid: SpecificationCategories.specificationUuid,
+              categoryUuid: SpecificationCategories.categoryUuid,
+              categoryName: Categories.name,
+            })
+            .from(SpecificationCategories)
+            .leftJoin(
+              Categories,
+              eq(SpecificationCategories.categoryUuid, Categories.uuid),
+            )
+            .where(inArray(SpecificationCategories.specificationUuid, specUuids))
+        : [];
+
+    const items = specs.map((spec) => {
+      const own = links.filter((link) => link.specificationUuid === spec.uuid);
+      return {
+        ...spec,
+        categoryUuids: own.map((link) => link.categoryUuid),
+        categoryNames: own.map((link) => link.categoryName ?? ""),
+      };
+    });
+
+    return { items, total: Number(totals?.total ?? 0) };
+  } catch (error) {
+    console.error("getSpecificationsList failed:", error);
     throw new Error("Failed to fetch specifications", { cause: error });
   }
 };

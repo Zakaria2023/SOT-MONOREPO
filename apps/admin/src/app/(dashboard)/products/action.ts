@@ -5,8 +5,14 @@ import { Brands, SelectBrands } from "@/db/schema/brands";
 import { Categories, SelectCategories } from "@/db/schema/categories";
 import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
 import { generateProductSku } from "services";
-import { generateUuid, slugify } from "utils";
-import { asc, count, eq, getTableColumns } from "drizzle-orm";
+import type { PaginatedResult } from "utils";
+import {
+  buildPaginatedResult,
+  generateUuid,
+  resolvePagination,
+  slugify,
+} from "utils";
+import { asc, count, eq, getTableColumns, like, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -28,6 +34,25 @@ export type ProductListItem = SelectProducts & {
   brandName: SelectBrands["name"] | null;
 };
 
+export type ProductListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Match a search term against the product name, SKU, or model.
+const productSearchFilter = (search?: string) => {
+  const term = search?.trim();
+  if (!term) {
+    return undefined;
+  }
+  return or(
+    like(Products.name, `%${term}%`),
+    like(Products.sku, `%${term}%`),
+    like(Products.model, `%${term}%`),
+  );
+};
+
 export const getProducts = async (): Promise<ProductListItem[]> => {
   try {
     return await db
@@ -42,6 +67,42 @@ export const getProducts = async (): Promise<ProductListItem[]> => {
       .orderBy(asc(Products.order));
   } catch (error) {
     console.error("getProducts failed:", error);
+    throw new Error("Failed to fetch products", { cause: error });
+  }
+};
+
+// Searched + paginated page of products for the list table. The frontend
+// drives `search`/`page` through URL search params.
+export const getProductsPage = async (
+  params: ProductListParams = {},
+): Promise<PaginatedResult<ProductListItem>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const where = productSearchFilter(params.search);
+
+  try {
+    const [rows, [totals]] = await Promise.all([
+      db
+        .select({
+          ...getTableColumns(Products),
+          categoryName: Categories.name,
+          brandName: Brands.name,
+        })
+        .from(Products)
+        .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+        .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+        .where(where)
+        .orderBy(asc(Products.order))
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(Products).where(where),
+    ]);
+
+    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+  } catch (error) {
+    console.error("getProductsPage failed:", error);
     throw new Error("Failed to fetch products", { cause: error });
   }
 };

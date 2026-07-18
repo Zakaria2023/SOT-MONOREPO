@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, like, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
@@ -142,12 +142,42 @@ export const createPartnerRequest = async (
   return request;
 };
 
-/** Every partner request, newest first (admin review queue). */
-export const listPartnerRequests = async (): Promise<SelectPartnerRequests[]> =>
-  db
-    .select()
-    .from(PartnerRequests)
-    .orderBy(desc(PartnerRequests.createdAt), desc(PartnerRequests.id));
+export type PartnerRequestsListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of partner requests, newest first (admin review
+ * queue), plus the unfiltered total for that search. Search matches the company
+ * name, contact full name, or email.
+ */
+export const listPartnerRequests = async (
+  params: PartnerRequestsListParams,
+): Promise<{ items: SelectPartnerRequests[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(PartnerRequests.companyName, `%${term}%`),
+        like(PartnerRequests.fullName, `%${term}%`),
+        like(PartnerRequests.email, `%${term}%`),
+      )
+    : undefined;
+
+  const [items, [totals]] = await Promise.all([
+    db
+      .select()
+      .from(PartnerRequests)
+      .where(where)
+      .orderBy(desc(PartnerRequests.createdAt), desc(PartnerRequests.id))
+      .limit(params.limit)
+      .offset(params.offset),
+    db.select({ total: count() }).from(PartnerRequests).where(where),
+  ]);
+
+  return { items, total: Number(totals?.total ?? 0) };
+};
 
 /** The partner request with this uuid, or null. */
 export const getPartnerRequestByUuid = async (

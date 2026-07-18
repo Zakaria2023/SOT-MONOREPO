@@ -11,6 +11,46 @@ type ReviewerUser = {
 /** Generates a random UUID v4. */
 export const generateUuid = (): string => crypto.randomUUID();
 
+/** A page of results plus the metadata a list UI needs to paginate. */
+export type PaginatedResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+/** Default rows per page for admin list tables. */
+export const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * Normalizes raw page/pageSize values (e.g. straight off URL search params,
+ * so possibly undefined, non-numeric, or out of range) into safe bounds and
+ * the matching SQL offset.
+ */
+export const resolvePagination = (
+  page?: number | string | null,
+  pageSize?: number | string | null,
+) => {
+  const size = Math.max(1, Math.floor(Number(pageSize) || DEFAULT_PAGE_SIZE));
+  const current = Math.max(1, Math.floor(Number(page) || 1));
+  return { page: current, pageSize: size, offset: (current - 1) * size };
+};
+
+/** Wraps a fetched page of rows and its total count into a PaginatedResult. */
+export const buildPaginatedResult = <T>(
+  items: T[],
+  total: number,
+  page: number,
+  pageSize: number,
+): PaginatedResult<T> => ({
+  items,
+  total,
+  page,
+  pageSize,
+  totalPages: Math.max(1, Math.ceil(total / pageSize)),
+});
+
 /** Formats a numeric amount as whole-unit currency, e.g. "SAR 17,768". */
 export const formatMoney = (amount: number, currency: string | null): string =>
   `${currency ?? "SAR"} ${Math.round(amount).toLocaleString("en-US")}`;

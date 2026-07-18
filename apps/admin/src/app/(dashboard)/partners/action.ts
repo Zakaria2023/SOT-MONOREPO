@@ -1,7 +1,8 @@
 "use server";
 
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
-import { getReviewerName } from "utils";
+import type { PaginatedResult } from "utils";
+import { buildPaginatedResult, getReviewerName, resolvePagination } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
@@ -25,9 +26,28 @@ export type PartnerReviewResult = {
   success?: boolean;
 };
 
-export const getPartnerRequests = async (): Promise<PartnerRequestListItem[]> => {
+export type PartnerRequestListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of partner requests for the list table. The
+// frontend drives `search`/`page` through URL search params.
+export const getPartnerRequestsPage = async (
+  params: PartnerRequestListParams = {},
+): Promise<PaginatedResult<PartnerRequestListItem>> => {
   await requireAdmin();
-  return listPartnerRequests();
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await listPartnerRequests({
+    search: params.search,
+    limit: pageSize,
+    offset,
+  });
+  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 export const approvePartnerRequestAction = async (

@@ -1,10 +1,17 @@
 import { GovernmentRequestsTable } from "@/components/government/government-requests-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { requireAdmin } from "@/lib/server/auth";
-import { getGovernmentRequests } from "./action";
+import { getGovernmentRequestsPage } from "./action";
 
-const GovernmentPage = async () => {
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+const GovernmentPage = async ({ searchParams }: Props) => {
   await requireAdmin();
-  const requests = await getGovernmentRequests();
+  const { search, page } = await searchParams;
+  const result = await getGovernmentRequestsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -15,7 +22,16 @@ const GovernmentPage = async () => {
         </p>
       </div>
 
-      <GovernmentRequestsTable requests={requests} />
+      <ListSearch placeholder="Search by entity, name, or email..." />
+
+      <GovernmentRequestsTable requests={result.items} />
+
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 };

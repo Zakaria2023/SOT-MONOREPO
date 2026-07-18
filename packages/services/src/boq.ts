@@ -1,4 +1,15 @@
-import { and, asc, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  or,
+  sql,
+} from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqStatus } from "../../../db/enum";
@@ -343,18 +354,46 @@ const attachBoqTotals = async <T extends { uuid: string }>(
   });
 };
 
-// List every BOQ with the customer's name and totals, newest first.
-export const getAllBoqs = async (): Promise<BoqListItem[]> => {
-  const boqs = await db
-    .select({
-      ...getTableColumns(Boqs),
-      customerName: Users.fullName,
-    })
-    .from(Boqs)
-    .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
-    .orderBy(desc(Boqs.createdAt));
+export type BoqsListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
 
-  return attachBoqTotals(boqs);
+/**
+ * A searched + paginated page of BOQs, each with the customer's name and
+ * totals (newest first), plus the unfiltered total for that search. Search
+ * matches the BOQ reference or the customer name.
+ */
+export const getAllBoqs = async (
+  params: BoqsListParams,
+): Promise<{ items: BoqListItem[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(like(Boqs.reference, `%${term}%`), like(Users.fullName, `%${term}%`))
+    : undefined;
+
+  const [boqs, [totals]] = await Promise.all([
+    db
+      .select({
+        ...getTableColumns(Boqs),
+        customerName: Users.fullName,
+      })
+      .from(Boqs)
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where)
+      .orderBy(desc(Boqs.createdAt))
+      .limit(params.limit)
+      .offset(params.offset),
+    db
+      .select({ total: count() })
+      .from(Boqs)
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where),
+  ]);
+
+  const items = await attachBoqTotals(boqs);
+  return { items, total: Number(totals?.total ?? 0) };
 };
 
 // Load one BOQ for the admin detail view: the BOQ, its customer, its sections,

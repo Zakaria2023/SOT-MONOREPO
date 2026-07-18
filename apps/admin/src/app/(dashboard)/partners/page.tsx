@@ -1,10 +1,17 @@
 import { PartnerRequestsTable } from "@/components/partners/partner-requests-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { requireAdmin } from "@/lib/server/auth";
-import { getPartnerRequests } from "./action";
+import { getPartnerRequestsPage } from "./action";
 
-const PartnersPage = async () => {
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+const PartnersPage = async ({ searchParams }: Props) => {
   await requireAdmin();
-  const requests = await getPartnerRequests();
+  const { search, page } = await searchParams;
+  const result = await getPartnerRequestsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -15,7 +22,16 @@ const PartnersPage = async () => {
         </p>
       </div>
 
-      <PartnerRequestsTable requests={requests} />
+      <ListSearch placeholder="Search by company, name, or email..." />
+
+      <PartnerRequestsTable requests={result.items} />
+
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 };

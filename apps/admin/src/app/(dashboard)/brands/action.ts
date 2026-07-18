@@ -2,8 +2,15 @@
 
 import { db } from "@/db";
 import { Brands, InsertBrands, SelectBrands } from "@/db/schema/brands";
-import { deriveCode, generateUuid, resolveUniqueCode } from "utils";
-import { asc, eq, getTableColumns } from "drizzle-orm";
+import type { PaginatedResult } from "utils";
+import {
+  buildPaginatedResult,
+  deriveCode,
+  generateUuid,
+  resolvePagination,
+  resolveUniqueCode,
+} from "utils";
+import { asc, count, eq, getTableColumns, like, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -23,8 +30,25 @@ export type BrandListItem = SelectBrands & {
   parentName: SelectBrands["name"] | null;
 };
 
+export type BrandListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
 const ParentBrands = alias(Brands, "parent_brands");
 
+// Match a search term against the brand name or its generated code.
+const brandSearchFilter = (search?: string) => {
+  const term = search?.trim();
+  if (!term) {
+    return undefined;
+  }
+  return or(like(Brands.name, `%${term}%`), like(Brands.code, `%${term}%`));
+};
+
+// Full, unpaginated list — used to populate the parent-brand dropdowns on the
+// brand/product forms, which need every brand.
 export const getBrands = async (): Promise<BrandListItem[]> => {
   try {
     return await db
@@ -37,6 +61,40 @@ export const getBrands = async (): Promise<BrandListItem[]> => {
       .orderBy(asc(Brands.order));
   } catch (error) {
     console.error("getBrands failed:", error);
+    throw new Error("Failed to fetch brands", { cause: error });
+  }
+};
+
+// Searched + paginated page of brands for the list table. The frontend drives
+// `search`/`page` through URL search params.
+export const getBrandsPage = async (
+  params: BrandListParams = {},
+): Promise<PaginatedResult<BrandListItem>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const where = brandSearchFilter(params.search);
+
+  try {
+    const [rows, [totals]] = await Promise.all([
+      db
+        .select({
+          ...getTableColumns(Brands),
+          parentName: ParentBrands.name,
+        })
+        .from(Brands)
+        .leftJoin(ParentBrands, eq(Brands.parentUuid, ParentBrands.uuid))
+        .where(where)
+        .orderBy(asc(Brands.order))
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(Brands).where(where),
+    ]);
+
+    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+  } catch (error) {
+    console.error("getBrandsPage failed:", error);
     throw new Error("Failed to fetch brands", { cause: error });
   }
 };

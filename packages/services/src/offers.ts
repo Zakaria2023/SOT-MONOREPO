@@ -1,4 +1,14 @@
-import { and, desc, eq, getTableColumns, inArray, lte } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  lte,
+  or,
+} from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
@@ -192,18 +202,52 @@ export const createOrUpdateOffer = async (
   return created;
 };
 
-/** Every offer with its BOQ reference and customer name (admin review). */
-export const listOffers = async (): Promise<OfferListItem[]> =>
-  db
-    .select({
-      ...getTableColumns(Offers),
-      boqReference: Boqs.reference,
-      customerName: Users.fullName,
-    })
-    .from(Offers)
-    .leftJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
-    .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
-    .orderBy(desc(Offers.createdAt));
+export type OffersListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of offers, each with its BOQ reference and
+ * customer name (admin review), plus the unfiltered total for that search.
+ * Search matches the BOQ reference or the customer name.
+ */
+export const listOffers = async (
+  params: OffersListParams,
+): Promise<{ items: OfferListItem[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(Boqs.reference, `%${term}%`),
+        like(Users.fullName, `%${term}%`),
+      )
+    : undefined;
+
+  const [items, [totals]] = await Promise.all([
+    db
+      .select({
+        ...getTableColumns(Offers),
+        boqReference: Boqs.reference,
+        customerName: Users.fullName,
+      })
+      .from(Offers)
+      .leftJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where)
+      .orderBy(desc(Offers.createdAt))
+      .limit(params.limit)
+      .offset(params.offset),
+    db
+      .select({ total: count() })
+      .from(Offers)
+      .leftJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where),
+  ]);
+
+  return { items, total: Number(totals?.total ?? 0) };
+};
 
 /** The offer with this uuid, or null. */
 export const getOfferByUuid = async (

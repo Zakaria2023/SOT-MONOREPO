@@ -1,6 +1,7 @@
 "use server";
 
-import { getReviewerName } from "utils";
+import type { PaginatedResult } from "utils";
+import { buildPaginatedResult, getReviewerName, resolvePagination } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
@@ -18,9 +19,28 @@ export type OfferReviewResult = {
   success?: boolean;
 };
 
-export const getOffers = async (): Promise<OfferRow[]> => {
+export type OfferListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of offers for the list table. The frontend drives
+// `search`/`page` through URL search params.
+export const getOffersPage = async (
+  params: OfferListParams = {},
+): Promise<PaginatedResult<OfferRow>> => {
   await requireAdmin();
-  return listOffers();
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await listOffers({
+    search: params.search,
+    limit: pageSize,
+    offset,
+  });
+  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 export const approveOfferAction = async (

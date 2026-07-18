@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, like, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -89,14 +89,42 @@ export const createGovernmentRequest = async (
   return request;
 };
 
-/** Every government request, newest first (admin review queue). */
-export const listGovernmentRequests = async (): Promise<
-  SelectGovernmentRequests[]
-> =>
-  db
-    .select()
-    .from(GovernmentRequests)
-    .orderBy(desc(GovernmentRequests.createdAt), desc(GovernmentRequests.id));
+export type GovernmentRequestsListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of government requests, newest first (admin
+ * review queue), plus the unfiltered total for that search. Search matches the
+ * entity name, contact full name, or official email.
+ */
+export const listGovernmentRequests = async (
+  params: GovernmentRequestsListParams,
+): Promise<{ items: SelectGovernmentRequests[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(GovernmentRequests.entityName, `%${term}%`),
+        like(GovernmentRequests.fullName, `%${term}%`),
+        like(GovernmentRequests.officialEmail, `%${term}%`),
+      )
+    : undefined;
+
+  const [items, [totals]] = await Promise.all([
+    db
+      .select()
+      .from(GovernmentRequests)
+      .where(where)
+      .orderBy(desc(GovernmentRequests.createdAt), desc(GovernmentRequests.id))
+      .limit(params.limit)
+      .offset(params.offset),
+    db.select({ total: count() }).from(GovernmentRequests).where(where),
+  ]);
+
+  return { items, total: Number(totals?.total ?? 0) };
+};
 
 /** The government request with this uuid, or null. */
 export const getGovernmentRequestByUuid = async (

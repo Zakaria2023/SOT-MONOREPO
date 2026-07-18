@@ -1,10 +1,17 @@
 import { CategoriesTable } from "@/components/categories/categories-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getCategories } from "./action";
+import { getCategoriesPage } from "./action";
 
-const CategoriesPage = async () => {
-  const categories = await getCategories();
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+const CategoriesPage = async ({ searchParams }: Props) => {
+  const { search, page } = await searchParams;
+  const result = await getCategoriesPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -20,7 +27,16 @@ const CategoriesPage = async () => {
         </Link>
       </div>
 
-      <CategoriesTable categories={categories} />
+      <ListSearch placeholder="Search categories..." />
+
+      <CategoriesTable categories={result.items} />
+
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 };

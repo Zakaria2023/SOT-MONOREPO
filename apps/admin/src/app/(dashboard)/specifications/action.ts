@@ -6,8 +6,12 @@ import {
   createSpecification,
   createSpecificationGroup,
   deleteSpecification,
+  getSpecificationsList,
   updateSpecification,
 } from "services";
+import type { SpecificationWithCategories } from "services";
+import type { PaginatedResult } from "utils";
+import { buildPaginatedResult, resolvePagination } from "utils";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -27,6 +31,29 @@ export type SpecificationActionInput = {
 export type SpecificationActionResult = {
   error?: string;
   success?: boolean;
+};
+
+export type SpecificationListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of specifications for the list table. The frontend
+// drives `search`/`page` through URL search params.
+export const getSpecificationsPage = async (
+  params: SpecificationListParams = {},
+): Promise<PaginatedResult<SpecificationWithCategories>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await getSpecificationsList({
+    search: params.search,
+    limit: pageSize,
+    offset,
+  });
+  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 // A filled "new group" name creates the group on save; otherwise use the

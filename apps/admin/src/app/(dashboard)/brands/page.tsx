@@ -1,10 +1,17 @@
 import { BrandsTable } from "@/components/brands/brands-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getBrands } from "./action";
+import { getBrandsPage } from "./action";
 
-const BrandsPage = async () => {
-  const brands = await getBrands();
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+const BrandsPage = async ({ searchParams }: Props) => {
+  const { search, page } = await searchParams;
+  const result = await getBrandsPage({ search, page });
 
   return (
     <div className="flex flex-col gap-5">
@@ -20,7 +27,16 @@ const BrandsPage = async () => {
         </Link>
       </div>
 
-      <BrandsTable brands={brands} />
+      <ListSearch placeholder="Search brands..." />
+
+      <BrandsTable brands={result.items} />
+
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
     </div>
   );
 };

@@ -4,7 +4,8 @@ import type { SelectGovernmentRequests } from "@/db/schema/government-requests";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
-import { getReviewerName } from "utils";
+import type { PaginatedResult } from "utils";
+import { buildPaginatedResult, getReviewerName, resolvePagination } from "utils";
 import { revalidatePath } from "next/cache";
 import {
   approveGovernmentRequest as approveGovernmentRequestRecord,
@@ -24,11 +25,28 @@ export type GovernmentReviewResult = {
   success?: boolean;
 };
 
-export const getGovernmentRequests = async (): Promise<
-  GovernmentRequestListItem[]
-> => {
+export type GovernmentRequestListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of government requests for the list table. The
+// frontend drives `search`/`page` through URL search params.
+export const getGovernmentRequestsPage = async (
+  params: GovernmentRequestListParams = {},
+): Promise<PaginatedResult<GovernmentRequestListItem>> => {
   await requireAdmin();
-  return listGovernmentRequests();
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await listGovernmentRequests({
+    search: params.search,
+    limit: pageSize,
+    offset,
+  });
+  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 export const approveGovernmentRequestAction = async (

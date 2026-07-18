@@ -3,7 +3,9 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { getClerkPreSellerUsers } from "@/lib/server/clerk";
 import { revalidatePath } from "next/cache";
-import { assignBoq } from "services";
+import { assignBoq, getAllBoqs, type BoqListItem } from "services";
+import type { PaginatedResult } from "utils";
+import { buildPaginatedResult, resolvePagination } from "utils";
 
 export type PreSellerOption = {
   id: string;
@@ -12,6 +14,30 @@ export type PreSellerOption = {
 
 export type AssignResult = {
   error?: string;
+};
+
+export type BoqListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of BOQs for the list table. The frontend drives
+// `search`/`page` through URL search params.
+export const getBoqsPage = async (
+  params: BoqListParams = {},
+): Promise<PaginatedResult<BoqListItem>> => {
+  await requireAdmin();
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await getAllBoqs({
+    search: params.search,
+    limit: pageSize,
+    offset,
+  });
+  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 /** Clerk users whose publicMetadata role is "pre-seller". */
