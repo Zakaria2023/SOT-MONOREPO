@@ -15,7 +15,15 @@ import {
   resolveUniqueCode,
 } from "utils";
 import { alias } from "drizzle-orm/mysql-core";
-import { asc, count, eq, getTableColumns, like, or } from "drizzle-orm";
+import {
+  asc,
+  count,
+  eq,
+  getTableColumns,
+  isNull,
+  like,
+  or,
+} from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -106,6 +114,57 @@ export const getCategoriesPage = async (
   } catch (error) {
     console.error("getCategoriesPage failed:", error);
     throw new Error("Failed to fetch categories", { cause: error });
+  }
+};
+
+// Every direct child of a parent (or the top-level categories when parentUuid
+// is null), ordered by their per-parent `order`. Unpaginated — this feeds the
+// drag-and-drop reorder view, which shows all siblings at once.
+export const getCategoryChildren = async (
+  parentUuid: string | null,
+): Promise<CategoryListItem[]> => {
+  try {
+    return await db
+      .select({
+        ...getTableColumns(Categories),
+        parentName: ParentCategories.name,
+      })
+      .from(Categories)
+      .leftJoin(
+        ParentCategories,
+        eq(Categories.parentUuid, ParentCategories.uuid),
+      )
+      .where(
+        parentUuid
+          ? eq(Categories.parentUuid, parentUuid)
+          : isNull(Categories.parentUuid),
+      )
+      .orderBy(asc(Categories.order));
+  } catch (error) {
+    console.error("getCategoryChildren failed:", error);
+    throw new Error("Failed to fetch category children", { cause: error });
+  }
+};
+
+// Persist a new sibling order: each category's `order` becomes its index in the
+// given list. The order is scoped to the parent (0-based among its children) —
+// it does not touch categories under any other parent.
+export const reorderCategories = async (
+  orderedUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await Promise.all(
+      orderedUuids.map((uuid, index) =>
+        db.update(Categories).set({ order: index }).where(eq(Categories.uuid, uuid)),
+      ),
+    );
+    revalidatePath("/categories");
+    return {};
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to reorder categories",
+    };
   }
 };
 

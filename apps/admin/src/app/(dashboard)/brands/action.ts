@@ -10,7 +10,15 @@ import {
   resolvePagination,
   resolveUniqueCode,
 } from "utils";
-import { asc, count, eq, getTableColumns, like, or } from "drizzle-orm";
+import {
+  asc,
+  count,
+  eq,
+  getTableColumns,
+  isNull,
+  like,
+  or,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -96,6 +104,51 @@ export const getBrandsPage = async (
   } catch (error) {
     console.error("getBrandsPage failed:", error);
     throw new Error("Failed to fetch brands", { cause: error });
+  }
+};
+
+// Every direct child of a parent brand (or the top-level brands when parentUuid
+// is null), ordered by their per-parent `order`. Unpaginated — feeds the
+// drag-and-drop reorder view, which shows all siblings at once.
+export const getBrandChildren = async (
+  parentUuid: string | null,
+): Promise<BrandListItem[]> => {
+  try {
+    return await db
+      .select({
+        ...getTableColumns(Brands),
+        parentName: ParentBrands.name,
+      })
+      .from(Brands)
+      .leftJoin(ParentBrands, eq(Brands.parentUuid, ParentBrands.uuid))
+      .where(
+        parentUuid ? eq(Brands.parentUuid, parentUuid) : isNull(Brands.parentUuid),
+      )
+      .orderBy(asc(Brands.order));
+  } catch (error) {
+    console.error("getBrandChildren failed:", error);
+    throw new Error("Failed to fetch brand children", { cause: error });
+  }
+};
+
+// Persist a new sibling order: each brand's `order` becomes its index in the
+// given list. Scoped to the parent (0-based among its children) — it does not
+// touch brands under any other parent.
+export const reorderBrands = async (
+  orderedUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await Promise.all(
+      orderedUuids.map((uuid, index) =>
+        db.update(Brands).set({ order: index }).where(eq(Brands.uuid, uuid)),
+      ),
+    );
+    revalidatePath("/brands");
+    return {};
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to reorder brands",
+    };
   }
 };
 
