@@ -7,7 +7,15 @@ import {
   CornerDownRight,
   Search,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./button";
 
@@ -53,8 +61,11 @@ export const Dropdown = (props: DropdownProps) => {
     searchPlaceholder = "Search...",
     emptyMessage = "No results",
   } = props;
+  const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Index of the keyboard-highlighted row among the currently rendered rows.
+  const [activeIndex, setActiveIndex] = useState(0);
   // Tree parents start collapsed so the menu doesn't dump the whole tree.
   // A parent is any option immediately followed by a deeper-depth option.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
@@ -196,10 +207,26 @@ export const Dropdown = (props: DropdownProps) => {
       return next;
     });
 
+  // The highlighted row, clamped to the rows currently rendered.
+  const active = rows.length > 0 ? Math.min(activeIndex, rows.length - 1) : -1;
+
+  // Keep the highlighted row scrolled into view as the user arrows through.
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    menuRef.current
+      ?.querySelector('[data-active="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [isOpen, active]);
+
   const handleToggle = () => {
-    if (!isOpen) updatePosition();
+    if (!isOpen) {
+      updatePosition();
+    }
     setIsOpen((open) => !open);
     setQuery("");
+    setActiveIndex(0);
   };
 
   const handleSelect = (optionValue: string) => {
@@ -217,12 +244,67 @@ export const Dropdown = (props: DropdownProps) => {
     setQuery("");
   };
 
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (!isOpen) {
+      if (event.key === "ArrowDown" || event.key === "Enter") {
+        event.preventDefault();
+        handleToggle();
+      }
+      return;
+    }
+
+    const row = active >= 0 ? rows[active] : undefined;
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        setActiveIndex(Math.min(active + 1, rows.length - 1));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        setActiveIndex(Math.max(active - 1, 0));
+        break;
+      case "Enter":
+        event.preventDefault();
+        if (row) {
+          handleSelect(row.option.value);
+        }
+        break;
+      case "Escape":
+        event.preventDefault();
+        setIsOpen(false);
+        break;
+      case "ArrowRight":
+        if (row?.hasChildren && row.isCollapsed) {
+          event.preventDefault();
+          toggleCollapse(row.option.value);
+        }
+        break;
+      case "ArrowLeft":
+        if (row?.hasChildren && !row.isCollapsed) {
+          event.preventDefault();
+          toggleCollapse(row.option.value);
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  const activeOptionId = active >= 0 ? `${listboxId}-opt-${active}` : undefined;
+
   return (
     <div ref={containerRef} className="relative">
       <Button
         type="button"
         variant="outline"
         onClick={handleToggle}
+        onKeyDown={handleKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-activedescendant={
+          isOpen && !searchable ? activeOptionId : undefined
+        }
         className="w-full justify-between text-left font-normal outline-none focus:border-primary"
       >
         <span className={isPlaceholder ? "text-faint" : ""}>
@@ -250,31 +332,52 @@ export const Dropdown = (props: DropdownProps) => {
                 <input
                   ref={searchRef}
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setActiveIndex(0);
+                  }}
+                  onKeyDown={handleKeyDown}
                   placeholder={searchPlaceholder}
+                  role="combobox"
+                  aria-controls={listboxId}
+                  aria-expanded={isOpen}
+                  aria-activedescendant={activeOptionId}
                   className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-faint"
                 />
               </div>
             )}
 
-            <ul className="max-h-72 overflow-y-auto">
+            <ul
+              id={listboxId}
+              role="listbox"
+              aria-multiselectable={props.multiple ? true : undefined}
+              className="max-h-72 overflow-y-auto"
+            >
               {rows.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-faint">{emptyMessage}</li>
               ) : (
-                rows.map(({ option, hasChildren, isCollapsed }) => {
+                rows.map(({ option, hasChildren, isCollapsed }, index) => {
                   const selected = isSelected(option.value);
+                  const isActive = index === active;
                   return (
                     <li key={option.value}>
                       <div
                         className={`flex items-center ${
                           selected
                             ? "bg-primary-tint text-primary"
-                            : "text-ink hover:bg-hover"
+                            : isActive
+                              ? "bg-hover text-ink"
+                              : "text-ink hover:bg-hover"
                         }`}
                       >
                         <button
                           type="button"
+                          id={`${listboxId}-opt-${index}`}
+                          role="option"
+                          aria-selected={selected}
+                          data-active={isActive ? "true" : undefined}
                           onClick={() => handleSelect(option.value)}
+                          onMouseEnter={() => setActiveIndex(index)}
                           style={{ paddingLeft: 12 + (option.depth ?? 0) * 16 }}
                           className={`flex flex-1 cursor-pointer items-center gap-1.5 py-2 pr-3 text-left text-sm ${
                             selected ? "font-semibold" : ""
