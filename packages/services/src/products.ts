@@ -1,6 +1,7 @@
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   getTableColumns,
@@ -10,14 +11,41 @@ import {
   or,
   type SQL,
 } from "drizzle-orm";
+import {
+  buildPaginatedResult,
+  generateUuid,
+  resolvePagination,
+  slugify,
+  type PaginatedResult,
+} from "utils";
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
-import { Products, SelectProducts } from "../../../db/schema/products";
+import {
+  InsertProducts,
+  Products,
+  SelectProducts,
+} from "../../../db/schema/products";
+
+export type { SelectProducts };
 
 export type ProductListItem = SelectProducts & {
   categoryName: SelectCategories["name"] | null;
   brandName: SelectBrands["name"] | null;
+};
+
+export type ProductFields = Omit<
+  InsertProducts,
+  "id" | "uuid" | "createdAt" | "updatedAt"
+>;
+
+// The client form never sets the slug — it's derived from the name on save.
+export type ProductClientFields = Omit<ProductFields, "slug">;
+
+export type ProductListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
 };
 
 export type ProductDetail = ProductListItem & {
@@ -152,6 +180,100 @@ export const getProducts = async (
     console.error("getProducts failed:", error);
     throw new Error("Failed to fetch products", { cause: error });
   }
+};
+
+// Admin list search: match the product name, SKU, or model.
+const adminProductSearchFilter = (search?: string) => {
+  const term = search?.trim();
+  if (!term) {
+    return undefined;
+  }
+  return or(
+    like(Products.name, `%${term}%`),
+    like(Products.sku, `%${term}%`),
+    like(Products.model, `%${term}%`),
+  );
+};
+
+/** A searched + paginated page of products for the admin list table. */
+export const getProductsPage = async (
+  params: ProductListParams = {},
+): Promise<PaginatedResult<ProductListItem>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const where = adminProductSearchFilter(params.search);
+
+  try {
+    const [rows, [totals]] = await Promise.all([
+      db
+        .select({
+          ...getTableColumns(Products),
+          categoryName: Categories.name,
+          brandName: Brands.name,
+        })
+        .from(Products)
+        .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+        .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+        .where(where)
+        .orderBy(asc(Products.order))
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(Products).where(where),
+    ]);
+
+    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+  } catch (error) {
+    console.error("getProductsPage failed:", error);
+    throw new Error("Failed to fetch products", { cause: error });
+  }
+};
+
+/**
+ * Create a product. The SKU is system-owned (assembled from the brand/category/
+ * series codes) and the slug is derived from the name — neither comes from the
+ * client. Returns the new product's uuid.
+ */
+export const createProduct = async (
+  fields: ProductClientFields,
+): Promise<string> => {
+  const uuid = generateUuid();
+  const [{ total }] = await db.select({ total: count() }).from(Products);
+  const sku = await generateProductSku({
+    brandUuid: fields.brandUuid,
+    categoryUuid: fields.categoryUuid,
+    seriesCode: fields.seriesCode,
+  });
+  await db.insert(Products).values({
+    ...fields,
+    sku,
+    uuid,
+    order: total,
+    slug: slugify(fields.name),
+  });
+  return uuid;
+};
+
+export const updateProduct = async (
+  uuid: string,
+  fields: ProductClientFields,
+): Promise<void> => {
+  // Regenerate the SKU (stable when brand/category/series are unchanged).
+  const sku = await generateProductSku({
+    brandUuid: fields.brandUuid,
+    categoryUuid: fields.categoryUuid,
+    seriesCode: fields.seriesCode,
+    productUuid: uuid,
+  });
+  await db
+    .update(Products)
+    .set({ ...fields, sku, slug: slugify(fields.name) })
+    .where(eq(Products.uuid, uuid));
+};
+
+export const deleteProduct = async (uuid: string): Promise<void> => {
+  await db.delete(Products).where(eq(Products.uuid, uuid));
 };
 
 export const getProductsByCategory = async (
