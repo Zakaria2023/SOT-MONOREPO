@@ -11,14 +11,22 @@ import {
   getBrandsPage as getBrandsPageList,
   reorderBrands as reorderBrandsRecord,
   updateBrand as updateBrandRecord,
-  type BrandFields,
-  type BrandListItem,
-  type BrandListParams,
-  type SelectBrands,
+} from "services";
+import type {
+  BrandFields as ServiceBrandFields,
+  BrandListItem as ServiceBrandListItem,
+  BrandListParams as ServiceBrandListParams,
+  SelectBrands as ServiceSelectBrands,
 } from "services";
 import type { PaginatedResult } from "utils";
 
-export type { BrandFields, BrandListItem, BrandListParams, SelectBrands };
+// A "use server" file may only export async functions; types are re-declared as
+// local aliases (not `export type { ... } from`, which the RSC compiler would
+// treat as a runtime export) so consumers can keep importing them from here.
+export type BrandFields = ServiceBrandFields;
+export type BrandListItem = ServiceBrandListItem;
+export type BrandListParams = ServiceBrandListParams;
+export type SelectBrands = ServiceSelectBrands;
 
 export type BrandActionResult = {
   brandUuid?: string;
@@ -28,17 +36,17 @@ export type BrandActionResult = {
 
 // Reads pass straight through to the service — the admin pages/components call
 // these from `./action`, keeping the transport boundary in one place.
-export const getBrands = (): Promise<BrandListItem[]> => getBrandsList();
+export const getBrands = async (): Promise<BrandListItem[]> => getBrandsList();
 
-export const getBrandsPage = (
+export const getBrandsPage = async (
   params: BrandListParams = {},
 ): Promise<PaginatedResult<BrandListItem>> => getBrandsPageList(params);
 
-export const getBrandChildren = (
+export const getBrandChildren = async (
   parentUuid: string | null,
 ): Promise<BrandListItem[]> => getBrandChildrenList(parentUuid);
 
-export const getBrand = (uuid: string): Promise<SelectBrands | null> =>
+export const getBrand = async (uuid: string): Promise<SelectBrands | null> =>
   getBrandRecord(uuid);
 
 export const createBrand = async (
