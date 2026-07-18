@@ -1,4 +1,11 @@
-import type { SelectOffers } from "services";
+// The three price fields offerTotal needs. Typed structurally (rather than
+// importing SelectOffers from "services") so utils has no dependency on
+// services — keeping the package graph one-directional (services -> utils).
+type OfferPrices = {
+  productPrice: string | number | null;
+  installPrice: string | number | null;
+  programmingPrice?: string | number | null;
+};
 
 type ReviewerUser = {
   id: string;
@@ -139,7 +146,7 @@ export const summarizeCart = (
 };
 
 /** Sum of an offer's product, install, and (optional) programming prices. */
-export const offerTotal = (offer: SelectOffers): number =>
+export const offerTotal = (offer: OfferPrices): number =>
   fromMinorUnits(
     toMinorUnits(offer.productPrice) +
       toMinorUnits(offer.installPrice) +

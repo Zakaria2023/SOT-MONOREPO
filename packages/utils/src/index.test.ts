@@ -1,4 +1,3 @@
-import type { SelectOffers } from "services";
 import { describe, expect, it } from "vitest";
 import {
   capitalize,
@@ -15,14 +14,6 @@ import {
   summarizeCart,
   toMinorUnits,
 } from "./index";
-
-// offerTotal only reads the three price fields; cast a minimal object to the row.
-const asOffer = (
-  prices: Pick<
-    SelectOffers,
-    "productPrice" | "installPrice" | "programmingPrice"
-  >,
-): SelectOffers => prices as SelectOffers;
 
 describe("formatMoney", () => {
   it("formats whole amounts with thousands separators", () => {
@@ -124,25 +115,21 @@ describe("summarizeCart", () => {
 describe("offerTotal", () => {
   it("sums product, install, and programming prices", () => {
     expect(
-      offerTotal(
-        asOffer({
-          productPrice: "1000",
-          installPrice: "200",
-          programmingPrice: "50",
-        }),
-      ),
+      offerTotal({
+        productPrice: "1000",
+        installPrice: "200",
+        programmingPrice: "50",
+      }),
     ).toBe(1250);
   });
 
   it("treats a null programming price as zero", () => {
     expect(
-      offerTotal(
-        asOffer({
-          productPrice: "1000",
-          installPrice: "200",
-          programmingPrice: null,
-        }),
-      ),
+      offerTotal({
+        productPrice: "1000",
+        installPrice: "200",
+        programmingPrice: null,
+      }),
     ).toBe(1200);
   });
 });

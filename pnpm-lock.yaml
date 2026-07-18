@@ -432,10 +432,6 @@ importers:
         version: 5.9.3
 
   packages/utils:
-    dependencies:
-      services:
-        specifier: workspace:*
-        version: link:../services
     devDependencies:
       '@types/node':
         specifier: ^20
