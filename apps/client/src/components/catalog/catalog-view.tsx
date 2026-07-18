@@ -7,14 +7,14 @@ import { SORT_OPTIONS, type TreeNode } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import type {
   BrandListItem,
   CategoryListItem,
   ProductListItem,
   ProductSort,
 } from "services";
-import { Dropdown } from "ui";
+import { Dropdown, useDebouncedCallback } from "ui";
 
 type CatalogViewProps = {
   products: ProductListItem[];
@@ -42,7 +42,6 @@ export const CatalogView = ({
   const [isFiltering, startNavigation] = useTransition();
 
   const [searchInput, setSearchInput] = useState(search);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -83,21 +82,20 @@ export const CatalogView = ({
       params.set("sort", value);
     });
 
+  const commitSearch = useDebouncedCallback((value: string) => {
+    updateParams((params) => {
+      const trimmed = value.trim();
+      if (trimmed) {
+        params.set("search", trimmed);
+      } else {
+        params.delete("search");
+      }
+    });
+  }, 350);
+
   const onSearchChange = (value: string) => {
     setSearchInput(value);
-    if (searchTimer.current) {
-      clearTimeout(searchTimer.current);
-    }
-    searchTimer.current = setTimeout(() => {
-      updateParams((params) => {
-        const trimmed = value.trim();
-        if (trimmed) {
-          params.set("search", trimmed);
-        } else {
-          params.delete("search");
-        }
-      });
-    }, 350);
+    commitSearch(value);
   };
 
   return (
