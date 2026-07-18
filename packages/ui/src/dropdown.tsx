@@ -1,6 +1,12 @@
 "use client";
 
-import { Check, ChevronDown, CornerDownRight, Search } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CornerDownRight,
+  Search,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./button";
@@ -49,6 +55,19 @@ export const Dropdown = (props: DropdownProps) => {
   } = props;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Tree parents start collapsed so the menu doesn't dump the whole tree.
+  // A parent is any option immediately followed by a deeper-depth option.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    const set = new Set<string>();
+    for (let i = 0; i < options.length; i++) {
+      const depth = options[i].depth ?? 0;
+      const next = options[i + 1];
+      if (next && (next.depth ?? 0) > depth) {
+        set.add(options[i].value);
+      }
+    }
+    return set;
+  });
   const [position, setPosition] = useState<MenuPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -124,15 +143,58 @@ export const Dropdown = (props: DropdownProps) => {
 
   const isPlaceholder = triggerLabel === placeholder;
 
-  // Filter by label while searching. During an active query the tree is flat,
-  // so drop the depth indentation to avoid orphaned-looking indents.
-  const visibleOptions = useMemo(() => {
+  // Rows to render: while searching, a flat list of label matches (no tree,
+  // no collapse). Otherwise the tree with collapsed parents' subtrees hidden.
+  const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return options;
-    return options
-      .filter((option) => option.label.toLowerCase().includes(term))
-      .map((option) => ({ ...option, depth: 0 }));
-  }, [options, query]);
+    if (term) {
+      return options
+        .filter((option) => option.label.toLowerCase().includes(term))
+        .map((option) => ({
+          option: { ...option, depth: 0 },
+          hasChildren: false,
+          isCollapsed: false,
+        }));
+    }
+
+    const result: {
+      option: DropdownOption;
+      hasChildren: boolean;
+      isCollapsed: boolean;
+    }[] = [];
+    // While inside a collapsed subtree, skip every deeper option until we come
+    // back out to the collapsed parent's depth (or shallower).
+    let hideDepth: number | null = null;
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      const depth = option.depth ?? 0;
+      if (hideDepth !== null) {
+        if (depth > hideDepth) {
+          continue;
+        }
+        hideDepth = null;
+      }
+      const next = options[i + 1];
+      const hasChildren = next ? (next.depth ?? 0) > depth : false;
+      const isCollapsed = collapsed.has(option.value);
+      result.push({ option, hasChildren, isCollapsed });
+      if (hasChildren && isCollapsed) {
+        hideDepth = depth;
+      }
+    }
+    return result;
+  }, [options, query, collapsed]);
+
+  const toggleCollapse = (value: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return next;
+    });
 
   const handleToggle = () => {
     if (!isOpen) updatePosition();
@@ -196,34 +258,63 @@ export const Dropdown = (props: DropdownProps) => {
             )}
 
             <ul className="max-h-72 overflow-y-auto">
-              {visibleOptions.length === 0 ? (
+              {rows.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-faint">{emptyMessage}</li>
               ) : (
-                visibleOptions.map((option) => {
+                rows.map(({ option, hasChildren, isCollapsed }) => {
                   const selected = isSelected(option.value);
                   return (
                     <li key={option.value}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelect(option.value)}
-                        style={{ paddingLeft: 12 + (option.depth ?? 0) * 16 }}
-                        className={`flex w-full cursor-pointer items-center gap-1.5 py-2 pr-3 text-left text-sm hover:bg-hover ${
+                      <div
+                        className={`flex items-center ${
                           selected
-                            ? "bg-primary-tint font-semibold text-primary"
-                            : "text-ink"
+                            ? "bg-primary-tint text-primary"
+                            : "text-ink hover:bg-hover"
                         }`}
                       >
-                        {(option.depth ?? 0) > 0 && (
-                          <CornerDownRight
-                            size={14}
-                            className="shrink-0 text-faint"
-                          />
+                        <button
+                          type="button"
+                          onClick={() => handleSelect(option.value)}
+                          style={{ paddingLeft: 12 + (option.depth ?? 0) * 16 }}
+                          className={`flex flex-1 cursor-pointer items-center gap-1.5 py-2 pr-3 text-left text-sm ${
+                            selected ? "font-semibold" : ""
+                          }`}
+                        >
+                          {(option.depth ?? 0) > 0 && !hasChildren && (
+                            <CornerDownRight
+                              size={14}
+                              className="shrink-0 text-faint"
+                            />
+                          )}
+                          <span className="flex-1">{option.label}</span>
+                          {props.multiple && selected && (
+                            <Check size={15} className="shrink-0 text-primary" />
+                          )}
+                        </button>
+
+                        {hasChildren && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleCollapse(option.value);
+                            }}
+                            aria-label={
+                              isCollapsed
+                                ? `Expand ${option.label}`
+                                : `Collapse ${option.label}`
+                            }
+                            className="flex h-8 w-8 shrink-0 items-center justify-center text-faint hover:text-ink"
+                          >
+                            <ChevronRight
+                              size={15}
+                              className={`transition-transform ${
+                                isCollapsed ? "" : "rotate-90"
+                              }`}
+                            />
+                          </button>
                         )}
-                        <span className="flex-1">{option.label}</span>
-                        {props.multiple && selected && (
-                          <Check size={15} className="shrink-0 text-primary" />
-                        )}
-                      </button>
+                      </div>
                     </li>
                   );
                 })

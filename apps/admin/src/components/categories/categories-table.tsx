@@ -53,12 +53,6 @@ const columns: TableColumn<CategoryListItem>[] = [
     ),
   },
   {
-    key: "order",
-    header: "Order",
-    align: "right",
-    render: (category) => category.order,
-  },
-  {
     key: "actions",
     header: "Action",
     align: "right",

@@ -53,12 +53,6 @@ const columns: TableColumn<BrandListItem>[] = [
       brand.parentName ?? <span className="text-faint">—</span>,
   },
   {
-    key: "order",
-    header: "Order",
-    align: "right",
-    render: (brand) => brand.order,
-  },
-  {
     key: "actions",
     header: "Action",
     align: "right",
