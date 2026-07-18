@@ -60,6 +60,8 @@ export const CategoryMultiSelect = ({
           <>
             <Dropdown
               multiple
+              searchable
+              searchPlaceholder="Search categories..."
               value={field.value}
               onChange={field.onChange}
               options={options}

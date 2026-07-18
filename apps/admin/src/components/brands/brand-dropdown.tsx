@@ -67,6 +67,8 @@ export const BrandDropdown = <TFieldValues extends FieldValues>({
         name={name}
         render={({ field }) => (
           <Dropdown
+            searchable
+            searchPlaceholder="Search brands..."
             value={typeof field.value === "string" ? field.value : ""}
             onChange={field.onChange}
             placeholder={placeholder}

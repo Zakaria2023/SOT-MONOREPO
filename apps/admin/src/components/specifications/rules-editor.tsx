@@ -180,6 +180,8 @@ const RuleClauseRow = ({
           name={`rules.${ruleIndex}.clauses.${clauseIndex}.specKey`}
           render={({ field }) => (
             <Dropdown
+              searchable
+              searchPlaceholder="Search specifications..."
               value={field.value}
               onChange={(value) => {
                 field.onChange(value);

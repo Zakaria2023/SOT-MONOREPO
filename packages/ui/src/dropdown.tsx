@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, ChevronDown, CornerDownRight } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, CornerDownRight, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./button";
 
@@ -14,6 +14,9 @@ export type DropdownOption = {
 type DropdownBaseProps = {
   options: DropdownOption[];
   placeholder?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
 };
 
 type SingleDropdownProps = DropdownBaseProps & {
@@ -37,11 +40,19 @@ type MenuPosition = {
 };
 
 export const Dropdown = (props: DropdownProps) => {
-  const { options, placeholder = "Select..." } = props;
+  const {
+    options,
+    placeholder = "Select...",
+    searchable = false,
+    searchPlaceholder = "Search...",
+    emptyMessage = "No results",
+  } = props;
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [position, setPosition] = useState<MenuPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Anchor the portalled menu to the trigger in viewport coordinates.
   const updatePosition = useCallback(() => {
@@ -64,6 +75,13 @@ export const Dropdown = (props: DropdownProps) => {
       window.removeEventListener("resize", reposition);
     };
   }, [isOpen, updatePosition]);
+
+  // Focus the search field as soon as a searchable menu opens.
+  useEffect(() => {
+    if (isOpen && searchable) {
+      searchRef.current?.focus();
+    }
+  }, [isOpen, searchable]);
 
   // Close on a click that lands outside both the trigger and the menu.
   useEffect(() => {
@@ -106,9 +124,20 @@ export const Dropdown = (props: DropdownProps) => {
 
   const isPlaceholder = triggerLabel === placeholder;
 
+  // Filter by label while searching. During an active query the tree is flat,
+  // so drop the depth indentation to avoid orphaned-looking indents.
+  const visibleOptions = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return options;
+    return options
+      .filter((option) => option.label.toLowerCase().includes(term))
+      .map((option) => ({ ...option, depth: 0 }));
+  }, [options, query]);
+
   const handleToggle = () => {
     if (!isOpen) updatePosition();
     setIsOpen((open) => !open);
+    setQuery("");
   };
 
   const handleSelect = (optionValue: string) => {
@@ -123,6 +152,7 @@ export const Dropdown = (props: DropdownProps) => {
     }
     props.onChange(optionValue);
     setIsOpen(false);
+    setQuery("");
   };
 
   return (
@@ -142,7 +172,7 @@ export const Dropdown = (props: DropdownProps) => {
       {isOpen &&
         position &&
         createPortal(
-          <ul
+          <div
             ref={menuRef}
             style={{
               position: "fixed",
@@ -150,37 +180,56 @@ export const Dropdown = (props: DropdownProps) => {
               left: position.left,
               width: position.width,
             }}
-            className="z-50 max-h-72 overflow-y-auto rounded-control border border-hairline bg-overlay shadow-lg"
+            className="z-50 overflow-hidden rounded-control border border-hairline bg-overlay shadow-lg"
           >
-            {options.map((option) => {
-              const selected = isSelected(option.value);
-              return (
-                <li key={option.value}>
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(option.value)}
-                    style={{ paddingLeft: 12 + (option.depth ?? 0) * 16 }}
-                    className={`flex w-full cursor-pointer items-center gap-1.5 py-2 pr-3 text-left text-sm hover:bg-hover ${
-                      selected
-                        ? "bg-primary-tint font-semibold text-primary"
-                        : "text-ink"
-                    }`}
-                  >
-                    {(option.depth ?? 0) > 0 && (
-                      <CornerDownRight
-                        size={14}
-                        className="shrink-0 text-faint"
-                      />
-                    )}
-                    <span className="flex-1">{option.label}</span>
-                    {props.multiple && selected && (
-                      <Check size={15} className="shrink-0 text-primary" />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>,
+            {searchable && (
+              <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
+                <Search size={15} className="shrink-0 text-faint" />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-faint"
+                />
+              </div>
+            )}
+
+            <ul className="max-h-72 overflow-y-auto">
+              {visibleOptions.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-faint">{emptyMessage}</li>
+              ) : (
+                visibleOptions.map((option) => {
+                  const selected = isSelected(option.value);
+                  return (
+                    <li key={option.value}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelect(option.value)}
+                        style={{ paddingLeft: 12 + (option.depth ?? 0) * 16 }}
+                        className={`flex w-full cursor-pointer items-center gap-1.5 py-2 pr-3 text-left text-sm hover:bg-hover ${
+                          selected
+                            ? "bg-primary-tint font-semibold text-primary"
+                            : "text-ink"
+                        }`}
+                      >
+                        {(option.depth ?? 0) > 0 && (
+                          <CornerDownRight
+                            size={14}
+                            className="shrink-0 text-faint"
+                          />
+                        )}
+                        <span className="flex-1">{option.label}</span>
+                        {props.multiple && selected && (
+                          <Check size={15} className="shrink-0 text-primary" />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>,
           document.body,
         )}
     </div>

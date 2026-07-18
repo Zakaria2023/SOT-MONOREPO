@@ -76,6 +76,8 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
         name={name}
         render={({ field }) => (
           <Dropdown
+            searchable
+            searchPlaceholder="Search categories..."
             value={typeof field.value === "string" ? field.value : ""}
             onChange={(value) => {
               field.onChange(value);
