@@ -197,14 +197,19 @@ export const getSpecification = async (
   }
 };
 
+// The transaction handle drizzle passes to a db.transaction callback.
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 // Insert category links for a specification (no delete — caller decides).
+// Runs on the given transaction so it's part of the caller's atomic write.
 const insertSpecificationCategories = async (
+  tx: Tx,
   specificationUuid: string,
   categoryUuids: string[],
 ): Promise<void> => {
   const unique = [...new Set(categoryUuids.filter((uuid) => uuid.length > 0))];
   if (unique.length > 0) {
-    await db.insert(SpecificationCategories).values(
+    await tx.insert(SpecificationCategories).values(
       unique.map((categoryUuid) => ({
         uuid: randomUUID(),
         specificationUuid,
@@ -219,13 +224,12 @@ export const createSpecification = async (
   categoryUuids: string[],
 ): Promise<string> => {
   const uuid = randomUUID();
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(Specifications);
-
-  await db.insert(Specifications).values({ ...fields, uuid, order: total });
-  // Fresh uuid — no existing links to clear, insert directly.
-  await insertSpecificationCategories(uuid, categoryUuids);
+  // Spec row + its category links in one atomic write.
+  await db.transaction(async (tx) => {
+    const [{ total }] = await tx.select({ total: count() }).from(Specifications);
+    await tx.insert(Specifications).values({ ...fields, uuid, order: total });
+    await insertSpecificationCategories(tx, uuid, categoryUuids);
+  });
   return uuid;
 };
 
@@ -234,15 +238,15 @@ export const updateSpecification = async (
   fields: SpecificationFields,
   categoryUuids: string[],
 ): Promise<void> => {
-  // The spec update and the old-links delete touch different tables — run
-  // them in parallel, then write the new links.
-  await Promise.all([
-    db.update(Specifications).set(fields).where(eq(Specifications.uuid, uuid)),
-    db
+  // Update the spec, clear its old links, and write the new ones as one atomic
+  // write — a failure can't leave the spec updated but its links half-replaced.
+  await db.transaction(async (tx) => {
+    await tx.update(Specifications).set(fields).where(eq(Specifications.uuid, uuid));
+    await tx
       .delete(SpecificationCategories)
-      .where(eq(SpecificationCategories.specificationUuid, uuid)),
-  ]);
-  await insertSpecificationCategories(uuid, categoryUuids);
+      .where(eq(SpecificationCategories.specificationUuid, uuid));
+    await insertSpecificationCategories(tx, uuid, categoryUuids);
+  });
 };
 
 export const deleteSpecification = async (uuid: string): Promise<void> => {
