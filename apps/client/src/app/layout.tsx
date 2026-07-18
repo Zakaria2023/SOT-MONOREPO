@@ -3,7 +3,6 @@ import { Navbar } from "@/components/layout/navbar";
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { SalesAssistantWidget } from "@/components/assistant/sales-assistant-widget";
 import "./globals.css";
 
 type RootLayoutProps = {
@@ -26,7 +25,6 @@ const RootLayout = ({ children }: RootLayoutProps) => (
         <FlagEmojiPolyfill />
         <Navbar />
         {children}
-        <SalesAssistantWidget />
       </body>
     </html>
   </ClerkProvider>

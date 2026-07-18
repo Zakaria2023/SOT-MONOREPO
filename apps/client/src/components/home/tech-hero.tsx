@@ -72,13 +72,13 @@ export const TechHero = () => (
             <Layers size={17} className="text-accent-cyan" />
             Shop by solution
           </Link>
-          <button
-            type="button"
+          <Link
+            href="/ai"
             className="font-grotesk inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface px-6 py-3.5 text-sm font-semibold text-ink transition-colors hover:border-search-border hover:bg-hover"
           >
             <Sparkles size={17} className="text-accent-violet" />
             Ask AI
-          </button>
+          </Link>
         </div>
 
         <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3">

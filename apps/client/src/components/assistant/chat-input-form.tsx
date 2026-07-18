@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRef } from "react";
 import type { ChangeEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { Input } from "@/components/ui/input";
+import { Input } from "ui";
 import type { useAttachedImages } from "@/app/assistant/use-attached-images";
 import type { ChatMessageFormValues } from "@/app/assistant/validation";
 
