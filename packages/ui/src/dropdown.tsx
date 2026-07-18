@@ -220,9 +220,40 @@ export const Dropdown = (props: DropdownProps) => {
       ?.scrollIntoView({ block: "nearest" });
   }, [isOpen, active]);
 
+  // The parent values above an option, found by walking back through the
+  // depth-ordered list to each shallower ancestor.
+  const ancestorsOf = (value: string): string[] => {
+    const index = options.findIndex((option) => option.value === value);
+    if (index === -1) {
+      return [];
+    }
+    const ancestors: string[] = [];
+    let depth = options[index].depth ?? 0;
+    for (let i = index - 1; i >= 0 && depth > 0; i--) {
+      const candidate = options[i].depth ?? 0;
+      if (candidate < depth) {
+        ancestors.push(options[i].value);
+        depth = candidate;
+      }
+    }
+    return ancestors;
+  };
+
   const handleToggle = () => {
     if (!isOpen) {
       updatePosition();
+      // Opening: reveal the selected option by expanding its ancestors.
+      const selectedValue = props.multiple ? props.value[0] : props.value;
+      if (selectedValue) {
+        const ancestors = ancestorsOf(selectedValue);
+        if (ancestors.length > 0) {
+          setCollapsed((prev) => {
+            const next = new Set(prev);
+            ancestors.forEach((value) => next.delete(value));
+            return next;
+          });
+        }
+      }
     }
     setIsOpen((open) => !open);
     setQuery("");
