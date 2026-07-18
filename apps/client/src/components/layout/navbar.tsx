@@ -29,7 +29,7 @@ export const Navbar = async () => {
           <span className="font-heading text-2xl text-ink">Stratum</span>
         </Link>
 
-        <CategoryMenu categories={tree.slice(0, 3)} />
+        <CategoryMenu categories={tree} />
 
         {user ? (
           <div className="flex items-center gap-3">
