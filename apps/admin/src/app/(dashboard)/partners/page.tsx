@@ -1,9 +1,8 @@
 import { PartnerRequestsTable } from "@/components/partners/partner-requests-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
-import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { requireAdmin } from "@/lib/server/auth";
-import { Suspense } from "react";
+import { AsyncSection } from "@/components/shared/async-section";
 import { getPartnerRequestsPage } from "./action";
 
 type Props = {
@@ -45,9 +44,9 @@ const PartnersPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search by company, name, or email..." />
 
-      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+      <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
         <PartnersList search={search} page={page} />
-      </Suspense>
+      </AsyncSection>
     </div>
   );
 };

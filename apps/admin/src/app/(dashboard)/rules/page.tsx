@@ -1,10 +1,9 @@
 import { RulesTable } from "@/components/rules/rules-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
-import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { FlaskConical, Plus } from "lucide-react";
 import Link from "next/link";
-import { Suspense } from "react";
+import { AsyncSection } from "@/components/shared/async-section";
 import { getRulesPage } from "./action";
 
 type Props = {
@@ -63,9 +62,9 @@ const RulesPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search by rule name or spec..." />
 
-      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+      <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
         <RulesList search={search} page={page} />
-      </Suspense>
+      </AsyncSection>
     </div>
   );
 };

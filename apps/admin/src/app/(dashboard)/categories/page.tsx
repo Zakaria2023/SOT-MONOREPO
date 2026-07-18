@@ -2,11 +2,10 @@ import { CategoriesReorderTable } from "@/components/categories/categories-reord
 import { CategoriesTable } from "@/components/categories/categories-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
+import { AsyncSection } from "@/components/shared/async-section";
 import { ParentFilter } from "@/components/shared/parent-filter";
-import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { Suspense } from "react";
 import { getCategories, getCategoriesPage, getCategoryChildren } from "./action";
 
 type Props = {
@@ -71,17 +70,14 @@ const CategoriesPage = async ({ searchParams }: Props) => {
             Drag rows to set their order within this parent. Changes save
             automatically.
           </p>
-          <Suspense key={`reorder-${parent}`} fallback={<TableSkeleton />}>
+          <AsyncSection reloadKey={`reorder-${parent}`}>
             <CategoriesReorderList parent={parent} />
-          </Suspense>
+          </AsyncSection>
         </>
       ) : (
-        <Suspense
-          key={`${search ?? ""}-${page ?? ""}`}
-          fallback={<TableSkeleton />}
-        >
+        <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
           <CategoriesBrowseList search={search} page={page} />
-        </Suspense>
+        </AsyncSection>
       )}
     </div>
   );

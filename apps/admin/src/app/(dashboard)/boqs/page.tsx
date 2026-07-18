@@ -1,9 +1,8 @@
 import { BoqsTable } from "@/components/boqs/boqs-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
-import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { requireAdmin } from "@/lib/server/auth";
-import { Suspense } from "react";
+import { AsyncSection } from "@/components/shared/async-section";
 import { getBoqsPage, listPreSellers } from "./action";
 
 type Props = {
@@ -43,9 +42,9 @@ const BoqsPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search by reference or customer..." />
 
-      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+      <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
         <BoqsList search={search} page={page} />
-      </Suspense>
+      </AsyncSection>
     </div>
   );
 };

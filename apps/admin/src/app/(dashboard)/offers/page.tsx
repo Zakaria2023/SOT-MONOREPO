@@ -1,9 +1,8 @@
 import { OffersTable } from "@/components/offers/offers-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
-import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { requireAdmin } from "@/lib/server/auth";
-import { Suspense } from "react";
+import { AsyncSection } from "@/components/shared/async-section";
 import { getOffersPage } from "./action";
 
 type Props = {
@@ -45,9 +44,9 @@ const OffersPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search by BOQ reference or customer..." />
 
-      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+      <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
         <OffersList search={search} page={page} />
-      </Suspense>
+      </AsyncSection>
     </div>
   );
 };

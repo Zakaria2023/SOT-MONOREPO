@@ -492,6 +492,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 - Never add route-level `loading.tsx` files. Show loading state with `<Suspense>` boundaries **inside** the page instead, wrapping only the async, data-dependent part (the table/list), with a static skeleton as the `fallback`.
 - Give the `<Suspense>` a `key` derived from the relevant search params (e.g. `` key={`${search}-${page}`} ``) so changing the search/filter/page re-shows the fallback while the new data streams in — the fast, param-independent chrome (heading, toolbar, filters) stays mounted and outside the boundary.
 - Move the param-dependent data fetch into a small async child component that the boundary wraps; the page component itself only awaits `searchParams` and renders the chrome + the boundary.
+- Pair the `<Suspense>` with an error boundary so a thrown fetch shows a retry UI instead of erroring the whole route. In `apps/admin`, use the shared `<AsyncSection reloadKey={...}>` which bundles the keyed Suspense (skeleton fallback) and the error boundary (retry fallback) together — pass the async child as its children.
 
   ```tsx
   // ❌ Bad — app/(dashboard)/products/loading.tsx

@@ -1,10 +1,9 @@
 import { SpecificationsTable } from "@/components/specifications/specifications-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
-import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { Suspense } from "react";
+import { AsyncSection } from "@/components/shared/async-section";
 import { getSpecificationsPage } from "./action";
 
 type Props = {
@@ -50,9 +49,9 @@ const SpecificationsPage = async ({ searchParams }: Props) => {
 
       <ListSearch placeholder="Search specifications..." />
 
-      <Suspense key={`${search ?? ""}-${page ?? ""}`} fallback={<TableSkeleton />}>
+      <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
         <SpecificationsList search={search} page={page} />
-      </Suspense>
+      </AsyncSection>
     </div>
   );
 };
