@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
 import type { PaginatedResult } from "utils";
-import { buildPaginatedResult, getReviewerName, resolvePagination } from "utils";
+import { getReviewerName, paginate } from "utils";
 import { revalidatePath } from "next/cache";
 import {
   approveGovernmentRequest as approveGovernmentRequestRecord,
@@ -37,16 +37,9 @@ export const getGovernmentRequestsPage = async (
   params: GovernmentRequestListParams = {},
 ): Promise<PaginatedResult<GovernmentRequestListItem>> => {
   await requireAdmin();
-  const { page, pageSize, offset } = resolvePagination(
-    params.page,
-    params.pageSize,
+  return paginate(params, ({ limit, offset }) =>
+    listGovernmentRequests({ search: params.search, limit, offset }),
   );
-  const { items, total } = await listGovernmentRequests({
-    search: params.search,
-    limit: pageSize,
-    offset,
-  });
-  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 export const approveGovernmentRequestAction = async (

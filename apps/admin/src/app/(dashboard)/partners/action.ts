@@ -2,7 +2,7 @@
 
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import type { PaginatedResult } from "utils";
-import { buildPaginatedResult, getReviewerName, resolvePagination } from "utils";
+import { getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
@@ -38,16 +38,9 @@ export const getPartnerRequestsPage = async (
   params: PartnerRequestListParams = {},
 ): Promise<PaginatedResult<PartnerRequestListItem>> => {
   await requireAdmin();
-  const { page, pageSize, offset } = resolvePagination(
-    params.page,
-    params.pageSize,
+  return paginate(params, ({ limit, offset }) =>
+    listPartnerRequests({ search: params.search, limit, offset }),
   );
-  const { items, total } = await listPartnerRequests({
-    search: params.search,
-    limit: pageSize,
-    offset,
-  });
-  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 export const approvePartnerRequestAction = async (

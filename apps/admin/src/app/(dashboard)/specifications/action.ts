@@ -11,7 +11,7 @@ import {
 } from "services";
 import type { SpecificationWithCategories } from "services";
 import type { PaginatedResult } from "utils";
-import { buildPaginatedResult, resolvePagination } from "utils";
+import { paginate } from "utils";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -43,18 +43,10 @@ export type SpecificationListParams = {
 // drives `search`/`page` through URL search params.
 export const getSpecificationsPage = async (
   params: SpecificationListParams = {},
-): Promise<PaginatedResult<SpecificationWithCategories>> => {
-  const { page, pageSize, offset } = resolvePagination(
-    params.page,
-    params.pageSize,
+): Promise<PaginatedResult<SpecificationWithCategories>> =>
+  paginate(params, ({ limit, offset }) =>
+    getSpecificationsList({ search: params.search, limit, offset }),
   );
-  const { items, total } = await getSpecificationsList({
-    search: params.search,
-    limit: pageSize,
-    offset,
-  });
-  return buildPaginatedResult(items, total, page, pageSize);
-};
 
 // A filled "new group" name creates the group on save; otherwise use the
 // picked one (empty = no group).

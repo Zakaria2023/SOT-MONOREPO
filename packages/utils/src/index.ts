@@ -51,6 +51,27 @@ export const buildPaginatedResult = <T>(
   totalPages: Math.max(1, Math.ceil(total / pageSize)),
 });
 
+/**
+ * End-to-end pagination for a list action: normalizes the raw page/pageSize
+ * params, hands the resolved `limit`/`offset` to `fetcher` (which returns the
+ * page's rows and the unfiltered total), and wraps the result. Removes the
+ * resolve/build boilerplate repeated across every paginated action.
+ */
+export const paginate = async <T>(
+  params: { page?: number | string | null; pageSize?: number | string | null },
+  fetcher: (args: {
+    limit: number;
+    offset: number;
+  }) => Promise<{ items: T[]; total: number }>,
+): Promise<PaginatedResult<T>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await fetcher({ limit: pageSize, offset });
+  return buildPaginatedResult(items, total, page, pageSize);
+};
+
 /** Formats a numeric amount as whole-unit currency, e.g. "SAR 17,768". */
 export const formatMoney = (amount: number, currency: string | null): string =>
   `${currency ?? "SAR"} ${Math.round(amount).toLocaleString("en-US")}`;

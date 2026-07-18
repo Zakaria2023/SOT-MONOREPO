@@ -5,7 +5,7 @@ import {
   type CompatibilityRuleListItem,
 } from "services";
 import type { PaginatedResult } from "utils";
-import { buildPaginatedResult, resolvePagination } from "utils";
+import { paginate } from "utils";
 
 export type RuleListParams = {
   search?: string;
@@ -17,15 +17,7 @@ export type RuleListParams = {
 // frontend drives `search`/`page` through URL search params.
 export const getRulesPage = async (
   params: RuleListParams = {},
-): Promise<PaginatedResult<CompatibilityRuleListItem>> => {
-  const { page, pageSize, offset } = resolvePagination(
-    params.page,
-    params.pageSize,
+): Promise<PaginatedResult<CompatibilityRuleListItem>> =>
+  paginate(params, ({ limit, offset }) =>
+    getCompatibilityRules({ search: params.search, limit, offset }),
   );
-  const { items, total } = await getCompatibilityRules({
-    search: params.search,
-    limit: pageSize,
-    offset,
-  });
-  return buildPaginatedResult(items, total, page, pageSize);
-};

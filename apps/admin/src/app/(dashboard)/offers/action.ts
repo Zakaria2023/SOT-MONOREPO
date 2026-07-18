@@ -1,7 +1,7 @@
 "use server";
 
 import type { PaginatedResult } from "utils";
-import { buildPaginatedResult, getReviewerName, resolvePagination } from "utils";
+import { getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
@@ -31,16 +31,9 @@ export const getOffersPage = async (
   params: OfferListParams = {},
 ): Promise<PaginatedResult<OfferRow>> => {
   await requireAdmin();
-  const { page, pageSize, offset } = resolvePagination(
-    params.page,
-    params.pageSize,
+  return paginate(params, ({ limit, offset }) =>
+    listOffers({ search: params.search, limit, offset }),
   );
-  const { items, total } = await listOffers({
-    search: params.search,
-    limit: pageSize,
-    offset,
-  });
-  return buildPaginatedResult(items, total, page, pageSize);
 };
 
 export const approveOfferAction = async (
