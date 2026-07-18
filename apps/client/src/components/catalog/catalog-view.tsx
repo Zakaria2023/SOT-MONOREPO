@@ -117,7 +117,7 @@ export const CatalogView = ({
         </header>
 
         <div className="mt-10 flex flex-col gap-8 lg:flex-row">
-          <aside className="flex shrink-0 flex-col gap-4 lg:w-64">
+          <aside className="flex shrink-0 flex-col gap-4 lg:w-80 xl:w-96">
             <CategoryFilter
               tree={categoryTree}
               total={total}
