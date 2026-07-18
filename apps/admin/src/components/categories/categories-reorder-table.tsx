@@ -2,6 +2,7 @@
 
 import { reorderCategories } from "@/app/(dashboard)/categories/action";
 import type { CategoryListItem } from "@/app/(dashboard)/categories/action";
+import { CategoryRowActions } from "@/components/categories/category-row-actions";
 import { ReorderableTable } from "@/components/shared/reorderable-table";
 import type { ReorderColumn } from "@/components/shared/reorderable-table";
 import { ImageOff } from "lucide-react";
@@ -44,6 +45,14 @@ const columns: ReorderColumn<CategoryListItem>[] = [
     header: "Parent",
     render: (category) =>
       category.parentName ?? <span className="text-faint">—</span>,
+  },
+  {
+    key: "actions",
+    header: "Action",
+    align: "right",
+    render: (category) => (
+      <CategoryRowActions uuid={category.uuid} name={category.name} />
+    ),
   },
 ];
 

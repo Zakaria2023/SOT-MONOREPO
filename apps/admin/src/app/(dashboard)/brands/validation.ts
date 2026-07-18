@@ -7,7 +7,6 @@ export const brandFormSchema = z.object({
   note: z.string().optional(),
   description: z.string().optional(),
   parentUuid: z.string().optional(),
-  order: z.number().int().min(0).optional(),
   image: z.string().optional(),
   businessLines: z.array(z.enum(businessLines)),
 });

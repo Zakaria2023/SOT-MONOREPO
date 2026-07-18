@@ -10,7 +10,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowUpDown, Award } from "lucide-react";
+import { Award } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -68,16 +68,6 @@ export const BrandForm = (props: BrandFormProps) => {
           placeholder="No parent"
           allowEmpty
         />
-
-        {mode === "edit" && (
-          <Input
-            label="Order"
-            labelIcon={<ArrowUpDown size={15} />}
-            type="number"
-            {...register("order", { valueAsNumber: true })}
-            error={errors.order?.message}
-          />
-        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">

@@ -2,6 +2,7 @@
 
 import { reorderBrands } from "@/app/(dashboard)/brands/action";
 import type { BrandListItem } from "@/app/(dashboard)/brands/action";
+import { BrandRowActions } from "@/components/brands/brand-row-actions";
 import { ReorderableTable } from "@/components/shared/reorderable-table";
 import type { ReorderColumn } from "@/components/shared/reorderable-table";
 import { ImageOff } from "lucide-react";
@@ -44,6 +45,12 @@ const columns: ReorderColumn<BrandListItem>[] = [
     header: "Parent",
     render: (brand) =>
       brand.parentName ?? <span className="text-faint">—</span>,
+  },
+  {
+    key: "actions",
+    header: "Action",
+    align: "right",
+    render: (brand) => <BrandRowActions uuid={brand.uuid} name={brand.name} />,
   },
 ];
 

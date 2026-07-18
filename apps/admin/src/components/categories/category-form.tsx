@@ -9,7 +9,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowUpDown, Tags } from "lucide-react";
+import { Tags } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -70,16 +70,6 @@ export const CategoryForm = (props: CategoryFormProps) => {
           name="parentUuid"
           categories={categories}
         />
-
-        {mode === "edit" && (
-          <Input
-            label="Order"
-            labelIcon={<ArrowUpDown size={15} />}
-            type="number"
-            {...register("order", { valueAsNumber: true })}
-            error={errors.order?.message}
-          />
-        )}
       </div>
 
       <Textarea label="Description" rows={3} {...register("description")} />
