@@ -47,7 +47,7 @@ export const OffersSection = ({
   if (offers.length === 0) {
     if (!awaiting) return null;
     return (
-      <div className="mx-auto max-w-6xl px-6 pb-16 lg:px-8">
+      <div className="mx-auto px-6 pb-16 lg:px-12 xl:px-20">
         <div className="rounded-[18px] border border-dashed border-search-border p-8 text-center">
           <h2 className="font-heading text-xl text-ink">Offers on the way</h2>
           <p className="font-grotesk mt-1 text-sm text-muted">
@@ -60,7 +60,7 @@ export const OffersSection = ({
   }
 
   return (
-    <div className="mx-auto px-6 pb-16 lg:px-8">
+    <div className="mx-auto px-6 pb-16 lg:px-12 xl:px-20">
       <h2 className="font-heading text-2xl text-ink">Offers for you</h2>
       <p className="font-grotesk mt-1 text-sm text-muted">
         Compare what our partners quoted and pick the one that fits you best.

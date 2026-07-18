@@ -10,7 +10,7 @@ type BrandSectionProps = {
 
 export const BrandSection = ({ brands }: BrandSectionProps) => (
   <section className="w-full bg-surface py-24">
-    <div className="mx-auto max-w-6xl px-8">
+    <div className="mx-auto px-6 lg:px-12 xl:px-20">
       <header className="mx-auto max-w-2xl text-center">
         <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
           The brands we carry

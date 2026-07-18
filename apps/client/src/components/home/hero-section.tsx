@@ -42,7 +42,7 @@ export const HeroSection = () => (
       />
     </div>
 
-    <div className="pointer-events-none relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-6 py-24 lg:grid-cols-5 lg:gap-16 lg:px-8">
+    <div className="pointer-events-none relative mx-auto grid w-full grid-cols-1 items-center gap-12 px-6 py-24 lg:grid-cols-5 lg:gap-16 lg:px-12 xl:px-20">
       <div className="pointer-events-auto lg:col-span-3">
         <h1 className="font-heading max-w-3xl bg-linear-to-b from-white to-[#ACA8BA] bg-clip-text text-5xl leading-[1.04] font-bold text-transparent md:text-6xl">
           Your enterprise network, quoted and ready to build.

@@ -19,7 +19,7 @@ const OrdersPage = async () => {
   const orders = await getUserOrders(user.uuid);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12 lg:px-8">
+    <main className="mx-auto px-6 py-12 lg:px-12 xl:px-20">
       <h1 className="font-heading text-2xl text-ink">Your orders</h1>
 
       {orders.length === 0 ? (

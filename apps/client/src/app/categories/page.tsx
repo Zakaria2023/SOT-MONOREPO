@@ -16,7 +16,7 @@ const CategoriesPage = async () => {
 
   return (
     <main className="min-h-screen bg-page">
-      <div className="mx-auto max-w-6xl px-6 py-14 lg:px-8">
+      <div className="mx-auto px-6 py-14 lg:px-12 xl:px-20">
         <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
           Shop by solution
         </p>
@@ -37,7 +37,7 @@ const CategoriesPage = async () => {
             {categories.map((category) => (
               <li key={category.uuid}>
                 <Link
-                  href={`/categories/${category.uuid}`}
+                  href={`/products?category=${category.uuid}`}
                   className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
                 >
                   <div className="relative h-40 w-full shrink-0 overflow-hidden bg-surface-2">

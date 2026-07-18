@@ -38,7 +38,7 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
   const subImages = product.images ?? [];
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-8 lg:px-8">
+    <section className="mx-auto px-6 pt-8 lg:px-12 xl:px-20">
       <Link
         href="/"
         className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-3.5 py-2 text-sm font-medium text-muted shadow-sm transition-colors hover:border-primary hover:text-primary"

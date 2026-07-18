@@ -1,3 +1,4 @@
+import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { FlagEmojiPolyfill } from "@/components/common/flag-emoji-polyfill";
 import { Navbar } from "@/components/layout/navbar";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -24,6 +25,7 @@ const RootLayout = ({ children }: Props) => (
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <FlagEmojiPolyfill />
         <Navbar />
+        <Breadcrumbs />
         {children}
       </body>
     </html>

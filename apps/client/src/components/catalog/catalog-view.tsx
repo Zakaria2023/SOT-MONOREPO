@@ -101,7 +101,7 @@ export const CatalogView = ({
 
   return (
     <main className="min-h-screen bg-page">
-      <div className="mx-auto max-w-6xl px-6 py-14 lg:px-8">
+      <div className="mx-auto px-6 py-14 lg:px-12 xl:px-20">
         <header>
           <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
             SOT Solutions · Catalog

@@ -23,7 +23,7 @@ export const BoqView = ({ boq, items }: BoqViewProps) => {
 
   return (
     <main className="w-full bg-surface">
-      <div className="mx-auto max-w-6xl px-6 py-12 lg:px-8">
+      <div className="mx-auto px-6 py-12 lg:px-12 xl:px-20">
         <Link
           href="/cart"
           className="font-grotesk inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-primary"

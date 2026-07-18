@@ -7,7 +7,7 @@ type ProductSectionProps = {
 
 export const ProductSection = ({ products }: ProductSectionProps) => (
   <section className="w-full bg-page pt-14 pb-24">
-    <div className="mx-auto max-w-6xl px-8">
+    <div className="mx-auto px-6 lg:px-12 xl:px-20">
       <header className="text-center">
         <h2 className="font-heading text-3xl text-ink">
           Hardware in this deployment

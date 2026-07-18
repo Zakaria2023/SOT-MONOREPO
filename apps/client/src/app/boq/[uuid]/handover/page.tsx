@@ -31,7 +31,7 @@ const HandoverPage = async ({ params }: Props) => {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12 lg:px-8">
+    <main className="mx-auto px-6 py-12 lg:px-12 xl:px-20">
       <Link
         href={`/boq/${uuid}`}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-primary"

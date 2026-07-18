@@ -13,7 +13,7 @@ export const ProductRelated = ({ products }: ProductRelatedProps) => {
   if (products.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
+    <section className="mx-auto px-6 pt-16 lg:px-12 xl:px-20">
       <h2 className="font-heading text-3xl text-ink">Pairs well with</h2>
       <p className="mt-2 text-muted">
         Other devices in the same range — tap a tile to jump to its page.
