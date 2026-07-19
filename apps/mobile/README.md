@@ -1,0 +1,101 @@
+# mobile
+
+The React Native mobile client for SOT, built with **Expo** (SDK 52) and
+**Expo Router**. It mirrors `apps/client` but for iOS/Android, and talks to the
+backend exclusively through the versioned REST API in `apps/api` (`/api/v1`) —
+it never imports `packages/services` or touches the database directly.
+
+## Architecture
+
+- **Routing** — file-based via Expo Router under `src/app` (like the client's
+  `src/app`). Route groups: `(auth)` for sign-in, `(tabs)` for the signed-in
+  app, and `product/[uuid]` pushed as a stack screen.
+- **Auth** — Clerk via `@clerk/clerk-expo`. The session token is cached in the
+  device keychain (`expo-secure-store`) and sent to `apps/api` as
+  `Authorization: Bearer <token>` — exactly what `getUserFromRequest` expects.
+- **Data** — `src/lib/api.ts` is a typed `fetch` wrapper over `/api/v1`. DTOs in
+  `src/lib/types.ts` mirror the service return shapes.
+
+## Prerequisites
+
+- Node 20+ and `pnpm` (already used by the monorepo).
+- The **Expo Go** app on your phone (App Store / Play Store), or an
+  Android emulator / iOS simulator.
+- `apps/api` running and reachable from your phone.
+
+## 1. Install dependencies
+
+From the **repo root**:
+
+```bash
+pnpm install
+```
+
+> **pnpm + Metro note:** Metro is configured for this monorepo in
+> `metro.config.js` (watches the repo root, resolves both app-local and root
+> `node_modules`). If Metro reports it can't resolve a module, add
+> `node-linker=hoisted` to the repo-root `.npmrc` and reinstall — that flattens
+> `node_modules` the way Metro expects.
+
+## 2. Configure environment
+
+```bash
+cp apps/mobile/.env.example apps/mobile/.env
+```
+
+Edit `apps/mobile/.env`:
+
+- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` — same value as
+  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in the repo-root `.env.local`.
+- `EXPO_PUBLIC_API_URL` — where `apps/api` is reachable **from the device**:
+  - iOS simulator / web: `http://localhost:3002`
+  - Android emulator: `http://10.0.2.2:3002`
+  - **Physical phone (Expo Go):** your computer's LAN IP, e.g.
+    `http://192.168.1.20:3002` (find it with `ipconfig` on Windows). The phone
+    and computer must be on the same Wi-Fi.
+
+## 3. Start the API
+
+In one terminal, from the repo root:
+
+```bash
+pnpm dev:api        # apps/api on http://localhost:3002
+```
+
+## 4. Start the mobile app
+
+In another terminal:
+
+```bash
+pnpm dev:mobile     # === pnpm --filter mobile dev === expo start
+```
+
+Then:
+
+- **Phone:** scan the QR code with Expo Go (Android) or the Camera app (iOS).
+- **Android emulator:** press `a` in the Expo terminal.
+- **iOS simulator (macOS only):** press `i`.
+- **Web preview:** press `w`.
+
+Sign in with an email that exists in Clerk — you'll receive a 6-digit code.
+After sign-in you land on the Products tab (Products / Categories / Cart /
+Profile), and tapping a product opens its detail screen where you can add it to
+your cart.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev:mobile` (root) | Start the Expo dev server |
+| `pnpm --filter mobile android` | Open on a connected Android device/emulator |
+| `pnpm --filter mobile ios` | Open on the iOS simulator (macOS) |
+| `pnpm --filter mobile type-check` | `tsc --noEmit` |
+
+## Notes
+
+- `src/lib/format.ts` keeps a local copy of `formatPrice`. Metro won't transform
+  the workspace `utils` package's raw-TS entry point, so cross-app helpers are
+  duplicated locally here rather than imported from `"utils"`.
+- Building standalone binaries (TestFlight / Play Store) uses EAS Build:
+  `npx eas build`. That's beyond local development and not required to run the
+  app in Expo Go.
