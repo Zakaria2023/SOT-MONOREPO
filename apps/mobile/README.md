@@ -42,20 +42,25 @@ pnpm install
 
 ## 2. Configure environment
 
+There is **no separate mobile env file**. `app.config.js` reads the monorepo
+root `.env.local` (the same file every other app uses) at startup and passes the
+values to the app via `expo-constants`. It reuses two keys that already live
+there:
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — the Clerk publishable key.
+- `NEXT_PUBLIC_API_URL` — the base URL of `apps/api` (defaults to
+  `http://localhost:3002`).
+
+`localhost` works for the iOS simulator and web. To run on a **physical phone**
+(Expo Go), `apps/api` must be reachable over your LAN, so start the dev server
+with your machine's LAN IP as an override (no file edit needed):
+
 ```bash
-cp apps/mobile/.env.example apps/mobile/.env
+# Windows: find your IPv4 with `ipconfig`; phone + PC on the same Wi-Fi
+EXPO_PUBLIC_API_URL=http://192.168.1.20:3002 pnpm dev:mobile
 ```
 
-Edit `apps/mobile/.env`:
-
-- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` — same value as
-  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in the repo-root `.env.local`.
-- `EXPO_PUBLIC_API_URL` — where `apps/api` is reachable **from the device**:
-  - iOS simulator / web: `http://localhost:3002`
-  - Android emulator: `http://10.0.2.2:3002`
-  - **Physical phone (Expo Go):** your computer's LAN IP, e.g.
-    `http://192.168.1.20:3002` (find it with `ipconfig` on Windows). The phone
-    and computer must be on the same Wi-Fi.
+(An Android emulator reaches the host at `http://10.0.2.2:3002`.)
 
 ## 3. Start the API
 

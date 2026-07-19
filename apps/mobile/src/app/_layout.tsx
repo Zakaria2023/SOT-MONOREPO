@@ -56,8 +56,8 @@ const AuthGate = () => {
 const MissingKey = () => (
   <View style={styles.center}>
     <Text style={styles.error}>
-      Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Copy apps/mobile/.env.example to
-      apps/mobile/.env and set your Clerk publishable key.
+      Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Set it in the monorepo root
+      .env.local — the mobile app reads its config from there.
     </Text>
   </View>
 );
