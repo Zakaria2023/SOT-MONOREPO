@@ -31,11 +31,14 @@ From the **repo root**:
 pnpm install
 ```
 
-> **pnpm + Metro note:** Metro is configured for this monorepo in
-> `metro.config.js` (watches the repo root, resolves both app-local and root
-> `node_modules`). If Metro reports it can't resolve a module, add
-> `node-linker=hoisted` to the repo-root `.npmrc` and reinstall — that flattens
-> `node_modules` the way Metro expects.
+> **pnpm + Metro note:** `metro.config.js` is tuned for pnpm — it watches the
+> repo root and keeps Metro's hierarchical lookup on so it can follow pnpm's
+> symlinks into the `.pnpm` virtual store (that lookup is what resolves
+> transitive deps like `@expo/metro-runtime`). Babel injects `@babel/runtime`
+> helper imports into app source, so it's declared as a direct dependency here.
+> A production JS bundle has been verified with `expo export`, so a clean
+> `pnpm install` should Just Work. If you ever add a library whose transitive
+> helper isn't resolvable, declare it directly in `apps/mobile/package.json`.
 
 ## 2. Configure environment
 
@@ -96,6 +99,11 @@ your cart.
 - `src/lib/format.ts` keeps a local copy of `formatPrice`. Metro won't transform
   the workspace `utils` package's raw-TS entry point, so cross-app helpers are
   duplicated locally here rather than imported from `"utils"`.
+- `@types/react` is pinned to v19 to match the rest of the monorepo (the other
+  apps are React 19). The mobile **runtime** stays on `react@18.3.1`, which is
+  what Expo SDK 52 / React Native 0.76 require — only the types are aligned, so
+  `tsc` doesn't see two conflicting copies of `@types/react`. It's listed under
+  `expo.install.exclude` so `expo install --fix` won't downgrade it.
 - Building standalone binaries (TestFlight / Play Store) uses EAS Build:
   `npx eas build`. That's beyond local development and not required to run the
   app in Expo Go.

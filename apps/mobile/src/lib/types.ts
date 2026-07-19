@@ -46,6 +46,29 @@ export type CartLineItem = {
   kind: string;
 };
 
+export type Brand = {
+  uuid: string;
+  name: string;
+  code: string | null;
+  description: string | null;
+  image: string | null;
+  businessLines: string[] | null;
+  // Present on the list endpoint, absent on the single-brand endpoint.
+  parentName?: string | null;
+  productCount?: number;
+};
+
+export type Offer = {
+  uuid: string;
+  boqUuid: string;
+  boqReference: string | null;
+  productPrice: string | null;
+  installPrice: string | null;
+  description: string | null;
+  status: string;
+  createdAt: string;
+};
+
 export type AuthUser = {
   uuid: string;
   fullName: string | null;
@@ -53,4 +76,24 @@ export type AuthUser = {
   phone: string | null;
   image: string | null;
   company: string | null;
+};
+
+// The mobile app implements the individual-applicant path of the partner
+// request (the API also accepts facility/government, handled on the web client).
+export type PartnerCapability =
+  | "system_integrator"
+  | "stock"
+  | "install_program"
+  | "install_only"
+  | "pre_sell"
+  | "post_sell";
+
+export type PartnerRequestInput = {
+  capabilities: PartnerCapability[];
+  type: "individual";
+  email: string;
+  location: string;
+  firstName: string;
+  lastName: string;
+  contactNumber?: string;
 };

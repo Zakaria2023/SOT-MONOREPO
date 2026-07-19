@@ -1,5 +1,11 @@
 import { Tabs } from "expo-router";
-import { LayoutGrid, Package, ShoppingCart, User } from "lucide-react-native";
+import {
+  Home,
+  LayoutGrid,
+  Package,
+  ShoppingCart,
+  User,
+} from "lucide-react-native";
 import { colors } from "@/lib/theme";
 
 const TabsLayout = () => (
@@ -18,6 +24,13 @@ const TabsLayout = () => (
   >
     <Tabs.Screen
       name="index"
+      options={{
+        title: "Home",
+        tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+      }}
+    />
+    <Tabs.Screen
+      name="products"
       options={{
         title: "Products",
         tabBarIcon: ({ color, size }) => <Package color={color} size={size} />,

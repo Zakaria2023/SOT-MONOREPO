@@ -1,8 +1,11 @@
 import { API_URL } from "./env";
 import type {
   AuthUser,
+  Brand,
   CartLineItem,
   Category,
+  Offer,
+  PartnerRequestInput,
   Product,
   ProductDetail,
 } from "./types";
@@ -105,13 +108,28 @@ export const fetchProduct = (uuid: string): Promise<ProductDetail> =>
 export const fetchCategories = (): Promise<Category[]> =>
   request<Category[]>("/categories");
 
+export const fetchCategory = (uuid: string): Promise<Category> =>
+  request<Category>(`/categories/${uuid}`);
+
+export const fetchBrands = (): Promise<Brand[]> =>
+  request<Brand[]>("/brands");
+
+export const fetchBrand = (uuid: string): Promise<Brand> =>
+  request<Brand>(`/brands/${uuid}`);
+
 // ---- Authenticated ----
 
 export const fetchMe = (token: string): Promise<AuthUser> =>
   request<AuthUser>("/auth/me", { token });
 
+export const fetchOffers = (token: string): Promise<Offer[]> =>
+  request<Offer[]>("/offers", { token });
+
 export const fetchCart = (token: string): Promise<CartLineItem[]> =>
   request<CartLineItem[]>("/cart", { token });
+
+export const fetchCartCount = (token: string): Promise<{ count: number }> =>
+  request<{ count: number }>("/cart/count", { token });
 
 export const addCartItem = (
   input: { productUuid: string; quantity?: number },
@@ -120,5 +138,29 @@ export const addCartItem = (
   request<CartLineItem>("/cart/items", {
     method: "POST",
     token,
+    body: input,
+  });
+
+export const updateCartItem = (
+  uuid: string,
+  quantity: number,
+  token: string,
+): Promise<void> =>
+  request<void>(`/cart/items/${uuid}`, {
+    method: "PATCH",
+    token,
+    body: { quantity },
+  });
+
+export const removeCartItem = (uuid: string, token: string): Promise<void> =>
+  request<void>(`/cart/items/${uuid}`, { method: "DELETE", token });
+
+// ---- Partner request (public) ----
+
+export const createPartnerRequest = (
+  input: PartnerRequestInput,
+): Promise<{ uuid: string }> =>
+  request<{ uuid: string }>("/partner-requests", {
+    method: "POST",
     body: input,
   });

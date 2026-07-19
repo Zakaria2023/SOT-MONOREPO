@@ -1,15 +1,17 @@
 import { useAuth } from "@clerk/clerk-expo";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { CartRow } from "@/components/cart/cart-row";
 import { ListState } from "@/components/ui/list-state";
-import { fetchCart } from "@/lib/api";
+import { fetchCart, removeCartItem, updateCartItem } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import { colors, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
+import type { CartLineItem } from "@/lib/types";
 
 const CartScreen = () => {
   const { getToken } = useAuth();
+  const [busyUuid, setBusyUuid] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const token = await getToken();
@@ -20,6 +22,28 @@ const CartScreen = () => {
   }, [getToken]);
 
   const { data, error, loading, reload } = useAsync(load);
+
+  const mutate = useCallback(
+    async (item: CartLineItem, action: "inc" | "dec" | "remove") => {
+      setBusyUuid(item.uuid);
+      try {
+        const token = await getToken();
+        if (!token) {
+          throw new Error("Please sign in.");
+        }
+        if (action === "remove") {
+          await removeCartItem(item.uuid, token);
+        } else {
+          const next = action === "inc" ? item.quantity + 1 : item.quantity - 1;
+          await updateCartItem(item.uuid, next, token);
+        }
+        reload();
+      } catch {
+        setBusyUuid(null);
+      }
+    },
+    [getToken, reload],
+  );
 
   if (loading || error || !data || data.length === 0) {
     return (
@@ -47,7 +71,15 @@ const CartScreen = () => {
         contentContainerStyle={styles.content}
         data={data}
         keyExtractor={(item) => item.uuid}
-        renderItem={({ item }) => <CartRow item={item} />}
+        renderItem={({ item }) => (
+          <CartRow
+            item={item}
+            busy={busyUuid === item.uuid}
+            onIncrement={() => mutate(item, "inc")}
+            onDecrement={() => mutate(item, "dec")}
+            onRemove={() => mutate(item, "remove")}
+          />
+        )}
       />
       <View style={styles.footer}>
         <Text style={styles.totalLabel}>Total</Text>

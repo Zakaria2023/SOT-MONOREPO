@@ -1,36 +1,34 @@
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { ChevronRight, LayoutGrid } from "lucide-react-native";
+import { ChevronRight, Layers } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "@/lib/theme";
-import type { Category } from "@/lib/types";
+import type { Brand } from "@/lib/types";
 
-type CategoryRowProps = {
-  category: Category;
+type BrandRowProps = {
+  brand: Brand;
 };
 
-export const CategoryRow = ({ category }: CategoryRowProps) => (
-  <Link href={`/category/${category.uuid}`} asChild>
+export const BrandRow = ({ brand }: BrandRowProps) => (
+  <Link href={`/brand/${brand.uuid}`} asChild>
     <Pressable
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      {category.image ? (
-        <Image
-          source={category.image}
-          style={styles.image}
-          contentFit="cover"
-        />
+      {brand.image ? (
+        <Image source={brand.image} style={styles.logo} contentFit="contain" />
       ) : (
-        <View style={[styles.image, styles.placeholder]}>
-          <LayoutGrid color={colors.muted} size={20} />
+        <View style={[styles.logo, styles.placeholder]}>
+          <Layers color={colors.muted} size={20} />
         </View>
       )}
       <View style={styles.body}>
-        <Text style={styles.name}>{category.name}</Text>
-        <Text style={styles.count}>
-          {category.productCount}{" "}
-          {category.productCount === 1 ? "product" : "products"}
-        </Text>
+        <Text style={styles.name}>{brand.name}</Text>
+        {typeof brand.productCount === "number" ? (
+          <Text style={styles.count}>
+            {brand.productCount}{" "}
+            {brand.productCount === 1 ? "product" : "products"}
+          </Text>
+        ) : null}
       </View>
       <ChevronRight color={colors.muted} size={18} />
     </Pressable>
@@ -51,7 +49,7 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.85,
   },
-  image: {
+  logo: {
     width: 48,
     height: 48,
     borderRadius: radius.sm,

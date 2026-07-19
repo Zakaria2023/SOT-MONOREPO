@@ -44,6 +44,11 @@ const AuthGate = () => {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/sign-in" options={{ headerShown: false }} />
       <Stack.Screen name="product/[uuid]" options={{ title: "Product" }} />
+      <Stack.Screen name="category/[uuid]" options={{ title: "Category" }} />
+      <Stack.Screen name="brand/[uuid]" options={{ title: "Brand" }} />
+      <Stack.Screen name="brands" options={{ title: "Brands" }} />
+      <Stack.Screen name="offers" options={{ title: "Your offers" }} />
+      <Stack.Screen name="partner" options={{ title: "Become a partner" }} />
     </Stack>
   );
 };
