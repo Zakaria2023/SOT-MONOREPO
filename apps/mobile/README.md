@@ -44,35 +44,37 @@ pnpm install
 
 There is **no separate mobile env file**. `app.config.js` reads the monorepo
 root `.env.local` (the same file every other app uses) at startup and passes the
-values to the app via `expo-constants`. It reuses two keys that already live
-there:
+values to the app via `expo-constants`. It uses these keys from that file:
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — the Clerk publishable key.
-- `NEXT_PUBLIC_API_URL` — the base URL of `apps/api` (defaults to
-  `http://localhost:3002`).
+- `EXPO_PUBLIC_API_URL` — the base URL of `apps/api` for the **mobile app**.
+  This points at the **deployed API** (`https://sot-monorepo-api.vercel.app`),
+  so the app works without running `apps/api` locally. If it's unset, the config
+  falls back to `NEXT_PUBLIC_API_URL`, then `http://localhost:3002`.
 
-`localhost` works for the iOS simulator and web. To run on a **physical phone**
-(Expo Go), `apps/api` must be reachable over your LAN, so start the dev server
-with your machine's LAN IP as an override (no file edit needed):
+Because it targets the hosted API, you can skip "Start the API" below and go
+straight to running the app. To point at a **local** server instead (e.g. to
+test API changes), override the base URL at launch — no file edit needed:
 
 ```bash
-# Windows: find your IPv4 with `ipconfig`; phone + PC on the same Wi-Fi
+# local server on the same machine (simulator/web):
+EXPO_PUBLIC_API_URL=http://localhost:3002 pnpm dev:mobile
+# physical phone in Expo Go — use your PC's LAN IP (find it with `ipconfig`),
+# phone + PC on the same Wi-Fi; Android emulator uses http://10.0.2.2:3002
 EXPO_PUBLIC_API_URL=http://192.168.1.20:3002 pnpm dev:mobile
 ```
 
-(An Android emulator reaches the host at `http://10.0.2.2:3002`.)
+## 3. Start the API (optional)
 
-## 3. Start the API
-
-In one terminal, from the repo root:
+The app defaults to the **deployed** API, so you can skip this. Only start a
+local server if you're testing API changes — and then launch the app with the
+matching `EXPO_PUBLIC_API_URL` override shown above.
 
 ```bash
 pnpm dev:api        # apps/api on http://localhost:3002
 ```
 
 ## 4. Start the mobile app
-
-In another terminal:
 
 ```bash
 pnpm dev:mobile     # === pnpm --filter mobile dev === expo start

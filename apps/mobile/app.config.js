@@ -35,10 +35,15 @@ const parseEnvFile = (filePath) => {
 
 const rootEnv = parseEnvFile(path.resolve(__dirname, "../../.env.local"));
 
-// Real shell env wins over the file, so `EXPO_PUBLIC_API_URL=... pnpm dev:mobile`
-// can still override the base URL (e.g. your LAN IP for a physical device).
+// API base URL resolution, most specific first:
+//  1. a shell override (e.g. your LAN IP for a physical device during dev),
+//  2. EXPO_PUBLIC_API_URL in the root .env.local — the mobile-specific URL
+//     (the deployed API), so no local server is needed,
+//  3. NEXT_PUBLIC_API_URL shared with the other apps,
+//  4. localhost as a last resort.
 const apiUrl =
   process.env.EXPO_PUBLIC_API_URL ??
+  rootEnv.EXPO_PUBLIC_API_URL ??
   rootEnv.NEXT_PUBLIC_API_URL ??
   "http://localhost:3002";
 
