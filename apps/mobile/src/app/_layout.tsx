@@ -1,18 +1,15 @@
 import { ClerkLoaded, ClerkProvider, useAuth } from "@clerk/clerk-expo";
-import {
-  HankenGrotesk_400Regular,
-  HankenGrotesk_500Medium,
-  HankenGrotesk_600SemiBold,
-  HankenGrotesk_700Bold,
-} from "@expo-google-fonts/hanken-grotesk";
-import {
-  Newsreader_700Bold,
-  Newsreader_800ExtraBold,
-} from "@expo-google-fonts/newsreader";
-import {
-  SpaceGrotesk_500Medium,
-  SpaceGrotesk_700Bold,
-} from "@expo-google-fonts/space-grotesk";
+// Import each weight from its own subpath rather than the package barrel: the
+// barrel's index.js eagerly requires all 18 weights, which Metro (SDK 52 +
+// pnpm) fails to resolve. The per-weight modules pull a single TTF each.
+import { HankenGrotesk_400Regular } from "@expo-google-fonts/hanken-grotesk/400Regular";
+import { HankenGrotesk_500Medium } from "@expo-google-fonts/hanken-grotesk/500Medium";
+import { HankenGrotesk_600SemiBold } from "@expo-google-fonts/hanken-grotesk/600SemiBold";
+import { HankenGrotesk_700Bold } from "@expo-google-fonts/hanken-grotesk/700Bold";
+import { Newsreader_700Bold } from "@expo-google-fonts/newsreader/700Bold";
+import { Newsreader_800ExtraBold } from "@expo-google-fonts/newsreader/800ExtraBold";
+import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
+import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk/700Bold";
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
