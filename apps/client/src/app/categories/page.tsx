@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     "Shop by solution — add a whole category of networking, infrastructure or security hardware to your deployment.",
 };
 
+// Reads the live category tree and has no dynamic API of its own, so it would
+// otherwise be prerendered once at build and serve a frozen tree on live —
+// new/reparented categories would never appear. Render per request instead.
+export const dynamic = "force-dynamic";
+
 const CategoriesPage = async () => {
   const categories = await getCategories();
 
