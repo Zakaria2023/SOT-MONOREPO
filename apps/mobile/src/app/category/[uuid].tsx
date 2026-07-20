@@ -2,9 +2,10 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ProductsGrid } from "@/components/products/products-grid";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { ListState } from "@/components/ui/list-state";
 import { fetchCategory, fetchProducts } from "@/lib/api";
-import { colors, spacing } from "@/lib/theme";
+import { colors, fonts, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const CategoryScreen = () => {
@@ -42,6 +43,7 @@ const CategoryScreen = () => {
         emptyLabel="No products in this category yet."
         header={
           <View style={styles.header}>
+            <Eyebrow label="Category" />
             <Text style={styles.title}>{data.category.name}</Text>
             {data.category.parentName ? (
               <Text style={styles.parent}>in {data.category.parentName}</Text>
@@ -59,16 +61,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   title: {
     color: colors.text,
-    fontSize: 22,
-    fontWeight: "600",
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    lineHeight: 32,
   },
   parent: {
     color: colors.muted,
+    fontFamily: fonts.medium,
     fontSize: 14,
   },
 });

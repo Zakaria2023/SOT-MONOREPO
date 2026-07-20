@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
-import { formatPrice } from "@/lib/format";
-import { colors, radius, spacing } from "@/lib/theme";
+import { Badge } from "@/components/ui/badge";
+import { formatMoney } from "@/lib/format";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import type { Offer } from "@/lib/types";
 
 type OfferCardProps = {
@@ -19,21 +20,24 @@ export const OfferCard = ({ offer }: OfferCardProps) => {
   return (
     <View style={styles.card}>
       <View style={styles.top}>
-        <Text style={styles.reference}>
+        <Text style={styles.reference} numberOfLines={1}>
           {offer.boqReference ?? "BOQ offer"}
         </Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>
-            {STATUS_LABELS[offer.status] ?? offer.status}
-          </Text>
-        </View>
+        <Badge
+          label={STATUS_LABELS[offer.status] ?? offer.status}
+          tone={offer.status === "selected" ? "success" : "primary"}
+        />
       </View>
       {offer.description ? (
         <Text style={styles.description} numberOfLines={3}>
           {offer.description}
         </Text>
       ) : null}
-      <Text style={styles.total}>{formatPrice(String(total), "SAR")}</Text>
+      <View style={styles.divider} />
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>Total</Text>
+        <Text style={styles.total}>{formatMoney(total)}</Text>
+      </View>
     </View>
   );
 };
@@ -41,41 +45,48 @@ export const OfferCard = ({ offer }: OfferCardProps) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.panel,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
-    gap: spacing.sm,
+    gap: spacing.md,
+    ...shadow.card,
   },
   top: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: spacing.md,
   },
   reference: {
+    flex: 1,
     color: colors.text,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  badge: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  badgeText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: "500",
+    fontFamily: fonts.heading,
+    fontSize: 17,
   },
   description: {
     color: colors.muted,
+    fontFamily: fonts.body,
     fontSize: 14,
     lineHeight: 20,
   },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  totalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  totalLabel: {
+    color: colors.muted,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
   total: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: "600",
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 18,
   },
 });

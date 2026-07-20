@@ -72,7 +72,7 @@ module.exports = {
       bundler: "metro",
       output: "static",
     },
-    plugins: ["expo-router", "expo-secure-store"],
+    plugins: ["expo-router", "expo-secure-store", "expo-font"],
     experiments: {
       typedRoutes: true,
     },

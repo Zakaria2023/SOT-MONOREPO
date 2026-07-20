@@ -6,19 +6,27 @@ import {
   ShoppingCart,
   User,
 } from "lucide-react-native";
-import { colors } from "@/lib/theme";
+import { Platform } from "react-native";
+import { colors, fonts } from "@/lib/theme";
 
 const TabsLayout = () => (
   <Tabs
     screenOptions={{
-      headerStyle: { backgroundColor: colors.surface },
+      headerStyle: { backgroundColor: colors.background },
       headerTintColor: colors.text,
+      headerTitleStyle: { fontFamily: fonts.heading, fontSize: 20 },
+      headerShadowVisible: false,
       tabBarStyle: {
-        backgroundColor: colors.surface,
+        backgroundColor: colors.overlay,
         borderTopColor: colors.border,
+        borderTopWidth: 1,
+        height: Platform.OS === "ios" ? 88 : 64,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === "ios" ? 28 : 8,
       },
       tabBarActiveTintColor: colors.primary,
-      tabBarInactiveTintColor: colors.muted,
+      tabBarInactiveTintColor: colors.faint,
+      tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11 },
       sceneStyle: { backgroundColor: colors.background },
     }}
   >

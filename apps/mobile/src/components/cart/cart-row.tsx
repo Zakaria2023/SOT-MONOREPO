@@ -1,8 +1,14 @@
 import { Image } from "expo-image";
-import { Minus, Plus, Trash2 } from "lucide-react-native";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { formatPrice } from "@/lib/format";
-import { colors, radius, spacing } from "@/lib/theme";
+import { Minus, Package, Plus, Trash2 } from "lucide-react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { formatMoney, formatPrice } from "@/lib/format";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import type { CartLineItem } from "@/lib/types";
 
 type CartRowProps = {
@@ -19,109 +25,158 @@ export const CartRow = ({
   onIncrement,
   onDecrement,
   onRemove,
-}: CartRowProps) => (
-  <View style={styles.row}>
-    <Image source={item.image} style={styles.image} contentFit="cover" />
-    <View style={styles.body}>
-      <Text style={styles.name} numberOfLines={2}>
-        {item.name}
-      </Text>
-      <Text style={styles.meta}>
-        {formatPrice(item.unitPrice, item.currency)}
-      </Text>
-      <View style={styles.controls}>
-        <Pressable
-          onPress={onDecrement}
-          disabled={busy || item.quantity <= 1}
-          style={[
-            styles.stepButton,
-            busy || item.quantity <= 1 ? styles.stepDisabled : null,
-          ]}
-        >
-          <Minus color={colors.text} size={16} />
-        </Pressable>
-        {busy ? (
-          <ActivityIndicator color={colors.muted} style={styles.quantity} />
-        ) : (
-          <Text style={styles.quantity}>{item.quantity}</Text>
-        )}
-        <Pressable
-          onPress={onIncrement}
-          disabled={busy}
-          style={[styles.stepButton, busy ? styles.stepDisabled : null]}
-        >
-          <Plus color={colors.text} size={16} />
-        </Pressable>
-        <Pressable
-          onPress={onRemove}
-          disabled={busy}
-          style={styles.remove}
-        >
-          <Trash2 color={colors.danger} size={18} />
+}: CartRowProps) => {
+  const lineTotal = Number(item.unitPrice ?? 0) * item.quantity;
+
+  return (
+    <View style={styles.row}>
+      <View style={styles.top}>
+        <View style={styles.thumb}>
+          {item.image ? (
+            <Image
+              source={item.image}
+              style={styles.thumbImage}
+              contentFit="contain"
+            />
+          ) : (
+            <Package color={colors.primary} size={22} />
+          )}
+        </View>
+        <View style={styles.body}>
+          {item.categoryName ? (
+            <Text style={styles.category} numberOfLines={1}>
+              {item.categoryName}
+            </Text>
+          ) : null}
+          <Text style={styles.name} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <Text style={styles.unit}>
+            {formatPrice(item.unitPrice, item.currency)} each
+          </Text>
+        </View>
+        <Pressable onPress={onRemove} disabled={busy} style={styles.remove} hitSlop={8}>
+          <Trash2 color={colors.faint} size={18} />
         </Pressable>
       </View>
+
+      <View style={styles.footer}>
+        <View style={styles.stepper}>
+          <Pressable
+            onPress={onDecrement}
+            disabled={busy || item.quantity <= 1}
+            style={styles.step}
+            hitSlop={6}
+          >
+            <Minus
+              color={item.quantity <= 1 ? colors.faint : colors.text}
+              size={16}
+            />
+          </Pressable>
+          {busy ? (
+            <ActivityIndicator color={colors.muted} style={styles.quantity} />
+          ) : (
+            <Text style={styles.quantity}>{item.quantity}</Text>
+          )}
+          <Pressable
+            onPress={onIncrement}
+            disabled={busy}
+            style={styles.step}
+            hitSlop={6}
+          >
+            <Plus color={colors.text} size={16} />
+          </Pressable>
+        </View>
+        <Text style={styles.lineTotal}>
+          {formatMoney(lineTotal, item.currency ?? "SAR")}
+        </Text>
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: "row",
+    padding: spacing.lg,
     gap: spacing.md,
-    padding: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.panel,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadow.card,
   },
-  image: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
+  top: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  thumb: {
+    width: 60,
+    height: 60,
+    borderRadius: radius.control,
+    backgroundColor: colors.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.sm,
+  },
+  thumbImage: {
+    width: "100%",
+    height: "100%",
   },
   body: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 3,
+  },
+  category: {
+    color: colors.faint,
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   name: {
     color: colors.text,
+    fontFamily: fonts.heading,
     fontSize: 15,
-    fontWeight: "500",
+    lineHeight: 19,
   },
-  meta: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  controls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  stepButton: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  stepDisabled: {
-    opacity: 0.4,
-  },
-  quantity: {
-    minWidth: 28,
-    textAlign: "center",
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: "500",
+  unit: {
+    color: colors.muted,
+    fontFamily: fonts.medium,
+    fontSize: 13,
   },
   remove: {
-    marginLeft: "auto",
-    padding: spacing.sm,
+    padding: spacing.xs,
+    height: 30,
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.backgroundAlt,
+  },
+  step: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quantity: {
+    minWidth: 32,
+    textAlign: "center",
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 15,
+  },
+  lineTotal: {
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 16,
   },
 });

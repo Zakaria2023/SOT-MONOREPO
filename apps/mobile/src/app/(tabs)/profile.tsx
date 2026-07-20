@@ -1,4 +1,5 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import {
   ChevronRight,
@@ -12,7 +13,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
 import { fetchMe } from "@/lib/api";
-import { colors, radius, spacing } from "@/lib/theme";
+import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 type ProfileRowProps = {
@@ -38,9 +39,11 @@ const LinkRow = ({ href, label, icon: Icon }: LinkRowProps) => (
     <Pressable
       style={({ pressed }) => [styles.linkRow, pressed ? styles.pressed : null]}
     >
-      <Icon color={colors.text} size={20} />
+      <View style={styles.linkIcon}>
+        <Icon color={colors.primary} size={18} />
+      </View>
       <Text style={styles.linkLabel}>{label}</Text>
-      <ChevronRight color={colors.muted} size={18} />
+      <ChevronRight color={colors.faint} size={18} />
     </Pressable>
   </Link>
 );
@@ -73,21 +76,38 @@ const ProfileScreen = () => {
     );
   }
 
+  const name = data.fullName ?? user?.fullName ?? "SOT customer";
+  const initial = name.charAt(0).toUpperCase();
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
     >
+      <View style={styles.identity}>
+        <LinearGradient
+          colors={gradient.accent}
+          start={gradient.start}
+          end={gradient.end}
+          style={styles.avatar}
+        >
+          <Text style={styles.avatarText}>{initial}</Text>
+        </LinearGradient>
+        <Text style={styles.name}>{name}</Text>
+        {data.company ? (
+          <Text style={styles.company}>{data.company}</Text>
+        ) : null}
+      </View>
+
       <View style={styles.card}>
-        <ProfileRow
-          label="Name"
-          value={data.fullName ?? user?.fullName ?? null}
-        />
         <ProfileRow
           label="Email"
           value={data.email ?? user?.primaryEmailAddress?.emailAddress ?? null}
         />
+        <View style={styles.divider} />
         <ProfileRow label="Phone" value={data.phone} />
+        <View style={styles.divider} />
         <ProfileRow label="Company" value={data.company} />
       </View>
 
@@ -97,7 +117,7 @@ const ProfileScreen = () => {
         <LinkRow href="/partner" label="Become a partner" icon={Handshake} />
       </View>
 
-      <Button label="Sign out" variant="ghost" onPress={() => signOut()} />
+      <Button label="Sign out" variant="outline" onPress={() => signOut()} />
     </ScrollView>
   );
 };
@@ -109,15 +129,44 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    gap: spacing.lg,
+    gap: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  identity: {
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+  },
+  avatar: {
+    width: 84,
+    height: 84,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadow.glow,
+  },
+  avatarText: {
+    color: colors.onGradient,
+    fontFamily: fonts.display,
+    fontSize: 34,
+  },
+  name: {
+    color: colors.text,
+    fontFamily: fonts.heading,
+    fontSize: 24,
+  },
+  company: {
+    color: colors.muted,
+    fontFamily: fonts.medium,
+    fontSize: 14,
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.panel,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
-    gap: spacing.lg,
+    ...shadow.card,
   },
   links: {
     gap: spacing.md,
@@ -126,31 +175,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    padding: spacing.lg,
+    padding: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  linkIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.control,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryTint,
+  },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.9,
   },
   linkLabel: {
     flex: 1,
     color: colors.text,
+    fontFamily: fonts.semibold,
     fontSize: 15,
-    fontWeight: "500",
   },
   field: {
-    gap: spacing.xs,
+    gap: 3,
   },
   label: {
-    color: colors.muted,
-    fontSize: 13,
+    color: colors.faint,
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   value: {
     color: colors.text,
+    fontFamily: fonts.medium,
     fontSize: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md,
   },
 });
 

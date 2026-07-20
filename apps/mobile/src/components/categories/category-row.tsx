@@ -1,77 +1,116 @@
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
-import { ChevronRight, LayoutGrid } from "lucide-react-native";
+import { ArrowRight, LayoutGrid } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/lib/theme";
+import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
 import type { Category } from "@/lib/types";
 
 type CategoryRowProps = {
   category: Category;
 };
 
+// A full-bleed image card with a bottom scrim and the title overlaid — the
+// mobile take on the client's bento category cards.
 export const CategoryRow = ({ category }: CategoryRowProps) => (
   <Link href={`/category/${category.uuid}`} asChild>
     <Pressable
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
     >
-      {category.image ? (
-        <Image
-          source={category.image}
-          style={styles.image}
-          contentFit="cover"
+      <View style={styles.imageWrap}>
+        {category.image ? (
+          <Image
+            source={category.image}
+            style={styles.image}
+            contentFit="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={gradient.wash}
+            start={gradient.start}
+            end={gradient.end}
+            style={styles.image}
+          >
+            <LayoutGrid color={colors.primary} size={28} />
+          </LinearGradient>
+        )}
+        <LinearGradient
+          colors={["transparent", "rgba(6,10,20,0.35)", "rgba(6,10,20,0.92)"]}
+          style={StyleSheet.absoluteFill}
         />
-      ) : (
-        <View style={[styles.image, styles.placeholder]}>
-          <LayoutGrid color={colors.muted} size={20} />
+        <View style={styles.countPill}>
+          <Text style={styles.countText}>{category.productCount}</Text>
         </View>
-      )}
-      <View style={styles.body}>
-        <Text style={styles.name}>{category.name}</Text>
-        <Text style={styles.count}>
-          {category.productCount}{" "}
-          {category.productCount === 1 ? "product" : "products"}
-        </Text>
+        <View style={styles.overlay}>
+          <Text style={styles.name} numberOfLines={1}>
+            {category.name}
+          </Text>
+          <View style={styles.cta}>
+            <Text style={styles.ctaText}>Browse</Text>
+            <ArrowRight color={colors.primary} size={15} />
+          </View>
+        </View>
       </View>
-      <ChevronRight color={colors.muted} size={18} />
     </Pressable>
   </Link>
 );
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
+  card: {
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: "hidden",
+    backgroundColor: colors.surface,
+    ...shadow.card,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.94,
   },
-  image: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.sm,
+  imageWrap: {
+    height: 132,
+    justifyContent: "flex-end",
     backgroundColor: colors.surfaceAlt,
   },
-  placeholder: {
+  image: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
   },
-  body: {
-    flex: 1,
-    gap: spacing.xs,
+  countPill: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+  },
+  countText: {
+    color: "#ffffff",
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  overlay: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: spacing.lg,
   },
   name: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: "500",
+    flex: 1,
+    color: "#ffffff",
+    fontFamily: fonts.heading,
+    fontSize: 20,
   },
-  count: {
-    color: colors.muted,
+  cta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  ctaText: {
+    color: colors.primary,
+    fontFamily: fonts.semibold,
     fontSize: 13,
   },
 });

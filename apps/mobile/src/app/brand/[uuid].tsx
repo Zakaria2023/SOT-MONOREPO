@@ -2,9 +2,10 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ProductsGrid } from "@/components/products/products-grid";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { ListState } from "@/components/ui/list-state";
 import { fetchBrand, fetchProducts } from "@/lib/api";
-import { colors, spacing } from "@/lib/theme";
+import { colors, fonts, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const BrandScreen = () => {
@@ -42,6 +43,7 @@ const BrandScreen = () => {
         emptyLabel="No products from this brand yet."
         header={
           <View style={styles.header}>
+            <Eyebrow label="Brand" />
             <Text style={styles.title}>{data.brand.name}</Text>
             {data.brand.description ? (
               <Text style={styles.description}>{data.brand.description}</Text>
@@ -59,18 +61,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   title: {
     color: colors.text,
-    fontSize: 22,
-    fontWeight: "600",
+    fontFamily: fonts.heading,
+    fontSize: 28,
+    lineHeight: 32,
   },
   description: {
     color: colors.muted,
+    fontFamily: fonts.body,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
   },
 });
 

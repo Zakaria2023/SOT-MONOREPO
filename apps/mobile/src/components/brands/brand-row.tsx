@@ -1,8 +1,8 @@
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { ChevronRight, Layers } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import type { Brand } from "@/lib/types";
 
 type BrandRowProps = {
@@ -14,15 +14,21 @@ export const BrandRow = ({ brand }: BrandRowProps) => (
     <Pressable
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      {brand.image ? (
-        <Image source={brand.image} style={styles.logo} contentFit="contain" />
-      ) : (
-        <View style={[styles.logo, styles.placeholder]}>
-          <Layers color={colors.muted} size={20} />
-        </View>
-      )}
+      <View style={styles.logoTile}>
+        {brand.image ? (
+          <Image
+            source={brand.image}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        ) : (
+          <Text style={styles.initial}>{brand.name.charAt(0)}</Text>
+        )}
+      </View>
       <View style={styles.body}>
-        <Text style={styles.name}>{brand.name}</Text>
+        <Text style={styles.name} numberOfLines={1}>
+          {brand.name}
+        </Text>
         {typeof brand.productCount === "number" ? (
           <Text style={styles.count}>
             {brand.productCount}{" "}
@@ -30,7 +36,7 @@ export const BrandRow = ({ brand }: BrandRowProps) => (
           </Text>
         ) : null}
       </View>
-      <ChevronRight color={colors.muted} size={18} />
+      <ChevronRight color={colors.faint} size={18} />
     </Pressable>
   </Link>
 );
@@ -39,37 +45,49 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    gap: spacing.lg,
     padding: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadow.card,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.9,
   },
-  logo: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.sm,
+  logoTile: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.control,
     backgroundColor: colors.surfaceAlt,
-  },
-  placeholder: {
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
+    padding: spacing.sm,
+  },
+  logo: {
+    width: "100%",
+    height: "100%",
+  },
+  initial: {
+    color: colors.primary,
+    fontFamily: fonts.heading,
+    fontSize: 20,
   },
   body: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 2,
   },
   name: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: "500",
+    fontFamily: fonts.heading,
+    fontSize: 16,
   },
   count: {
     color: colors.muted,
+    fontFamily: fonts.medium,
     fontSize: 13,
   },
 });

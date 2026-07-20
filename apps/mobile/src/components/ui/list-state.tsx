@@ -1,6 +1,7 @@
+import { PackageOpen, TriangleAlert } from "lucide-react-native";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
-import { colors, spacing } from "@/lib/theme";
+import { colors, fonts, radius, spacing } from "@/lib/theme";
 
 type ListStateProps = {
   loading: boolean;
@@ -22,21 +23,27 @@ export const ListState = ({
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.primary} />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
   if (error) {
     return (
       <View style={styles.center}>
+        <View style={styles.iconWell}>
+          <TriangleAlert color={colors.danger} size={26} />
+        </View>
         <Text style={styles.error}>{error}</Text>
-        <Button label="Retry" variant="ghost" onPress={onRetry} />
+        <Button label="Try again" variant="outline" onPress={onRetry} />
       </View>
     );
   }
   if (empty) {
     return (
       <View style={styles.center}>
+        <View style={styles.iconWell}>
+          <PackageOpen color={colors.faint} size={26} />
+        </View>
         <Text style={styles.muted}>{emptyLabel}</Text>
       </View>
     );
@@ -50,15 +57,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,
-    gap: spacing.md,
+    gap: spacing.lg,
+  },
+  iconWell: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   error: {
-    color: colors.danger,
+    color: colors.text,
+    fontFamily: fonts.medium,
     fontSize: 15,
     textAlign: "center",
+    lineHeight: 22,
   },
   muted: {
     color: colors.muted,
+    fontFamily: fonts.medium,
     fontSize: 15,
     textAlign: "center",
   },

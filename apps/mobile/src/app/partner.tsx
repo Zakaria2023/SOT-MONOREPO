@@ -1,16 +1,12 @@
-import { CheckCircle2 } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Check, CircleCheckBig } from "lucide-react-native";
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
 import { TextField } from "@/components/ui/text-field";
 import { createPartnerRequest } from "@/lib/api";
-import { colors, radius, spacing } from "@/lib/theme";
+import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
 import type { PartnerCapability } from "@/lib/types";
 
 type CapabilityOption = {
@@ -78,7 +74,14 @@ const PartnerScreen = () => {
   if (done) {
     return (
       <View style={styles.doneContainer}>
-        <CheckCircle2 color={colors.primary} size={48} />
+        <LinearGradient
+          colors={gradient.accent}
+          start={gradient.start}
+          end={gradient.end}
+          style={styles.doneBadge}
+        >
+          <CircleCheckBig color={colors.onGradient} size={36} />
+        </LinearGradient>
         <Text style={styles.doneTitle}>Request submitted</Text>
         <Text style={styles.doneText}>
           Thanks — our team will review your application and be in touch by
@@ -92,11 +95,15 @@ const PartnerScreen = () => {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.lead}>
-        Apply to become an SOT partner. Choose what you can offer and tell us how
-        to reach you.
-      </Text>
+      <View style={styles.intro}>
+        <Eyebrow label="Partner program" />
+        <Text style={styles.lead}>
+          Apply to become an SOT partner. Choose what you can offer and tell us
+          how to reach you.
+        </Text>
+      </View>
 
       <Text style={styles.label}>Capabilities</Text>
       <View style={styles.chips}>
@@ -108,11 +115,9 @@ const PartnerScreen = () => {
               onPress={() => toggleCapability(option.value)}
               style={[styles.chip, active ? styles.chipActive : null]}
             >
+              {active ? <Check color={colors.primary} size={14} /> : null}
               <Text
-                style={[
-                  styles.chipText,
-                  active ? styles.chipTextActive : null,
-                ]}
+                style={[styles.chipText, active ? styles.chipTextActive : null]}
               >
                 {option.label}
               </Text>
@@ -178,19 +183,24 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     gap: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  intro: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
   lead: {
     color: colors.muted,
+    fontFamily: fonts.body,
     fontSize: 15,
-    lineHeight: 21,
-    marginBottom: spacing.md,
+    lineHeight: 22,
   },
   label: {
     color: colors.text,
+    fontFamily: fonts.semibold,
     fontSize: 14,
-    fontWeight: "500",
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
   },
   chips: {
     flexDirection: "row",
@@ -198,31 +208,37 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    paddingVertical: 10,
+    borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
   chipActive: {
     borderColor: colors.primary,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.primaryTint,
   },
   chipText: {
     color: colors.muted,
+    fontFamily: fonts.medium,
     fontSize: 13,
   },
   chipTextActive: {
     color: colors.text,
+    fontFamily: fonts.semibold,
   },
   error: {
     color: colors.danger,
+    fontFamily: fonts.medium,
     fontSize: 14,
     marginTop: spacing.md,
   },
   submit: {
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
   },
   doneContainer: {
     flex: 1,
@@ -230,18 +246,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.background,
     padding: spacing.xl,
-    gap: spacing.md,
+    gap: spacing.lg,
+  },
+  doneBadge: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadow.glow,
   },
   doneTitle: {
     color: colors.text,
-    fontSize: 22,
-    fontWeight: "600",
+    fontFamily: fonts.heading,
+    fontSize: 24,
   },
   doneText: {
     color: colors.muted,
+    fontFamily: fonts.body,
     fontSize: 15,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 23,
   },
 });
 
