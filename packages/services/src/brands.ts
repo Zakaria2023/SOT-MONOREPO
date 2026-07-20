@@ -174,11 +174,9 @@ export const getBrandChildrenPage = async (
 
 /**
  * The reorder board: the top-level column plus one column per parent that has
- * children, each with its total count and only its first page of children.
+ * children, each with all of its children.
  */
-export const getBrandBoard = async (
-  pageSize = BOARD_PAGE_SIZE,
-): Promise<BrandBoardColumn[]> => {
+export const getBrandBoard = async (): Promise<BrandBoardColumn[]> => {
   const structure = await db
     .select({
       uuid: Brands.uuid,
@@ -208,7 +206,7 @@ export const getBrandBoard = async (
       parentUuid,
       parentName: parentUuid ? (nameOf.get(parentUuid) ?? null) : null,
       total: totals.get(parentUuid) ?? 0,
-      items: await getBrandChildrenPage(parentUuid, 0, pageSize),
+      items: await getBrandChildren(parentUuid),
     })),
   );
 };

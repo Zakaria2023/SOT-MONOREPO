@@ -195,11 +195,9 @@ export const getCategoryChildrenPage = async (
 
 /**
  * The reorder board: the top-level column plus one column per parent that has
- * children, each with its total count and only its first page of children.
+ * children, each with all of its children.
  */
-export const getCategoryBoard = async (
-  pageSize = BOARD_PAGE_SIZE,
-): Promise<CategoryBoardColumn[]> => {
+export const getCategoryBoard = async (): Promise<CategoryBoardColumn[]> => {
   // Lightweight structure pass (no joins) to derive the columns and per-parent
   // totals; the heavy product-count join is paginated per column below.
   const structure = await db
@@ -232,7 +230,7 @@ export const getCategoryBoard = async (
       parentUuid,
       parentName: parentUuid ? (nameOf.get(parentUuid) ?? null) : null,
       total: totals.get(parentUuid) ?? 0,
-      items: await getCategoryChildrenPage(parentUuid, 0, pageSize),
+      items: await getCategoryChildren(parentUuid),
     })),
   );
 };

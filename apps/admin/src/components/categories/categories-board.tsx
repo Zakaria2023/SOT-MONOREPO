@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getCategoryChildrenPage,
   moveCategoryToParent,
   reorderCategoryChildren,
 } from "@/app/(dashboard)/categories/action";
@@ -11,17 +10,11 @@ import { ReorderableBoard } from "@/components/shared/reorderable-board";
 
 type CategoriesBoardProps = {
   columns: CategoryBoardColumn[];
-  pageSize: number;
 };
 
-export const CategoriesBoard = ({
-  columns,
-  pageSize,
-}: CategoriesBoardProps) => (
+export const CategoriesBoard = ({ columns }: CategoriesBoardProps) => (
   <ReorderableBoard
     columns={columns}
-    pageSize={pageSize}
-    fetchPage={getCategoryChildrenPage}
     onReorder={reorderCategoryChildren}
     onMove={moveCategoryToParent}
     renderActions={(category) => (

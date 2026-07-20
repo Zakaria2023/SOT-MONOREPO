@@ -3,12 +3,11 @@ import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { BOARD_PAGE_SIZE } from "utils";
 import { getCategoryBoard } from "./action";
 
 const CategoriesBoardSection = async () => {
   const columns = await getCategoryBoard();
-  return <CategoriesBoard columns={columns} pageSize={BOARD_PAGE_SIZE} />;
+  return <CategoriesBoard columns={columns} />;
 };
 
 const CategoriesPage = () => (

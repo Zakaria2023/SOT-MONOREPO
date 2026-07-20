@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getBrandChildrenPage,
   moveBrandToParent,
   reorderBrandChildren,
 } from "@/app/(dashboard)/brands/action";
@@ -11,14 +10,11 @@ import { ReorderableBoard } from "@/components/shared/reorderable-board";
 
 type BrandsBoardProps = {
   columns: BrandBoardColumn[];
-  pageSize: number;
 };
 
-export const BrandsBoard = ({ columns, pageSize }: BrandsBoardProps) => (
+export const BrandsBoard = ({ columns }: BrandsBoardProps) => (
   <ReorderableBoard
     columns={columns}
-    pageSize={pageSize}
-    fetchPage={getBrandChildrenPage}
     onReorder={reorderBrandChildren}
     onMove={moveBrandToParent}
     renderActions={(brand) => (

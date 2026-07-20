@@ -3,12 +3,11 @@ import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { BOARD_PAGE_SIZE } from "utils";
 import { getBrandBoard } from "./action";
 
 const BrandsBoardSection = async () => {
   const columns = await getBrandBoard();
-  return <BrandsBoard columns={columns} pageSize={BOARD_PAGE_SIZE} />;
+  return <BrandsBoard columns={columns} />;
 };
 
 const BrandsPage = () => (
