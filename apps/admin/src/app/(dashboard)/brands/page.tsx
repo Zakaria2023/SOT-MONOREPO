@@ -1,86 +1,38 @@
-import { BrandsReorderTable } from "@/components/brands/brands-reorder-table";
-import { BrandsTable } from "@/components/brands/brands-table";
-import { ListSearch } from "@/components/shared/list-search";
-import { Pagination } from "@/components/shared/pagination";
+import { BrandsBoard } from "@/components/brands/brands-board";
 import { AsyncSection } from "@/components/shared/async-section";
-import { ParentFilter } from "@/components/shared/parent-filter";
+import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getBrandChildren, getBrands, getBrandsPage } from "./action";
+import { getBrands } from "./action";
 
-type Props = {
-  searchParams: Promise<{ search?: string; page?: string; parent?: string }>;
+const BrandsBoardSection = async () => {
+  const brands = await getBrands();
+  return <BrandsBoard brands={brands} />;
 };
 
-type BrowseProps = {
-  search?: string;
-  page?: string;
-};
+const BrandsPage = () => (
+  <div className="flex flex-col gap-5">
+    <div className="flex items-center justify-between">
+      <h1 className="font-heading text-2xl text-ink">Brands</h1>
 
-type ReorderProps = {
-  parent: string;
-};
-
-const BrandsBrowseList = async ({ search, page }: BrowseProps) => {
-  const result = await getBrandsPage({ search, page });
-  return (
-    <>
-      <BrandsTable brands={result.items} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
-};
-
-const BrandsReorderList = async ({ parent }: ReorderProps) => {
-  const children = await getBrandChildren(parent === "root" ? null : parent);
-  return <BrandsReorderTable brands={children} />;
-};
-
-const BrandsPage = async ({ searchParams }: Props) => {
-  const { search, page, parent } = await searchParams;
-  const allBrands = await getBrands();
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl text-ink">Brands</h1>
-
-        <Link
-          href="/brands/new"
-          className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
-        >
-          <Plus size={16} />
-          Add Brand
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <ParentFilter items={allBrands} browseLabel="All (browse)" />
-        {!parent && <ListSearch placeholder="Search brands..." />}
-      </div>
-
-      {parent ? (
-        <>
-          <p className="text-sm text-muted">
-            Drag rows to set their order within this parent. Changes save
-            automatically.
-          </p>
-          <AsyncSection reloadKey={`reorder-${parent}`}>
-            <BrandsReorderList parent={parent} />
-          </AsyncSection>
-        </>
-      ) : (
-        <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
-          <BrandsBrowseList search={search} page={page} />
-        </AsyncSection>
-      )}
+      <Link
+        href="/brands/new"
+        className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
+      >
+        <Plus size={16} />
+        Add Brand
+      </Link>
     </div>
-  );
-};
+
+    <p className="text-sm text-muted">
+      Each column is a parent; drag the cards inside a column to reorder its
+      brands. Changes save automatically.
+    </p>
+
+    <AsyncSection reloadKey="brands-board" skeleton={<BoardSkeleton />}>
+      <BrandsBoardSection />
+    </AsyncSection>
+  </div>
+);
 
 export default BrandsPage;

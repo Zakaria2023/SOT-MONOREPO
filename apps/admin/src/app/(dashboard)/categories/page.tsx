@@ -1,86 +1,38 @@
-import { CategoriesReorderTable } from "@/components/categories/categories-reorder-table";
-import { CategoriesTable } from "@/components/categories/categories-table";
-import { ListSearch } from "@/components/shared/list-search";
-import { Pagination } from "@/components/shared/pagination";
+import { CategoriesBoard } from "@/components/categories/categories-board";
 import { AsyncSection } from "@/components/shared/async-section";
-import { ParentFilter } from "@/components/shared/parent-filter";
+import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getCategories, getCategoriesPage, getCategoryChildren } from "./action";
+import { getCategories } from "./action";
 
-type Props = {
-  searchParams: Promise<{ search?: string; page?: string; parent?: string }>;
+const CategoriesBoardSection = async () => {
+  const categories = await getCategories();
+  return <CategoriesBoard categories={categories} />;
 };
 
-type BrowseProps = {
-  search?: string;
-  page?: string;
-};
+const CategoriesPage = () => (
+  <div className="flex flex-col gap-5">
+    <div className="flex items-center justify-between">
+      <h1 className="font-heading text-2xl text-ink">Categories</h1>
 
-type ReorderProps = {
-  parent: string;
-};
-
-const CategoriesBrowseList = async ({ search, page }: BrowseProps) => {
-  const result = await getCategoriesPage({ search, page });
-  return (
-    <>
-      <CategoriesTable categories={result.items} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
-};
-
-const CategoriesReorderList = async ({ parent }: ReorderProps) => {
-  const children = await getCategoryChildren(parent === "root" ? null : parent);
-  return <CategoriesReorderTable categories={children} />;
-};
-
-const CategoriesPage = async ({ searchParams }: Props) => {
-  const { search, page, parent } = await searchParams;
-  const allCategories = await getCategories();
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl text-ink">Categories</h1>
-
-        <Link
-          href="/categories/new"
-          className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
-        >
-          <Plus size={16} />
-          Add Category
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <ParentFilter items={allCategories} browseLabel="All (browse)" />
-        {!parent && <ListSearch placeholder="Search categories..." />}
-      </div>
-
-      {parent ? (
-        <>
-          <p className="text-sm text-muted">
-            Drag rows to set their order within this parent. Changes save
-            automatically.
-          </p>
-          <AsyncSection reloadKey={`reorder-${parent}`}>
-            <CategoriesReorderList parent={parent} />
-          </AsyncSection>
-        </>
-      ) : (
-        <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
-          <CategoriesBrowseList search={search} page={page} />
-        </AsyncSection>
-      )}
+      <Link
+        href="/categories/new"
+        className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
+      >
+        <Plus size={16} />
+        Add Category
+      </Link>
     </div>
-  );
-};
+
+    <p className="text-sm text-muted">
+      Each column is a parent; drag the cards inside a column to reorder its
+      categories. Changes save automatically.
+    </p>
+
+    <AsyncSection reloadKey="categories-board" skeleton={<BoardSkeleton />}>
+      <CategoriesBoardSection />
+    </AsyncSection>
+  </div>
+);
 
 export default CategoriesPage;
