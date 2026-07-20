@@ -25,13 +25,26 @@ type UseSpecificationFormArgs =
   | { mode: "add" }
   | { mode: "edit"; specification: SpecificationWithCategories };
 
-// Form tree -> stored tree, deriving a stable key from each label.
+// Form tree -> stored tree, deriving a stable key from each label. A numeric
+// sub-field stores its fixed choices in the same `options` column (flat, no
+// children) — mirroring how the top-level numeric spec is persisted.
 const toSpecFields = (fields: SpecFieldForm[]): SpecField[] =>
-  fields.map((field) => ({
-    key: slugify(field.label),
-    label: field.label,
-    options: toSpecOptions(field.options),
-  }));
+  fields.map((field) => {
+    const valueType = field.valueType ?? "select";
+    return {
+      key: slugify(field.label),
+      label: field.label,
+      valueType,
+      unit: valueType === "number" ? field.unit : null,
+      options:
+        valueType === "number"
+          ? field.numericValues.map((value) => ({
+              value: value.trim(),
+              children: [],
+            }))
+          : toSpecOptions(field.options),
+    };
+  });
 
 const toSpecOptions = (options: SpecOptionForm[]): SpecOption[] =>
   options.map((option) => ({
@@ -39,12 +52,22 @@ const toSpecOptions = (options: SpecOptionForm[]): SpecOption[] =>
     children: toSpecFields(option.children),
   }));
 
-// Stored tree -> editable form tree (labels only, keys dropped).
+// Stored tree -> editable form tree (labels only, keys dropped). Split a
+// numeric sub-field's flat options back out into the chip editor.
 const toFormFields = (fields: SpecField[]): SpecFieldForm[] =>
-  fields.map((field) => ({
-    label: field.label,
-    options: toFormOptions(field.options),
-  }));
+  fields.map((field) => {
+    const valueType = field.valueType ?? "select";
+    return {
+      label: field.label,
+      valueType,
+      unit: field.unit ?? "",
+      options: valueType === "number" ? [] : toFormOptions(field.options),
+      numericValues:
+        valueType === "number"
+          ? field.options.map((option) => option.value)
+          : [],
+    };
+  });
 
 const toFormOptions = (options: SpecOption[]): SpecOptionForm[] =>
   options.map((option) => ({

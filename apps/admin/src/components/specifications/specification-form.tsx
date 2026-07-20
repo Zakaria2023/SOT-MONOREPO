@@ -2,20 +2,15 @@
 
 import { useSpecificationForm } from "@/app/(dashboard)/specifications/use-specification-form";
 import { CategoryMultiSelect } from "@/components/specifications/category-multi-select";
+import { NumericValuesEditor } from "@/components/specifications/numeric-values-editor";
 import { RulesEditor } from "@/components/specifications/rules-editor";
 import { SpecOptionList } from "@/components/specifications/spec-fields-editor";
 import type { SelectCategories } from "@/db/schema/categories";
-import { ListChecks, Plus, X } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import type { SpecificationFormValues } from "@/app/(dashboard)/specifications/validation";
+import { useMemo } from "react";
 import { measurementUnits } from "@/db/enum";
-import {
-  Controller,
-  FormProvider,
-  useFormContext,
-  useWatch,
-} from "react-hook-form";
+import { Controller, FormProvider, useWatch } from "react-hook-form";
 import { Button, Combobox, Dropdown, FormError, Input } from "ui";
 import type {
   SelectSpecificationGroups,
@@ -74,83 +69,6 @@ const categoryTree = (
     }
   }
   return tree;
-};
-
-// Chip editor for a numeric spec's fixed choices. Only parseable numbers can
-// be added, so the stored values are always computable by the rule engine.
-const NumericValuesEditor = () => {
-  const { control, setValue } = useFormContext<SpecificationFormValues>();
-  const watchedValues = useWatch({ control, name: "numericValues" });
-  const values = useMemo(() => watchedValues ?? [], [watchedValues]);
-  const [draft, setDraft] = useState("");
-
-  const isValidDraft =
-    draft.trim() !== "" &&
-    Number.isFinite(Number(draft.trim())) &&
-    !values.includes(draft.trim());
-
-  const addDraft = () => {
-    if (!isValidDraft) {
-      return;
-    }
-    setValue("numericValues", [...values, draft.trim()], {
-      shouldDirty: true,
-    });
-    setDraft("");
-  };
-
-  const remove = (value: string) => {
-    setValue(
-      "numericValues",
-      values.filter((candidate) => candidate !== value),
-      { shouldDirty: true },
-    );
-  };
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {values.map((value) => (
-        <span
-          key={value}
-          className="inline-flex items-center gap-1.5 rounded-full bg-primary-tint px-3 py-1 text-xs font-medium text-primary"
-        >
-          {value}
-          <button
-            type="button"
-            aria-label={`Remove ${value}`}
-            onClick={() => remove(value)}
-            className="text-primary hover:text-primary-hover"
-          >
-            <X size={12} />
-          </button>
-        </span>
-      ))}
-
-      <input
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            addDraft();
-          }
-        }}
-        type="number"
-        step="any"
-        placeholder="e.g. 24"
-        className="w-32 rounded-control border border-hairline bg-surface px-3 py-1.5 text-sm text-ink outline-none focus:border-primary"
-      />
-      <Button
-        type="button"
-        onClick={addDraft}
-        disabled={!isValidDraft}
-        className="flex items-center gap-1 px-3 py-1.5 text-xs"
-      >
-        <Plus size={13} />
-        Add
-      </Button>
-    </div>
-  );
 };
 
 export const SpecificationForm = (props: SpecificationFormProps) => {
@@ -319,7 +237,7 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
                 ports. Leave empty to let products type any number. Either
                 way, compatibility rules can compute with the value.
               </p>
-              <NumericValuesEditor />
+              <NumericValuesEditor name="numericValues" />
               <FormError message={numericValuesError} />
             </div>
 
