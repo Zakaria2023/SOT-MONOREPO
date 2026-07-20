@@ -23,14 +23,12 @@ import {
   GripVertical,
   ImageOff,
   Layers,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { documentDownloadUrl } from "@/lib/documents";
-
-// Cards shown per column before paging kicks in.
-const PAGE_SIZE = 8;
 
 // The minimal shape the board needs from a category/brand list item — both
 // satisfy it, so one board serves both pages.
@@ -43,15 +41,24 @@ export type BoardItem = {
   productCount: number;
 };
 
-type Column<T> = {
-  key: string;
-  title: string;
+// One column as computed on the server: a parent (null = top level), its total
+// child count, and only the first page of children.
+export type BoardColumnData<T extends BoardItem> = {
+  parentUuid: string | null;
+  parentName: string | null;
+  total: number;
   items: T[];
 };
 
 type ReorderableBoardProps<T extends BoardItem> = {
-  items: T[];
-  onReorder: (orderedIds: string[]) => Promise<{ error?: string }>;
+  columns: BoardColumnData<T>[];
+  pageSize: number;
+  fetchPage: (parentUuid: string | null, page: number) => Promise<T[]>;
+  onReorder: (
+    parentUuid: string | null,
+    pageStart: number,
+    orderedIds: string[],
+  ) => Promise<{ error?: string }>;
   renderActions: (item: T) => ReactNode;
   rootTitle?: string;
 };
@@ -63,9 +70,16 @@ type BoardCardProps<T extends BoardItem> = {
 };
 
 type BoardColumnProps<T extends BoardItem> = {
-  column: Column<T>;
+  column: BoardColumnData<T>;
+  title: string;
+  pageSize: number;
   childCountOf: (uuid: string) => number;
-  onReorder: (orderedIds: string[]) => Promise<{ error?: string }>;
+  fetchPage: (parentUuid: string | null, page: number) => Promise<T[]>;
+  onReorder: (
+    parentUuid: string | null,
+    pageStart: number,
+    orderedIds: string[],
+  ) => Promise<{ error?: string }>;
   renderActions: (item: T) => ReactNode;
 };
 
@@ -86,9 +100,7 @@ const BoardCard = <T extends BoardItem>({
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.6 : 1,
-        boxShadow: isDragging
-          ? "0 12px 28px rgba(27,35,51,0.16)"
-          : undefined,
+        boxShadow: isDragging ? "0 12px 28px rgba(27,35,51,0.16)" : undefined,
       }}
       className="group flex items-center gap-3 rounded-control border-2 border-search-border bg-surface p-3 shadow-[0_1px_2px_rgba(27,35,51,0.05)] transition-colors hover:border-primary/50 hover:bg-hover/40"
     >
@@ -140,34 +152,33 @@ const BoardCard = <T extends BoardItem>({
   );
 };
 
-// One node card: a fixed-width column whose items reorder among themselves.
+// One node card: a column whose items reorder among themselves. Only the
+// current page (8 cards) is held in state; other pages are fetched on demand.
 // The column itself is not draggable — only the cards inside it are.
 const BoardColumn = <T extends BoardItem>({
   column,
+  title,
+  pageSize,
   childCountOf,
+  fetchPage,
   onReorder,
   renderActions,
 }: BoardColumnProps<T>) => {
   const [items, setItems] = useState(column.items);
-  const [prevItems, setPrevItems] = useState(column.items);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
 
-  // Re-sync when the server sends a fresh list (revalidation), the same
-  // render-time reset the reorderable table uses.
-  if (column.items !== prevItems) {
-    setPrevItems(column.items);
+  // Re-sync page 0 when the server sends a fresh column (revalidation after a
+  // create/delete/reorder), the render-time reset pattern React recommends.
+  const [prevColumn, setPrevColumn] = useState(column);
+  if (column !== prevColumn) {
+    setPrevColumn(column);
     setItems(column.items);
+    setPage(0);
   }
 
-  // Paginate the column. Dragging still reorders against the full `items`
-  // list (absolute indices), so order persists across pages — only the visible
-  // window is sliced here.
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pageStart = safePage * PAGE_SIZE;
-  const pageItems = items.slice(pageStart, pageStart + PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(column.total / pageSize));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -176,7 +187,25 @@ const BoardColumn = <T extends BoardItem>({
     }),
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const goToPage = async (next: number) => {
+    const target = Math.max(0, Math.min(next, totalPages - 1));
+    if (target === page || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const rows = await fetchPage(column.parentUuid, target);
+      setItems(rows);
+      setPage(target);
+    } catch {
+      setError("Failed to load page.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) {
       return;
@@ -190,30 +219,38 @@ const BoardColumn = <T extends BoardItem>({
     const next = arrayMove(items, oldIndex, newIndex);
     setItems(next);
     setError(null);
+    setBusy(true);
 
-    startTransition(async () => {
-      const result = await onReorder(next.map((item) => item.uuid));
-      if (result.error) {
-        setError(result.error);
-        setItems(column.items);
+    const pageStart = page * pageSize;
+    const result = await onReorder(
+      column.parentUuid,
+      pageStart,
+      next.map((item) => item.uuid),
+    );
+    if (result.error) {
+      setError(result.error);
+      // Reload the current page from the server on failure.
+      try {
+        setItems(await fetchPage(column.parentUuid, page));
+      } catch {
+        /* keep the optimistic order if the reload also fails */
       }
-    });
+    }
+    setBusy(false);
   };
 
   return (
     <div className="flex flex-col overflow-hidden rounded-card border-2 border-hairline bg-page shadow-[0_1px_3px_rgba(27,35,51,0.06)]">
       <div className="flex items-center justify-between gap-2 border-b-2 border-hairline bg-surface px-4 py-3">
         <h2 className="line-clamp-1 text-sm font-bold tracking-wide text-ink uppercase">
-          {column.title}
+          {title}
         </h2>
         <span className="rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-bold text-primary">
-          {items.length}
+          {column.total}
         </span>
       </div>
 
-      <div
-        className={`flex flex-col gap-2.5 p-3 ${isPending ? "opacity-70" : ""}`}
-      >
+      <div className={`flex flex-col gap-2.5 p-3 ${busy ? "opacity-70" : ""}`}>
         {error && <p className="text-xs text-danger">{error}</p>}
 
         {items.length === 0 ? (
@@ -227,10 +264,10 @@ const BoardColumn = <T extends BoardItem>({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={pageItems.map((item) => item.uuid)}
+              items={items.map((item) => item.uuid)}
               strategy={verticalListSortingStrategy}
             >
-              {pageItems.map((item) => (
+              {items.map((item) => (
                 <BoardCard
                   key={item.uuid}
                   item={item}
@@ -247,20 +284,21 @@ const BoardColumn = <T extends BoardItem>({
             <button
               type="button"
               aria-label="Previous page"
-              disabled={safePage === 0}
-              onClick={() => setPage(safePage - 1)}
+              disabled={page === 0 || busy}
+              onClick={() => goToPage(page - 1)}
               className="flex h-8 w-8 items-center justify-center rounded-control border border-hairline text-secondary transition-colors hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-xs font-medium text-muted">
-              Page {safePage + 1} of {totalPages}
+            <span className="flex items-center gap-1.5 text-xs font-medium text-muted">
+              {busy && <Loader2 size={12} className="animate-spin" />}
+              Page {page + 1} of {totalPages}
             </span>
             <button
               type="button"
               aria-label="Next page"
-              disabled={safePage >= totalPages - 1}
-              onClick={() => setPage(safePage + 1)}
+              disabled={page >= totalPages - 1 || busy}
+              onClick={() => goToPage(page + 1)}
               className="flex h-8 w-8 items-center justify-center rounded-control border border-hairline text-secondary transition-colors hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <ChevronRight size={16} />
@@ -273,48 +311,33 @@ const BoardColumn = <T extends BoardItem>({
 };
 
 export const ReorderableBoard = <T extends BoardItem>({
-  items,
+  columns,
+  pageSize,
+  fetchPage,
   onReorder,
   renderActions,
   rootTitle = "Top level",
 }: ReorderableBoardProps<T>) => {
-  // Group children by their parent. Items arrive ordered by `order`, so each
-  // group stays in its saved per-parent order.
-  const childrenOf = new Map<string | null, T[]>();
-  for (const item of items) {
-    const key = item.parentUuid ?? null;
-    const bucket = childrenOf.get(key);
-    if (bucket) {
-      bucket.push(item);
-    } else {
-      childrenOf.set(key, [item]);
+  // A card that is itself a parent shows its child count — look it up from the
+  // column whose parentUuid is that card's uuid.
+  const totalByParent = new Map<string, number>();
+  for (const column of columns) {
+    if (column.parentUuid) {
+      totalByParent.set(column.parentUuid, column.total);
     }
   }
-
-  const childCountOf = (uuid: string) => childrenOf.get(uuid)?.length ?? 0;
-
-  // One column for the top level, then one for every item that has children —
-  // in the items' existing order, so the board reads top-down like the tree.
-  const columns: Column<T>[] = [
-    { key: "root", title: rootTitle, items: childrenOf.get(null) ?? [] },
-  ];
-  for (const item of items) {
-    if (childrenOf.has(item.uuid)) {
-      columns.push({
-        key: item.uuid,
-        title: item.name,
-        items: childrenOf.get(item.uuid) ?? [],
-      });
-    }
-  }
+  const childCountOf = (uuid: string) => totalByParent.get(uuid) ?? 0;
 
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] items-start gap-4">
       {columns.map((column) => (
         <BoardColumn
-          key={column.key}
+          key={column.parentUuid ?? "root"}
           column={column}
+          title={column.parentName ?? rootTitle}
+          pageSize={pageSize}
           childCountOf={childCountOf}
+          fetchPage={fetchPage}
           onReorder={onReorder}
           renderActions={renderActions}
         />

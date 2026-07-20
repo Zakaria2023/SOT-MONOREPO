@@ -30,6 +30,9 @@ export type PaginatedResult<T> = {
 /** Default rows per page for admin list tables. */
 export const DEFAULT_PAGE_SIZE = 10;
 
+/** Cards shown per column on the reorder boards (categories & brands). */
+export const BOARD_PAGE_SIZE = 8;
+
 /**
  * Normalizes raw page/pageSize values (e.g. straight off URL search params,
  * so possibly undefined, non-numeric, or out of range) into safe bounds and

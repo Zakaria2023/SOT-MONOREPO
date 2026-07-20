@@ -6,13 +6,17 @@ import {
   createBrand as createBrandRecord,
   deleteBrand as deleteBrandRecord,
   getBrand as getBrandRecord,
+  getBrandBoard as getBrandBoardRecord,
   getBrandChildren as getBrandChildrenList,
+  getBrandChildrenPage as getBrandChildrenPageList,
   getBrands as getBrandsList,
   getBrandsPage as getBrandsPageList,
+  reorderBrandChildren as reorderBrandChildrenRecord,
   reorderBrands as reorderBrandsRecord,
   updateBrand as updateBrandRecord,
 } from "services";
 import type {
+  BrandBoardColumn as ServiceBrandBoardColumn,
   BrandFields as ServiceBrandFields,
   BrandListItem as ServiceBrandListItem,
   BrandListParams as ServiceBrandListParams,
@@ -26,6 +30,7 @@ import type { PaginatedResult } from "utils";
 export type BrandFields = ServiceBrandFields;
 export type BrandListItem = ServiceBrandListItem;
 export type BrandListParams = ServiceBrandListParams;
+export type BrandBoardColumn = ServiceBrandBoardColumn;
 export type SelectBrands = ServiceSelectBrands;
 
 export type BrandActionResult = {
@@ -45,6 +50,14 @@ export const getBrandsPage = async (
 export const getBrandChildren = async (
   parentUuid: string | null,
 ): Promise<BrandListItem[]> => getBrandChildrenList(parentUuid);
+
+export const getBrandBoard = async (): Promise<BrandBoardColumn[]> =>
+  getBrandBoardRecord();
+
+export const getBrandChildrenPage = async (
+  parentUuid: string | null,
+  page: number,
+): Promise<BrandListItem[]> => getBrandChildrenPageList(parentUuid, page);
 
 export const getBrand = async (uuid: string): Promise<SelectBrands | null> =>
   getBrandRecord(uuid);
@@ -102,6 +115,25 @@ export const reorderBrands = async (
   try {
     await reorderBrandsRecord(orderedUuids);
     revalidatePath("/brands");
+    return {};
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to reorder brands",
+    };
+  }
+};
+
+// Reorder within one paginated board column: only the reordered page window is
+// sent; the service splices it into the parent's full ordered list.
+export const reorderBrandChildren = async (
+  parentUuid: string | null,
+  pageStart: number,
+  orderedPageUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await reorderBrandChildrenRecord(parentUuid, pageStart, orderedPageUuids);
+    // No revalidatePath here: the column already reflects the new order
+    // optimistically, and revalidating would snap every column back to page 1.
     return {};
   } catch (error) {
     return {

@@ -3,11 +3,12 @@ import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getCategories } from "./action";
+import { BOARD_PAGE_SIZE } from "utils";
+import { getCategoryBoard } from "./action";
 
 const CategoriesBoardSection = async () => {
-  const categories = await getCategories();
-  return <CategoriesBoard categories={categories} />;
+  const columns = await getCategoryBoard();
+  return <CategoriesBoard columns={columns} pageSize={BOARD_PAGE_SIZE} />;
 };
 
 const CategoriesPage = () => (
@@ -23,11 +24,6 @@ const CategoriesPage = () => (
         Add Category
       </Link>
     </div>
-
-    <p className="text-sm text-muted">
-      Each column is a parent; drag the cards inside a column to reorder its
-      categories. Changes save automatically.
-    </p>
 
     <AsyncSection reloadKey="categories-board" skeleton={<BoardSkeleton />}>
       <CategoriesBoardSection />

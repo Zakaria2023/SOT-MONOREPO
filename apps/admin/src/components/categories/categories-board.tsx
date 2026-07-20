@@ -1,18 +1,27 @@
 "use client";
 
-import { reorderCategories } from "@/app/(dashboard)/categories/action";
-import type { CategoryListItem } from "@/app/(dashboard)/categories/action";
+import {
+  getCategoryChildrenPage,
+  reorderCategoryChildren,
+} from "@/app/(dashboard)/categories/action";
+import type { CategoryBoardColumn } from "@/app/(dashboard)/categories/action";
 import { CategoryRowActions } from "@/components/categories/category-row-actions";
 import { ReorderableBoard } from "@/components/shared/reorderable-board";
 
 type CategoriesBoardProps = {
-  categories: CategoryListItem[];
+  columns: CategoryBoardColumn[];
+  pageSize: number;
 };
 
-export const CategoriesBoard = ({ categories }: CategoriesBoardProps) => (
+export const CategoriesBoard = ({
+  columns,
+  pageSize,
+}: CategoriesBoardProps) => (
   <ReorderableBoard
-    items={categories}
-    onReorder={reorderCategories}
+    columns={columns}
+    pageSize={pageSize}
+    fetchPage={getCategoryChildrenPage}
+    onReorder={reorderCategoryChildren}
     renderActions={(category) => (
       <CategoryRowActions uuid={category.uuid} name={category.name} />
     )}

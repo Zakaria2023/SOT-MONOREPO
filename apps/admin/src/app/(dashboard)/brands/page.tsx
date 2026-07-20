@@ -3,11 +3,12 @@ import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getBrands } from "./action";
+import { BOARD_PAGE_SIZE } from "utils";
+import { getBrandBoard } from "./action";
 
 const BrandsBoardSection = async () => {
-  const brands = await getBrands();
-  return <BrandsBoard brands={brands} />;
+  const columns = await getBrandBoard();
+  return <BrandsBoard columns={columns} pageSize={BOARD_PAGE_SIZE} />;
 };
 
 const BrandsPage = () => (
@@ -23,11 +24,6 @@ const BrandsPage = () => (
         Add Brand
       </Link>
     </div>
-
-    <p className="text-sm text-muted">
-      Each column is a parent; drag the cards inside a column to reorder its
-      brands. Changes save automatically.
-    </p>
 
     <AsyncSection reloadKey="brands-board" skeleton={<BoardSkeleton />}>
       <BrandsBoardSection />

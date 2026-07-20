@@ -8,11 +8,15 @@ import {
   getCategories as getCategoriesList,
   getCategoriesPage as getCategoriesPageList,
   getCategory as getCategoryRecord,
+  getCategoryBoard as getCategoryBoardRecord,
   getCategoryChildren as getCategoryChildrenList,
+  getCategoryChildrenPage as getCategoryChildrenPageList,
   reorderCategories as reorderCategoriesRecord,
+  reorderCategoryChildren as reorderCategoryChildrenRecord,
   updateCategory as updateCategoryRecord,
 } from "services";
 import type {
+  CategoryBoardColumn as ServiceCategoryBoardColumn,
   CategoryFields as ServiceCategoryFields,
   CategoryListItem as ServiceCategoryListItem,
   CategoryListParams as ServiceCategoryListParams,
@@ -26,6 +30,7 @@ import type { PaginatedResult } from "utils";
 export type CategoryFields = ServiceCategoryFields;
 export type CategoryListItem = ServiceCategoryListItem;
 export type CategoryListParams = ServiceCategoryListParams;
+export type CategoryBoardColumn = ServiceCategoryBoardColumn;
 export type SelectCategories = ServiceSelectCategories;
 
 export type CategoryActionResult = {
@@ -46,6 +51,14 @@ export const getCategoriesPage = async (
 export const getCategoryChildren = async (
   parentUuid: string | null,
 ): Promise<CategoryListItem[]> => getCategoryChildrenList(parentUuid);
+
+export const getCategoryBoard = async (): Promise<CategoryBoardColumn[]> =>
+  getCategoryBoardRecord();
+
+export const getCategoryChildrenPage = async (
+  parentUuid: string | null,
+  page: number,
+): Promise<CategoryListItem[]> => getCategoryChildrenPageList(parentUuid, page);
 
 export const getCategory = async (
   uuid: string,
@@ -107,6 +120,26 @@ export const reorderCategories = async (
   try {
     await reorderCategoriesRecord(orderedUuids);
     revalidatePath("/categories");
+    return {};
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to reorder categories",
+    };
+  }
+};
+
+// Reorder within one paginated board column: only the reordered page window is
+// sent; the service splices it into the parent's full ordered list.
+export const reorderCategoryChildren = async (
+  parentUuid: string | null,
+  pageStart: number,
+  orderedPageUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await reorderCategoryChildrenRecord(parentUuid, pageStart, orderedPageUuids);
+    // No revalidatePath here: the column already reflects the new order
+    // optimistically, and revalidating would snap every column back to page 1.
     return {};
   } catch (error) {
     return {
