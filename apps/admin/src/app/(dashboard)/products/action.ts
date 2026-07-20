@@ -6,11 +6,13 @@ import {
   createProduct as createProductRecord,
   deleteProduct as deleteProductRecord,
   getProduct as getProductRecord,
+  getProductDetailByUuid as getProductDetailByUuidRecord,
   getProductsPage as getProductsPageList,
   updateProduct as updateProductRecord,
 } from "services";
 import type {
   ProductClientFields as ServiceProductClientFields,
+  ProductDetail as ServiceProductDetail,
   ProductFields as ServiceProductFields,
   ProductListItem as ServiceProductListItem,
   ProductListParams as ServiceProductListParams,
@@ -25,6 +27,7 @@ export type ProductFields = ServiceProductFields;
 export type ProductClientFields = ServiceProductClientFields;
 export type ProductListItem = ServiceProductListItem;
 export type ProductListParams = ServiceProductListParams;
+export type ProductDetail = ServiceProductDetail;
 export type SelectProducts = ServiceSelectProducts;
 
 export type ProductActionResult = {
@@ -42,6 +45,10 @@ export const getProductsPage = async (
 export const getProduct = async (
   uuid: string,
 ): Promise<SelectProducts | null> => getProductRecord(uuid);
+
+export const getProductDetail = async (
+  uuid: string,
+): Promise<ProductDetail | null> => getProductDetailByUuidRecord(uuid);
 
 export const createProduct = async (
   _prevState: ProductActionResult,

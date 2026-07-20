@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -36,7 +36,16 @@ export const ProductRowActions = ({ uuid, name }: ProductRowActionsProps) => {
   return (
     <div className="flex items-center justify-end gap-2">
       <Link
+        href={`/products/${uuid}`}
+        aria-label={`View ${name}`}
+        className="flex h-9 w-9 items-center justify-center rounded-control border border-hairline text-secondary hover:bg-hover"
+      >
+        <Eye size={16} />
+      </Link>
+
+      <Link
         href={`/products/${uuid}/edit`}
+        aria-label={`Edit ${name}`}
         className="flex h-9 w-9 items-center justify-center rounded-control border border-hairline text-secondary hover:bg-hover"
       >
         <Pencil size={16} />

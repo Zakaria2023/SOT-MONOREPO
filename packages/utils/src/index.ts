@@ -188,6 +188,13 @@ export const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+/** Turns a slug/key back into a readable Title Case label, e.g. "poe-standard" -> "Poe Standard". */
+export const humanizeSlug = (value: string): string =>
+  value
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
 /**
  * Derives a short uppercase SKU segment from a name, e.g. "Switches" -> "SW",
  * "Hyundai Electric" -> "HE". Prefers word initials, falling back to the first

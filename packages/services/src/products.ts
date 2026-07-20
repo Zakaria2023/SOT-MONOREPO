@@ -334,6 +334,39 @@ export const getProduct = async (
   }
 };
 
+/** A product resolved by its uuid, enriched with category & brand for the admin detail page. */
+export const getProductDetailByUuid = async (
+  uuid: string,
+): Promise<ProductDetail | null> => {
+  try {
+    const [product] = await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+        brandBusinessLines: Brands.businessLines,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(Products.uuid, uuid));
+
+    if (!product) {
+      return null;
+    }
+
+    const [category] = await db
+      .select()
+      .from(Categories)
+      .where(eq(Categories.uuid, product.categoryUuid));
+
+    return { ...product, category: category ?? null };
+  } catch (error) {
+    console.error("getProductDetailByUuid failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
+  }
+};
+
 /** A product resolved by its slug, enriched with its category for the detail page. */
 export const getProductDetailBySlug = async (
   slug: string,
