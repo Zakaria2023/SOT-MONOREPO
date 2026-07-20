@@ -2,6 +2,7 @@
 
 import {
   getBrandChildrenPage,
+  moveBrandToParent,
   reorderBrandChildren,
 } from "@/app/(dashboard)/brands/action";
 import type { BrandBoardColumn } from "@/app/(dashboard)/brands/action";
@@ -19,6 +20,7 @@ export const BrandsBoard = ({ columns, pageSize }: BrandsBoardProps) => (
     pageSize={pageSize}
     fetchPage={getBrandChildrenPage}
     onReorder={reorderBrandChildren}
+    onMove={moveBrandToParent}
     renderActions={(brand) => (
       <BrandRowActions uuid={brand.uuid} name={brand.name} />
     )}

@@ -275,6 +275,68 @@ export const reorderCategoryChildren = async (
   });
 };
 
+/**
+ * Move a category under a new parent (null = top level) and place it at
+ * `targetIndex` among that parent's children. Rejects a move that would create
+ * a cycle (dropping a category into one of its own descendants). Renumbers the
+ * target parent's children 0-based so the paginated board stays consistent.
+ */
+export const moveCategoryToParent = async (
+  uuid: string,
+  newParentUuid: string | null,
+  targetIndex: number,
+): Promise<void> => {
+  if (newParentUuid === uuid) {
+    throw new Error("A category can't be its own parent.");
+  }
+
+  // Cycle guard: walk up from the target parent — if we reach the moved
+  // category, the target is inside its own subtree.
+  if (newParentUuid) {
+    const all = await db
+      .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
+      .from(Categories);
+    const parentOf = new Map(all.map((row) => [row.uuid, row.parentUuid]));
+    let cursor: string | null = newParentUuid;
+    while (cursor) {
+      if (cursor === uuid) {
+        throw new Error(
+          "Can't move a category into one of its own subcategories.",
+        );
+      }
+      cursor = parentOf.get(cursor) ?? null;
+    }
+  }
+
+  await db
+    .update(Categories)
+    .set({ parentUuid: newParentUuid })
+    .where(eq(Categories.uuid, uuid));
+
+  const rows = await db
+    .select({ uuid: Categories.uuid })
+    .from(Categories)
+    .where(
+      newParentUuid
+        ? eq(Categories.parentUuid, newParentUuid)
+        : isNull(Categories.parentUuid),
+    )
+    .orderBy(asc(Categories.order));
+
+  const ordered = rows.map((row) => row.uuid).filter((id) => id !== uuid);
+  const index = Math.max(0, Math.min(targetIndex, ordered.length));
+  ordered.splice(index, 0, uuid);
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < ordered.length; i++) {
+      await tx
+        .update(Categories)
+        .set({ order: i })
+        .where(eq(Categories.uuid, ordered[i]));
+    }
+  });
+};
+
 export const getCategory = async (
   uuid: string,
 ): Promise<SelectCategories | null> => {

@@ -2,6 +2,7 @@
 
 import {
   getCategoryChildrenPage,
+  moveCategoryToParent,
   reorderCategoryChildren,
 } from "@/app/(dashboard)/categories/action";
 import type { CategoryBoardColumn } from "@/app/(dashboard)/categories/action";
@@ -22,6 +23,7 @@ export const CategoriesBoard = ({
     pageSize={pageSize}
     fetchPage={getCategoryChildrenPage}
     onReorder={reorderCategoryChildren}
+    onMove={moveCategoryToParent}
     renderActions={(category) => (
       <CategoryRowActions uuid={category.uuid} name={category.name} />
     )}

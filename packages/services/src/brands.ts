@@ -248,6 +248,64 @@ export const reorderBrandChildren = async (
   });
 };
 
+/**
+ * Move a brand under a new parent (null = top level) and place it at
+ * `targetIndex` among that parent's children. Rejects a move that would create
+ * a cycle (dropping a brand into one of its own descendants). Renumbers the
+ * target parent's children 0-based so the paginated board stays consistent.
+ */
+export const moveBrandToParent = async (
+  uuid: string,
+  newParentUuid: string | null,
+  targetIndex: number,
+): Promise<void> => {
+  if (newParentUuid === uuid) {
+    throw new Error("A brand can't be its own parent.");
+  }
+
+  if (newParentUuid) {
+    const all = await db
+      .select({ uuid: Brands.uuid, parentUuid: Brands.parentUuid })
+      .from(Brands);
+    const parentOf = new Map(all.map((row) => [row.uuid, row.parentUuid]));
+    let cursor: string | null = newParentUuid;
+    while (cursor) {
+      if (cursor === uuid) {
+        throw new Error("Can't move a brand into one of its own sub-brands.");
+      }
+      cursor = parentOf.get(cursor) ?? null;
+    }
+  }
+
+  await db
+    .update(Brands)
+    .set({ parentUuid: newParentUuid })
+    .where(eq(Brands.uuid, uuid));
+
+  const rows = await db
+    .select({ uuid: Brands.uuid })
+    .from(Brands)
+    .where(
+      newParentUuid
+        ? eq(Brands.parentUuid, newParentUuid)
+        : isNull(Brands.parentUuid),
+    )
+    .orderBy(asc(Brands.order));
+
+  const ordered = rows.map((row) => row.uuid).filter((id) => id !== uuid);
+  const index = Math.max(0, Math.min(targetIndex, ordered.length));
+  ordered.splice(index, 0, uuid);
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < ordered.length; i++) {
+      await tx
+        .update(Brands)
+        .set({ order: i })
+        .where(eq(Brands.uuid, ordered[i]));
+    }
+  });
+};
+
 export const getBrand = async (uuid: string): Promise<SelectBrands | null> => {
   try {
     const [brand] = await db.select().from(Brands).where(eq(Brands.uuid, uuid));

@@ -11,6 +11,7 @@ import {
   getBrandChildrenPage as getBrandChildrenPageList,
   getBrands as getBrandsList,
   getBrandsPage as getBrandsPageList,
+  moveBrandToParent as moveBrandToParentRecord,
   reorderBrandChildren as reorderBrandChildrenRecord,
   reorderBrands as reorderBrandsRecord,
   updateBrand as updateBrandRecord,
@@ -119,6 +120,25 @@ export const reorderBrands = async (
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to reorder brands",
+    };
+  }
+};
+
+// Move a card into another column (re-parent) at the dropped position. This is
+// a structural change (counts shift, columns may appear/disappear), so it
+// revalidates the board.
+export const moveBrandToParent = async (
+  uuid: string,
+  newParentUuid: string | null,
+  targetIndex: number,
+): Promise<{ error?: string }> => {
+  try {
+    await moveBrandToParentRecord(uuid, newParentUuid, targetIndex);
+    revalidatePath("/brands");
+    return {};
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to move brand",
     };
   }
 };

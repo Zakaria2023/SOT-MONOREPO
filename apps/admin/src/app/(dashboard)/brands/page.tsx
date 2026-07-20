@@ -25,6 +25,12 @@ const BrandsPage = () => (
       </Link>
     </div>
 
+    <p className="text-sm text-muted">
+      Each column is a parent. Drag a card within its column to reorder, or
+      drop it into another column to move it under that parent. Changes save
+      automatically.
+    </p>
+
     <AsyncSection reloadKey="brands-board" skeleton={<BoardSkeleton />}>
       <BrandsBoardSection />
     </AsyncSection>

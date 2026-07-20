@@ -11,6 +11,7 @@ import {
   getCategoryBoard as getCategoryBoardRecord,
   getCategoryChildren as getCategoryChildrenList,
   getCategoryChildrenPage as getCategoryChildrenPageList,
+  moveCategoryToParent as moveCategoryToParentRecord,
   reorderCategories as reorderCategoriesRecord,
   reorderCategoryChildren as reorderCategoryChildrenRecord,
   updateCategory as updateCategoryRecord,
@@ -125,6 +126,26 @@ export const reorderCategories = async (
     return {
       error:
         error instanceof Error ? error.message : "Failed to reorder categories",
+    };
+  }
+};
+
+// Move a card into another column (re-parent) at the dropped position. This is
+// a structural change (counts shift, columns may appear/disappear), so it
+// revalidates the board.
+export const moveCategoryToParent = async (
+  uuid: string,
+  newParentUuid: string | null,
+  targetIndex: number,
+): Promise<{ error?: string }> => {
+  try {
+    await moveCategoryToParentRecord(uuid, newParentUuid, targetIndex);
+    revalidatePath("/categories");
+    return {};
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to move category",
     };
   }
 };
