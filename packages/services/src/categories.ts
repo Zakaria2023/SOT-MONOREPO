@@ -1,6 +1,7 @@
 import {
   asc,
   count,
+  countDistinct,
   eq,
   getTableColumns,
   isNull,
@@ -32,6 +33,13 @@ export type CategoryListItem = SelectCategories & {
   productCount: number;
 };
 
+// A board card: a list item that also carries its own direct child count, so a
+// card knows whether it can be expanded without the board ever loading any
+// other column's children.
+export type CategoryBoardItem = CategoryListItem & {
+  childCount: number;
+};
+
 // One column of the reorder board: a parent (null = top level) with its total
 // child count and the first page of those children.
 export type CategoryBoardColumn = {
@@ -53,6 +61,7 @@ export type CategoryListParams = {
 };
 
 const ParentCategories = alias(Categories, "parent_categories");
+const ChildCategories = alias(Categories, "child_categories");
 
 // The row selection shared by every list query: the category columns, its
 // parent's name, and how many products sit directly in it.
@@ -60,6 +69,16 @@ const categoryListSelection = {
   ...getTableColumns(Categories),
   parentName: ParentCategories.name,
   productCount: count(Products.id),
+};
+
+// The board selection: adds each card's own direct child count (via a join to a
+// child alias). Both counts use countDistinct so the child join and the product
+// join don't multiply each other's rows.
+const categoryBoardSelection = {
+  ...getTableColumns(Categories),
+  parentName: ParentCategories.name,
+  productCount: countDistinct(Products.id),
+  childCount: countDistinct(ChildCategories.id),
 };
 
 // Match a search term against the category name or its generated code.
@@ -135,16 +154,20 @@ export const getCategoriesPage = async (
  */
 export const getCategoryChildren = async (
   parentUuid: string | null,
-): Promise<CategoryListItem[]> => {
+): Promise<CategoryBoardItem[]> => {
   try {
     return await db
-      .select(categoryListSelection)
+      .select(categoryBoardSelection)
       .from(Categories)
       .leftJoin(
         ParentCategories,
         eq(Categories.parentUuid, ParentCategories.uuid),
       )
       .leftJoin(Products, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(
+        ChildCategories,
+        eq(ChildCategories.parentUuid, Categories.uuid),
+      )
       .where(
         parentUuid
           ? eq(Categories.parentUuid, parentUuid)

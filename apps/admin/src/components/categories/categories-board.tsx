@@ -1,20 +1,22 @@
 "use client";
 
 import {
+  getCategoryChildren,
   moveCategoryToParent,
   reorderCategoryChildren,
 } from "@/app/(dashboard)/categories/action";
-import type { CategoryBoardColumn } from "@/app/(dashboard)/categories/action";
+import type { CategoryBoardItem } from "@/app/(dashboard)/categories/action";
 import { CategoryRowActions } from "@/components/categories/category-row-actions";
 import { ReorderableBoard } from "@/components/shared/reorderable-board";
 
 type CategoriesBoardProps = {
-  columns: CategoryBoardColumn[];
+  rootItems: CategoryBoardItem[];
 };
 
-export const CategoriesBoard = ({ columns }: CategoriesBoardProps) => (
+export const CategoriesBoard = ({ rootItems }: CategoriesBoardProps) => (
   <ReorderableBoard
-    columns={columns}
+    rootItems={rootItems}
+    loadColumn={getCategoryChildren}
     onReorder={reorderCategoryChildren}
     onMove={moveCategoryToParent}
     renderActions={(category) => (

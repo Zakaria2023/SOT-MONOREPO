@@ -3,11 +3,13 @@ import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getBrandBoard } from "./action";
+import { getBrandChildren } from "./action";
 
 const BrandsBoardSection = async () => {
-  const columns = await getBrandBoard();
-  return <BrandsBoard columns={columns} />;
+  // First render fetches only the top-level cards; each child column is loaded
+  // on demand when its parent card is opened.
+  const rootItems = await getBrandChildren(null);
+  return <BrandsBoard rootItems={rootItems} />;
 };
 
 const BrandsPage = () => (

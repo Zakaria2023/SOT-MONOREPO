@@ -1,6 +1,7 @@
 import {
   asc,
   count,
+  countDistinct,
   eq,
   getTableColumns,
   isNull,
@@ -28,6 +29,13 @@ export type BrandListItem = SelectBrands & {
   productCount: number;
 };
 
+// A board card: a list item that also carries its own direct child count, so a
+// card knows whether it can be expanded without the board ever loading any
+// other column's children.
+export type BrandBoardItem = BrandListItem & {
+  childCount: number;
+};
+
 // One column of the reorder board: a parent (null = top level) with its total
 // child count and the first page of those children.
 export type BrandBoardColumn = {
@@ -49,6 +57,7 @@ export type BrandListParams = {
 };
 
 const ParentBrands = alias(Brands, "parent_brands");
+const ChildBrands = alias(Brands, "child_brands");
 
 // The row selection shared by every list query: the brand columns, its parent's
 // name, and how many products sit directly in it.
@@ -56,6 +65,16 @@ const brandListSelection = {
   ...getTableColumns(Brands),
   parentName: ParentBrands.name,
   productCount: count(Products.id),
+};
+
+// The board selection: adds each card's own direct child count (via a join to a
+// child alias). Both counts use countDistinct so the child join and the product
+// join don't multiply each other's rows.
+const brandBoardSelection = {
+  ...getTableColumns(Brands),
+  parentName: ParentBrands.name,
+  productCount: countDistinct(Products.id),
+  childCount: countDistinct(ChildBrands.id),
 };
 
 // Match a search term against the brand name or its generated code.
@@ -122,13 +141,14 @@ export const getBrandsPage = async (
  */
 export const getBrandChildren = async (
   parentUuid: string | null,
-): Promise<BrandListItem[]> => {
+): Promise<BrandBoardItem[]> => {
   try {
     return await db
-      .select(brandListSelection)
+      .select(brandBoardSelection)
       .from(Brands)
       .leftJoin(ParentBrands, eq(Brands.parentUuid, ParentBrands.uuid))
       .leftJoin(Products, eq(Products.brandUuid, Brands.uuid))
+      .leftJoin(ChildBrands, eq(ChildBrands.parentUuid, Brands.uuid))
       .where(
         parentUuid ? eq(Brands.parentUuid, parentUuid) : isNull(Brands.parentUuid),
       )

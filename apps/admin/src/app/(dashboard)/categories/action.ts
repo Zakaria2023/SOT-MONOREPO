@@ -18,6 +18,7 @@ import {
 } from "services";
 import type {
   CategoryBoardColumn as ServiceCategoryBoardColumn,
+  CategoryBoardItem as ServiceCategoryBoardItem,
   CategoryFields as ServiceCategoryFields,
   CategoryListItem as ServiceCategoryListItem,
   CategoryListParams as ServiceCategoryListParams,
@@ -30,6 +31,7 @@ import type { PaginatedResult } from "utils";
 // treat as a runtime export) so consumers can keep importing them from here.
 export type CategoryFields = ServiceCategoryFields;
 export type CategoryListItem = ServiceCategoryListItem;
+export type CategoryBoardItem = ServiceCategoryBoardItem;
 export type CategoryListParams = ServiceCategoryListParams;
 export type CategoryBoardColumn = ServiceCategoryBoardColumn;
 export type SelectCategories = ServiceSelectCategories;
@@ -49,9 +51,13 @@ export const getCategoriesPage = async (
   params: CategoryListParams = {},
 ): Promise<PaginatedResult<CategoryListItem>> => getCategoriesPageList(params);
 
+// One column's cards — the top-level cards when parentUuid is null, otherwise a
+// single parent's direct children. Each card carries its own childCount, so the
+// board never has to load any other column to know what is expandable. This is
+// both the first-render fetch (null) and every lazy column open.
 export const getCategoryChildren = async (
   parentUuid: string | null,
-): Promise<CategoryListItem[]> => getCategoryChildrenList(parentUuid);
+): Promise<CategoryBoardItem[]> => getCategoryChildrenList(parentUuid);
 
 export const getCategoryBoard = async (): Promise<CategoryBoardColumn[]> =>
   getCategoryBoardRecord();

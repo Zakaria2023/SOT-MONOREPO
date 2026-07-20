@@ -3,11 +3,13 @@ import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { getCategoryBoard } from "./action";
+import { getCategoryChildren } from "./action";
 
 const CategoriesBoardSection = async () => {
-  const columns = await getCategoryBoard();
-  return <CategoriesBoard columns={columns} />;
+  // First render fetches only the top-level cards; each child column is loaded
+  // on demand when its parent card is opened.
+  const rootItems = await getCategoryChildren(null);
+  return <CategoriesBoard rootItems={rootItems} />;
 };
 
 const CategoriesPage = () => (

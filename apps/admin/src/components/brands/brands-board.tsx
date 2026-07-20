@@ -1,20 +1,22 @@
 "use client";
 
 import {
+  getBrandChildren,
   moveBrandToParent,
   reorderBrandChildren,
 } from "@/app/(dashboard)/brands/action";
-import type { BrandBoardColumn } from "@/app/(dashboard)/brands/action";
+import type { BrandBoardItem } from "@/app/(dashboard)/brands/action";
 import { BrandRowActions } from "@/components/brands/brand-row-actions";
 import { ReorderableBoard } from "@/components/shared/reorderable-board";
 
 type BrandsBoardProps = {
-  columns: BrandBoardColumn[];
+  rootItems: BrandBoardItem[];
 };
 
-export const BrandsBoard = ({ columns }: BrandsBoardProps) => (
+export const BrandsBoard = ({ rootItems }: BrandsBoardProps) => (
   <ReorderableBoard
-    columns={columns}
+    rootItems={rootItems}
+    loadColumn={getBrandChildren}
     onReorder={reorderBrandChildren}
     onMove={moveBrandToParent}
     renderActions={(brand) => (

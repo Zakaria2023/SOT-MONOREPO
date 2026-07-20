@@ -18,6 +18,7 @@ import {
 } from "services";
 import type {
   BrandBoardColumn as ServiceBrandBoardColumn,
+  BrandBoardItem as ServiceBrandBoardItem,
   BrandFields as ServiceBrandFields,
   BrandListItem as ServiceBrandListItem,
   BrandListParams as ServiceBrandListParams,
@@ -30,6 +31,7 @@ import type { PaginatedResult } from "utils";
 // treat as a runtime export) so consumers can keep importing them from here.
 export type BrandFields = ServiceBrandFields;
 export type BrandListItem = ServiceBrandListItem;
+export type BrandBoardItem = ServiceBrandBoardItem;
 export type BrandListParams = ServiceBrandListParams;
 export type BrandBoardColumn = ServiceBrandBoardColumn;
 export type SelectBrands = ServiceSelectBrands;
@@ -48,9 +50,13 @@ export const getBrandsPage = async (
   params: BrandListParams = {},
 ): Promise<PaginatedResult<BrandListItem>> => getBrandsPageList(params);
 
+// One column's cards — the top-level cards when parentUuid is null, otherwise a
+// single parent's direct children. Each card carries its own childCount, so the
+// board never has to load any other column to know what is expandable. This is
+// both the first-render fetch (null) and every lazy column open.
 export const getBrandChildren = async (
   parentUuid: string | null,
-): Promise<BrandListItem[]> => getBrandChildrenList(parentUuid);
+): Promise<BrandBoardItem[]> => getBrandChildrenList(parentUuid);
 
 export const getBrandBoard = async (): Promise<BrandBoardColumn[]> =>
   getBrandBoardRecord();
