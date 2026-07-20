@@ -190,6 +190,37 @@ export const updateCategory = async (
 };
 
 export const deleteCategory = async (uuid: string): Promise<void> => {
+  // `Products.categoryUuid` references this row with onDelete: "restrict", so a
+  // raw delete throws an opaque foreign-key error when products still point
+  // here. Check dependents first and surface a clear, actionable message. Child
+  // categories use onDelete: "set null" (they survive, orphaned to top level),
+  // but blocking on them too keeps the tree from silently reshaping.
+  const [productDep] = await db
+    .select({ value: count() })
+    .from(Products)
+    .where(eq(Products.categoryUuid, uuid));
+  const productCount = productDep?.value ?? 0;
+  if (productCount > 0) {
+    throw new Error(
+      `This category still has ${productCount} ${
+        productCount === 1 ? "product" : "products"
+      }. Move or delete them before deleting the category.`,
+    );
+  }
+
+  const [childDep] = await db
+    .select({ value: count() })
+    .from(Categories)
+    .where(eq(Categories.parentUuid, uuid));
+  const childCount = childDep?.value ?? 0;
+  if (childCount > 0) {
+    throw new Error(
+      `This category has ${childCount} ${
+        childCount === 1 ? "subcategory" : "subcategories"
+      }. Move or delete them before deleting the category.`,
+    );
+  }
+
   await db.delete(Categories).where(eq(Categories.uuid, uuid));
 };
 
