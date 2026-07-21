@@ -8,7 +8,7 @@ import {
 } from "@/app/cart/actions";
 import { useCompatibility } from "@/app/cart/use-compatibility";
 import { CompatibilityGateModal } from "@/components/cart/compatibility-gate-modal";
-import { CompatibilityWarnings } from "@/components/cart/compatibility-warnings";
+import { DesignCheck } from "@/components/cart/design-check";
 import { ProfileGateModal } from "@/components/profile/profile-gate-modal";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
@@ -235,11 +235,13 @@ export const CartView = ({
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [, startTransition] = useTransition();
 
-  // Advisory compatibility check over everything in the cart, re-run
-  // (debounced) whenever lines or quantities change.
-  const warnings = useCompatibility(items);
-  // The BOQ form intercepted before checkout; "Continue anyway" re-submits it
-  // with the gate bypassed.
+  // Design check over everything in the cart, re-run (debounced) on change.
+  // Blockers (failed HARD rules) must be fixed; warnings only caution.
+  const findings = useCompatibility(items);
+  const blockers = findings.filter((finding) => finding.status === "fail");
+  const warnings = findings.filter((finding) => finding.status === "warn");
+  // The form intercepted before checkout; "Continue anyway" (warnings only)
+  // re-submits it with the gate bypassed.
   const [pendingCheckout, setPendingCheckout] =
     useState<HTMLFormElement | null>(null);
   const bypassCompatibilityGate = useRef(false);
@@ -314,7 +316,7 @@ export const CartView = ({
           </p>
         ) : (
           <div className="mt-8 flex flex-col gap-6">
-            <CompatibilityWarnings warnings={warnings} />
+            <DesignCheck blockers={blockers} warnings={warnings} />
 
             {[...solutionGroups.entries()].map(([categoryUuid, groupItems]) => (
               <CartSection
@@ -335,11 +337,11 @@ export const CartView = ({
                         setShowProfileGate(true);
                         return;
                       }
-                      // Final look at the rule warnings before the order goes
-                      // out — agreed flow: warn again at checkout, never block.
+                      // Blocking issues can't be bypassed; warnings can, after
+                      // one more look. Both open the design-check gate.
                       if (
-                        warnings.length > 0 &&
-                        !bypassCompatibilityGate.current
+                        blockers.length > 0 ||
+                        (warnings.length > 0 && !bypassCompatibilityGate.current)
                       ) {
                         event.preventDefault();
                         setPendingCheckout(event.currentTarget);
@@ -376,6 +378,12 @@ export const CartView = ({
                       if (needsProfile) {
                         event.preventDefault();
                         setShowProfileGate(true);
+                        return;
+                      }
+                      // A broken design blocks the direct order too.
+                      if (blockers.length > 0) {
+                        event.preventDefault();
+                        setPendingCheckout(event.currentTarget);
                       }
                     }}
                   >
@@ -397,6 +405,7 @@ export const CartView = ({
 
       {pendingCheckout && (
         <CompatibilityGateModal
+          blockers={blockers}
           warnings={warnings}
           onContinue={() => {
             bypassCompatibilityGate.current = true;

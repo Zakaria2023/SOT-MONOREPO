@@ -2,7 +2,7 @@
 
 import { previewGuestCart } from "@/app/cart/actions";
 import { useCompatibility } from "@/app/cart/use-compatibility";
-import { CompatibilityWarnings } from "@/components/cart/compatibility-warnings";
+import { DesignCheck } from "@/components/cart/design-check";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
   removeFromGuestCart,
@@ -63,8 +63,10 @@ export const GuestCartView = () => {
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const { subtotal, vat, total } = summarizeCart(lines);
 
-  // Same advisory compatibility check as the signed-in cart.
-  const warnings = useCompatibility(lines);
+  // Same design check as the signed-in cart.
+  const findings = useCompatibility(lines);
+  const blockers = findings.filter((finding) => finding.status === "fail");
+  const warnings = findings.filter((finding) => finding.status === "warn");
 
   return (
     <main className="min-h-screen w-full bg-page">
@@ -89,7 +91,7 @@ export const GuestCartView = () => {
         ) : (
           <>
           <div className="mt-8">
-            <CompatibilityWarnings warnings={warnings} />
+            <DesignCheck blockers={blockers} warnings={warnings} />
           </div>
           <section className="mt-6 rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)]">
             <div className="divide-y divide-hairline border-b border-hairline">

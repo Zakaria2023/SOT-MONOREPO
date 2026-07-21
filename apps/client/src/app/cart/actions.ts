@@ -100,10 +100,10 @@ export const checkCartCompatibility = async (
   }
   try {
     const report = await checkCompatibility(selection);
+    // Every rule the design breaks — blockers (fail) and advisories (warn).
+    // The UI separates the two; blockers gate checkout, warnings only caution.
     return report.results.filter(
-      (result) =>
-        (result.status === "fail" || result.status === "warn") &&
-        result.providers.length > 0,
+      (result) => result.status === "fail" || result.status === "warn",
     );
   } catch (error) {
     // The check is a courtesy — a failure here must never break the cart.
