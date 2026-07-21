@@ -1,7 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import { BoqItems } from "../../../db/schema/boqs";
+import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
+import type { SelectionInput } from "./rule-engine";
 import {
   evaluatePresence,
   gateDecision,
@@ -144,5 +146,59 @@ export const checkBoqPresence = async (
 
   const boq: PresenceBoq = { items, choices };
   const findings = evaluatePresence(boq, getPresenceRules());
+  return { findings, gate: gateDecision(findings) };
+};
+
+/**
+ * The same requires-companion check over a raw cart selection (product uuids +
+ * quantities), so the storefront cart can warn "camera with no recorder" before
+ * anything becomes a BOQ. Mirrors checkBoqPresence but resolves attributes from
+ * live products rather than snapshotted BOQ lines.
+ */
+export const checkCartPresence = async (
+  selection: SelectionInput[],
+  choices: Record<string, boolean> = {},
+): Promise<BoqPresenceResult> => {
+  const active = selection.filter((line) => line.quantity > 0);
+  if (active.length === 0) {
+    return { findings: [], gate: gateDecision([]) };
+  }
+
+  const rows = await db
+    .select({
+      uuid: Products.uuid,
+      name: Products.name,
+      categoryName: Categories.name,
+      technicalAttributes: Products.technicalAttributes,
+    })
+    .from(Products)
+    .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+    .where(
+      inArray(
+        Products.uuid,
+        active.map((line) => line.productUuid),
+      ),
+    );
+  const byUuid = new Map(rows.map((row) => [row.uuid, row]));
+
+  const items: PresenceItem[] = active.flatMap((line) => {
+    const product = byUuid.get(line.productUuid);
+    if (!product) {
+      return [];
+    }
+    return [
+      {
+        productUuid: product.uuid,
+        name: product.name,
+        quantity: line.quantity,
+        attributes: classifyPresenceAttributes(
+          product.categoryName,
+          product.technicalAttributes ?? {},
+        ),
+      },
+    ];
+  });
+
+  const findings = evaluatePresence({ items, choices }, getPresenceRules());
   return { findings, gate: gateDecision(findings) };
 };

@@ -1,36 +1,22 @@
 "use client";
 
+import type { DesignFinding } from "@/app/cart/actions";
 import { CheckCircle2, Lightbulb, ShieldAlert, TriangleAlert } from "lucide-react";
-import type { RuleEvaluation } from "services";
 
 type DesignCheckProps = {
-  blockers: RuleEvaluation[];
-  warnings: RuleEvaluation[];
+  blockers: DesignFinding[];
+  warnings: DesignFinding[];
 };
 
 type FindingRowProps = {
-  finding: RuleEvaluation;
+  finding: DesignFinding;
   tone: "block" | "warn";
 };
 
-const suggestionText = (finding: RuleEvaluation): string =>
-  finding.suggestions
-    .map(
-      (suggestion) =>
-        `${suggestion.name}${
-          suggestion.capacity
-            ? ` (${suggestion.capacity}${finding.unit ? ` ${finding.unit}` : ""})`
-            : ""
-        }`,
-    )
-    .join(", ");
-
 const FindingRow = ({ finding, tone }: FindingRowProps) => (
   <div className="font-grotesk text-sm">
-    <p
-      className={tone === "block" ? "font-semibold text-red-900" : "font-semibold text-amber-900"}
-    >
-      {finding.name}
+    <p className={tone === "block" ? "font-semibold text-red-900" : "font-semibold text-amber-900"}>
+      {finding.title}
     </p>
     <p className={tone === "block" ? "mt-0.5 text-red-800" : "mt-0.5 text-amber-800"}>
       {finding.message}
@@ -44,22 +30,22 @@ const FindingRow = ({ finding, tone }: FindingRowProps) => (
         }
       >
         <Lightbulb size={14} className="mt-0.5 shrink-0" />
-        <span>Add one of: {suggestionText(finding)}</span>
+        <span>Add one of: {finding.suggestions.join(", ")}</span>
       </p>
     )}
   </div>
 );
 
-// The customer-facing design check. Groups what the design breaks into
-// blockers (must fix to order) and heads-up warnings (can proceed) so the
-// buyer always knows exactly where they stand.
+// The customer-facing design check. Groups what the design breaks into blockers
+// (must fix to order — a camera with no recorder, an over-budget switch) and
+// heads-up warnings (can proceed) so the buyer always knows where they stand.
 export const DesignCheck = ({ blockers, warnings }: DesignCheckProps) => {
   if (blockers.length === 0 && warnings.length === 0) {
     return (
       <section className="flex items-center gap-2 rounded-[18px] border border-emerald-200 bg-emerald-50 p-4">
         <CheckCircle2 size={18} className="text-emerald-600" />
         <p className="font-grotesk text-sm font-medium text-emerald-900">
-          Your design checks out — everything is compatible.
+          Your design checks out — everything it needs is here and compatible.
         </p>
       </section>
     );
@@ -78,7 +64,7 @@ export const DesignCheck = ({ blockers, warnings }: DesignCheckProps) => {
           </div>
           <div className="mt-3 flex flex-col gap-3">
             {blockers.map((finding) => (
-              <FindingRow key={finding.ruleUuid} finding={finding} tone="block" />
+              <FindingRow key={finding.id} finding={finding} tone="block" />
             ))}
           </div>
         </section>
@@ -94,7 +80,7 @@ export const DesignCheck = ({ blockers, warnings }: DesignCheckProps) => {
           </div>
           <div className="mt-3 flex flex-col gap-3">
             {warnings.map((finding) => (
-              <FindingRow key={finding.ruleUuid} finding={finding} tone="warn" />
+              <FindingRow key={finding.id} finding={finding} tone="warn" />
             ))}
           </div>
           <p className="font-grotesk mt-3 text-xs text-amber-700">

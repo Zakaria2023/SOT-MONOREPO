@@ -236,10 +236,8 @@ export const CartView = ({
   const [, startTransition] = useTransition();
 
   // Design check over everything in the cart, re-run (debounced) on change.
-  // Blockers (failed HARD rules) must be fixed; warnings only caution.
-  const findings = useCompatibility(items);
-  const blockers = findings.filter((finding) => finding.status === "fail");
-  const warnings = findings.filter((finding) => finding.status === "warn");
+  // Blockers (missing companions + broken rules) must be fixed; warnings caution.
+  const { blockers, warnings } = useCompatibility(items);
   // The form intercepted before checkout; "Continue anyway" (warnings only)
   // re-submits it with the gate bypassed.
   const [pendingCheckout, setPendingCheckout] =

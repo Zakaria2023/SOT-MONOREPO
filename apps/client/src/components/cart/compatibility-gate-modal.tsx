@@ -1,11 +1,11 @@
 "use client";
 
+import type { DesignFinding } from "@/app/cart/actions";
 import { ArrowRight, ShieldAlert, TriangleAlert, X } from "lucide-react";
-import type { RuleEvaluation } from "services";
 
 type CompatibilityGateModalProps = {
-  blockers: RuleEvaluation[];
-  warnings: RuleEvaluation[];
+  blockers: DesignFinding[];
+  warnings: DesignFinding[];
   onContinue: () => void;
   onClose: () => void;
 };
@@ -56,8 +56,8 @@ export const CompatibilityGateModal = ({
         {hasBlockers && (
           <div className="mt-4 flex max-h-52 flex-col gap-3 overflow-y-auto rounded-xl bg-red-50 p-4">
             {blockers.map((finding) => (
-              <div key={finding.ruleUuid} className="font-grotesk text-sm">
-                <p className="font-semibold text-red-900">{finding.name}</p>
+              <div key={finding.id} className="font-grotesk text-sm">
+                <p className="font-semibold text-red-900">{finding.title}</p>
                 <p className="mt-0.5 text-red-800">{finding.message}</p>
               </div>
             ))}
@@ -67,8 +67,8 @@ export const CompatibilityGateModal = ({
         {warnings.length > 0 && (
           <div className="mt-3 flex max-h-40 flex-col gap-3 overflow-y-auto rounded-xl bg-amber-50 p-4">
             {warnings.map((finding) => (
-              <div key={finding.ruleUuid} className="font-grotesk text-sm">
-                <p className="font-semibold text-amber-900">{finding.name}</p>
+              <div key={finding.id} className="font-grotesk text-sm">
+                <p className="font-semibold text-amber-900">{finding.title}</p>
                 <p className="mt-0.5 text-amber-800">{finding.message}</p>
               </div>
             ))}
