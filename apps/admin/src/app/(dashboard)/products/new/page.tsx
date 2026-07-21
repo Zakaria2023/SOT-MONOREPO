@@ -1,13 +1,13 @@
 import { getBrands } from "@/app/(dashboard)/brands/action";
 import { getCategories } from "@/app/(dashboard)/categories/action";
 import { ProductForm } from "@/components/products/product-form";
-import { getSpecifications } from "services";
+import { getSpecificationLibrary } from "services";
 
 const NewProductPage = async () => {
-  const [categories, brands, specifications] = await Promise.all([
+  const [categories, brands, library] = await Promise.all([
     getCategories(),
     getBrands(),
-    getSpecifications(),
+    getSpecificationLibrary(),
   ]);
 
   return (
@@ -15,7 +15,7 @@ const NewProductPage = async () => {
       mode="add"
       categories={categories}
       brands={brands}
-      specifications={specifications}
+      library={library}
     />
   );
 };

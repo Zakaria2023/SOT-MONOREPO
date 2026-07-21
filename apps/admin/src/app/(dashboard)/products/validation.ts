@@ -26,6 +26,7 @@ export const productFormSchema = z.object({
   price: priceField, // public MSRP
   currency: z.string().min(1, "Required").max(3),
   isAvailable: z.boolean(),
+  specKeys: z.array(z.string()),
   technicalAttributes: z.record(z.string(), z.string()),
   status: z.enum(productStatuses),
   order: z.number().int().min(0).optional(),

@@ -2,7 +2,7 @@
 
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { DatasheetUpload } from "@/components/products/datasheet-upload";
-import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
+import { SpecificationComposer } from "@/components/products/specification-composer";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { productStatuses } from "@/db/enum";
@@ -11,7 +11,7 @@ import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
-import type { SpecificationWithCategories } from "services";
+import type { LibraryDomain } from "services";
 import {
   ArrowUpDown,
   Coins,
@@ -39,13 +39,13 @@ type ProductFormProps =
       mode: "add";
       categories: SelectCategories[];
       brands: SelectBrands[];
-      specifications: SpecificationWithCategories[];
+      library: LibraryDomain[];
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
-      specifications: SpecificationWithCategories[];
+      library: LibraryDomain[];
       product: SelectProducts;
     };
 
@@ -60,7 +60,7 @@ const availabilityOptions = [
 ];
 
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands, specifications } = props;
+  const { mode, categories, brands, library } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -89,10 +89,6 @@ export const ProductForm = (props: ProductFormProps) => {
   const selectedBrand = brands.find((brand) => brand.uuid === selectedBrandUuid);
   const brandIdLabel = selectedBrand?.idLabel;
 
-  // Applicable specs depend on the category, so clear chosen values on change.
-  const handleCategoryChange = () => {
-    setValue("technicalAttributes", {});
-  };
 
   return (
     <FormProvider {...form}>
@@ -142,7 +138,6 @@ export const ProductForm = (props: ProductFormProps) => {
             placeholder="Select a category"
             allowEmpty={false}
             error={errors.categoryUuid?.message}
-            onValueChange={handleCategoryChange}
           />
           <BrandDropdown
             control={control}
@@ -285,10 +280,7 @@ export const ProductForm = (props: ProductFormProps) => {
           )}
         />
 
-        <TechnicalSpecsEditor
-          categories={categories}
-          specifications={specifications}
-        />
+        <SpecificationComposer library={library} />
 
         <FormError message={state.error} />
 

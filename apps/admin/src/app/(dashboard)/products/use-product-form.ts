@@ -47,6 +47,11 @@ export const useProductForm = (args: UseProductFormArgs) => {
       price: product?.price ?? "",
       currency: product?.currency ?? "SAR",
       isAvailable: product?.isAvailable ?? true,
+      // Existing products with no explicit selection fall back to the keys they
+      // already have values for.
+      specKeys:
+        product?.specKeys ??
+        Object.keys(product?.technicalAttributes ?? {}),
       technicalAttributes: product?.technicalAttributes ?? {},
       status: product?.status ?? "in_stock",
       order: product?.order ?? 0,
@@ -73,6 +78,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
         price: values.price || null,
         currency: values.currency,
         isAvailable: values.isAvailable,
+        specKeys: values.specKeys,
         technicalAttributes: values.technicalAttributes,
         status: values.status,
         order: values.order,
