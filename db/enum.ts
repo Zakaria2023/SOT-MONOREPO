@@ -84,6 +84,23 @@ export const specValueTypes = [
 
 export type SpecValueType = (typeof specValueTypes)[number];
 
+// The attribute type shown in the library builder — a richer, UX-facing set
+// that maps down to valueType/allowMultiple for the engine:
+//   number        → valueType number (has a unit)
+//   single_select → valueType select, one option
+//   multi_select  → valueType select, several options (allowMultiple)
+//   boolean       → valueType select with Yes/No options
+//   text          → valueType select, free text (no options)
+export const specInputTypes = [
+  "number",
+  "single_select",
+  "multi_select",
+  "boolean",
+  "text",
+] as const satisfies readonly string[];
+
+export type SpecInputType = (typeof specInputTypes)[number];
+
 // Compatibility rule families. Rules bind to specifications, never to
 // products: any product carrying the consumer spec participates, any product
 // carrying the provider spec supplies capacity.
