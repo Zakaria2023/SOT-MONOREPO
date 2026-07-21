@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   description: "Stratum admin dashboard",
 };
 
+// Always render against live data — never a build-time static snapshot.
+export const dynamic = "force-dynamic";
+
 type Props = {
   children: ReactNode;
 };

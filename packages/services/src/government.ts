@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, like, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -11,7 +11,7 @@ export type GovernmentRequestInput = {
   officialEmail: SelectGovernmentRequests["officialEmail"];
   entityName: SelectGovernmentRequests["entityName"];
   fullName: SelectGovernmentRequests["fullName"];
-  contactNumber: SelectGovernmentRequests["contactNumber"];
+  contactNumber?: SelectGovernmentRequests["contactNumber"];
   location: SelectGovernmentRequests["location"];
 };
 
@@ -32,6 +32,11 @@ export type RejectGovernmentRequestInput = {
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const normalizeText = (value?: string | null): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
 
 /** Create a pending government request, rejecting a duplicate active email. */
 export const createGovernmentRequest = async (
@@ -68,7 +73,7 @@ export const createGovernmentRequest = async (
     officialEmail,
     entityName: input.entityName.trim(),
     fullName: input.fullName.trim(),
-    contactNumber: input.contactNumber.trim(),
+    contactNumber: normalizeText(input.contactNumber),
     location: input.location.trim(),
   });
 
@@ -84,14 +89,42 @@ export const createGovernmentRequest = async (
   return request;
 };
 
-/** Every government request, newest first (admin review queue). */
-export const listGovernmentRequests = async (): Promise<
-  SelectGovernmentRequests[]
-> =>
-  db
-    .select()
-    .from(GovernmentRequests)
-    .orderBy(desc(GovernmentRequests.createdAt), desc(GovernmentRequests.id));
+export type GovernmentRequestsListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of government requests, newest first (admin
+ * review queue), plus the unfiltered total for that search. Search matches the
+ * entity name, contact full name, or official email.
+ */
+export const listGovernmentRequests = async (
+  params: GovernmentRequestsListParams,
+): Promise<{ items: SelectGovernmentRequests[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(GovernmentRequests.entityName, `%${term}%`),
+        like(GovernmentRequests.fullName, `%${term}%`),
+        like(GovernmentRequests.officialEmail, `%${term}%`),
+      )
+    : undefined;
+
+  const [items, [totals]] = await Promise.all([
+    db
+      .select()
+      .from(GovernmentRequests)
+      .where(where)
+      .orderBy(desc(GovernmentRequests.createdAt), desc(GovernmentRequests.id))
+      .limit(params.limit)
+      .offset(params.offset),
+    db.select({ total: count() }).from(GovernmentRequests).where(where),
+  ]);
+
+  return { items, total: Number(totals?.total ?? 0) };
+};
 
 /** The government request with this uuid, or null. */
 export const getGovernmentRequestByUuid = async (

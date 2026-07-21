@@ -5,13 +5,11 @@ import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { TechnicalSpecsEditor } from "@/components/products/technical-specs-editor";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
-import { VendorDropdown } from "@/components/vendors/vendor-dropdown";
 import { productStatuses } from "@/db/enum";
 import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
-import type { SelectVendors } from "@/db/schema/vendors";
 import { documentDownloadUrl } from "@/lib/documents";
 import type { SpecificationWithCategories } from "services";
 import {
@@ -19,18 +17,15 @@ import {
   Coins,
   Globe,
   Hash,
-  Layers,
   Package,
   ShieldCheck,
   Tag,
-  Waypoints,
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Controller, FormProvider } from "react-hook-form";
+import { Controller, FormProvider, useWatch } from "react-hook-form";
 import {
   Button,
-  Checkbox,
   Dropdown,
   FormError,
   ImageUpload,
@@ -44,14 +39,12 @@ type ProductFormProps =
       mode: "add";
       categories: SelectCategories[];
       brands: SelectBrands[];
-      vendors: SelectVendors[];
       specifications: SpecificationWithCategories[];
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
-      vendors: SelectVendors[];
       specifications: SpecificationWithCategories[];
       product: SelectProducts;
     };
@@ -67,7 +60,7 @@ const availabilityOptions = [
 ];
 
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands, vendors, specifications } = props;
+  const { mode, categories, brands, specifications } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -89,6 +82,12 @@ export const ProductForm = (props: ProductFormProps) => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
   const hasSubmittedRef = useRef(false);
+
+  // The selected brand may define an ID label (e.g. BOM / PID / Part Number).
+  // When it does, show an input for the per-product value of that label.
+  const selectedBrandUuid = useWatch({ control, name: "brandUuid" });
+  const selectedBrand = brands.find((brand) => brand.uuid === selectedBrandUuid);
+  const brandIdLabel = selectedBrand?.idLabel;
 
   // Applicable specs depend on the category, so clear chosen values on change.
   const handleCategoryChange = () => {
@@ -128,13 +127,6 @@ export const ProductForm = (props: ProductFormProps) => {
             {...register("model")}
           />
           <Input
-            label="Product Family"
-            labelIcon={<Layers size={15} />}
-            type="text"
-            placeholder="e.g. S500 Series"
-            {...register("productFamily")}
-          />
-          <Input
             label="Series Code"
             labelIcon={<Hash size={15} />}
             type="text"
@@ -158,14 +150,16 @@ export const ProductForm = (props: ProductFormProps) => {
             brands={brands}
             error={errors.brandUuid?.message}
           />
-          <VendorDropdown
-            control={control}
-            name="vendorUuid"
-            vendors={vendors}
-            placeholder="No vendor"
-            allowEmpty
-          />
-
+          {brandIdLabel && (
+            <Input
+              label={brandIdLabel}
+              labelIcon={<Hash size={15} />}
+              type="text"
+              placeholder={`Enter ${brandIdLabel}`}
+              {...register("brandIdValue")}
+              error={errors.brandIdValue?.message}
+            />
+          )}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-ink">Status</label>
             <Controller
@@ -196,38 +190,6 @@ export const ProductForm = (props: ProductFormProps) => {
             {...register("price")}
             error={errors.price?.message}
           />
-          <Input
-            label="Cost price"
-            labelIcon={<Coins size={15} />}
-            type="text"
-            inputMode="decimal"
-            {...register("priceCost")}
-            error={errors.priceCost?.message}
-          />
-          <Input
-            label="System Integrator price"
-            labelIcon={<Coins size={15} />}
-            type="text"
-            inputMode="decimal"
-            {...register("priceSystemIntegrator")}
-            error={errors.priceSystemIntegrator?.message}
-          />
-          <Input
-            label="Sub-distributor price"
-            labelIcon={<Coins size={15} />}
-            type="text"
-            inputMode="decimal"
-            {...register("priceSubDistributor")}
-            error={errors.priceSubDistributor?.message}
-          />
-          <Input
-            label="End-user price"
-            labelIcon={<Coins size={15} />}
-            type="text"
-            inputMode="decimal"
-            {...register("priceEndUser")}
-            error={errors.priceEndUser?.message}
-          />
 
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-ink">
@@ -245,12 +207,6 @@ export const ProductForm = (props: ProductFormProps) => {
               )}
             />
           </div>
-          <Input
-            label="Role"
-            labelIcon={<Waypoints size={15} />}
-            type="text"
-            {...register("role")}
-          />
           <Input
             label="Warranty period"
             labelIcon={<ShieldCheck size={15} />}
@@ -301,18 +257,6 @@ export const ProductForm = (props: ProductFormProps) => {
             />
           )}
         />
-
-        <div className="flex flex-col gap-3">
-          <Checkbox label="Featured product" {...register("isFeatured")} />
-          <Checkbox
-            label="Warranty extendable"
-            {...register("warrantyExtendable")}
-          />
-          <Checkbox
-            label="Anchor product (needs solution review)"
-            {...register("needsSolutionReview")}
-          />
-        </div>
 
         <ImageUpload
           label="Main image"

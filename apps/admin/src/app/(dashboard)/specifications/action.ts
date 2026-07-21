@@ -6,8 +6,12 @@ import {
   createSpecification,
   createSpecificationGroup,
   deleteSpecification,
+  getSpecificationsList,
   updateSpecification,
 } from "services";
+import type { SpecificationWithCategories } from "services";
+import type { PaginatedResult } from "utils";
+import { paginate } from "utils";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -19,6 +23,8 @@ export type SpecificationActionInput = {
   newGroupName: string;
   valueType: SpecValueType;
   unit: string;
+  allowMultiple: boolean;
+  allowRange: boolean;
   options: SpecOption[];
   rules: SpecRule[];
   categoryUuids: string[];
@@ -28,6 +34,21 @@ export type SpecificationActionResult = {
   error?: string;
   success?: boolean;
 };
+
+export type SpecificationListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of specifications for the list table. The frontend
+// drives `search`/`page` through URL search params.
+export const getSpecificationsPage = async (
+  params: SpecificationListParams = {},
+): Promise<PaginatedResult<SpecificationWithCategories>> =>
+  paginate(params, ({ limit, offset }) =>
+    getSpecificationsList({ search: params.search, limit, offset }),
+  );
 
 // A filled "new group" name creates the group on save; otherwise use the
 // picked one (empty = no group).
@@ -49,6 +70,9 @@ const toFields = async (input: SpecificationActionInput) => ({
   groupUuid: await resolveGroupUuid(input),
   valueType: input.valueType,
   unit: input.valueType === "number" ? input.unit.trim() || null : null,
+  // Each flag only applies to its own value type — normalize the other away.
+  allowMultiple: input.valueType === "select" ? input.allowMultiple : false,
+  allowRange: input.valueType === "number" ? input.allowRange : false,
   options: input.options,
   rules: input.rules,
 });

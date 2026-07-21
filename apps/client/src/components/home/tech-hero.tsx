@@ -33,7 +33,7 @@ export const TechHero = () => (
       <div className="absolute inset-0 [background-image:radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
     </div>
 
-    <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
+    <div className="relative mx-auto grid items-center gap-14 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 xl:px-20">
       <div>
         <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1">
           <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan shadow-[0_0_8px_rgba(34,211,238,0.9)]" />

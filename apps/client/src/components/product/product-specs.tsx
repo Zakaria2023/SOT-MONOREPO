@@ -13,7 +13,7 @@ export const ProductSpecs = ({ attributes }: ProductSpecsProps) => {
   }
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-16 lg:px-8">
+    <section className="mx-auto px-6 pt-16 lg:px-12 xl:px-20">
       <h2 className="font-heading text-3xl text-ink">
         Technical specifications
       </h2>

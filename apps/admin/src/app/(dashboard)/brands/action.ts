@@ -1,17 +1,40 @@
 "use server";
 
-import { db } from "@/db";
-import { Brands, InsertBrands, SelectBrands } from "@/db/schema/brands";
-import { deriveCode, generateUuid, resolveUniqueCode } from "utils";
-import { asc, eq, getTableColumns } from "drizzle-orm";
-import { alias } from "drizzle-orm/mysql-core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  createBrand as createBrandRecord,
+  deleteBrand as deleteBrandRecord,
+  getBrand as getBrandRecord,
+  getBrandBoard as getBrandBoardRecord,
+  getBrandChildren as getBrandChildrenList,
+  getBrandChildrenPage as getBrandChildrenPageList,
+  getBrands as getBrandsList,
+  getBrandsPage as getBrandsPageList,
+  moveBrandToParent as moveBrandToParentRecord,
+  reorderBrandChildren as reorderBrandChildrenRecord,
+  reorderBrands as reorderBrandsRecord,
+  updateBrand as updateBrandRecord,
+} from "services";
+import type {
+  BrandBoardColumn as ServiceBrandBoardColumn,
+  BrandBoardItem as ServiceBrandBoardItem,
+  BrandFields as ServiceBrandFields,
+  BrandListItem as ServiceBrandListItem,
+  BrandListParams as ServiceBrandListParams,
+  SelectBrands as ServiceSelectBrands,
+} from "services";
+import type { PaginatedResult } from "utils";
 
-export type BrandFields = Omit<
-  InsertBrands,
-  "id" | "uuid" | "createdAt" | "updatedAt"
->;
+// A "use server" file may only export async functions; types are re-declared as
+// local aliases (not `export type { ... } from`, which the RSC compiler would
+// treat as a runtime export) so consumers can keep importing them from here.
+export type BrandFields = ServiceBrandFields;
+export type BrandListItem = ServiceBrandListItem;
+export type BrandBoardItem = ServiceBrandBoardItem;
+export type BrandListParams = ServiceBrandListParams;
+export type BrandBoardColumn = ServiceBrandBoardColumn;
+export type SelectBrands = ServiceSelectBrands;
 
 export type BrandActionResult = {
   brandUuid?: string;
@@ -19,55 +42,39 @@ export type BrandActionResult = {
   success?: boolean;
 };
 
-export type BrandListItem = SelectBrands & {
-  parentName: SelectBrands["name"] | null;
-};
+// Reads pass straight through to the service — the admin pages/components call
+// these from `./action`, keeping the transport boundary in one place.
+export const getBrands = async (): Promise<BrandListItem[]> => getBrandsList();
 
-const ParentBrands = alias(Brands, "parent_brands");
+export const getBrandsPage = async (
+  params: BrandListParams = {},
+): Promise<PaginatedResult<BrandListItem>> => getBrandsPageList(params);
 
-export const getBrands = async (): Promise<BrandListItem[]> => {
-  try {
-    return await db
-      .select({
-        ...getTableColumns(Brands),
-        parentName: ParentBrands.name,
-      })
-      .from(Brands)
-      .leftJoin(ParentBrands, eq(Brands.parentUuid, ParentBrands.uuid))
-      .orderBy(asc(Brands.order));
-  } catch {
-    throw new Error("Failed to fetch brands");
-  }
-};
+// One column's cards — the top-level cards when parentUuid is null, otherwise a
+// single parent's direct children. Each card carries its own childCount, so the
+// board never has to load any other column to know what is expandable. This is
+// both the first-render fetch (null) and every lazy column open.
+export const getBrandChildren = async (
+  parentUuid: string | null,
+): Promise<BrandBoardItem[]> => getBrandChildrenList(parentUuid);
 
-export const getBrand = async (
-  uuid: string,
-): Promise<SelectBrands | null> => {
-  try {
-    const [brand] = await db.select().from(Brands).where(eq(Brands.uuid, uuid));
+export const getBrandBoard = async (): Promise<BrandBoardColumn[]> =>
+  getBrandBoardRecord();
 
-    return brand ?? null;
-  } catch {
-    throw new Error("Failed to fetch brand");
-  }
-};
+export const getBrandChildrenPage = async (
+  parentUuid: string | null,
+  page: number,
+): Promise<BrandListItem[]> => getBrandChildrenPageList(parentUuid, page);
+
+export const getBrand = async (uuid: string): Promise<SelectBrands | null> =>
+  getBrandRecord(uuid);
 
 export const createBrand = async (
   _prevState: BrandActionResult,
   fields: BrandFields,
 ): Promise<BrandActionResult> => {
-  const uuid = generateUuid();
   try {
-    const existing = await db.select({ code: Brands.code }).from(Brands);
-    const taken = new Set(
-      existing.map((row) => row.code).filter((code): code is string =>
-        Boolean(code),
-      ),
-    );
-    const code = resolveUniqueCode(deriveCode(fields.name), taken);
-    await db
-      .insert(Brands)
-      .values({ ...fields, uuid, order: existing.length, code });
+    await createBrandRecord(fields);
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to create brand",
@@ -84,7 +91,7 @@ export const updateBrand = async (
   fields: BrandFields,
 ): Promise<BrandActionResult> => {
   try {
-    await db.update(Brands).set(fields).where(eq(Brands.uuid, uuid));
+    await updateBrandRecord(uuid, fields);
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to update brand",
@@ -99,12 +106,64 @@ export const deleteBrand = async (
   uuid: string,
 ): Promise<BrandActionResult> => {
   try {
-    await db.delete(Brands).where(eq(Brands.uuid, uuid));
+    await deleteBrandRecord(uuid);
     revalidatePath("/brands");
     return { success: true, brandUuid: uuid };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Failed to delete brand",
+    };
+  }
+};
+
+export const reorderBrands = async (
+  orderedUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await reorderBrandsRecord(orderedUuids);
+    revalidatePath("/brands");
+    return {};
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to reorder brands",
+    };
+  }
+};
+
+// Move a card into another column (re-parent) at the dropped position. This is
+// a structural change (counts shift, columns may appear/disappear), so it
+// revalidates the board.
+export const moveBrandToParent = async (
+  uuid: string,
+  newParentUuid: string | null,
+  targetIndex: number,
+): Promise<{ error?: string }> => {
+  try {
+    await moveBrandToParentRecord(uuid, newParentUuid, targetIndex);
+    revalidatePath("/brands");
+    return {};
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to move brand",
+    };
+  }
+};
+
+// Reorder within one paginated board column: only the reordered page window is
+// sent; the service splices it into the parent's full ordered list.
+export const reorderBrandChildren = async (
+  parentUuid: string | null,
+  pageStart: number,
+  orderedPageUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await reorderBrandChildrenRecord(parentUuid, pageStart, orderedPageUuids);
+    // No revalidatePath here: the column already reflects the new order
+    // optimistically, and revalidating would snap every column back to page 1.
+    return {};
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to reorder brands",
     };
   }
 };

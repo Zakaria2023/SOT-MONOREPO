@@ -1,8 +1,8 @@
 import { AddToCartButton } from "@/components/home/add-to-cart-button";
 import { BusinessLineChips } from "@/components/catalog/business-line-chips";
 import { BuyNowButton } from "@/components/product/buy-now-button";
+import { ProductPrice } from "@/components/shared/product-price";
 import { documentDownloadUrl } from "@/lib/documents";
-import { formatPrice } from "utils";
 import {
   ArrowLeft,
   Cpu,
@@ -28,17 +28,22 @@ type SpecAttribute = {
 type ProductHeroProps = {
   product: ProductDetail;
   attributes: SpecAttribute[];
+  discountPercent: number;
 };
 
 const STAT_ICONS: LucideIcon[] = [Gauge, ShieldCheck, Users, Layers, Cpu, Network];
 
-export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
+export const ProductHero = ({
+  product,
+  attributes,
+  discountPercent,
+}: ProductHeroProps) => {
   const chipAttributes = attributes.slice(0, 2);
   const statAttributes = attributes.slice(0, 4);
   const subImages = product.images ?? [];
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-8 lg:px-8">
+    <section className="mx-auto px-6 pt-8 lg:px-12 xl:px-20">
       <Link
         href="/"
         className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-3.5 py-2 text-sm font-medium text-muted shadow-sm transition-colors hover:border-primary hover:text-primary"
@@ -146,9 +151,12 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
 
           <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-surface-2 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-heading text-3xl text-ink">
-                {formatPrice(product.price, product.currency)}
-              </p>
+              <ProductPrice
+                price={product.price}
+                currency={product.currency}
+                discountPercent={discountPercent}
+                className="font-heading text-3xl text-ink"
+              />
               <p className="mt-0.5 text-sm text-faint">per unit</p>
             </div>
             {product.isAvailable ? (
@@ -201,12 +209,6 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
                   {product.warrantyPeriod} warranty
                 </span>
               )}
-              {product.warrantyExtendable && (
-                <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
-                  <Layers size={14} className="text-primary" />
-                  Extendable
-                </span>
-              )}
               {product.countryOfOrigin && (
                 <span className="inline-flex items-center gap-1.5 rounded-control border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ink">
                   <Globe size={14} className="text-primary" />
@@ -216,19 +218,6 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
             </div>
           )}
 
-          {product.role && (
-            <div className="mt-4 flex gap-3 rounded-card bg-primary-tint p-5">
-              <Layers size={18} className="mt-0.5 shrink-0 text-primary" />
-              <div>
-                <p className="font-grotesk text-xs font-bold uppercase tracking-wide text-primary">
-                  Role in your network
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-muted">
-                  {product.role}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </section>

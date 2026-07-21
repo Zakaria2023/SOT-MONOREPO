@@ -3,6 +3,7 @@ import { ProductDetails } from "@/components/product/product-details";
 import { ProductHero } from "@/components/product/product-hero";
 import { ProductRelated } from "@/components/product/product-related";
 import { ProductSpecs } from "@/components/product/product-specs";
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { notFound } from "next/navigation";
 import {
   getComparableProducts,
@@ -54,10 +55,11 @@ const ProductPage = async ({ params }: Props) => {
   const product = await getProductDetailBySlug(slug);
   if (!product) notFound();
 
-  const [comparables, related, specTemplate] = await Promise.all([
+  const [comparables, related, specTemplate, viewerPricing] = await Promise.all([
     getComparableProducts(product.categoryUuid, product.uuid),
     getRelatedProducts(product.uuid),
     getSpecificationsForCategory(product.categoryUuid),
+    getViewerPartnerPricing(),
   ]);
 
   // Spec template = the specifications assigned to this product's category (and
@@ -72,7 +74,11 @@ const ProductPage = async ({ params }: Props) => {
 
   return (
     <main className="min-h-screen bg-page pb-16">
-      <ProductHero product={product} attributes={attributes} />
+      <ProductHero
+        product={product}
+        attributes={attributes}
+        discountPercent={viewerPricing.discountPercent}
+      />
       <ProductDetails product={product} />
       <ProductSpecs attributes={attributes} />
       <ProductCompare

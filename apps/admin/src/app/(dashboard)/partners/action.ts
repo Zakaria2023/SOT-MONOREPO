@@ -1,7 +1,8 @@
 "use server";
 
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
-import { getReviewerName } from "utils";
+import type { PaginatedResult } from "utils";
+import { getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
@@ -11,6 +12,7 @@ import {
   getPartnerRequestByUuid,
   listPartnerRequests,
   rejectPartnerRequest as rejectPartnerRequestRecord,
+  setPartnerIntegration,
 } from "services";
 import {
   partnerRejectionSchema,
@@ -24,13 +26,26 @@ export type PartnerReviewResult = {
   success?: boolean;
 };
 
-export const getPartnerRequests = async (): Promise<PartnerRequestListItem[]> => {
+export type PartnerRequestListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of partner requests for the list table. The
+// frontend drives `search`/`page` through URL search params.
+export const getPartnerRequestsPage = async (
+  params: PartnerRequestListParams = {},
+): Promise<PaginatedResult<PartnerRequestListItem>> => {
   await requireAdmin();
-  return listPartnerRequests();
+  return paginate(params, ({ limit, offset }) =>
+    listPartnerRequests({ search: params.search, limit, offset }),
+  );
 };
 
 export const approvePartnerRequestAction = async (
   partnerRequestUuid: string,
+  isIntegrated: boolean,
 ): Promise<PartnerReviewResult> => {
   const { userId, user } = await requireAdmin();
 
@@ -67,24 +82,48 @@ export const approvePartnerRequestAction = async (
       representativeName: request.representativeName,
     };
 
-    const invitation = await client.invitations.createInvitation({
-      emailAddress: request.email,
-      ignoreExisting: true,
-      publicMetadata: {
-        role: "partner",
-        type: "partner",
-        ...Object.fromEntries(
-          Object.entries(metadataFields).filter(([, value]) => value != null),
-        ),
-      },
+    const publicMetadata = {
+      role: "partner",
+      type: "partner",
+      ...Object.fromEntries(
+        Object.entries(metadataFields).filter(([, value]) => value != null),
+      ),
+    };
+
+    // If a Clerk account with this email already exists (e.g. the partner
+    // signed up as a customer first), an invitation would never apply this
+    // metadata — invitations only seed brand-new signups, so the account would
+    // keep role=undefined and be bounced by the partner app's role gate. So set
+    // the partner role directly on the existing user; otherwise invite them.
+    const { data: existingUsers } = await client.users.getUserList({
+      emailAddress: [request.email],
     });
+    const [existingUser] = existingUsers;
+
+    let approvedClerkUserId: string;
+    if (existingUser) {
+      await client.users.updateUserMetadata(existingUser.id, {
+        publicMetadata: { ...existingUser.publicMetadata, ...publicMetadata },
+      });
+      approvedClerkUserId = existingUser.id;
+    } else {
+      const invitation = await client.invitations.createInvitation({
+        emailAddress: request.email,
+        ignoreExisting: true,
+        publicMetadata,
+      });
+      approvedClerkUserId = invitation.id;
+    }
 
     await approvePartnerRequestRecord({
       partnerRequestUuid,
-      approvedClerkUserId: invitation.id,
+      approvedClerkUserId,
       reviewedByClerkUserId: userId,
       reviewedByName: getReviewerName(user),
     });
+
+    // Set whether the partner is integrated (chosen at approval).
+    await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
   } catch (error) {
     if (isClerkAPIResponseError(error)) {
       const [firstError] = error.errors;
@@ -101,6 +140,28 @@ export const approvePartnerRequestAction = async (
         error instanceof Error
           ? error.message
           : "Failed to approve partner request.",
+    };
+  }
+
+  revalidatePath("/partners");
+  return { success: true };
+};
+
+// Edit an already-approved partner's integration setting.
+export const setPartnerIntegrationAction = async (
+  partnerRequestUuid: string,
+  isIntegrated: boolean,
+): Promise<PartnerReviewResult> => {
+  await requireAdmin();
+
+  try {
+    await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update partner profile.",
     };
   }
 

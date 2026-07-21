@@ -1,4 +1,14 @@
-import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  lte,
+  or,
+} from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
@@ -13,6 +23,10 @@ import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 
 export type { SelectOffers };
 
+// How long an approved offer stays selectable before it expires (stage 3:
+// "expires if unpaid"). Adjustable in Phase 1.
+export const OFFER_VALIDITY_DAYS = 14;
+
 export type ApprovedPartner = {
   partnerRequestUuid: SelectPartnerRequests["uuid"];
   name: string; // companyName || fullName — composed, no single column
@@ -26,6 +40,7 @@ export type CreateOfferInput = {
   installPrice: SelectOffers["installPrice"];
   programmingPrice?: NonNullable<SelectOffers["programmingPrice"]>;
   description: SelectOffers["description"];
+  presentationMode?: SelectOffers["presentationMode"];
 };
 
 export type OfferReviewInput = {
@@ -145,6 +160,7 @@ export const createOrUpdateOffer = async (
     installPrice: input.installPrice,
     programmingPrice: programmingPrice ?? null,
     description: input.description.trim(),
+    presentationMode: input.presentationMode ?? "itemized",
   };
 
   if (existing) {
@@ -186,18 +202,52 @@ export const createOrUpdateOffer = async (
   return created;
 };
 
-/** Every offer with its BOQ reference and customer name (admin review). */
-export const listOffers = async (): Promise<OfferListItem[]> =>
-  db
-    .select({
-      ...getTableColumns(Offers),
-      boqReference: Boqs.reference,
-      customerName: Users.fullName,
-    })
-    .from(Offers)
-    .leftJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
-    .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
-    .orderBy(desc(Offers.createdAt));
+export type OffersListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of offers, each with its BOQ reference and
+ * customer name (admin review), plus the unfiltered total for that search.
+ * Search matches the BOQ reference or the customer name.
+ */
+export const listOffers = async (
+  params: OffersListParams,
+): Promise<{ items: OfferListItem[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(Boqs.reference, `%${term}%`),
+        like(Users.fullName, `%${term}%`),
+      )
+    : undefined;
+
+  const [items, [totals]] = await Promise.all([
+    db
+      .select({
+        ...getTableColumns(Offers),
+        boqReference: Boqs.reference,
+        customerName: Users.fullName,
+      })
+      .from(Offers)
+      .leftJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where)
+      .orderBy(desc(Offers.createdAt))
+      .limit(params.limit)
+      .offset(params.offset),
+    db
+      .select({ total: count() })
+      .from(Offers)
+      .leftJoin(Boqs, eq(Offers.boqUuid, Boqs.uuid))
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where),
+  ]);
+
+  return { items, total: Number(totals?.total ?? 0) };
+};
 
 /** The offer with this uuid, or null. */
 export const getOfferByUuid = async (
@@ -221,17 +271,38 @@ export const approveOffer = async ({
     throw new ConflictError("This offer has already been reviewed");
   }
 
-  await db
-    .update(Offers)
-    .set({
-      status: "approved",
-      rejectionReason: null,
-      reviewedByClerkUserId,
-      reviewedByName,
-      approvedAt: new Date(),
-      rejectedAt: null,
-    })
-    .where(eq(Offers.uuid, offerUuid));
+  const approvedAt = new Date();
+  const expiresAt = new Date(
+    approvedAt.getTime() + OFFER_VALIDITY_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  // Approving an offer presents a price to the customer — the BOQ is now
+  // "offered". Guard the update so a BOQ already past this stage (ordered and
+  // beyond) isn't dragged backwards.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(Offers)
+      .set({
+        status: "approved",
+        rejectionReason: null,
+        reviewedByClerkUserId,
+        reviewedByName,
+        approvedAt,
+        expiresAt,
+        rejectedAt: null,
+      })
+      .where(eq(Offers.uuid, offerUuid));
+
+    await tx
+      .update(Boqs)
+      .set({ status: "offered" })
+      .where(
+        and(
+          eq(Boqs.uuid, offer.boqUuid),
+          inArray(Boqs.status, ["draft", "validated", "submitted", "reviewed"]),
+        ),
+      );
+  });
 };
 
 /** Rejects a pending offer with a reason. */
@@ -316,6 +387,23 @@ export const getApprovedOffersForUser = async (
     )
     .orderBy(desc(Offers.status), Offers.createdAt);
 
+/**
+ * Expires every approved-but-unselected offer whose validity window has passed.
+ * Selected offers are left alone — the customer already committed. Returns how
+ * many were expired. Meant to be run on a schedule.
+ */
+export const expireStaleOffers = async (): Promise<number> => {
+  const result = await db
+    .update(Offers)
+    .set({ status: "expired" })
+    .where(
+      and(eq(Offers.status, "approved"), lte(Offers.expiresAt, new Date())),
+    );
+  // drizzle mysql returns [ResultSetHeader]; affectedRows is the count.
+  const [header] = result;
+  return header.affectedRows;
+};
+
 /** Marks one approved offer as the customer's selection (replaces any prior). */
 export const selectOffer = async ({
   userUuid,
@@ -337,6 +425,9 @@ export const selectOffer = async ({
   }
   if (offer.status !== "approved" && offer.status !== "selected") {
     throw new ConflictError("This offer can't be selected");
+  }
+  if (offer.expiresAt && offer.expiresAt.getTime() < Date.now()) {
+    throw new ConflictError("This offer has expired");
   }
 
   // Swap the selection atomically: demote any currently selected offer on this

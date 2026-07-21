@@ -30,7 +30,7 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
       name: category?.name ?? "",
       description: category?.description ?? "",
       parentUuid: category?.parentUuid ?? "",
-      order: category?.order ?? 0,
+      classificationUuid: category?.classificationUuid ?? "",
       image: category?.image ?? "",
     },
   });
@@ -41,7 +41,7 @@ export const useCategoryForm = (args: UseCategoryFormArgs) => {
         name: values.name,
         description: values.description || null,
         parentUuid: values.parentUuid || null,
-        order: values.order,
+        classificationUuid: values.classificationUuid || null,
         image: values.image || null,
       });
     });

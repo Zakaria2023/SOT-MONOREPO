@@ -1,21 +1,38 @@
-import { and, asc, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  like,
+  or,
+  sql,
+} from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
+import { BoqStatus } from "../../../db/enum";
 import {
   BoqPartners,
   SelectBoqPartners,
 } from "../../../db/schema/boq-partners";
 import {
   BoqItems,
+  BoqSections,
   Boqs,
   SelectBoqItems,
   SelectBoqs,
+  SelectBoqSections,
 } from "../../../db/schema/boqs";
+import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
-import { Products } from "../../../db/schema/products";
+import { Products, SelectProducts } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
+import { checkCompatibility } from "./check-compatibility";
 import { ConflictError, ValidationError } from "./errors";
+import type { CompatibilityReport } from "./rule-engine";
 import {
   getApprovedPartnerOptions,
   type BoqPartnerOptions,
@@ -23,11 +40,18 @@ import {
   type MatchedPartner,
 } from "./partners";
 
-export type { SelectBoqItems, SelectBoqs };
+export type { SelectBoqItems, SelectBoqs, SelectBoqSections };
 
 export type BoqDetail = {
   boq: SelectBoqs;
+  sections: SelectBoqSections[];
   items: SelectBoqItems[];
+};
+
+export type ValidateBoqResult = {
+  boq: SelectBoqs;
+  report: CompatibilityReport;
+  validated: boolean;
 };
 
 export type BoqListItem = SelectBoqs & {
@@ -48,6 +72,26 @@ export type SubmitBoqResult = {
 
 export type PartnerBoqDetail = BoqDetail & {
   preSellerComment: SelectBoqPartners["preSellerComment"];
+};
+
+// A BOQ line enriched with the live product's fields (for the admin detail
+// view). Left-joined, so every product-backed column is nullable; service
+// lines have no product at all.
+export type AdminBoqItem = SelectBoqItems & {
+  productImage: SelectProducts["image"] | null;
+  productSku: SelectProducts["sku"] | null;
+  productModel: SelectProducts["model"] | null;
+  productSlug: SelectProducts["slug"] | null;
+  productStatus: SelectProducts["status"] | null;
+  productPrice: SelectProducts["price"] | null;
+  brandName: SelectBrands["name"] | null;
+};
+
+export type AdminBoqDetail = {
+  boq: SelectBoqs;
+  customerName: SelectUsers["fullName"] | null;
+  sections: SelectBoqSections[];
+  items: AdminBoqItem[];
 };
 
 // Create a draft BOQ from one solution in the user's cart — the solution lines
@@ -71,6 +115,7 @@ export const createBoqFromCart = async (
       productUuid: CartItems.productUuid,
       name: Products.name,
       categoryName: Categories.name,
+      systemRole: Products.systemRole,
       unitPrice: Products.price,
       currency: Products.currency,
       quantity: CartItems.quantity,
@@ -92,14 +137,25 @@ export const createBoqFromCart = async (
   const productUuids = lines.map((line) => line.productUuid);
   const boqUuid = randomUUID();
   const reference = `BOQ-${boqUuid.slice(0, 8).toUpperCase()}`;
+  // One solution = one category = one system, so the whole BOQ is a single
+  // section named after that system.
+  const sectionUuid = randomUUID();
+  const [firstLine] = lines;
+  const sectionName = firstLine?.categoryName ?? "System";
 
   return db.transaction(async (tx) => {
     await tx.insert(Boqs).values({ uuid: boqUuid, userUuid, reference });
+    await tx
+      .insert(BoqSections)
+      .values({ uuid: sectionUuid, boqUuid, name: sectionName, order: 0 });
     await tx.insert(BoqItems).values(
       lines.map((line) => ({
         uuid: randomUUID(),
         boqUuid,
+        sectionUuid,
         productUuid: line.productUuid,
+        lineType: "product" as const,
+        role: line.systemRole,
         name: line.name,
         categoryName: line.categoryName,
         unitPrice: line.unitPrice ?? "0",
@@ -142,8 +198,13 @@ const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   }
 
   const items = rows.flatMap((row) => (row.item ? [row.item] : []));
+  const sections = await db
+    .select()
+    .from(BoqSections)
+    .where(eq(BoqSections.boqUuid, boqUuid))
+    .orderBy(asc(BoqSections.order));
 
-  return { boq: first.boq, items };
+  return { boq: first.boq, sections, items };
 };
 
 /** A BOQ with its items, but only if it belongs to this customer. */
@@ -178,6 +239,82 @@ export const getUserBoqs = async (userUuid: string): Promise<SelectBoqs[]> =>
     .where(eq(Boqs.userUuid, userUuid))
     .orderBy(desc(Boqs.createdAt));
 
+// Run the compatibility rules over a draft BOQ (stage 2, "validated"). A
+// blocking failure keeps it a draft and returns the report so the customer can
+// fix it; a clean pass promotes it to `validated`. Phase 1: a human still
+// confirms downstream — this feeds validation, it is not the final authority.
+export const validateBoq = async (
+  userUuid: string,
+  boqUuid: string,
+): Promise<ValidateBoqResult> => {
+  const detail = await getUserBoq(userUuid, boqUuid);
+  if (!detail) {
+    throw new ValidationError("BOQ not found");
+  }
+  if (detail.boq.status !== "draft") {
+    throw new ConflictError("This BOQ has already been validated");
+  }
+
+  const selection = detail.items.flatMap((item) =>
+    item.productUuid
+      ? [{ productUuid: item.productUuid, quantity: item.quantity }]
+      : [],
+  );
+  const report = await checkCompatibility(selection);
+  const validated = report.failures === 0;
+
+  if (validated) {
+    await db
+      .update(Boqs)
+      .set({ status: "validated" })
+      .where(eq(Boqs.uuid, boqUuid));
+  }
+
+  const [boq] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
+  if (!boq) {
+    throw new Error("Failed to load BOQ after validation");
+  }
+  return { boq, report, validated };
+};
+
+// The fulfilment stages, in order — the Service & Handover progression. Each
+// call may only move a BOQ to the immediately next stage.
+const FULFILMENT_ORDER: BoqStatus[] = [
+  "ordered",
+  "assigned",
+  "installing",
+  "installed",
+  "verified",
+  "handed_over",
+];
+
+// Advance a BOQ one fulfilment stage forward (assigned → … → handed_over),
+// rejecting skips and backward moves so the lifecycle can't jump states.
+export const advanceBoqFulfilment = async (
+  boqUuid: string,
+  next: BoqStatus,
+): Promise<SelectBoqs> => {
+  const [boq] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
+  if (!boq) {
+    throw new ValidationError("BOQ not found");
+  }
+
+  const currentIndex = FULFILMENT_ORDER.indexOf(boq.status ?? "draft");
+  const nextIndex = FULFILMENT_ORDER.indexOf(next);
+  if (nextIndex <= 0 || nextIndex !== currentIndex + 1) {
+    throw new ConflictError(
+      `A BOQ at "${boq.status}" can't move to "${next}"`,
+    );
+  }
+
+  await db.update(Boqs).set({ status: next }).where(eq(Boqs.uuid, boqUuid));
+  const [updated] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
+  if (!updated) {
+    throw new Error("Failed to advance BOQ");
+  }
+  return updated;
+};
+
 // Attach item count and subtotal (summed from BoqItems) to each BOQ, keying the
 // aggregate to just these BOQs instead of scanning the whole table.
 const attachBoqTotals = async <T extends { uuid: string }>(
@@ -190,8 +327,11 @@ const attachBoqTotals = async <T extends { uuid: string }>(
   const totals = await db
     .select({
       boqUuid: BoqItems.boqUuid,
-      itemCount: sql<number>`sum(${BoqItems.quantity})`,
-      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`,
+      // MySQL returns SUM() as a decimal string — map it to a real number.
+      itemCount: sql<number>`sum(${BoqItems.quantity})`.mapWith(Number),
+      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`.mapWith(
+        Number,
+      ),
     })
     .from(BoqItems)
     .where(
@@ -214,18 +354,88 @@ const attachBoqTotals = async <T extends { uuid: string }>(
   });
 };
 
-// List every BOQ with the customer's name and totals, newest first.
-export const getAllBoqs = async (): Promise<BoqListItem[]> => {
-  const boqs = await db
-    .select({
-      ...getTableColumns(Boqs),
-      customerName: Users.fullName,
-    })
+export type BoqsListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of BOQs, each with the customer's name and
+ * totals (newest first), plus the unfiltered total for that search. Search
+ * matches the BOQ reference or the customer name.
+ */
+export const getAllBoqs = async (
+  params: BoqsListParams,
+): Promise<{ items: BoqListItem[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(like(Boqs.reference, `%${term}%`), like(Users.fullName, `%${term}%`))
+    : undefined;
+
+  const [boqs, [totals]] = await Promise.all([
+    db
+      .select({
+        ...getTableColumns(Boqs),
+        customerName: Users.fullName,
+      })
+      .from(Boqs)
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where)
+      .orderBy(desc(Boqs.createdAt))
+      .limit(params.limit)
+      .offset(params.offset),
+    db
+      .select({ total: count() })
+      .from(Boqs)
+      .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
+      .where(where),
+  ]);
+
+  const items = await attachBoqTotals(boqs);
+  return { items, total: Number(totals?.total ?? 0) };
+};
+
+// Load one BOQ for the admin detail view: the BOQ, its customer, its sections,
+// and every line enriched with the live product's fields. Not ownership-scoped
+// — admin-only.
+export const getAdminBoq = async (
+  boqUuid: string,
+): Promise<AdminBoqDetail | null> => {
+  const [row] = await db
+    .select({ boq: getTableColumns(Boqs), customerName: Users.fullName })
     .from(Boqs)
     .leftJoin(Users, eq(Boqs.userUuid, Users.uuid))
-    .orderBy(desc(Boqs.createdAt));
+    .where(eq(Boqs.uuid, boqUuid));
+  if (!row) {
+    return null;
+  }
 
-  return attachBoqTotals(boqs);
+  const [items, sections] = await Promise.all([
+    db
+      .select({
+        ...getTableColumns(BoqItems),
+        productImage: Products.image,
+        productSku: Products.sku,
+        productModel: Products.model,
+        productSlug: Products.slug,
+        productStatus: Products.status,
+        productPrice: Products.price,
+        brandName: Brands.name,
+      })
+      .from(BoqItems)
+      .leftJoin(Products, eq(BoqItems.productUuid, Products.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(BoqItems.boqUuid, boqUuid))
+      .orderBy(asc(BoqItems.createdAt)),
+    db
+      .select()
+      .from(BoqSections)
+      .where(eq(BoqSections.boqUuid, boqUuid))
+      .orderBy(asc(BoqSections.order)),
+  ]);
+
+  return { boq: row.boq, customerName: row.customerName, sections, items };
 };
 
 // Assign a BOQ to a pre-seller for review, or unassign it when given null.

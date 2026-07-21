@@ -1,6 +1,7 @@
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   getTableColumns,
@@ -10,14 +11,41 @@ import {
   or,
   type SQL,
 } from "drizzle-orm";
+import {
+  buildPaginatedResult,
+  generateUuid,
+  resolvePagination,
+  slugify,
+  type PaginatedResult,
+} from "utils";
 import { db } from "../../../db";
 import { Brands, SelectBrands } from "../../../db/schema/brands";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
-import { Products, SelectProducts } from "../../../db/schema/products";
+import {
+  InsertProducts,
+  Products,
+  SelectProducts,
+} from "../../../db/schema/products";
+
+export type { SelectProducts };
 
 export type ProductListItem = SelectProducts & {
   categoryName: SelectCategories["name"] | null;
   brandName: SelectBrands["name"] | null;
+};
+
+export type ProductFields = Omit<
+  InsertProducts,
+  "id" | "uuid" | "createdAt" | "updatedAt"
+>;
+
+// The client form never sets the slug — it's derived from the name on save.
+export type ProductClientFields = Omit<ProductFields, "slug">;
+
+export type ProductListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
 };
 
 export type ProductDetail = ProductListItem & {
@@ -48,7 +76,7 @@ const productOrder = (sort: ProductSort | undefined) => {
     case "name":
       return [asc(Products.name)];
     default:
-      return [desc(Products.isFeatured), asc(Products.order)];
+      return [asc(Products.order)];
   }
 };
 
@@ -64,14 +92,16 @@ export const generateProductSku = async (input: {
   seriesCode?: string | null;
   productUuid?: string;
 }): Promise<string | null> => {
-  const [brand] = await db
-    .select({ code: Brands.code })
-    .from(Brands)
-    .where(eq(Brands.uuid, input.brandUuid));
-  const [category] = await db
-    .select({ code: Categories.code })
-    .from(Categories)
-    .where(eq(Categories.uuid, input.categoryUuid));
+  const [[brand], [category]] = await Promise.all([
+    db
+      .select({ code: Brands.code })
+      .from(Brands)
+      .where(eq(Brands.uuid, input.brandUuid)),
+    db
+      .select({ code: Categories.code })
+      .from(Categories)
+      .where(eq(Categories.uuid, input.categoryUuid)),
+  ]);
 
   const brandCode = (brand?.code ?? "").toUpperCase();
   const categoryCode = (category?.code ?? "").toUpperCase();
@@ -119,7 +149,6 @@ export const getProducts = async (
           like(Products.name, term),
           like(Products.model, term),
           like(Products.sku, term),
-          like(Products.productFamily, term),
           like(Products.seriesCode, term),
           like(Products.shortDescription, term),
           like(Products.description, term),
@@ -146,9 +175,104 @@ export const getProducts = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(...productOrder(filters.sort));
-  } catch {
-    throw new Error("Failed to fetch products");
+  } catch (error) {
+    console.error("getProducts failed:", error);
+    throw new Error("Failed to fetch products", { cause: error });
   }
+};
+
+// Admin list search: match the product name, SKU, or model.
+const adminProductSearchFilter = (search?: string) => {
+  const term = search?.trim();
+  if (!term) {
+    return undefined;
+  }
+  return or(
+    like(Products.name, `%${term}%`),
+    like(Products.sku, `%${term}%`),
+    like(Products.model, `%${term}%`),
+  );
+};
+
+/** A searched + paginated page of products for the admin list table. */
+export const getProductsPage = async (
+  params: ProductListParams = {},
+): Promise<PaginatedResult<ProductListItem>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const where = adminProductSearchFilter(params.search);
+
+  try {
+    const [rows, [totals]] = await Promise.all([
+      db
+        .select({
+          ...getTableColumns(Products),
+          categoryName: Categories.name,
+          brandName: Brands.name,
+        })
+        .from(Products)
+        .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+        .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+        .where(where)
+        .orderBy(asc(Products.order))
+        .limit(pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(Products).where(where),
+    ]);
+
+    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+  } catch (error) {
+    console.error("getProductsPage failed:", error);
+    throw new Error("Failed to fetch products", { cause: error });
+  }
+};
+
+/**
+ * Create a product. The SKU is system-owned (assembled from the brand/category/
+ * series codes) and the slug is derived from the name — neither comes from the
+ * client. Returns the new product's uuid.
+ */
+export const createProduct = async (
+  fields: ProductClientFields,
+): Promise<string> => {
+  const uuid = generateUuid();
+  const [{ total }] = await db.select({ total: count() }).from(Products);
+  const sku = await generateProductSku({
+    brandUuid: fields.brandUuid,
+    categoryUuid: fields.categoryUuid,
+    seriesCode: fields.seriesCode,
+  });
+  await db.insert(Products).values({
+    ...fields,
+    sku,
+    uuid,
+    order: total,
+    slug: slugify(fields.name),
+  });
+  return uuid;
+};
+
+export const updateProduct = async (
+  uuid: string,
+  fields: ProductClientFields,
+): Promise<void> => {
+  // Regenerate the SKU (stable when brand/category/series are unchanged).
+  const sku = await generateProductSku({
+    brandUuid: fields.brandUuid,
+    categoryUuid: fields.categoryUuid,
+    seriesCode: fields.seriesCode,
+    productUuid: uuid,
+  });
+  await db
+    .update(Products)
+    .set({ ...fields, sku, slug: slugify(fields.name) })
+    .where(eq(Products.uuid, uuid));
+};
+
+export const deleteProduct = async (uuid: string): Promise<void> => {
+  await db.delete(Products).where(eq(Products.uuid, uuid));
 };
 
 export const getProductsByCategory = async (
@@ -166,8 +290,9 @@ export const getProductsByCategory = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(eq(Products.categoryUuid, categoryUuid))
       .orderBy(asc(Products.order));
-  } catch {
-    throw new Error("Failed to fetch products for category");
+  } catch (error) {
+    console.error("getProductsByCategory failed:", error);
+    throw new Error("Failed to fetch products for category", { cause: error });
   }
 };
 
@@ -186,8 +311,9 @@ export const getProductsByBrand = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(eq(Products.brandUuid, brandUuid))
       .orderBy(asc(Products.order));
-  } catch {
-    throw new Error("Failed to fetch products for brand");
+  } catch (error) {
+    console.error("getProductsByBrand failed:", error);
+    throw new Error("Failed to fetch products for brand", { cause: error });
   }
 };
 
@@ -201,8 +327,42 @@ export const getProduct = async (
       .where(eq(Products.uuid, uuid));
 
     return product ?? null;
-  } catch {
-    throw new Error("Failed to fetch product");
+  } catch (error) {
+    console.error("getProduct failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
+  }
+};
+
+/** A product resolved by its uuid, enriched with category & brand for the admin detail page. */
+export const getProductDetailByUuid = async (
+  uuid: string,
+): Promise<ProductDetail | null> => {
+  try {
+    const [product] = await db
+      .select({
+        ...getTableColumns(Products),
+        categoryName: Categories.name,
+        brandName: Brands.name,
+        brandBusinessLines: Brands.businessLines,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(eq(Products.uuid, uuid));
+
+    if (!product) {
+      return null;
+    }
+
+    const [category] = await db
+      .select()
+      .from(Categories)
+      .where(eq(Categories.uuid, product.categoryUuid));
+
+    return { ...product, category: category ?? null };
+  } catch (error) {
+    console.error("getProductDetailByUuid failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
   }
 };
 
@@ -231,8 +391,9 @@ export const getProductDetailBySlug = async (
       .where(eq(Categories.uuid, product.categoryUuid));
 
     return { ...product, category: category ?? null };
-  } catch {
-    throw new Error("Failed to fetch product");
+  } catch (error) {
+    console.error("getProductDetailBySlug failed:", error);
+    throw new Error("Failed to fetch product", { cause: error });
   }
 };
 
@@ -260,8 +421,9 @@ export const getComparableProducts = async (
       )
       .orderBy(asc(Products.order))
       .limit(limit);
-  } catch {
-    throw new Error("Failed to fetch comparable products");
+  } catch (error) {
+    console.error("getComparableProducts failed:", error);
+    throw new Error("Failed to fetch comparable products", { cause: error });
   }
 };
 
@@ -312,7 +474,8 @@ export const getRelatedProducts = async (
       )
       .orderBy(asc(Products.order))
       .limit(limit);
-  } catch {
-    throw new Error("Failed to fetch related products");
+  } catch (error) {
+    console.error("getRelatedProducts failed:", error);
+    throw new Error("Failed to fetch related products", { cause: error });
   }
 };

@@ -1,4 +1,11 @@
-import type { SelectOffers } from "services";
+// The three price fields offerTotal needs. Typed structurally (rather than
+// importing SelectOffers from "services") so utils has no dependency on
+// services — keeping the package graph one-directional (services -> utils).
+type OfferPrices = {
+  productPrice: string | number | null;
+  installPrice: string | number | null;
+  programmingPrice?: string | number | null;
+};
 
 type ReviewerUser = {
   id: string;
@@ -10,6 +17,70 @@ type ReviewerUser = {
 
 /** Generates a random UUID v4. */
 export const generateUuid = (): string => crypto.randomUUID();
+
+/** A page of results plus the metadata a list UI needs to paginate. */
+export type PaginatedResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+/** Default rows per page for admin list tables. */
+export const DEFAULT_PAGE_SIZE = 10;
+
+/** Cards shown per column on the reorder boards (categories & brands). */
+export const BOARD_PAGE_SIZE = 8;
+
+/**
+ * Normalizes raw page/pageSize values (e.g. straight off URL search params,
+ * so possibly undefined, non-numeric, or out of range) into safe bounds and
+ * the matching SQL offset.
+ */
+export const resolvePagination = (
+  page?: number | string | null,
+  pageSize?: number | string | null,
+) => {
+  const size = Math.max(1, Math.floor(Number(pageSize) || DEFAULT_PAGE_SIZE));
+  const current = Math.max(1, Math.floor(Number(page) || 1));
+  return { page: current, pageSize: size, offset: (current - 1) * size };
+};
+
+/** Wraps a fetched page of rows and its total count into a PaginatedResult. */
+export const buildPaginatedResult = <T>(
+  items: T[],
+  total: number,
+  page: number,
+  pageSize: number,
+): PaginatedResult<T> => ({
+  items,
+  total,
+  page,
+  pageSize,
+  totalPages: Math.max(1, Math.ceil(total / pageSize)),
+});
+
+/**
+ * End-to-end pagination for a list action: normalizes the raw page/pageSize
+ * params, hands the resolved `limit`/`offset` to `fetcher` (which returns the
+ * page's rows and the unfiltered total), and wraps the result. Removes the
+ * resolve/build boilerplate repeated across every paginated action.
+ */
+export const paginate = async <T>(
+  params: { page?: number | string | null; pageSize?: number | string | null },
+  fetcher: (args: {
+    limit: number;
+    offset: number;
+  }) => Promise<{ items: T[]; total: number }>,
+): Promise<PaginatedResult<T>> => {
+  const { page, pageSize, offset } = resolvePagination(
+    params.page,
+    params.pageSize,
+  );
+  const { items, total } = await fetcher({ limit: pageSize, offset });
+  return buildPaginatedResult(items, total, page, pageSize);
+};
 
 /** Formats a numeric amount as whole-unit currency, e.g. "SAR 17,768". */
 export const formatMoney = (amount: number, currency: string | null): string =>
@@ -51,6 +122,22 @@ export const lineTotal = (
   quantity: number,
 ): number => fromMinorUnits(toMinorUnits(unitPrice) * quantity);
 
+/**
+ * Apply a whole-number percent discount to a price, returning the discounted
+ * amount in major units. All math runs in integer minor units to avoid
+ * floating-point drift; a null price counts as 0. The percent is clamped to
+ * 0–100 (stacked partner discounts are already capped at 100).
+ */
+export const applyPercentDiscount = (
+  price: string | number | null,
+  percent: number,
+): number => {
+  const safePercent = Math.min(100, Math.max(0, percent));
+  return fromMinorUnits(
+    Math.round((toMinorUnits(price) * (100 - safePercent)) / 100),
+  );
+};
+
 export type CartTotals = {
   subtotal: number;
   vat: number;
@@ -78,12 +165,32 @@ export const summarizeCart = (
 };
 
 /** Sum of an offer's product, install, and (optional) programming prices. */
-export const offerTotal = (offer: SelectOffers): number =>
+export const offerTotal = (offer: OfferPrices): number =>
   fromMinorUnits(
     toMinorUnits(offer.productPrice) +
       toMinorUnits(offer.installPrice) +
       toMinorUnits(offer.programmingPrice ?? 0),
   );
+
+/**
+ * Groups card digits into blocks of four for display, e.g.
+ * "4242424242424242" -> "4242 4242 4242 4242". Caps at 19 digits.
+ */
+export const formatCardNumber = (value: string): string =>
+  value
+    .replace(/\D/g, "")
+    .slice(0, 19)
+    .replace(/(.{4})/g, "$1 ")
+    .trim();
+
+/** Formats a card expiry as MM/YY while typing, e.g. "1230" -> "12/30". */
+export const formatCardExpiry = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) {
+    return digits;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
 
 /** Capitalizes the first letter of a string, e.g. "published" -> "Published". */
 export const capitalize = (value: string): string =>
@@ -96,6 +203,72 @@ export const slugify = (value: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+// A multi-select spec's chosen options are stored comma-joined in the product's
+// flat attribute map (e.g. "802.3af, 802.3at"). These two helpers move between
+// that stored string and the individual option values the UI works with.
+export const parseSpecValues = (raw: string | null | undefined): string[] =>
+  raw
+    ? raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
+
+export const serializeSpecValues = (values: string[]): string =>
+  values.join(", ");
+
+// A range spec's value is stored as "from - to" (e.g. "10 - 20", "-20 - 60") —
+// a plain number never contains " - ", so that separator distinguishes the two.
+export const RANGE_SEPARATOR = " - ";
+
+export const serializeSpecRange = (from: string, to: string): string =>
+  `${from.trim()}${RANGE_SEPARATOR}${to.trim()}`;
+
+/** Splits a stored range value into its raw "from"/"to" parts for editing. */
+export const splitSpecRange = (
+  raw: string | null | undefined,
+): [string, string] => {
+  if (!raw) {
+    return ["", ""];
+  }
+  const at = raw.indexOf(RANGE_SEPARATOR);
+  if (at === -1) {
+    return [raw, ""];
+  }
+  return [raw.slice(0, at), raw.slice(at + RANGE_SEPARATOR.length)];
+};
+
+/**
+ * Parses a stored range spec value back into numeric bounds, or null when it
+ * isn't a valid "from - to" pair. The rule engine reads these bounds: a range
+ * consumer is budgeted at its max (worst case), a range provider at its min
+ * (guaranteed capacity).
+ */
+export const parseSpecRange = (
+  raw: string | null | undefined,
+): { min: number; max: number } | null => {
+  if (!raw) {
+    return null;
+  }
+  const at = raw.indexOf(RANGE_SEPARATOR);
+  if (at === -1) {
+    return null;
+  }
+  const min = Number(raw.slice(0, at).trim());
+  const max = Number(raw.slice(at + RANGE_SEPARATOR.length).trim());
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+  return { min, max };
+};
+
+/** Turns a slug/key back into a readable Title Case label, e.g. "poe-standard" -> "Poe Standard". */
+export const humanizeSlug = (value: string): string =>
+  value
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
 /**
  * Derives a short uppercase SKU segment from a name, e.g. "Switches" -> "SW",

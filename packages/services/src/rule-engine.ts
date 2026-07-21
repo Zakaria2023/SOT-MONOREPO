@@ -1,3 +1,4 @@
+import { parseSpecRange, parseSpecValues } from "utils";
 import type { SelectCompatibilityRules } from "../../../db/schema/compatibility-rules";
 import type { SelectProducts } from "../../../db/schema/products";
 import type { SelectSpecifications } from "../../../db/schema/specifications";
@@ -38,6 +39,7 @@ export type EngineRule = {
   kind: SelectCompatibilityRules["kind"];
   comparator: SelectCompatibilityRules["comparator"];
   headroomPercent: SelectCompatibilityRules["headroomPercent"];
+  allocation: SelectCompatibilityRules["allocation"];
   condition: SelectCompatibilityRules["condition"];
   severity: SelectCompatibilityRules["severity"];
   consumerSpec: EngineSpec;
@@ -67,6 +69,23 @@ export type RuleSuggestion = {
   capacity: number;
 };
 
+// One physical provider unit (e.g. one of the two switches) in a
+// per-provider distribution, with what was placed into it.
+export type ProviderBin = {
+  productUuid: SelectProducts["uuid"];
+  name: SelectProducts["name"];
+  // 1-based unit number among that product's quantity (Switch #1, #2, ...).
+  unitIndex: number;
+  capacity: number; // effective (after headroom)
+  used: number;
+  items: {
+    productUuid: SelectProducts["uuid"];
+    name: SelectProducts["name"];
+    count: number;
+    unitValue: number;
+  }[];
+};
+
 export type RuleStatus = "pass" | "warn" | "fail" | "not_applicable";
 
 export type RuleEvaluation = {
@@ -89,6 +108,9 @@ export type RuleEvaluation = {
   providers: RuleParticipant[];
   failingItems: RuleParticipant[];
   suggestions: RuleSuggestion[];
+  // Filled only for per_provider allocation: how consumers were distributed
+  // across the individual provider units.
+  bins: ProviderBin[];
 };
 
 export type CompatibilityReport = {
@@ -103,14 +125,21 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 // Read a numeric spec value off a product's attribute map. Values are stored
 // as strings (the map is shared with dropdown specs) — non-numeric or absent
-// means the product doesn't carry this spec.
+// means the product doesn't carry this spec. A range spec ("from - to") is
+// reduced to a single bound: a consumer reads its max (worst-case demand), a
+// provider reads its min (guaranteed capacity).
 const numericValue = (
   attributes: Record<string, string>,
   key: string,
+  bound: "min" | "max" = "max",
 ): number | null => {
   const raw = attributes[key];
   if (raw === undefined || raw.trim() === "") {
     return null;
+  }
+  const range = parseSpecRange(raw);
+  if (range) {
+    return bound === "min" ? range.min : range.max;
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
@@ -123,7 +152,10 @@ const matchesCondition = (
   if (!condition || condition.values.length === 0) {
     return true;
   }
-  return condition.values.includes(item.attributes[condition.specKey] ?? "");
+  // The condition spec may be multi-select (comma-joined) — it matches when any
+  // ticked value is one the condition asks for.
+  const selected = parseSpecValues(item.attributes[condition.specKey]);
+  return selected.some((value) => condition.values.includes(value));
 };
 
 const compare = (
@@ -179,7 +211,11 @@ const findSuggestions = (
   }
   return catalog
     .flatMap((product) => {
-      const capacity = numericValue(product.attributes, rule.providerSpec.key);
+      const capacity = numericValue(
+        product.attributes,
+        rule.providerSpec.key,
+        "min",
+      );
       if (capacity === null) {
         return [];
       }
@@ -201,7 +237,7 @@ export const evaluateRule = (
   catalog: EngineCatalogProduct[],
 ): RuleEvaluation => {
   const consumers: RuleParticipant[] = selection.flatMap((item) => {
-    const unitValue = numericValue(item.attributes, rule.consumerSpec.key);
+    const unitValue = numericValue(item.attributes, rule.consumerSpec.key, "max");
     if (unitValue === null || !matchesCondition(item, rule.condition)) {
       return [];
     }
@@ -217,7 +253,7 @@ export const evaluateRule = (
   });
 
   const providers: RuleParticipant[] = selection.flatMap((item) => {
-    const unitValue = numericValue(item.attributes, rule.providerSpec.key);
+    const unitValue = numericValue(item.attributes, rule.providerSpec.key, "min");
     if (unitValue === null) {
       return [];
     }
@@ -247,6 +283,7 @@ export const evaluateRule = (
     providers,
     failingItems: [] as RuleParticipant[],
     suggestions: [] as RuleSuggestion[],
+    bins: [] as ProviderBin[],
   };
 
   if (consumers.length === 0) {
@@ -322,6 +359,105 @@ export const evaluateRule = (
     providers.reduce((sum, provider) => sum + provider.totalValue, 0),
   );
   const effective = round2((capacity * rule.headroomPercent) / 100);
+
+  // Per-provider allocation: each provider unit is its own bin; consumers are
+  // distributed by first-fit-decreasing and every unit must fit its share.
+  // Only meaningful for "must fit within" — other comparators stay pooled.
+  if (rule.allocation === "per_provider" && rule.comparator === "lte") {
+    const bins: ProviderBin[] = providers.flatMap((provider) =>
+      Array.from({ length: provider.quantity }, (_, index) => ({
+        productUuid: provider.productUuid,
+        name: provider.name,
+        unitIndex: index + 1,
+        capacity: round2((provider.unitValue * rule.headroomPercent) / 100),
+        used: 0,
+        items: [],
+      })),
+    );
+
+    // One entry per physical consumer unit, largest first (FFD). Count rules
+    // occupy one slot per unit; sum rules occupy their own value.
+    const units = consumers
+      .flatMap((consumer) =>
+        Array.from({ length: consumer.quantity }, () => ({
+          productUuid: consumer.productUuid,
+          name: consumer.name,
+          size: rule.kind === "count_limit" ? 1 : consumer.unitValue,
+        })),
+      )
+      .sort((a, b) => b.size - a.size);
+
+    const unplacedByProduct = new Map<string, RuleParticipant>();
+    for (const unit of units) {
+      const bin = bins.find(
+        (candidate) => candidate.used + unit.size <= candidate.capacity + 1e-9,
+      );
+      if (!bin) {
+        const existing = unplacedByProduct.get(unit.productUuid);
+        if (existing) {
+          existing.quantity += 1;
+          existing.totalValue = round2(existing.totalValue + unit.size);
+        } else {
+          unplacedByProduct.set(unit.productUuid, {
+            productUuid: unit.productUuid,
+            name: unit.name,
+            quantity: 1,
+            unitValue: unit.size,
+            totalValue: unit.size,
+          });
+        }
+        continue;
+      }
+      bin.used = round2(bin.used + unit.size);
+      const entry = bin.items.find(
+        (item) => item.productUuid === unit.productUuid,
+      );
+      if (entry) {
+        entry.count += 1;
+      } else {
+        bin.items.push({
+          productUuid: unit.productUuid,
+          name: unit.name,
+          count: 1,
+          unitValue: unit.size,
+        });
+      }
+    }
+
+    const unplaced = [...unplacedByProduct.values()];
+    const unitWord = rule.kind === "count_limit" ? "slot(s)" : "";
+
+    if (unplaced.length === 0) {
+      return {
+        ...base,
+        status: "pass",
+        demand,
+        capacity,
+        effectiveCapacity: effective,
+        bins,
+        message: `Everything fits: distributed across ${bins.length} provider unit(s), each within its own capacity.`,
+      };
+    }
+
+    const leftoverCount = unplaced.reduce((sum, item) => sum + item.quantity, 0);
+    const largest = Math.max(...unplaced.map((item) => item.unitValue));
+    return {
+      ...base,
+      status: violationStatus,
+      demand,
+      capacity,
+      effectiveCapacity: effective,
+      bins,
+      failingItems: unplaced,
+      message: `${leftoverCount} item(s) do not fit on any single provider unit ${unitWord ? `(${unitWord})` : ""}even after distributing across ${bins.length} unit(s): ${unplaced
+        .map(
+          (item) =>
+            `${item.quantity} × ${item.name}${rule.kind === "count_limit" ? "" : ` (${formatValue(item.unitValue, rule.consumerSpec.unit)} each)`}`,
+        )
+        .join(", ")}.`,
+      suggestions: findSuggestions(rule, largest, catalog),
+    };
+  }
   const headroomNote =
     rule.headroomPercent === 100
       ? ""

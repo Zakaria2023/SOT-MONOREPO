@@ -17,6 +17,7 @@ const poeBudgetRule: EngineRule = {
   comparator: "lte",
   headroomPercent: 90,
   condition: { specKey: "poe", values: ["Yes"] },
+  allocation: "pooled",
   severity: "block",
   consumerSpec: { key: "power-consumption", label: "Power Consumption", unit: "W" },
   providerSpec: { key: "poe-budget", label: "PoE Budget", unit: "W" },
@@ -30,6 +31,7 @@ const portCountRule: EngineRule = {
   comparator: "lte",
   headroomPercent: 100,
   condition: null,
+  allocation: "pooled",
   severity: "block",
   consumerSpec: { key: "power-consumption", label: "Power Consumption", unit: "W" },
   providerSpec: { key: "port-count", label: "Port Count", unit: "ports" },
@@ -43,6 +45,7 @@ const perPortRule: EngineRule = {
   comparator: "lte",
   headroomPercent: 100,
   condition: null,
+  allocation: "pooled",
   severity: "block",
   consumerSpec: { key: "power-consumption", label: "Power Consumption", unit: "W" },
   providerSpec: { key: "poe-per-port-max", label: "PoE Per-Port Max", unit: "W" },
@@ -139,6 +142,64 @@ describe("evaluateRule — sum_budget", () => {
   });
 });
 
+describe("evaluateRule — range & multi-select specs", () => {
+  it("budgets a range consumer at its max (worst case)", () => {
+    const rangeCamera: EngineItem = {
+      productUuid: "rng-cam",
+      name: "Range Camera",
+      quantity: 8,
+      attributes: { "power-consumption": "6.5 - 9", poe: "Yes" },
+    };
+    const result = evaluateRule(
+      poeBudgetRule,
+      [smallSwitch, rangeCamera],
+      catalog,
+    );
+    // reads the max (9): 8 x 9 = 72 <= 130 x 90% = 117
+    expect(result.demand).toBe(72);
+    expect(result.status).toBe("pass");
+  });
+
+  it("counts a range provider at its min (guaranteed capacity)", () => {
+    const rangeSwitch: EngineItem = {
+      productUuid: "rng-switch",
+      name: "Range Switch",
+      quantity: 1,
+      attributes: {
+        "poe-budget": "100 - 130",
+        "port-count": "8",
+        "poe-per-port-max": "30",
+      },
+    };
+    const result = evaluateRule(
+      poeBudgetRule,
+      [rangeSwitch, camera("b850", "12", 10)],
+      catalog,
+    );
+    // reads the min (100): usable 100 x 90% = 90; demand 10 x 12 = 120 > 90
+    expect(result.capacity).toBe(100);
+    expect(result.effectiveCapacity).toBe(90);
+    expect(result.status).toBe("fail");
+  });
+
+  it("matches a multi-select condition on any ticked value", () => {
+    const multiCamera: EngineItem = {
+      productUuid: "multi-cam",
+      name: "Multi Camera",
+      quantity: 4,
+      attributes: { "power-consumption": "6.5", poe: "Yes, PoE+" },
+    };
+    const result = evaluateRule(
+      poeBudgetRule,
+      [smallSwitch, multiCamera],
+      catalog,
+    );
+    // the condition asks for "Yes"; the device ticked "Yes, PoE+" — it counts
+    expect(result.consumers).toHaveLength(1);
+    expect(result.demand).toBe(26); // 4 x 6.5
+  });
+});
+
 describe("evaluateRule — count_limit", () => {
   it("fails when there are more devices than ports", () => {
     const result = evaluateRule(
@@ -150,6 +211,49 @@ describe("evaluateRule — count_limit", () => {
     expect(result.demand).toBe(10);
     expect(result.effectiveCapacity).toBe(8);
     expect(result.suggestions.map((s) => s.productUuid)).toEqual(["switch-24p"]);
+  });
+});
+
+describe("evaluateRule — per_provider allocation", () => {
+  const perDeviceBudget: EngineRule = {
+    ...poeBudgetRule,
+    uuid: "rule-dist",
+    name: "Per-switch power budget",
+    headroomPercent: 100,
+    condition: null,
+    allocation: "per_provider",
+  };
+
+  const switch300 = (quantity: number): EngineItem => ({
+    productUuid: "switch-300",
+    name: "300 W Switch",
+    quantity,
+    attributes: { "poe-budget": "300" },
+  });
+
+  it("distributes items across provider units and reports per-unit bins", () => {
+    const result = evaluateRule(
+      perDeviceBudget,
+      [switch300(2), camera("cam", "100", 5)],
+      [],
+    );
+    // 5 x 100 W over two separate 300 W bins -> 3 + 2, both fit.
+    expect(result.status).toBe("pass");
+    expect(result.bins).toHaveLength(2);
+    expect(result.bins.map((bin) => bin.used).sort()).toEqual([200, 300]);
+  });
+
+  it("fails when no single unit can host the remainder, even if the pool could", () => {
+    const result = evaluateRule(
+      perDeviceBudget,
+      [switch300(2), camera("cam", "200", 3)],
+      [],
+    );
+    // Pooled: 600 <= 600 would pass. Per device: 200 + 200 + 200 cannot be
+    // split over two 300 W bins (one item each, third fits nowhere).
+    expect(result.status).toBe("fail");
+    expect(result.failingItems).toHaveLength(1);
+    expect(result.failingItems[0].quantity).toBe(1);
   });
 });
 

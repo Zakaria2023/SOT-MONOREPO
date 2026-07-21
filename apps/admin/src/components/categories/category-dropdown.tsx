@@ -22,10 +22,18 @@ type CategoryDropdownProps<TFieldValues extends FieldValues> = {
 const buildCategoryTreeOptions = (
   categories: SelectCategories[],
 ): DropdownOption[] => {
+  const presentUuids = new Set(categories.map((category) => category.uuid));
   const childrenByParent = new Map<string | null, SelectCategories[]>();
 
   for (const category of categories) {
-    const parentUuid = category.parentUuid ?? null;
+    // Treat a category as a root when it has no parent, or when its parent
+    // row is missing (e.g. the parent was deleted but parent_uuid was left
+    // dangling). Otherwise the orphan and its whole subtree never render,
+    // since the walk only descends from real roots.
+    const parentUuid =
+      category.parentUuid && presentUuids.has(category.parentUuid)
+        ? category.parentUuid
+        : null;
     const siblings = childrenByParent.get(parentUuid) ?? [];
     siblings.push(category);
     childrenByParent.set(parentUuid, siblings);
@@ -68,6 +76,8 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
         name={name}
         render={({ field }) => (
           <Dropdown
+            searchable
+            searchPlaceholder="Search categories..."
             value={typeof field.value === "string" ? field.value : ""}
             onChange={(value) => {
               field.onChange(value);

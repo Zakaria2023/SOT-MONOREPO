@@ -19,10 +19,16 @@ type BrandDropdownProps<TFieldValues extends FieldValues> = {
 };
 
 const buildBrandTreeOptions = (brands: SelectBrands[]): DropdownOption[] => {
+  const presentUuids = new Set(brands.map((brand) => brand.uuid));
   const childrenByParent = new Map<string | null, SelectBrands[]>();
 
   for (const brand of brands) {
-    const parentUuid = brand.parentUuid ?? null;
+    // Treat a brand whose parent is missing (deleted, dangling parent_uuid)
+    // as a root, otherwise it and its subtree never render.
+    const parentUuid =
+      brand.parentUuid && presentUuids.has(brand.parentUuid)
+        ? brand.parentUuid
+        : null;
     const siblings = childrenByParent.get(parentUuid) ?? [];
     siblings.push(brand);
     childrenByParent.set(parentUuid, siblings);
@@ -61,6 +67,8 @@ export const BrandDropdown = <TFieldValues extends FieldValues>({
         name={name}
         render={({ field }) => (
           <Dropdown
+            searchable
+            searchPlaceholder="Search brands..."
             value={typeof field.value === "string" ? field.value : ""}
             onChange={field.onChange}
             placeholder={placeholder}

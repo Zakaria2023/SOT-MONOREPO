@@ -82,6 +82,18 @@ export const ruleComparators = [
 
 export type RuleComparator = (typeof ruleComparators)[number];
 
+// How provider capacity is applied in sum/count rules:
+// - pooled: all provider units act as one big pool (SUM of capacities).
+// - per_provider: each provider unit is its own bin — consumers are
+//   distributed across units and every unit must fit its share (e.g. each
+//   switch's own PoE budget, not the fleet total).
+export const ruleAllocations = [
+  "pooled",
+  "per_provider",
+] as const satisfies readonly string[];
+
+export type RuleAllocation = (typeof ruleAllocations)[number];
+
 export const ruleSeverities = [
   "block",
   "warn",
@@ -110,13 +122,48 @@ export const lifecycleStatuses = [
 
 export type LifecycleStatus = (typeof lifecycleStatuses)[number];
 
+// The full BOQ lifecycle. One object carries these states end to end: the
+// customer drafts it, the rules engine validates it, a pre-seller reviews and
+// dispatches it, partners price it (offered), the customer confirms and pays
+// (ordered), then the Service & Handover stages track fulfilment.
 export const boqStatuses = [
   "draft",
+  "validated",
   "submitted",
   "reviewed",
+  "offered",
+  "ordered",
+  "assigned",
+  "installing",
+  "installed",
+  "verified",
+  "handed_over",
 ] as const satisfies readonly string[];
 
 export type BoqStatus = (typeof boqStatuses)[number];
+
+// A BOQ line's place in its system. `anchor` = the brain (NVR, hub, PBX,
+// core switch); `peripheral` = a device that hangs off it (camera, detector,
+// phone); `accessory` = supporting hardware (mounts, cabling parts). The
+// completeness / requires-companion validation keys off this. Products carry
+// the same enum as `systemRole`; it is snapshotted onto the BOQ line.
+export const boqItemRoles = [
+  "anchor",
+  "peripheral",
+  "accessory",
+] as const satisfies readonly string[];
+
+export type BoqItemRole = (typeof boqItemRoles)[number];
+
+// The two revenue streams inside a BOQ. `product` = hardware at MSRP;
+// `service` = labour (installation, programming, cabling). Both streams live
+// as line items in the same BOQ — that is what makes it a BOQ, not a BOM.
+export const boqLineTypes = [
+  "product",
+  "service",
+] as const satisfies readonly string[];
+
+export type BoqLineType = (typeof boqLineTypes)[number];
 
 // Which kind of applicant a partner request comes from — mirrors the client
 // sign-up account types. Every type submits a request for admin review.
@@ -127,6 +174,20 @@ export const partnerTypes = [
 ] as const satisfies readonly string[];
 
 export type PartnerType = (typeof partnerTypes)[number];
+
+// What a partner can do — one or more capabilities, chosen on the partner
+// application. Drives the per-capability discount matrix. Labels live in
+// packages/validators (PARTNER_CAPABILITY_LABELS).
+export const partnerCapabilities = [
+  "system_integrator",
+  "stock",
+  "install_program",
+  "install_only",
+  "pre_sell",
+  "post_sell",
+] as const satisfies readonly string[];
+
+export type PartnerCapability = (typeof partnerCapabilities)[number];
 
 export const partnerRequestStatuses = [
   "pending",
@@ -160,9 +221,89 @@ export const offerStatuses = [
   "approved",
   "rejected",
   "selected",
+  "expired",
 ] as const satisfies readonly string[];
 
 export type OfferStatus = (typeof offerStatuses)[number];
+
+// An order is a confirmed offer moving through confirm-then-pay. It opens
+// `awaiting_payment`; a successful payment flips it to `paid` (and issues the
+// invoice). Payment has no live provider yet, so `paid` is reached by the
+// admin/plumbing path until a gateway is wired.
+export const orderStatuses = [
+  "awaiting_payment",
+  "paid",
+  "cancelled",
+  "refunded",
+] as const satisfies readonly string[];
+
+export type OrderStatus = (typeof orderStatuses)[number];
+
+// Invoices are only ever raised for a confirmed order.
+export const invoiceStatuses = [
+  "issued",
+  "paid",
+  "void",
+] as const satisfies readonly string[];
+
+export type InvoiceStatus = (typeof invoiceStatuses)[number];
+
+// The QA lifecycle of a handover pack (Service & Handover, stages 6–7). The
+// partner assembles it (draft), submits it, the customer tests their own
+// access and confirms, SOT does a remote completeness check (verified). A
+// failed check or a customer complaint puts it in dispute.
+export const handoverStatuses = [
+  "draft",
+  "submitted",
+  "customer_confirmed",
+  "verified",
+  "disputed",
+] as const satisfies readonly string[];
+
+export type HandoverStatus = (typeof handoverStatuses)[number];
+
+// What kind of control a handover credential transfers. offline_access = the
+// user/password that reaches the system with no internet; cloud_admin = full
+// owner rights on the vendor cloud project; device_access = a single device's
+// static/configured login.
+export const handoverCredentialTypes = [
+  "offline_access",
+  "cloud_admin",
+  "device_access",
+] as const satisfies readonly string[];
+
+export type HandoverCredentialType = (typeof handoverCredentialTypes)[number];
+
+// A partner earning is a PAYABLE (money SOT owes the partner for verified
+// service), NOT a stored wallet balance — the distinction is legally
+// meaningful (SAMA). accrued = owed after verified handover; invoiced = the
+// partner has raised their ZATCA invoice to cash out; paid = transferred.
+export const partnerEarningStatuses = [
+  "accrued",
+  "invoiced",
+  "paid",
+] as const satisfies readonly string[];
+
+export type PartnerEarningStatus = (typeof partnerEarningStatuses)[number];
+
+export const partnerPayoutStatuses = [
+  "requested",
+  "paid",
+] as const satisfies readonly string[];
+
+export type PartnerPayoutStatus = (typeof partnerPayoutStatuses)[number];
+
+// How an offer's price is SHOWN — the flexibility is presentation only, the
+// money always flows through SOT. all_in = one total; itemized = products +
+// service broken out (same transaction as all_in); products_only = genuine
+// hardware-only sale, no SOT service and NO handover guarantee.
+export const offerPresentationModes = [
+  "all_in",
+  "itemized",
+  "products_only",
+] as const satisfies readonly string[];
+
+export type OfferPresentationMode = (typeof offerPresentationModes)[number];
 
 export const cartItemKinds = [
   "solution",
@@ -174,15 +315,6 @@ export type CartItemKind = (typeof cartItemKinds)[number];
 // Which business line a product sells under. Phase 1 runs the first two
 // (fixed price, buy now); "projects" and "enterprise" are dormant (pre-order,
 // vendor approval) — structure built now, activated later.
-// Vendor rollout staging — Active vendors appear throughout the catalog;
-// Inactive ones are kept for historical/alias data but hidden from pickers.
-export const vendorStatuses = [
-  "active",
-  "inactive",
-] as const satisfies readonly string[];
-
-export type VendorStatus = (typeof vendorStatuses)[number];
-
 export const businessLines = [
   "consumer",
   "smb_sme_channels",

@@ -10,12 +10,14 @@ type CategorySolutionProps = {
   category: SelectCategories;
   products: ProductListItem[];
   canAdd: boolean;
+  discountPercent?: number;
 };
 
 export const CategorySolution = ({
   category,
   products,
   canAdd,
+  discountPercent = 0,
 }: CategorySolutionProps) => {
   const [isPending, startTransition] = useTransition();
   const [added, setAdded] = useState(false);
@@ -35,7 +37,7 @@ export const CategorySolution = ({
 
   return (
     <main className="min-h-screen bg-page">
-      <div className="mx-auto max-w-6xl px-6 py-14 lg:px-8">
+      <div className="mx-auto px-6 py-14 lg:px-12 xl:px-20">
         <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
           Shop by solution
         </p>
@@ -85,7 +87,11 @@ export const CategorySolution = ({
           <ul className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => (
               <li key={product.uuid}>
-                <CatalogProductCard product={product} view="grid" />
+                <CatalogProductCard
+                product={product}
+                view="grid"
+                discountPercent={discountPercent}
+              />
               </li>
             ))}
           </ul>

@@ -12,10 +12,9 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { lifecycleStatuses, productStatuses } from "../enum";
+import { boqItemRoles, lifecycleStatuses, productStatuses } from "../enum";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
-import { Vendors } from "./vendors";
 
 export const Products = mysqlTable(
   "Products",
@@ -30,12 +29,6 @@ export const Products = mysqlTable(
     brandUuid: char("brand_uuid", { length: 36 })
       .notNull()
       .references(() => Brands.uuid, { onDelete: "restrict" }),
-    // Optional — not every product is tied to a single vendor entry (e.g.
-    // generic/unbranded catalog items).
-    vendorUuid: char("vendor_uuid", { length: 36 }).references(
-      () => Vendors.uuid,
-      { onDelete: "set null" },
-    ),
 
     // Identity
     name: varchar("name", { length: 255 }).notNull(),
@@ -46,13 +39,16 @@ export const Products = mysqlTable(
     sku: varchar("sku", { length: 100 }).unique(),
     model: varchar("model", { length: 255 }),
 
+    // Value for the selected brand's ID label (Brands.idLabel — e.g. the brand's
+    // own BOM / PID / Part Number). The label comes from the brand; this is the
+    // per-product value entered against it.
+    brandIdValue: varchar("brand_id_value", { length: 255 }),
+
     // Vendor series/line — feeds the [SERIES] SKU segment and vendor mapping.
-    productFamily: varchar("product_family", { length: 255 }),
     seriesCode: varchar("series_code", { length: 4 }),
 
     shortDescription: varchar("short_description", { length: 500 }), // vendor-neutral one-liner
     description: text("description"), // long detail description
-    role: varchar("role", { length: 500 }), // "role in your network"
 
     // Datasheet PDF (document id) — served free, no login, from the storefront.
     datasheet: varchar("datasheet", { length: 64 }),
@@ -65,32 +61,15 @@ export const Products = mysqlTable(
     // anti-gray-market badge; warrantyExtendable gates the "extend warranty" CTA.
     warrantyPeriod: varchar("warranty_period", { length: 50 }), // e.g. "24 months"
     warrantyRegion: varchar("warranty_region", { length: 100 }),
-    warrantyExtendable: boolean("warranty_extendable").default(false).notNull(),
     countryOfOrigin: varchar("country_of_origin", { length: 100 }),
 
-    // Merchandising
-    isFeatured: boolean("is_featured").default(false),
-
-    // Anchor flag: the "brain" of a system (hub, NVR, IP PBX, core switch). A
-    // cart containing an anchor enters the solution-confirmation gate.
-    needsSolutionReview: boolean("needs_solution_review")
-      .default(false)
-      .notNull(),
+    // Structured place in a system — anchor / peripheral / accessory.
+    // Snapshotted onto each BOQ line so completeness/requires-companion
+    // validation can key off it.
+    systemRole: mysqlEnum("system_role", boqItemRoles),
 
     // Price book. `price` is the public MSRP — the only price shown publicly.
-    // Cost + system-integrator define the internal margin pool. Sub-distributor
-    // and end-user tiers are dormant structure (not used in Phase 1).
     price: decimal("price", { precision: 12, scale: 2 }), // public MSRP
-    priceCost: decimal("price_cost", { precision: 12, scale: 2 }),
-    priceSystemIntegrator: decimal("price_system_integrator", {
-      precision: 12,
-      scale: 2,
-    }),
-    priceSubDistributor: decimal("price_sub_distributor", {
-      precision: 12,
-      scale: 2,
-    }),
-    priceEndUser: decimal("price_end_user", { precision: 12, scale: 2 }),
     currency: char("currency", { length: 3 }).default("SAR"),
 
     // `isAvailable` is the manual Available/Unavailable storefront toggle — the
@@ -119,7 +98,6 @@ export const Products = mysqlTable(
   (table) => [
     index("idx_products_category_uuid").on(table.categoryUuid),
     index("idx_products_brand_uuid").on(table.brandUuid),
-    index("idx_products_vendor_uuid").on(table.vendorUuid),
     index("idx_products_status").on(table.status),
   ],
 );

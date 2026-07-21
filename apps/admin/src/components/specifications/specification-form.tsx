@@ -2,21 +2,16 @@
 
 import { useSpecificationForm } from "@/app/(dashboard)/specifications/use-specification-form";
 import { CategoryMultiSelect } from "@/components/specifications/category-multi-select";
+import { NumericValuesEditor } from "@/components/specifications/numeric-values-editor";
 import { RulesEditor } from "@/components/specifications/rules-editor";
 import { SpecOptionList } from "@/components/specifications/spec-fields-editor";
 import type { SelectCategories } from "@/db/schema/categories";
-import { ListChecks, Plus, X } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import type { SpecificationFormValues } from "@/app/(dashboard)/specifications/validation";
+import { useMemo } from "react";
 import { measurementUnits } from "@/db/enum";
-import {
-  Controller,
-  FormProvider,
-  useFormContext,
-  useWatch,
-} from "react-hook-form";
-import { Button, Combobox, Dropdown, FormError, Input } from "ui";
+import { Controller, FormProvider, useWatch } from "react-hook-form";
+import { Button, Checkbox, Combobox, Dropdown, FormError, Input } from "ui";
 import type {
   SelectSpecificationGroups,
   SpecificationWithCategories,
@@ -76,83 +71,6 @@ const categoryTree = (
   return tree;
 };
 
-// Chip editor for a numeric spec's fixed choices. Only parseable numbers can
-// be added, so the stored values are always computable by the rule engine.
-const NumericValuesEditor = () => {
-  const { control, setValue } = useFormContext<SpecificationFormValues>();
-  const watchedValues = useWatch({ control, name: "numericValues" });
-  const values = useMemo(() => watchedValues ?? [], [watchedValues]);
-  const [draft, setDraft] = useState("");
-
-  const isValidDraft =
-    draft.trim() !== "" &&
-    Number.isFinite(Number(draft.trim())) &&
-    !values.includes(draft.trim());
-
-  const addDraft = () => {
-    if (!isValidDraft) {
-      return;
-    }
-    setValue("numericValues", [...values, draft.trim()], {
-      shouldDirty: true,
-    });
-    setDraft("");
-  };
-
-  const remove = (value: string) => {
-    setValue(
-      "numericValues",
-      values.filter((candidate) => candidate !== value),
-      { shouldDirty: true },
-    );
-  };
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {values.map((value) => (
-        <span
-          key={value}
-          className="inline-flex items-center gap-1.5 rounded-full bg-primary-tint px-3 py-1 text-xs font-medium text-primary"
-        >
-          {value}
-          <button
-            type="button"
-            aria-label={`Remove ${value}`}
-            onClick={() => remove(value)}
-            className="text-primary hover:text-primary-hover"
-          >
-            <X size={12} />
-          </button>
-        </span>
-      ))}
-
-      <input
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            addDraft();
-          }
-        }}
-        type="number"
-        step="any"
-        placeholder="e.g. 24"
-        className="w-32 rounded-control border border-hairline bg-surface px-3 py-1.5 text-sm text-ink outline-none focus:border-primary"
-      />
-      <Button
-        type="button"
-        onClick={addDraft}
-        disabled={!isValidDraft}
-        className="flex items-center gap-1 px-3 py-1.5 text-xs"
-      >
-        <Plus size={13} />
-        Add
-      </Button>
-    </div>
-  );
-};
-
 export const SpecificationForm = (props: SpecificationFormProps) => {
   const { mode, categories, specifications, groups } = props;
   const editingUuid = props.mode === "edit" ? props.specification.uuid : null;
@@ -170,6 +88,7 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
 
   const watchedCategoryUuids = useWatch({ control, name: "categoryUuids" });
   const valueType = useWatch({ control, name: "valueType" });
+  const allowRange = useWatch({ control, name: "allowRange" });
 
   // The numericValues error may sit on the array itself or on one entry.
   const numericValuesError = Array.isArray(errors.numericValues)
@@ -296,6 +215,10 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
                 Dropdown values products pick from. An option can reveal its
                 own sub-fields when selected.
               </p>
+              <Checkbox
+                label="Allow multiple — products can tick several options"
+                {...register("allowMultiple")}
+              />
               <SpecOptionList name="options" depth={0} />
             </div>
 
@@ -311,17 +234,31 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
         {valueType === "number" && (
           <>
             <div className="flex flex-col gap-2 border-t border-hairline pt-6">
-              <label className="text-sm font-semibold text-ink">
-                Allowed values (optional)
-              </label>
+              <Checkbox
+                label="Allow range — products enter a from–to value (e.g. 10 – 20)"
+                {...register("allowRange")}
+              />
               <p className="text-xs text-muted">
-                Fixed numeric choices products pick from — e.g. 24 / 32 / 52
-                ports. Leave empty to let products type any number. Either
-                way, compatibility rules can compute with the value.
+                For values that span a range, like operating temperature. In
+                compatibility rules a range is budgeted at its max as a
+                consumer, and counted at its min as a provider.
               </p>
-              <NumericValuesEditor />
-              <FormError message={numericValuesError} />
             </div>
+
+            {!allowRange && (
+              <div className="flex flex-col gap-2 border-t border-hairline pt-6">
+                <label className="text-sm font-semibold text-ink">
+                  Allowed values (optional)
+                </label>
+                <p className="text-xs text-muted">
+                  Fixed numeric choices products pick from — e.g. 24 / 32 / 52
+                  ports. Leave empty to let products type any number. Either
+                  way, compatibility rules can compute with the value.
+                </p>
+                <NumericValuesEditor name="numericValues" />
+                <FormError message={numericValuesError} />
+              </div>
+            )}
 
             <p className="rounded-control border border-dashed border-hairline p-4 text-xs text-muted">
               Products enter a numeric value for this specification (in the

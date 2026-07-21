@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, count, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray, like, or } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import {
@@ -69,8 +69,87 @@ export const getSpecifications = async (): Promise<
         categoryNames: own.map((link) => link.categoryName ?? ""),
       };
     });
-  } catch {
-    throw new Error("Failed to fetch specifications");
+  } catch (error) {
+    console.error("getSpecifications failed:", error);
+    throw new Error("Failed to fetch specifications", { cause: error });
+  }
+};
+
+export type SpecificationListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+// A searched + paginated page of specifications, each enriched with the
+// categories it's directly assigned to, plus the unfiltered total for that
+// search. Returns raw rows + total; the caller assembles the page metadata.
+export const getSpecificationsList = async (
+  params: SpecificationListParams,
+): Promise<{ items: SpecificationWithCategories[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(Specifications.label, `%${term}%`),
+        like(Specifications.key, `%${term}%`),
+      )
+    : undefined;
+
+  try {
+    const [specRows, [totals]] = await Promise.all([
+      db
+        .select({
+          spec: Specifications,
+          groupName: SpecificationGroups.name,
+        })
+        .from(Specifications)
+        .leftJoin(
+          SpecificationGroups,
+          eq(Specifications.groupUuid, SpecificationGroups.uuid),
+        )
+        .where(where)
+        .orderBy(asc(Specifications.order))
+        .limit(params.limit)
+        .offset(params.offset),
+      db.select({ total: count() }).from(Specifications).where(where),
+    ]);
+
+    const specs = specRows.map((row) => ({
+      ...row.spec,
+      groupName: row.groupName,
+    }));
+
+    // Only fetch category links for the specs on this page.
+    const specUuids = specs.map((spec) => spec.uuid);
+    const links =
+      specUuids.length > 0
+        ? await db
+            .select({
+              specificationUuid: SpecificationCategories.specificationUuid,
+              categoryUuid: SpecificationCategories.categoryUuid,
+              categoryName: Categories.name,
+            })
+            .from(SpecificationCategories)
+            .leftJoin(
+              Categories,
+              eq(SpecificationCategories.categoryUuid, Categories.uuid),
+            )
+            .where(inArray(SpecificationCategories.specificationUuid, specUuids))
+        : [];
+
+    const items = specs.map((spec) => {
+      const own = links.filter((link) => link.specificationUuid === spec.uuid);
+      return {
+        ...spec,
+        categoryUuids: own.map((link) => link.categoryUuid),
+        categoryNames: own.map((link) => link.categoryName ?? ""),
+      };
+    });
+
+    return { items, total: Number(totals?.total ?? 0) };
+  } catch (error) {
+    console.error("getSpecificationsList failed:", error);
+    throw new Error("Failed to fetch specifications", { cause: error });
   }
 };
 
@@ -112,19 +191,25 @@ export const getSpecification = async (
       categoryUuids: links.map((link) => link.categoryUuid),
       categoryNames: links.map((link) => link.categoryName ?? ""),
     };
-  } catch {
-    throw new Error("Failed to fetch specification");
+  } catch (error) {
+    console.error("getSpecification failed:", error);
+    throw new Error("Failed to fetch specification", { cause: error });
   }
 };
 
+// The transaction handle drizzle passes to a db.transaction callback.
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 // Insert category links for a specification (no delete — caller decides).
+// Runs on the given transaction so it's part of the caller's atomic write.
 const insertSpecificationCategories = async (
+  tx: Tx,
   specificationUuid: string,
   categoryUuids: string[],
 ): Promise<void> => {
   const unique = [...new Set(categoryUuids.filter((uuid) => uuid.length > 0))];
   if (unique.length > 0) {
-    await db.insert(SpecificationCategories).values(
+    await tx.insert(SpecificationCategories).values(
       unique.map((categoryUuid) => ({
         uuid: randomUUID(),
         specificationUuid,
@@ -139,13 +224,12 @@ export const createSpecification = async (
   categoryUuids: string[],
 ): Promise<string> => {
   const uuid = randomUUID();
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(Specifications);
-
-  await db.insert(Specifications).values({ ...fields, uuid, order: total });
-  // Fresh uuid — no existing links to clear, insert directly.
-  await insertSpecificationCategories(uuid, categoryUuids);
+  // Spec row + its category links in one atomic write.
+  await db.transaction(async (tx) => {
+    const [{ total }] = await tx.select({ total: count() }).from(Specifications);
+    await tx.insert(Specifications).values({ ...fields, uuid, order: total });
+    await insertSpecificationCategories(tx, uuid, categoryUuids);
+  });
   return uuid;
 };
 
@@ -154,15 +238,15 @@ export const updateSpecification = async (
   fields: SpecificationFields,
   categoryUuids: string[],
 ): Promise<void> => {
-  // The spec update and the old-links delete touch different tables — run
-  // them in parallel, then write the new links.
-  await Promise.all([
-    db.update(Specifications).set(fields).where(eq(Specifications.uuid, uuid)),
-    db
+  // Update the spec, clear its old links, and write the new ones as one atomic
+  // write — a failure can't leave the spec updated but its links half-replaced.
+  await db.transaction(async (tx) => {
+    await tx.update(Specifications).set(fields).where(eq(Specifications.uuid, uuid));
+    await tx
       .delete(SpecificationCategories)
-      .where(eq(SpecificationCategories.specificationUuid, uuid)),
-  ]);
-  await insertSpecificationCategories(uuid, categoryUuids);
+      .where(eq(SpecificationCategories.specificationUuid, uuid));
+    await insertSpecificationCategories(tx, uuid, categoryUuids);
+  });
 };
 
 export const deleteSpecification = async (uuid: string): Promise<void> => {
@@ -210,6 +294,8 @@ export const getSpecificationsForCategory = async (
         label: Specifications.label,
         valueType: Specifications.valueType,
         unit: Specifications.unit,
+        allowMultiple: Specifications.allowMultiple,
+        allowRange: Specifications.allowRange,
         options: Specifications.options,
         order: Specifications.order,
       })
@@ -235,10 +321,15 @@ export const getSpecificationsForCategory = async (
         options: row.options ?? [],
         valueType: row.valueType,
         unit: row.unit,
+        allowMultiple: row.allowMultiple,
+        allowRange: row.allowRange,
       });
     }
     return specs;
-  } catch {
-    throw new Error("Failed to fetch specifications for category");
+  } catch (error) {
+    console.error("getSpecificationsForCategory failed:", error);
+    throw new Error("Failed to fetch specifications for category", {
+      cause: error,
+    });
   }
 };

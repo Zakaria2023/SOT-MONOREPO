@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { desc, eq, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray, like, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { db } from "../../../db";
 import {
@@ -52,26 +52,64 @@ const toListItem = (row: {
   providerSpecUnit: row.providerSpecUnit,
 });
 
-export const getCompatibilityRules = async (): Promise<
-  CompatibilityRuleListItem[]
-> => {
-  try {
-    const rows = await db
-      .select(listSelection)
-      .from(CompatibilityRules)
-      .leftJoin(
-        consumerSpec,
-        eq(CompatibilityRules.consumerSpecUuid, consumerSpec.uuid),
-      )
-      .leftJoin(
-        providerSpec,
-        eq(CompatibilityRules.providerSpecUuid, providerSpec.uuid),
-      )
-      .orderBy(desc(CompatibilityRules.createdAt));
+export type CompatibilityRulesListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
 
-    return rows.map(toListItem);
-  } catch {
-    throw new Error("Failed to fetch compatibility rules");
+/**
+ * A searched + paginated page of compatibility rules, each enriched with the
+ * bound specs' labels/units (newest first), plus the unfiltered total for that
+ * search. Search matches the rule name or either bound spec's label.
+ */
+export const getCompatibilityRules = async (
+  params: CompatibilityRulesListParams,
+): Promise<{ items: CompatibilityRuleListItem[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(CompatibilityRules.name, `%${term}%`),
+        like(consumerSpec.label, `%${term}%`),
+        like(providerSpec.label, `%${term}%`),
+      )
+    : undefined;
+
+  try {
+    const [rows, [totals]] = await Promise.all([
+      db
+        .select(listSelection)
+        .from(CompatibilityRules)
+        .leftJoin(
+          consumerSpec,
+          eq(CompatibilityRules.consumerSpecUuid, consumerSpec.uuid),
+        )
+        .leftJoin(
+          providerSpec,
+          eq(CompatibilityRules.providerSpecUuid, providerSpec.uuid),
+        )
+        .where(where)
+        .orderBy(desc(CompatibilityRules.createdAt))
+        .limit(params.limit)
+        .offset(params.offset),
+      db
+        .select({ total: count() })
+        .from(CompatibilityRules)
+        .leftJoin(
+          consumerSpec,
+          eq(CompatibilityRules.consumerSpecUuid, consumerSpec.uuid),
+        )
+        .leftJoin(
+          providerSpec,
+          eq(CompatibilityRules.providerSpecUuid, providerSpec.uuid),
+        )
+        .where(where),
+    ]);
+
+    return { items: rows.map(toListItem), total: Number(totals?.total ?? 0) };
+  } catch (error) {
+    console.error("getCompatibilityRules failed:", error);
+    throw new Error("Failed to fetch compatibility rules", { cause: error });
   }
 };
 
@@ -93,8 +131,9 @@ export const getCompatibilityRule = async (
       .where(eq(CompatibilityRules.uuid, uuid));
 
     return row ? toListItem(row) : null;
-  } catch {
-    throw new Error("Failed to fetch compatibility rule");
+  } catch (error) {
+    console.error("getCompatibilityRule failed:", error);
+    throw new Error("Failed to fetch compatibility rule", { cause: error });
   }
 };
 
@@ -103,6 +142,24 @@ export const getCompatibilityRule = async (
 // rules are exempt: they compare a quantity count against a count-like
 // capacity (e.g. devices vs ports) — the consumer spec only marks
 // participation there.
+// Per-provider distribution only makes sense for "must fit within" on the
+// aggregating kinds — per-item rules already judge units individually.
+const assertAllocationValid = (fields: CompatibilityRuleFields): void => {
+  if (fields.allocation !== "per_provider") {
+    return;
+  }
+  if (fields.kind === "per_item_threshold") {
+    throw new Error(
+      "Per-device capacity applies to sum and count rules — per-item rules already check each unit individually.",
+    );
+  }
+  if (fields.comparator !== "lte") {
+    throw new Error(
+      'Per-device capacity requires the "must fit within (≤)" comparison.',
+    );
+  }
+};
+
 const assertUnitsMatch = async (
   fields: CompatibilityRuleFields,
 ): Promise<void> => {
@@ -137,6 +194,7 @@ const assertUnitsMatch = async (
 export const createCompatibilityRule = async (
   fields: CompatibilityRuleFields,
 ): Promise<string> => {
+  assertAllocationValid(fields);
   await assertUnitsMatch(fields);
   const uuid = randomUUID();
   await db.insert(CompatibilityRules).values({ ...fields, uuid });
@@ -147,6 +205,7 @@ export const updateCompatibilityRule = async (
   uuid: string,
   fields: CompatibilityRuleFields,
 ): Promise<void> => {
+  assertAllocationValid(fields);
   await assertUnitsMatch(fields);
   await db
     .update(CompatibilityRules)

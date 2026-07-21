@@ -6,13 +6,21 @@ import type { SpecField, SpecOption, SpecRule } from "@/db/types";
 import { Lock } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { Dropdown } from "ui";
+import { Checkbox, Dropdown } from "ui";
+import {
+  parseSpecValues,
+  serializeSpecRange,
+  serializeSpecValues,
+  splitSpecRange,
+} from "utils";
 
 type SpecificationForCategory = {
   key: string;
   label: string;
   valueType: SpecField["valueType"];
   unit: SpecField["unit"];
+  allowMultiple: SpecField["allowMultiple"];
+  allowRange: SpecField["allowRange"];
   options: SpecOption[] | null;
   rules: SpecRule[] | null;
   categoryUuids: string[];
@@ -96,9 +104,13 @@ const visibleFields = (
   values: Record<string, string>,
 ): SpecField[] =>
   fields.flatMap((field) => {
-    const option = field.options.find(
-      (candidate) => candidate.value === (values[field.key] ?? ""),
-    );
+    // Multi-select specs are flat — they never reveal an option's sub-fields,
+    // even when a single ticked value happens to equal an option string.
+    const option = field.allowMultiple
+      ? undefined
+      : field.options.find(
+          (candidate) => candidate.value === (values[field.key] ?? ""),
+        );
     return [field, ...(option ? visibleFields(option.children, values) : [])];
   });
 
@@ -131,6 +143,8 @@ export const TechnicalSpecsEditor = ({
           label: spec.label,
           valueType: spec.valueType,
           unit: spec.unit,
+          allowMultiple: spec.allowMultiple,
+          allowRange: spec.allowRange,
           options: spec.options ?? [],
           rules: spec.rules ?? [],
         });
@@ -216,6 +230,45 @@ export const TechnicalSpecsEditor = ({
     setValue("technicalAttributes", next, { shouldDirty: true });
   };
 
+  // Multi-select: tick/untick one option, storing the set comma-joined. These
+  // specs are flat (no revealed sub-fields), so nothing to prune.
+  const toggleMultiOption = (
+    field: SpecField,
+    option: string,
+    checked: boolean,
+  ) => {
+    const current = parseSpecValues(values[field.key]);
+    const selected = checked
+      ? [...current, option]
+      : current.filter((value) => value !== option);
+    const next = { ...values };
+    if (selected.length > 0) {
+      next[field.key] = serializeSpecValues(selected);
+    } else {
+      delete next[field.key];
+    }
+    setValue("technicalAttributes", next, { shouldDirty: true });
+  };
+
+  // Range: edit either the "from" or "to" bound, storing them as "from - to".
+  // An all-empty range clears the value entirely.
+  const handleRangeChange = (
+    field: SpecField,
+    part: "from" | "to",
+    value: string,
+  ) => {
+    const [from, to] = splitSpecRange(values[field.key]);
+    const nextFrom = part === "from" ? value : from;
+    const nextTo = part === "to" ? value : to;
+    const next = { ...values };
+    if (nextFrom.trim() === "" && nextTo.trim() === "") {
+      delete next[field.key];
+    } else {
+      next[field.key] = serializeSpecRange(nextFrom, nextTo);
+    }
+    setValue("technicalAttributes", next, { shouldDirty: true });
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -223,8 +276,9 @@ export const TechnicalSpecsEditor = ({
           Technical specifications
         </label>
         <p className="mt-1 text-xs text-muted">
-          Dropdown-only, from the specifications assigned to this category (and
-          its parents). Selecting an option can reveal follow-up fields; rules
+          From the specifications assigned to this category (and its parents).
+          Fields may be a single dropdown, a multi-select, a number, or a
+          from–to range. Selecting an option can reveal follow-up fields; rules
           may auto-set and lock a field based on other choices.
         </p>
       </div>
@@ -238,6 +292,10 @@ export const TechnicalSpecsEditor = ({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {visible.map((field) => {
             const forced = forcedByKey[field.key];
+            const isMulti = field.valueType === "select" && field.allowMultiple;
+            const isRange = field.valueType === "number" && field.allowRange;
+            const [rangeFrom, rangeTo] = splitSpecRange(values[field.key]);
+            const selectedMulti = parseSpecValues(values[field.key]);
 
             return (
               <div key={field.key} className="flex flex-col gap-2">
@@ -254,6 +312,60 @@ export const TechnicalSpecsEditor = ({
                   <div className="flex items-center justify-between rounded-control border border-hairline bg-page px-4 py-2.5 text-sm text-faint">
                     {forced}
                     <Lock size={14} />
+                  </div>
+                ) : isRange ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      value={rangeFrom}
+                      onChange={(event) =>
+                        handleRangeChange(field, "from", event.target.value)
+                      }
+                      placeholder="From"
+                      className="w-full flex-1 rounded-control border border-hairline bg-surface px-4 py-2.5 text-sm text-ink outline-none focus:border-primary"
+                    />
+                    <span className="text-sm text-faint">–</span>
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        step="any"
+                        value={rangeTo}
+                        onChange={(event) =>
+                          handleRangeChange(field, "to", event.target.value)
+                        }
+                        placeholder="To"
+                        className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 pr-14 text-sm text-ink outline-none focus:border-primary"
+                      />
+                      {field.unit && (
+                        <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs font-medium text-faint">
+                          {field.unit}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : isMulti ? (
+                  <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
+                    {field.options.length === 0 ? (
+                      <span className="text-sm text-faint">
+                        No options defined.
+                      </span>
+                    ) : (
+                      field.options.map((option) => (
+                        <Checkbox
+                          key={option.value}
+                          label={option.value}
+                          checked={selectedMulti.includes(option.value)}
+                          onChange={(event) =>
+                            toggleMultiOption(
+                              field,
+                              option.value,
+                              event.target.checked,
+                            )
+                          }
+                        />
+                      ))
+                    )}
                   </div>
                 ) : field.valueType === "number" ? (
                   field.options.length > 0 ? (

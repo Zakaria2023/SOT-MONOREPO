@@ -13,11 +13,18 @@ export const buildCategoryTree = (
   categories: CategoryListItem[],
   products: ProductListItem[],
 ): CategoryNode[] => {
+  const presentUuids = new Set(categories.map((category) => category.uuid));
   const childrenByParent = new Map<string | null, CategoryListItem[]>();
   for (const category of categories) {
-    const siblings = childrenByParent.get(category.parentUuid) ?? [];
+    // Treat a category whose parent is missing (deleted, dangling
+    // parent_uuid) as a root, otherwise it and its subtree never render.
+    const parentUuid =
+      category.parentUuid && presentUuids.has(category.parentUuid)
+        ? category.parentUuid
+        : null;
+    const siblings = childrenByParent.get(parentUuid) ?? [];
     siblings.push(category);
-    childrenByParent.set(category.parentUuid, siblings);
+    childrenByParent.set(parentUuid, siblings);
   }
 
   const productsByCategory = new Map<string, ProductListItem[]>();

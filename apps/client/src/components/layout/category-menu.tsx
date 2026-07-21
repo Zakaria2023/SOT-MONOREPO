@@ -74,7 +74,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
           onMouseLeave={scheduleClose}
           className="fixed inset-x-0 top-18 z-40 border-b border-hairline bg-surface-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)]"
         >
-          <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+          <div className="mx-auto px-6 py-8 lg:px-12 xl:px-20">
             <p className="font-grotesk text-xs font-bold tracking-widest text-faint uppercase">
               {activeTop.name}
             </p>
@@ -83,26 +83,29 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
               <div className="mt-6 grid grid-cols-2 gap-8 lg:grid-cols-3">
                 {activeTop.children.map((child) => (
                   <div key={child.uuid}>
-                    <div className="flex items-center gap-3">
+                    <Link
+                      href={`/products?category=${child.uuid}`}
+                      className="flex items-center gap-3"
+                    >
                       <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-tint text-primary">
                         <Layers size={18} />
                       </span>
                       <div>
-                        <p className="font-heading text-base font-bold text-ink">
+                        <p className="font-heading text-base font-bold text-ink transition-colors hover:text-primary">
                           {child.name}
                         </p>
                         <p className="font-grotesk text-xs text-faint">
                           {child.productCount} products
                         </p>
                       </div>
-                    </div>
+                    </Link>
 
                     {child.children.length > 0 && (
                       <ul className="mt-4 space-y-1">
                         {child.children.map((leaf) => (
                           <li key={leaf.uuid}>
                             <Link
-                              href={`/categories/${leaf.uuid}`}
+                              href={`/products?category=${leaf.uuid}`}
                               onMouseEnter={() => setActiveLeafUuid(leaf.uuid)}
                               className={cn(
                                 "font-grotesk flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",

@@ -7,19 +7,26 @@ import { LocationPicker } from "@/components/location/location-picker";
 import {
   ArrowLeft,
   ArrowRight,
+  Boxes,
   Building2,
+  Check,
   ChevronRight,
+  ClipboardList,
+  Cpu,
   Handshake,
   Hash,
   Landmark,
+  Layers,
+  LifeBuoy,
   Mail,
   Receipt,
   User,
+  Wrench,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Controller } from "react-hook-form";
 import { Input } from "ui";
-import type { PartnerApplicantType } from "validators";
+import type { PartnerApplicantType, PartnerCapability } from "validators";
 
 type TypeOption = {
   value: PartnerApplicantType;
@@ -27,6 +34,52 @@ type TypeOption = {
   description: string;
   icon: ReactNode;
 };
+
+type CapabilityOption = {
+  value: PartnerCapability;
+  label: string;
+  description: string;
+  icon: ReactNode;
+};
+
+const CAPABILITY_OPTIONS: CapabilityOption[] = [
+  {
+    value: "system_integrator",
+    label: "System Integrator",
+    description: "You design and deliver complete solutions end to end",
+    icon: <Layers size={20} />,
+  },
+  {
+    value: "stock",
+    label: "Have stock",
+    description: "You keep inventory and resell hardware",
+    icon: <Boxes size={20} />,
+  },
+  {
+    value: "install_program",
+    label: "Install & program the network",
+    description: "Install and configure the network",
+    icon: <Cpu size={20} />,
+  },
+  {
+    value: "install_only",
+    label: "Install the network only",
+    description: "Physical installation / cabling only",
+    icon: <Wrench size={20} />,
+  },
+  {
+    value: "pre_sell",
+    label: "Pre-sell partner",
+    description: "Help scope and quote solutions",
+    icon: <ClipboardList size={20} />,
+  },
+  {
+    value: "post_sell",
+    label: "Post-sell partner",
+    description: "Service, support and handover",
+    icon: <LifeBuoy size={20} />,
+  },
+];
 
 const TYPE_OPTIONS: TypeOption[] = [
   {
@@ -50,6 +103,8 @@ const TYPE_OPTIONS: TypeOption[] = [
 ];
 
 export const PartnerForm = () => {
+  const [capabilities, setCapabilities] = useState<PartnerCapability[]>([]);
+  const [capsDone, setCapsDone] = useState(false);
   const [selected, setSelected] = useState<PartnerApplicantType | null>(null);
   const {
     form: {
@@ -62,6 +117,16 @@ export const PartnerForm = () => {
     isPending,
     onSubmit,
   } = usePartnerForm();
+
+  const toggleCapability = (value: PartnerCapability) => {
+    setCapabilities((prev) => {
+      const next = prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value];
+      setValue("capabilities", next);
+      return next;
+    });
+  };
 
   if (state.success) {
     return (
@@ -78,7 +143,8 @@ export const PartnerForm = () => {
     );
   }
 
-  if (!selected) {
+  // Step 1 — what the partner can do (one or more), chosen before the type.
+  if (!capsDone) {
     return (
       <>
         <div>
@@ -86,8 +152,84 @@ export const PartnerForm = () => {
             Join us as a partner
           </h1>
           <p className="font-grotesk mt-2 text-sm text-muted">
-            Partners are verified by our team. Pick your type, submit your
-            details, and we&apos;ll email an invitation once approved.
+            First, tell us what you do. Pick everything that applies — you can
+            choose more than one.
+          </p>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3">
+          {CAPABILITY_OPTIONS.map((option) => {
+            const active = capabilities.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggleCapability(option.value)}
+                aria-pressed={active}
+                className={`font-grotesk flex items-center gap-3 rounded-2xl border bg-surface p-4 text-left transition-colors ${
+                  active
+                    ? "border-primary ring-1 ring-primary"
+                    : "border-search-border hover:border-primary"
+                }`}
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-tint text-primary">
+                  {option.icon}
+                </span>
+                <span className="flex-1">
+                  <span className="block text-sm font-bold text-ink">
+                    {option.label}
+                  </span>
+                  <span className="block text-xs text-faint">
+                    {option.description}
+                  </span>
+                </span>
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-md border ${
+                    active
+                      ? "border-primary bg-primary text-white"
+                      : "border-search-border text-transparent"
+                  }`}
+                >
+                  <Check size={13} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          disabled={capabilities.length === 0}
+          onClick={() => setCapsDone(true)}
+          className="font-grotesk mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+        >
+          Continue
+          <ArrowRight size={18} />
+        </button>
+      </>
+    );
+  }
+
+  // Step 2 — the applicant type.
+  if (!selected) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setCapsDone(false)}
+          className="font-grotesk inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-primary"
+        >
+          <ArrowLeft size={16} />
+          What you do
+        </button>
+
+        <div className="mt-4">
+          <h1 className="font-heading text-3xl text-ink">
+            Join us as a partner
+          </h1>
+          <p className="font-grotesk mt-2 text-sm text-muted">
+            Now pick your type, submit your details, and we&apos;ll email an
+            invitation once approved.
           </p>
         </div>
 
@@ -303,7 +445,7 @@ export const PartnerForm = () => {
           name="contactNumber"
           render={({ field }) => (
             <PhoneInput
-              label="Contact number"
+              label="Contact number (optional)"
               value={field.value ?? ""}
               onChange={field.onChange}
               error={errors.contactNumber?.message}

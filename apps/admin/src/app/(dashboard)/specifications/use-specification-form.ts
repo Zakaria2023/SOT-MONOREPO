@@ -25,13 +25,28 @@ type UseSpecificationFormArgs =
   | { mode: "add" }
   | { mode: "edit"; specification: SpecificationWithCategories };
 
-// Form tree -> stored tree, deriving a stable key from each label.
+// Form tree -> stored tree, deriving a stable key from each label. A numeric
+// sub-field stores its fixed choices in the same `options` column (flat, no
+// children) — mirroring how the top-level numeric spec is persisted.
 const toSpecFields = (fields: SpecFieldForm[]): SpecField[] =>
-  fields.map((field) => ({
-    key: slugify(field.label),
-    label: field.label,
-    options: toSpecOptions(field.options),
-  }));
+  fields.map((field) => {
+    const valueType = field.valueType ?? "select";
+    return {
+      key: slugify(field.label),
+      label: field.label,
+      valueType,
+      unit: valueType === "number" ? field.unit : null,
+      allowMultiple: valueType === "select" ? field.allowMultiple : false,
+      allowRange: valueType === "number" ? field.allowRange : false,
+      options:
+        valueType === "number"
+          ? field.numericValues.map((value) => ({
+              value: value.trim(),
+              children: [],
+            }))
+          : toSpecOptions(field.options),
+    };
+  });
 
 const toSpecOptions = (options: SpecOptionForm[]): SpecOption[] =>
   options.map((option) => ({
@@ -39,12 +54,24 @@ const toSpecOptions = (options: SpecOptionForm[]): SpecOption[] =>
     children: toSpecFields(option.children),
   }));
 
-// Stored tree -> editable form tree (labels only, keys dropped).
+// Stored tree -> editable form tree (labels only, keys dropped). Split a
+// numeric sub-field's flat options back out into the chip editor.
 const toFormFields = (fields: SpecField[]): SpecFieldForm[] =>
-  fields.map((field) => ({
-    label: field.label,
-    options: toFormOptions(field.options),
-  }));
+  fields.map((field) => {
+    const valueType = field.valueType ?? "select";
+    return {
+      label: field.label,
+      valueType,
+      unit: field.unit ?? "",
+      allowMultiple: field.allowMultiple ?? false,
+      allowRange: field.allowRange ?? false,
+      options: valueType === "number" ? [] : toFormOptions(field.options),
+      numericValues:
+        valueType === "number"
+          ? field.options.map((option) => option.value)
+          : [],
+    };
+  });
 
 const toFormOptions = (options: SpecOption[]): SpecOptionForm[] =>
   options.map((option) => ({
@@ -74,6 +101,8 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
       newGroupName: "",
       valueType: specification?.valueType ?? "select",
       unit: specification?.unit ?? "",
+      allowMultiple: specification?.allowMultiple ?? false,
+      allowRange: specification?.allowRange ?? false,
       options:
         specification?.valueType === "number"
           ? []
@@ -102,6 +131,8 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
         newGroupName: values.newGroupName,
         valueType: values.valueType,
         unit: values.unit,
+        allowMultiple: values.allowMultiple,
+        allowRange: values.allowRange,
         options:
           values.valueType === "number"
             ? values.numericValues.map((value) => ({

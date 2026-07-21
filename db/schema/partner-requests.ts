@@ -1,8 +1,10 @@
 import { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
+  boolean,
   char,
   index,
   int,
+  json,
   mysqlEnum,
   mysqlTable,
   text,
@@ -21,6 +23,10 @@ export const PartnerRequests = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     uuid: char("uuid", { length: 36 }).notNull().unique(),
 
+    // What the partner can do — chosen first, one or more (stock, install +
+    // program, install only, pre-sell, post-sell). Stored as a JSON array.
+    capabilities: json("capabilities").$type<string[]>(),
+
     // Which sign-up-style applicant this is; drives the type-specific fields.
     type: mysqlEnum("type", partnerTypes).notNull(),
 
@@ -28,7 +34,9 @@ export const PartnerRequests = mysqlTable(
     // parts for individuals, the representative name for facilities.
     fullName: varchar("full_name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
-    contactNumber: varchar("contact_number", { length: 30 }).notNull(),
+    // Email is the required identifier (invitation + linking key); phone is an
+    // optional secondary contact.
+    contactNumber: varchar("contact_number", { length: 30 }),
     location: varchar("location", { length: 255 }).notNull(),
 
     // ── Individual fields (null for facilities) ───────────────────────────
@@ -54,6 +62,11 @@ export const PartnerRequests = mysqlTable(
       .default("install-program")
       .notNull(),
 
+    // Integrated partners (accounting system bound to SOT) are auto-invoiced
+    // and paid the instant handover completes; non-integrated partners submit a
+    // manual invoice and wait. Integration is the faster-paid path.
+    isIntegrated: boolean("is_integrated").default(false).notNull(),
+
     status: mysqlEnum("status", partnerRequestStatuses)
       .default("pending")
       .notNull(),
@@ -73,6 +86,10 @@ export const PartnerRequests = mysqlTable(
     index("idx_partner_requests_email").on(table.email),
     index("idx_partner_requests_status").on(table.status),
     index("idx_partner_requests_created_at").on(table.createdAt),
+    // getApprovedPartnerByClerkId resolves every partner request by this column.
+    index("idx_partner_requests_approved_clerk_user_id").on(
+      table.approvedClerkUserId,
+    ),
   ],
 );
 

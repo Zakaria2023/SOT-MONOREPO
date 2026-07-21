@@ -82,7 +82,7 @@ export const GovernmentRequestForm = () => {
         name="contactNumber"
         render={({ field }) => (
           <PhoneInput
-            label="Contact number"
+            label="Contact number (optional)"
             value={field.value ?? ""}
             onChange={field.onChange}
             error={errors.contactNumber?.message}

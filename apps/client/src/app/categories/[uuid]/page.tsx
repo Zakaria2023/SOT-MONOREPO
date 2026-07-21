@@ -1,5 +1,6 @@
 import { CategorySolution } from "@/components/category/category-solution";
 import { getCurrentUser } from "@/lib/auth";
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCategory, getProductsByCategory } from "services";
@@ -20,10 +21,11 @@ export const generateMetadata = async ({
 
 const CategoryPage = async ({ params }: Props) => {
   const { uuid } = await params;
-  const [category, products, user] = await Promise.all([
+  const [category, products, user, viewerPricing] = await Promise.all([
     getCategory(uuid),
     getProductsByCategory(uuid),
     getCurrentUser(),
+    getViewerPartnerPricing(),
   ]);
 
   if (!category) {
@@ -35,6 +37,7 @@ const CategoryPage = async ({ params }: Props) => {
       category={category}
       products={products}
       canAdd={Boolean(user)}
+      discountPercent={viewerPricing.discountPercent}
     />
   );
 };

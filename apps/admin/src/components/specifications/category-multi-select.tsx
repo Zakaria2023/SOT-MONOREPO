@@ -15,9 +15,15 @@ type CategoryMultiSelectProps = {
 
 // Flatten the category tree into depth-ordered dropdown options.
 const buildOptions = (categories: SelectCategories[]): DropdownOption[] => {
+  const presentUuids = new Set(categories.map((category) => category.uuid));
   const childrenByParent = new Map<string | null, SelectCategories[]>();
   for (const category of categories) {
-    const parentUuid = category.parentUuid ?? null;
+    // Treat a category whose parent is missing (deleted, dangling
+    // parent_uuid) as a root, otherwise it and its subtree never render.
+    const parentUuid =
+      category.parentUuid && presentUuids.has(category.parentUuid)
+        ? category.parentUuid
+        : null;
     const siblings = childrenByParent.get(parentUuid) ?? [];
     siblings.push(category);
     childrenByParent.set(parentUuid, siblings);
@@ -54,6 +60,8 @@ export const CategoryMultiSelect = ({
           <>
             <Dropdown
               multiple
+              searchable
+              searchPlaceholder="Search categories..."
               value={field.value}
               onChange={field.onChange}
               options={options}

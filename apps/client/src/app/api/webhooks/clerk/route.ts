@@ -1,7 +1,11 @@
 import { buildClerkUserSync } from "@/lib/clerk-user";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { deleteClerkUser, syncClerkUser } from "services";
+import {
+  deleteClerkUser,
+  linkPartnerRequestToClerkUser,
+  syncClerkUser,
+} from "services";
 import { Webhook } from "svix";
 
 // Clerk is the source of truth for identity; this webhook mirrors its users into
@@ -105,6 +109,13 @@ export const POST = async (request: Request) => {
         publicMetadata: event.data.public_metadata ?? {},
       }),
     );
+
+    // A partner account may have been approved with an invitation id; once the
+    // real Clerk user exists, point their approved request at this user id so
+    // partner features resolve them by the signed-in id.
+    if (email && event.data.public_metadata?.role === "partner") {
+      await linkPartnerRequestToClerkUser({ email, clerkUserId: event.data.id });
+    }
   }
 
   if (event.type === "user.deleted") {

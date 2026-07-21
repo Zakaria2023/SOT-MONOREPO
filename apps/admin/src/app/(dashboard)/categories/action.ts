@@ -1,21 +1,40 @@
 "use server";
 
-import { db } from "@/db";
-import {
-  Categories,
-  InsertCategories,
-  SelectCategories,
-} from "@/db/schema/categories";
-import { deriveCode, generateUuid, resolveUniqueCode } from "utils";
-import { alias } from "drizzle-orm/mysql-core";
-import { asc, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  createCategory as createCategoryRecord,
+  deleteCategory as deleteCategoryRecord,
+  getCategories as getCategoriesList,
+  getCategoriesPage as getCategoriesPageList,
+  getCategory as getCategoryRecord,
+  getCategoryBoard as getCategoryBoardRecord,
+  getCategoryChildren as getCategoryChildrenList,
+  getCategoryChildrenPage as getCategoryChildrenPageList,
+  moveCategoryToParent as moveCategoryToParentRecord,
+  reorderCategories as reorderCategoriesRecord,
+  reorderCategoryChildren as reorderCategoryChildrenRecord,
+  updateCategory as updateCategoryRecord,
+} from "services";
+import type {
+  CategoryBoardColumn as ServiceCategoryBoardColumn,
+  CategoryBoardItem as ServiceCategoryBoardItem,
+  CategoryFields as ServiceCategoryFields,
+  CategoryListItem as ServiceCategoryListItem,
+  CategoryListParams as ServiceCategoryListParams,
+  SelectCategories as ServiceSelectCategories,
+} from "services";
+import type { PaginatedResult } from "utils";
 
-export type CategoryFields = Omit<
-  InsertCategories,
-  "id" | "uuid" | "createdAt" | "updatedAt"
->;
+// A "use server" file may only export async functions; types are re-declared as
+// local aliases (not `export type { ... } from`, which the RSC compiler would
+// treat as a runtime export) so consumers can keep importing them from here.
+export type CategoryFields = ServiceCategoryFields;
+export type CategoryListItem = ServiceCategoryListItem;
+export type CategoryBoardItem = ServiceCategoryBoardItem;
+export type CategoryListParams = ServiceCategoryListParams;
+export type CategoryBoardColumn = ServiceCategoryBoardColumn;
+export type SelectCategories = ServiceSelectCategories;
 
 export type CategoryActionResult = {
   categoryUuid?: string;
@@ -23,58 +42,41 @@ export type CategoryActionResult = {
   success?: boolean;
 };
 
-export type CategoryListItem = SelectCategories & {
-  parentName: SelectCategories["name"] | null;
-};
+// Reads pass straight through to the service — the admin pages/components call
+// these from `./action`, keeping the transport boundary in one place.
+export const getCategories = async (): Promise<CategoryListItem[]> =>
+  getCategoriesList();
 
-const ParentCategories = alias(Categories, "parent_categories");
+export const getCategoriesPage = async (
+  params: CategoryListParams = {},
+): Promise<PaginatedResult<CategoryListItem>> => getCategoriesPageList(params);
 
-export const getCategories = async (): Promise<CategoryListItem[]> => {
-  try {
-    return await db
-      .select({
-        ...getTableColumns(Categories),
-        parentName: ParentCategories.name,
-      })
-      .from(Categories)
-      .leftJoin(ParentCategories, eq(Categories.parentUuid, ParentCategories.uuid))
-      .orderBy(asc(Categories.order));
-  } catch {
-    throw new Error("Failed to fetch categories");
-  }
-};
+// One column's cards — the top-level cards when parentUuid is null, otherwise a
+// single parent's direct children. Each card carries its own childCount, so the
+// board never has to load any other column to know what is expandable. This is
+// both the first-render fetch (null) and every lazy column open.
+export const getCategoryChildren = async (
+  parentUuid: string | null,
+): Promise<CategoryBoardItem[]> => getCategoryChildrenList(parentUuid);
+
+export const getCategoryBoard = async (): Promise<CategoryBoardColumn[]> =>
+  getCategoryBoardRecord();
+
+export const getCategoryChildrenPage = async (
+  parentUuid: string | null,
+  page: number,
+): Promise<CategoryListItem[]> => getCategoryChildrenPageList(parentUuid, page);
 
 export const getCategory = async (
   uuid: string,
-): Promise<SelectCategories | null> => {
-  try {
-    const [category] = await db
-      .select()
-      .from(Categories)
-      .where(eq(Categories.uuid, uuid));
-
-    return category ?? null;
-  } catch {
-    throw new Error("Failed to fetch category");
-  }
-};
+): Promise<SelectCategories | null> => getCategoryRecord(uuid);
 
 export const createCategory = async (
   _prevState: CategoryActionResult,
   fields: CategoryFields,
 ): Promise<CategoryActionResult> => {
-  const uuid = generateUuid();
   try {
-    const existing = await db.select({ code: Categories.code }).from(Categories);
-    const taken = new Set(
-      existing.map((row) => row.code).filter((code): code is string =>
-        Boolean(code),
-      ),
-    );
-    const code = resolveUniqueCode(deriveCode(fields.name), taken);
-    await db
-      .insert(Categories)
-      .values({ ...fields, uuid, order: existing.length, code });
+    await createCategoryRecord(fields);
   } catch (error) {
     return {
       error:
@@ -92,7 +94,7 @@ export const updateCategory = async (
   fields: CategoryFields,
 ): Promise<CategoryActionResult> => {
   try {
-    await db.update(Categories).set(fields).where(eq(Categories.uuid, uuid));
+    await updateCategoryRecord(uuid, fields);
   } catch (error) {
     return {
       error:
@@ -108,13 +110,68 @@ export const deleteCategory = async (
   uuid: string,
 ): Promise<CategoryActionResult> => {
   try {
-    await db.delete(Categories).where(eq(Categories.uuid, uuid));
+    await deleteCategoryRecord(uuid);
     revalidatePath("/categories");
     return { success: true, categoryUuid: uuid };
   } catch (error) {
     return {
       error:
         error instanceof Error ? error.message : "Failed to delete category",
+    };
+  }
+};
+
+export const reorderCategories = async (
+  orderedUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await reorderCategoriesRecord(orderedUuids);
+    revalidatePath("/categories");
+    return {};
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to reorder categories",
+    };
+  }
+};
+
+// Move a card into another column (re-parent) at the dropped position. This is
+// a structural change (counts shift, columns may appear/disappear), so it
+// revalidates the board.
+export const moveCategoryToParent = async (
+  uuid: string,
+  newParentUuid: string | null,
+  targetIndex: number,
+): Promise<{ error?: string }> => {
+  try {
+    await moveCategoryToParentRecord(uuid, newParentUuid, targetIndex);
+    revalidatePath("/categories");
+    return {};
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to move category",
+    };
+  }
+};
+
+// Reorder within one paginated board column: only the reordered page window is
+// sent; the service splices it into the parent's full ordered list.
+export const reorderCategoryChildren = async (
+  parentUuid: string | null,
+  pageStart: number,
+  orderedPageUuids: string[],
+): Promise<{ error?: string }> => {
+  try {
+    await reorderCategoryChildrenRecord(parentUuid, pageStart, orderedPageUuids);
+    // No revalidatePath here: the column already reflects the new order
+    // optimistically, and revalidating would snap every column back to page 1.
+    return {};
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to reorder categories",
     };
   }
 };

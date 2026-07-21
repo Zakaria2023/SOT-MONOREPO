@@ -1,0 +1,127 @@
+import { OrderPayment } from "@/components/orders/order-payment";
+import { getCurrentUser } from "@/lib/auth";
+import { ORDER_STATUS_LABELS } from "@/db/label";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { CheckCircle2, Clock, FileText } from "lucide-react";
+import { formatMoney } from "utils";
+import { getInvoiceForOrder, getOrderItems, getUserOrder } from "services";
+
+export const metadata: Metadata = {
+  title: "Your order · Stratum",
+};
+
+type Props = {
+  params: Promise<{ uuid: string }>;
+};
+
+const OrderPage = async ({ params }: Props) => {
+  const { uuid } = await params;
+
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  const order = await getUserOrder(user.uuid, uuid);
+  if (!order) {
+    notFound();
+  }
+
+  const currency = order.currency ?? "SAR";
+  const [invoice, items] = await Promise.all([
+    order.status === "paid" ? getInvoiceForOrder(order.uuid) : null,
+    getOrderItems(order.uuid),
+  ]);
+
+  return (
+    <main className="mx-auto px-6 py-12 lg:px-12 xl:px-20">
+      <h1 className="font-heading text-2xl text-ink">Order {order.reference}</h1>
+      <p className="font-grotesk mt-1 text-sm text-muted">
+        {ORDER_STATUS_LABELS[order.status]}
+      </p>
+
+      {items.length > 0 && (
+        <div className="mt-6 flex flex-col divide-y divide-hairline-soft rounded-[18px] border border-search-border bg-surface p-6">
+          {items.map((item) => (
+            <div
+              key={item.uuid}
+              className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0 text-sm"
+            >
+              <span className="text-ink">
+                {item.name}
+                <span className="text-faint"> × {item.quantity}</span>
+              </span>
+              <span className="font-medium tabular-nums text-ink">
+                {formatMoney(Number(item.lineTotal), currency)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-6 flex flex-col gap-3 rounded-[18px] border border-search-border bg-surface p-6">
+        <div className="flex justify-between text-sm text-muted">
+          <span>Products</span>
+          <span className="font-medium text-ink">
+            {formatMoney(Number(order.productTotal), currency)}
+          </span>
+        </div>
+        {Number(order.serviceTotal) > 0 && (
+          <div className="flex justify-between text-sm text-muted">
+            <span>Service</span>
+            <span className="font-medium text-ink">
+              {formatMoney(Number(order.serviceTotal), currency)}
+            </span>
+          </div>
+        )}
+        {order.discountPercent > 0 && (
+          <div className="flex justify-between text-sm text-muted">
+            <span>Partner discount</span>
+            <span className="font-medium text-primary">
+              {order.discountPercent}% applied
+            </span>
+          </div>
+        )}
+        <div className="mt-2 flex justify-between border-t border-hairline-soft pt-3 text-base">
+          <span className="font-semibold text-ink">Total</span>
+          <span className="font-semibold text-ink">
+            {formatMoney(Number(order.grandTotal), currency)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-col gap-4">
+        {order.status === "awaiting_payment" ? (
+          <OrderPayment
+            orderUuid={order.uuid}
+            total={formatMoney(Number(order.grandTotal), currency)}
+          />
+        ) : order.status === "paid" ? (
+          <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
+            <CheckCircle2 size={16} className="text-primary" />
+            Payment received{invoice ? ` — invoice ${invoice.number}` : ""}. Your
+            funds are held by SOT until your system is handed over and verified.
+          </p>
+        ) : (
+          <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
+            <Clock size={16} className="text-primary" />
+            {ORDER_STATUS_LABELS[order.status]}.
+          </p>
+        )}
+        {order.boqUuid && (
+          <Link
+            href={`/boq/${order.boqUuid}/handover`}
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-search-border px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-hover"
+          >
+            <FileText size={16} />
+            View handover
+          </Link>
+        )}
+      </div>
+    </main>
+  );
+};
+
+export default OrderPage;

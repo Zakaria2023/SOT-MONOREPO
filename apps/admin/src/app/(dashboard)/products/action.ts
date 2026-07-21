@@ -1,22 +1,34 @@
 "use server";
 
-import { db } from "@/db";
-import { Brands, SelectBrands } from "@/db/schema/brands";
-import { Categories, SelectCategories } from "@/db/schema/categories";
-import { InsertProducts, Products, SelectProducts } from "@/db/schema/products";
-import { SelectVendors, Vendors } from "@/db/schema/vendors";
-import { generateProductSku } from "services";
-import { generateUuid, slugify } from "utils";
-import { asc, count, eq, getTableColumns } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  createProduct as createProductRecord,
+  deleteProduct as deleteProductRecord,
+  getProduct as getProductRecord,
+  getProductDetailByUuid as getProductDetailByUuidRecord,
+  getProductsPage as getProductsPageList,
+  updateProduct as updateProductRecord,
+} from "services";
+import type {
+  ProductClientFields as ServiceProductClientFields,
+  ProductDetail as ServiceProductDetail,
+  ProductFields as ServiceProductFields,
+  ProductListItem as ServiceProductListItem,
+  ProductListParams as ServiceProductListParams,
+  SelectProducts as ServiceSelectProducts,
+} from "services";
+import type { PaginatedResult } from "utils";
 
-export type ProductFields = Omit<
-  InsertProducts,
-  "id" | "uuid" | "createdAt" | "updatedAt"
->;
-
-export type ProductClientFields = Omit<ProductFields, "slug">;
+// A "use server" file may only export async functions; types are re-declared as
+// local aliases (not `export type { ... } from`, which the RSC compiler would
+// treat as a runtime export) so consumers can keep importing them from here.
+export type ProductFields = ServiceProductFields;
+export type ProductClientFields = ServiceProductClientFields;
+export type ProductListItem = ServiceProductListItem;
+export type ProductListParams = ServiceProductListParams;
+export type ProductDetail = ServiceProductDetail;
+export type SelectProducts = ServiceSelectProducts;
 
 export type ProductActionResult = {
   productUuid?: string;
@@ -24,68 +36,26 @@ export type ProductActionResult = {
   success?: boolean;
 };
 
-export type ProductListItem = SelectProducts & {
-  categoryName: SelectCategories["name"] | null;
-  brandName: SelectBrands["name"] | null;
-  vendorName: SelectVendors["name"] | null;
-};
-
-export const getProducts = async (): Promise<ProductListItem[]> => {
-  try {
-    return await db
-      .select({
-        ...getTableColumns(Products),
-        categoryName: Categories.name,
-        brandName: Brands.name,
-        vendorName: Vendors.name,
-      })
-      .from(Products)
-      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
-      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
-      .leftJoin(Vendors, eq(Products.vendorUuid, Vendors.uuid))
-      .orderBy(asc(Products.order));
-  } catch {
-    throw new Error("Failed to fetch products");
-  }
-};
+// Reads pass straight through to the service — the admin pages/components call
+// these from `./action`, keeping the transport boundary in one place.
+export const getProductsPage = async (
+  params: ProductListParams = {},
+): Promise<PaginatedResult<ProductListItem>> => getProductsPageList(params);
 
 export const getProduct = async (
   uuid: string,
-): Promise<SelectProducts | null> => {
-  try {
-    const [product] = await db
-      .select()
-      .from(Products)
-      .where(eq(Products.uuid, uuid));
+): Promise<SelectProducts | null> => getProductRecord(uuid);
 
-    return product ?? null;
-  } catch {
-    throw new Error("Failed to fetch product");
-  }
-};
+export const getProductDetail = async (
+  uuid: string,
+): Promise<ProductDetail | null> => getProductDetailByUuidRecord(uuid);
 
 export const createProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  const uuid = generateUuid();
-  const productFields = fields;
   try {
-    const [{ total }] = await db.select({ total: count() }).from(Products);
-    // The SKU is system-owned: assembled from the brand/category/series codes,
-    // never taken from the client.
-    const sku = await generateProductSku({
-      brandUuid: productFields.brandUuid,
-      categoryUuid: productFields.categoryUuid,
-      seriesCode: productFields.seriesCode,
-    });
-    await db.insert(Products).values({
-      ...productFields,
-      sku,
-      uuid,
-      order: total,
-      slug: slugify(productFields.name),
-    });
+    await createProductRecord(fields);
   } catch (error) {
     return {
       error:
@@ -102,19 +72,8 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  const productFields = fields;
   try {
-    // Regenerate the SKU (stable when brand/category/series are unchanged).
-    const sku = await generateProductSku({
-      brandUuid: productFields.brandUuid,
-      categoryUuid: productFields.categoryUuid,
-      seriesCode: productFields.seriesCode,
-      productUuid: uuid,
-    });
-    await db
-      .update(Products)
-      .set({ ...productFields, sku, slug: slugify(productFields.name) })
-      .where(eq(Products.uuid, uuid));
+    await updateProductRecord(uuid, fields);
   } catch (error) {
     return {
       error:
@@ -130,7 +89,7 @@ export const deleteProduct = async (
   uuid: string,
 ): Promise<ProductActionResult> => {
   try {
-    await db.delete(Products).where(eq(Products.uuid, uuid));
+    await deleteProductRecord(uuid);
     revalidatePath("/products");
     return { success: true, productUuid: uuid };
   } catch (error) {

@@ -1,0 +1,245 @@
+import type { ProductDetail as ProductDetailData } from "@/app/(dashboard)/products/action";
+import type { BoqItemRole, ProductStatus } from "@/db/enum";
+import { BOQ_ITEM_ROLE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
+import { documentDownloadUrl } from "@/lib/documents";
+import { ArrowLeft, FileText, ImageOff, Pencil } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { formatPrice, humanizeSlug } from "utils";
+
+type ProductDetailProps = {
+  product: ProductDetailData;
+};
+
+type FieldProps = {
+  label: string;
+  value: ReactNode;
+};
+
+type SectionProps = {
+  title: string;
+  children: ReactNode;
+};
+
+const STATUS_BADGE_CLASSES: Record<ProductStatus, string> = {
+  in_stock: "bg-success-tint text-success",
+  out_of_stock: "bg-danger-tint text-danger",
+  limited_stock: "bg-warning-tint text-warning",
+  pre_order: "bg-primary-tint text-primary",
+  in_order: "bg-primary-tint text-primary",
+  end_of_sale: "bg-hover text-faint",
+  end_of_life: "bg-hover text-faint",
+};
+
+const Field = ({ label, value }: FieldProps) => (
+  <div className="flex flex-col gap-1">
+    <span className="text-xs font-semibold tracking-wide text-faint uppercase">
+      {label}
+    </span>
+    <span className="text-sm text-ink">
+      {value === null || value === undefined || value === "" ? (
+        <span className="text-faint">—</span>
+      ) : (
+        value
+      )}
+    </span>
+  </div>
+);
+
+const Section = ({ title, children }: SectionProps) => (
+  <div className="flex flex-col gap-4 rounded-card border border-hairline bg-surface p-6 shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
+    <h2 className="font-heading text-lg text-ink">{title}</h2>
+    {children}
+  </div>
+);
+
+export const ProductDetail = ({ product }: ProductDetailProps) => {
+  const status = product.status ?? "in_stock";
+  const gallery = product.images ?? [];
+  const attributes = Object.entries(product.technicalAttributes ?? {});
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/products"
+            className="flex h-9 w-9 items-center justify-center rounded-control border border-hairline text-secondary hover:bg-hover"
+          >
+            <ArrowLeft size={16} />
+          </Link>
+          <div>
+            <h1 className="font-heading text-2xl text-ink">{product.name}</h1>
+            {product.sku && (
+              <p className="text-sm text-muted">SKU {product.sku}</p>
+            )}
+          </div>
+        </div>
+
+        <Link
+          href={`/products/${product.uuid}/edit`}
+          className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
+        >
+          <Pencil size={16} />
+          Edit
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="flex flex-col gap-5">
+          <Section title="Media">
+            <div className="overflow-hidden rounded-card border border-hairline bg-page">
+              {product.image ? (
+                <Image
+                  src={documentDownloadUrl(product.image)}
+                  alt={product.name}
+                  width={640}
+                  height={640}
+                  unoptimized
+                  className="h-72 w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-72 w-full items-center justify-center text-faint">
+                  <ImageOff size={40} />
+                </div>
+              )}
+            </div>
+            {gallery.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {gallery.map((image) => (
+                  <Image
+                    key={image}
+                    src={documentDownloadUrl(image)}
+                    alt={product.name}
+                    width={64}
+                    height={64}
+                    unoptimized
+                    className="h-16 w-16 rounded-control border border-hairline object-cover"
+                  />
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section title="Descriptions">
+            <Field label="Short description" value={product.shortDescription} />
+            <Field
+              label="Description"
+              value={
+                product.description ? (
+                  <span className="whitespace-pre-wrap leading-relaxed">
+                    {product.description}
+                  </span>
+                ) : null
+              }
+            />
+          </Section>
+
+          <Section title="Technical specifications">
+            {attributes.length === 0 ? (
+              <p className="text-sm text-faint">
+                No technical attributes set for this product.
+              </p>
+            ) : (
+              <dl className="divide-y divide-hairline">
+                {attributes.map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
+                  >
+                    <dt className="text-sm text-muted">{humanizeSlug(key)}</dt>
+                    <dd className="text-sm font-medium text-ink">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </Section>
+        </div>
+
+        <div className="flex flex-col gap-5">
+          <Section title="Overview">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[status]}`}
+              >
+                {PRODUCT_STATUS_LABELS[status]}
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  product.isAvailable
+                    ? "bg-success-tint text-success"
+                    : "bg-danger-tint text-danger"
+                }`}
+              >
+                {product.isAvailable ? "Available" : "Unavailable"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Category" value={product.categoryName} />
+              <Field label="Brand" value={product.brandName} />
+              <Field
+                label="System role"
+                value={
+                  product.systemRole
+                    ? BOQ_ITEM_ROLE_LABELS[product.systemRole as BoqItemRole]
+                    : null
+                }
+              />
+              <Field label="Model" value={product.model} />
+            </div>
+          </Section>
+
+          <Section title="Pricing">
+            <Field
+              label="Public price (MSRP)"
+              value={
+                product.price ? (
+                  <span className="font-heading text-xl text-ink">
+                    {formatPrice(product.price, product.currency)}
+                  </span>
+                ) : (
+                  "Set by partner"
+                )
+              }
+            />
+          </Section>
+
+          <Section title="Identity">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Slug" value={product.slug} />
+              <Field label="Series code" value={product.seriesCode} />
+              <Field
+                label="Datasheet"
+                value={
+                  product.datasheet ? (
+                    <a
+                      href={documentDownloadUrl(product.datasheet)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                    >
+                      <FileText size={14} />
+                      Open PDF
+                    </a>
+                  ) : null
+                }
+              />
+            </div>
+          </Section>
+
+          <Section title="Warranty & origin">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Warranty period" value={product.warrantyPeriod} />
+              <Field label="Warranty region" value={product.warrantyRegion} />
+              <Field
+                label="Country of origin"
+                value={product.countryOfOrigin}
+              />
+            </div>
+          </Section>
+        </div>
+      </div>
+    </div>
+  );
+};

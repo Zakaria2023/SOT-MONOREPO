@@ -30,7 +30,9 @@ const columns: TableColumn<GovernmentRequestListItem>[] = [
         <a href={`mailto:${request.officialEmail}`} className="text-primary">
           {request.officialEmail}
         </a>
-        <p className="text-muted">{request.contactNumber}</p>
+        {request.contactNumber && (
+          <p className="text-muted">{request.contactNumber}</p>
+        )}
       </div>
     ),
   },

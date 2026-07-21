@@ -5,16 +5,16 @@ import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { CategoryFilter } from "@/components/catalog/category-filter";
 import { SORT_OPTIONS, type TreeNode } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, List, Search } from "lucide-react";
+import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import type {
   BrandListItem,
   CategoryListItem,
   ProductListItem,
   ProductSort,
 } from "services";
-import { Dropdown } from "ui";
+import { Dropdown, useDebouncedCallback, useFocusTrap } from "ui";
 
 type CatalogViewProps = {
   products: ProductListItem[];
@@ -25,6 +25,8 @@ type CatalogViewProps = {
   selectedBrands: string[];
   sort: ProductSort;
   search: string;
+  // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
+  discountPercent: number;
 };
 
 export const CatalogView = ({
@@ -36,14 +38,18 @@ export const CatalogView = ({
   selectedBrands,
   sort,
   search,
+  discountPercent,
 }: CatalogViewProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const [isFiltering, startNavigation] = useTransition();
 
   const [searchInput, setSearchInput] = useState(search);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const drawerRef = useFocusTrap<HTMLDivElement>(filtersOpen, () =>
+    setFiltersOpen(false),
+  );
 
   const selectedBrandSet = new Set(selectedBrands);
 
@@ -82,26 +88,25 @@ export const CatalogView = ({
       params.set("sort", value);
     });
 
+  const commitSearch = useDebouncedCallback((value: string) => {
+    updateParams((params) => {
+      const trimmed = value.trim();
+      if (trimmed) {
+        params.set("search", trimmed);
+      } else {
+        params.delete("search");
+      }
+    });
+  }, 350);
+
   const onSearchChange = (value: string) => {
     setSearchInput(value);
-    if (searchTimer.current) {
-      clearTimeout(searchTimer.current);
-    }
-    searchTimer.current = setTimeout(() => {
-      updateParams((params) => {
-        const trimmed = value.trim();
-        if (trimmed) {
-          params.set("search", trimmed);
-        } else {
-          params.delete("search");
-        }
-      });
-    }, 350);
+    commitSearch(value);
   };
 
   return (
     <main className="min-h-screen bg-page">
-      <div className="mx-auto max-w-6xl px-6 py-14 lg:px-8">
+      <div className="mx-auto px-6 py-14 lg:px-12 xl:px-20">
         <header>
           <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
             SOT Solutions · Catalog
@@ -116,8 +121,16 @@ export const CatalogView = ({
           </p>
         </header>
 
+        {discountPercent > 0 && (
+          <div className="mt-6 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-tint px-4 py-3 text-sm font-semibold text-primary">
+            <SlidersHorizontal size={16} />
+            Partner pricing active — {discountPercent}% off every product.
+          </div>
+        )}
+
         <div className="mt-10 flex flex-col gap-8 lg:flex-row">
-          <aside className="flex shrink-0 flex-col gap-4 lg:w-64">
+          {/* Desktop sidebar */}
+          <aside className="hidden shrink-0 flex-col gap-4 lg:flex lg:w-80 xl:w-96">
             <CategoryFilter
               tree={categoryTree}
               total={total}
@@ -131,7 +144,57 @@ export const CatalogView = ({
             />
           </aside>
 
+          {/* Mobile filters drawer */}
+          {filtersOpen && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={() => setFiltersOpen(false)}
+              />
+              <div
+                ref={drawerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Filters"
+                tabIndex={-1}
+                className="absolute inset-y-0 left-0 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto bg-page p-4 shadow-2xl outline-none"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-heading text-lg text-ink">Filters</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen(false)}
+                    aria-label="Close filters"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-surface-2 hover:text-ink"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <CategoryFilter
+                  tree={categoryTree}
+                  total={total}
+                  selected={selectedCategory}
+                  onSelect={setCategory}
+                />
+                <BrandFilter
+                  tree={brandTree}
+                  selected={selectedBrandSet}
+                  onToggle={toggleBrand}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className="font-grotesk mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-search-border bg-surface py-3 text-sm font-semibold text-ink transition-colors hover:border-primary lg:hidden"
+            >
+              <SlidersHorizontal size={16} />
+              Filters
+            </button>
+
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
                 <Search
@@ -207,7 +270,11 @@ export const CatalogView = ({
               >
                 {products.map((product) => (
                   <li key={product.uuid}>
-                    <CatalogProductCard product={product} view={view} />
+                    <CatalogProductCard
+                      product={product}
+                      view={view}
+                      discountPercent={discountPercent}
+                    />
                   </li>
                 ))}
               </ul>

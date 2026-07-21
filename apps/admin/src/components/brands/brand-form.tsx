@@ -10,7 +10,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
 import { documentDownloadUrl } from "@/lib/documents";
-import { ArrowUpDown, Award } from "lucide-react";
+import { Award } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -68,21 +68,28 @@ export const BrandForm = (props: BrandFormProps) => {
           placeholder="No parent"
           allowEmpty
         />
+      </div>
 
-        {mode === "edit" && (
-          <Input
-            label="Order"
-            labelIcon={<ArrowUpDown size={15} />}
-            type="number"
-            {...register("order", { valueAsNumber: true })}
-            error={errors.order?.message}
-          />
-        )}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <Input
+          label="Product ID label"
+          placeholder='What this brand calls its product code — e.g. "BOM", "PID", "Part Number"'
+          type="text"
+          {...register("idLabel")}
+          error={errors.idLabel?.message}
+        />
       </div>
 
       <BusinessLinesField control={control} />
 
       <Textarea label="Description" rows={3} {...register("description")} />
+
+      <Textarea
+        label="Internal note"
+        placeholder="Enrollment details, contacts, quirks — internal only"
+        rows={3}
+        {...register("note")}
+      />
 
       <ImageUpload
         label="Image"

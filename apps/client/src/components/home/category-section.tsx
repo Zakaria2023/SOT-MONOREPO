@@ -14,7 +14,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
 
   return (
     <section className="w-full bg-surface py-24">
-      <div className="mx-auto max-w-6xl px-8">
+      <div className="mx-auto px-6 lg:px-12 xl:px-20">
         <header>
           <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
             Top categories
@@ -52,7 +52,7 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
                 className={isFeatured ? "md:col-span-2 md:row-span-2" : ""}
               >
                 <Link
-                  href={`/categories/${category.uuid}`}
+                  href={`/products?category=${category.uuid}`}
                   className="group relative flex h-72 flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg md:h-full"
                 >
                   <div className="relative min-h-0 flex-1 overflow-hidden bg-surface-2">

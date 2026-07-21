@@ -21,6 +21,7 @@ export const usePartnerForm = () => {
   const form = useForm<PartnerRequestInput>({
     resolver: zodResolver(partnerRequestSchema),
     defaultValues: {
+      capabilities: [],
       type: "individual",
       email: "",
       contactNumber: "",

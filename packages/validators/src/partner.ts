@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { partnerCapabilities, type PartnerCapability } from "../../../db/enum";
+
+// Re-exported so existing consumers keep importing these from "validators".
+// The canonical capability list lives in db/enum.ts (services reads it there).
+export { partnerCapabilities };
+export type { PartnerCapability };
 
 export const partnerServiceScopes = [
   "installation",
@@ -6,6 +12,15 @@ export const partnerServiceScopes = [
 ] as const satisfies readonly string[];
 
 export type PartnerServiceScope = (typeof partnerServiceScopes)[number];
+
+export const PARTNER_CAPABILITY_LABELS: Record<PartnerCapability, string> = {
+  system_integrator: "System Integrator",
+  stock: "Have stock",
+  install_program: "Install & program the network",
+  install_only: "Install the network only",
+  pre_sell: "Pre-sell partner",
+  post_sell: "Post-sell partner",
+};
 
 // Which kind of applicant is applying — mirrors the client sign-up account
 // types. Every type submits a request that an admin reviews.
@@ -20,11 +35,16 @@ const digits = (value: string | undefined) => (value ?? "").replace(/\D/g, "");
 
 export const partnerRequestSchema = z
   .object({
+    // Chosen first — one or more capabilities.
+    capabilities: z
+      .array(z.enum(partnerCapabilities))
+      .min(1, "Select at least one option"),
+
     type: z.enum(partnerApplicantTypes),
 
     // Shared contact identity. The email receives the Clerk invitation.
     email: z.string().email("Enter a valid email address").max(255),
-    contactNumber: z.string().min(1, "Contact number is required").max(30),
+    contactNumber: z.string().max(30).optional(),
     location: z.string().min(1, "Location is required").max(255),
 
     // Individual identity + name.

@@ -1,10 +1,37 @@
 import { PartnerRequestsTable } from "@/components/partners/partner-requests-table";
+import { ListSearch } from "@/components/shared/list-search";
+import { Pagination } from "@/components/shared/pagination";
 import { requireAdmin } from "@/lib/server/auth";
-import { getPartnerRequests } from "./action";
+import { AsyncSection } from "@/components/shared/async-section";
+import { getPartnerRequestsPage } from "./action";
 
-const PartnersPage = async () => {
+type Props = {
+  searchParams: Promise<{ search?: string; page?: string }>;
+};
+
+type PartnersListProps = {
+  search?: string;
+  page?: string;
+};
+
+const PartnersList = async ({ search, page }: PartnersListProps) => {
+  const result = await getPartnerRequestsPage({ search, page });
+  return (
+    <>
+      <PartnerRequestsTable requests={result.items} />
+      <Pagination
+        page={result.page}
+        totalPages={result.totalPages}
+        total={result.total}
+        pageSize={result.pageSize}
+      />
+    </>
+  );
+};
+
+const PartnersPage = async ({ searchParams }: Props) => {
   await requireAdmin();
-  const requests = await getPartnerRequests();
+  const { search, page } = await searchParams;
 
   return (
     <div className="flex flex-col gap-5">
@@ -15,7 +42,11 @@ const PartnersPage = async () => {
         </p>
       </div>
 
-      <PartnerRequestsTable requests={requests} />
+      <ListSearch placeholder="Search by company, name, or email..." />
+
+      <AsyncSection reloadKey={`${search ?? ""}-${page ?? ""}`}>
+        <PartnersList search={search} page={page} />
+      </AsyncSection>
     </div>
   );
 };

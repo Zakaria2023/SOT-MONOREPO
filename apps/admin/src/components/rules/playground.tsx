@@ -124,6 +124,52 @@ const ResultCard = ({ result }: ResultCardProps) => {
         </div>
       )}
 
+      {result.bins.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 text-xs text-muted md:grid-cols-2">
+          {result.bins.map((bin) => {
+            const overloaded = bin.used > bin.capacity;
+            return (
+              <div
+                key={`${bin.productUuid}-${bin.unitIndex}`}
+                className={`flex flex-col gap-1 rounded-control border p-3 ${
+                  overloaded
+                    ? "border-red-200 bg-red-50"
+                    : "border-emerald-200 bg-emerald-50"
+                }`}
+              >
+                <span className="font-semibold text-secondary">
+                  {bin.name} #{bin.unitIndex} — {bin.used}
+                  {result.unit ? ` ${result.unit}` : ""} of {bin.capacity}
+                  {result.unit ? ` ${result.unit}` : ""}
+                </span>
+                {bin.items.length > 0 ? (
+                  bin.items.map((item) => (
+                    <span key={item.productUuid}>
+                      {item.count} × {item.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-faint">Empty</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {result.bins.length > 0 && result.failingItems.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-control border border-red-200 bg-red-50 p-3 text-xs">
+          <span className="font-semibold text-red-700">
+            Did not fit anywhere
+          </span>
+          {result.failingItems.map((item) => (
+            <span key={item.productUuid} className="text-red-700">
+              {item.quantity} × {item.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       {result.suggestions.length > 0 && (
         <div className="flex flex-col gap-1 rounded-control bg-primary-tint p-3 text-xs">
           <span className="flex items-center gap-1.5 font-semibold text-primary">

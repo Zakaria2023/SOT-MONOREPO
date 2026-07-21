@@ -22,6 +22,10 @@ export type SpecField = {
   options: SpecOption[];
   valueType?: SpecValueType;
   unit?: string | null;
+  // "select" spec that accepts several ticked options (stored comma-joined).
+  allowMultiple?: boolean;
+  // "number" spec whose value is a from–to range (stored as "from - to").
+  allowRange?: boolean;
 };
 
 // Optional consumer-side filter on a compatibility rule: only selection items

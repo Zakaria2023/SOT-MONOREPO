@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldCheck, TriangleAlert, X } from "lucide-react";
-import { Button, FormError, Textarea } from "ui";
+import { Button, Checkbox, FormError, Textarea } from "ui";
 
 type PartnerRequestReviewDialogProps = {
   open: boolean;
@@ -9,9 +9,11 @@ type PartnerRequestReviewDialogProps = {
   partnerName: string;
   email: string;
   rejectionReason: string;
+  isIntegrated: boolean;
   isSubmitting: boolean;
   error?: string;
   onRejectionReasonChange: (value: string) => void;
+  onIntegratedChange: (value: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -22,9 +24,11 @@ export const PartnerRequestReviewDialog = ({
   partnerName,
   email,
   rejectionReason,
+  isIntegrated,
   isSubmitting,
   error,
   onRejectionReasonChange,
+  onIntegratedChange,
   onConfirm,
   onCancel,
 }: PartnerRequestReviewDialogProps) => {
@@ -57,6 +61,17 @@ export const PartnerRequestReviewDialog = ({
             </p>
           </div>
         </div>
+
+        {approve && (
+          <div className="mt-5">
+            <Checkbox
+              label="Integrated partner (auto-invoiced & paid at handover)"
+              checked={isIntegrated}
+              onChange={(event) => onIntegratedChange(event.target.checked)}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
 
         {!approve && (
           <div className="mt-5">

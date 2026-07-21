@@ -4,7 +4,8 @@ import type { SelectGovernmentRequests } from "@/db/schema/government-requests";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
-import { getReviewerName } from "utils";
+import type { PaginatedResult } from "utils";
+import { getReviewerName, paginate } from "utils";
 import { revalidatePath } from "next/cache";
 import {
   approveGovernmentRequest as approveGovernmentRequestRecord,
@@ -24,11 +25,21 @@ export type GovernmentReviewResult = {
   success?: boolean;
 };
 
-export const getGovernmentRequests = async (): Promise<
-  GovernmentRequestListItem[]
-> => {
+export type GovernmentRequestListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
+// Searched + paginated page of government requests for the list table. The
+// frontend drives `search`/`page` through URL search params.
+export const getGovernmentRequestsPage = async (
+  params: GovernmentRequestListParams = {},
+): Promise<PaginatedResult<GovernmentRequestListItem>> => {
   await requireAdmin();
-  return listGovernmentRequests();
+  return paginate(params, ({ limit, offset }) =>
+    listGovernmentRequests({ search: params.search, limit, offset }),
+  );
 };
 
 export const approveGovernmentRequestAction = async (
@@ -48,25 +59,44 @@ export const approveGovernmentRequestAction = async (
       throw new Error("This government request has already been reviewed");
     }
 
-    // Invite the official email to set up their account. The entity details
-    // ride in publicMetadata so the webhook can build the government Users row
-    // when the invitation is accepted.
-    const invitation = await client.invitations.createInvitation({
-      emailAddress: request.officialEmail,
-      ignoreExisting: true,
-      publicMetadata: {
-        role: "user",
-        type: "government",
-        entityName: request.entityName,
-        fullName: request.fullName,
-        contactNumber: request.contactNumber,
-        location: request.location,
-      },
+    // The entity details ride in publicMetadata so the webhook can build the
+    // government Users row. A government official is a client, so their role is
+    // "client" (they use the customer app, not a staff app).
+    const publicMetadata = {
+      role: "client",
+      type: "government",
+      entityName: request.entityName,
+      fullName: request.fullName,
+      contactNumber: request.contactNumber,
+      location: request.location,
+    };
+
+    // If a Clerk account with this email already exists, an invitation would
+    // never apply this metadata (invitations only seed brand-new signups), so
+    // set it directly on the existing user; otherwise invite them.
+    const { data: existingUsers } = await client.users.getUserList({
+      emailAddress: [request.officialEmail],
     });
+    const [existingUser] = existingUsers;
+
+    let approvedClerkUserId: string;
+    if (existingUser) {
+      await client.users.updateUserMetadata(existingUser.id, {
+        publicMetadata: { ...existingUser.publicMetadata, ...publicMetadata },
+      });
+      approvedClerkUserId = existingUser.id;
+    } else {
+      const invitation = await client.invitations.createInvitation({
+        emailAddress: request.officialEmail,
+        ignoreExisting: true,
+        publicMetadata,
+      });
+      approvedClerkUserId = invitation.id;
+    }
 
     await approveGovernmentRequestRecord({
       governmentRequestUuid,
-      approvedClerkUserId: invitation.id,
+      approvedClerkUserId,
       reviewedByClerkUserId: userId,
       reviewedByName: getReviewerName(user),
     });

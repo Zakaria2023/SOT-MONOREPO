@@ -1,6 +1,8 @@
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, like, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
+import { BoqPartners } from "../../../db/schema/boq-partners";
+import { Offers } from "../../../db/schema/offers";
 import {
   PartnerRequests,
   SelectPartnerRequests,
@@ -16,9 +18,10 @@ export type DbExecutor =
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PartnerRequestInput = {
+  capabilities?: SelectPartnerRequests["capabilities"];
   type: SelectPartnerRequests["type"];
   email: SelectPartnerRequests["email"];
-  contactNumber: SelectPartnerRequests["contactNumber"];
+  contactNumber?: SelectPartnerRequests["contactNumber"];
   location: SelectPartnerRequests["location"];
   // Individual identity + name (null/absent for other types).
   firstName?: SelectPartnerRequests["firstName"];
@@ -108,10 +111,11 @@ export const createPartnerRequest = async (
 
   await db.insert(PartnerRequests).values({
     uuid,
+    capabilities: input.capabilities ?? [],
     type: input.type,
     fullName,
     email,
-    contactNumber: input.contactNumber.trim(),
+    contactNumber: normalizeText(input.contactNumber),
     location: input.location.trim(),
     firstName: normalizeText(input.firstName),
     middleName: normalizeText(input.middleName),
@@ -138,12 +142,42 @@ export const createPartnerRequest = async (
   return request;
 };
 
-/** Every partner request, newest first (admin review queue). */
-export const listPartnerRequests = async (): Promise<SelectPartnerRequests[]> =>
-  db
-    .select()
-    .from(PartnerRequests)
-    .orderBy(desc(PartnerRequests.createdAt), desc(PartnerRequests.id));
+export type PartnerRequestsListParams = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
+/**
+ * A searched + paginated page of partner requests, newest first (admin review
+ * queue), plus the unfiltered total for that search. Search matches the company
+ * name, contact full name, or email.
+ */
+export const listPartnerRequests = async (
+  params: PartnerRequestsListParams,
+): Promise<{ items: SelectPartnerRequests[]; total: number }> => {
+  const term = params.search?.trim();
+  const where = term
+    ? or(
+        like(PartnerRequests.companyName, `%${term}%`),
+        like(PartnerRequests.fullName, `%${term}%`),
+        like(PartnerRequests.email, `%${term}%`),
+      )
+    : undefined;
+
+  const [items, [totals]] = await Promise.all([
+    db
+      .select()
+      .from(PartnerRequests)
+      .where(where)
+      .orderBy(desc(PartnerRequests.createdAt), desc(PartnerRequests.id))
+      .limit(params.limit)
+      .offset(params.offset),
+    db.select({ total: count() }).from(PartnerRequests).where(where),
+  ]);
+
+  return { items, total: Number(totals?.total ?? 0) };
+};
 
 /** The partner request with this uuid, or null. */
 export const getPartnerRequestByUuid = async (
@@ -336,4 +370,81 @@ export const getApprovedPartnerOptions = async (
     close: closeEntries.map((entry, index) => toMatched(entry, index + 1)),
     others: otherEntries.map((entry) => toMatched(entry, 0)),
   };
+};
+
+// Point an approved partner request at the real Clerk user id once that account
+// exists. Approval may store an invitation id (for a brand-new signup); when
+// the user is created/updated the webhook calls this so getApprovedPartnerByClerkId
+// resolves by the signed-in user's id. Matches by email; a no-op if none.
+export const linkPartnerRequestToClerkUser = async ({
+  email,
+  clerkUserId,
+}: {
+  email: string;
+  clerkUserId: string;
+}): Promise<void> => {
+  const normalized = normalizeEmail(email);
+
+  const [request] = await db
+    .select({ oldId: PartnerRequests.approvedClerkUserId })
+    .from(PartnerRequests)
+    .where(
+      and(
+        eq(PartnerRequests.email, normalized),
+        eq(PartnerRequests.status, "approved"),
+      ),
+    );
+  // No approved request, or already linked to this user — nothing to do.
+  if (!request || request.oldId === clerkUserId) {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(PartnerRequests)
+      .set({ approvedClerkUserId: clerkUserId })
+      .where(
+        and(
+          eq(PartnerRequests.email, normalized),
+          eq(PartnerRequests.status, "approved"),
+        ),
+      );
+
+    // Re-point anything dispatched/quoted under the old id (e.g. an invitation
+    // id used before the partner signed up) to the real user id, so their
+    // incoming BOQs and offers resolve.
+    if (request.oldId) {
+      await tx
+        .update(BoqPartners)
+        .set({ partnerClerkUserId: clerkUserId })
+        .where(eq(BoqPartners.partnerClerkUserId, request.oldId));
+      await tx
+        .update(Offers)
+        .set({ partnerClerkUserId: clerkUserId })
+        .where(eq(Offers.partnerClerkUserId, request.oldId));
+    }
+  });
+};
+
+// Set whether a partner is integrated (auto-invoiced & paid at handover).
+// Admin only. Badge isn't set here — every partner prices at the SI rate.
+export const setPartnerIntegration = async ({
+  partnerRequestUuid,
+  isIntegrated,
+}: {
+  partnerRequestUuid: SelectPartnerRequests["uuid"];
+  isIntegrated: SelectPartnerRequests["isIntegrated"];
+}): Promise<void> => {
+  const [existing] = await db
+    .select({ id: PartnerRequests.id })
+    .from(PartnerRequests)
+    .where(eq(PartnerRequests.uuid, partnerRequestUuid));
+  if (!existing) {
+    throw new ValidationError("Partner not found");
+  }
+
+  await db
+    .update(PartnerRequests)
+    .set({ isIntegrated })
+    .where(eq(PartnerRequests.uuid, partnerRequestUuid));
 };

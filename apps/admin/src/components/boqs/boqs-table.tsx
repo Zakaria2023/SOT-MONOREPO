@@ -4,6 +4,8 @@ import type { PreSellerOption } from "@/app/(dashboard)/boqs/action";
 import { AssignPreSeller } from "@/components/boqs/assign-pre-seller";
 import type { BoqStatus } from "@/db/enum";
 import { BOQ_STATUS_LABELS } from "@/db/label";
+import { Eye } from "lucide-react";
+import Link from "next/link";
 import { formatSar } from "utils";
 import type { BoqListItem } from "services";
 import type { TableColumn } from "ui";
@@ -16,8 +18,16 @@ type BoqsTableProps = {
 
 const STATUS_BADGE_CLASSES: Record<BoqStatus, string> = {
   draft: "bg-hover text-faint",
+  validated: "bg-primary-tint text-primary",
   submitted: "bg-warning-tint text-warning",
   reviewed: "bg-success-tint text-success",
+  offered: "bg-primary-tint text-primary",
+  ordered: "bg-success-tint text-success",
+  assigned: "bg-primary-tint text-primary",
+  installing: "bg-warning-tint text-warning",
+  installed: "bg-primary-tint text-primary",
+  verified: "bg-success-tint text-success",
+  handed_over: "bg-success-tint text-success",
 };
 
 const buildColumns = (
@@ -27,7 +37,12 @@ const buildColumns = (
     key: "reference",
     header: "Reference",
     render: (boq) => (
-      <span className="font-semibold text-ink">{boq.reference}</span>
+      <Link
+        href={`/boqs/${boq.uuid}`}
+        className="font-semibold text-primary hover:underline"
+      >
+        {boq.reference}
+      </Link>
     ),
   },
   {
@@ -82,6 +97,20 @@ const buildColumns = (
       ) : (
         <span className="text-faint">—</span>
       ),
+  },
+  {
+    key: "actions",
+    header: "",
+    align: "right",
+    render: (boq) => (
+      <Link
+        href={`/boqs/${boq.uuid}`}
+        className="inline-flex items-center gap-1.5 rounded-control border border-hairline px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-hover"
+      >
+        <Eye size={14} />
+        View
+      </Link>
+    ),
   },
 ];
 
