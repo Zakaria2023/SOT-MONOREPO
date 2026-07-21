@@ -4,6 +4,7 @@ export * from "./brands";
 export * from "./cart";
 export * from "./categories";
 export * from "./check-compatibility";
+export * from "./classifications";
 export * from "./compatibility-rules";
 export * from "./errors";
 export * from "./government";
