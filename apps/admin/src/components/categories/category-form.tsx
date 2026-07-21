@@ -2,27 +2,34 @@
 
 import { useCategoryForm } from "@/app/(dashboard)/categories/use-category-form";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
+import { ClassificationDropdown } from "@/components/classifications/classification-dropdown";
 import { Button } from "ui";
 import { FormError } from "ui";
 import { ImageUpload } from "ui";
 import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
+import type { SelectClassifications } from "@/db/schema/classifications";
 import { documentDownloadUrl } from "@/lib/documents";
 import { Tags } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
 type CategoryFormProps =
-  | { mode: "add"; categories: SelectCategories[] }
+  | {
+      mode: "add";
+      categories: SelectCategories[];
+      classifications: SelectClassifications[];
+    }
   | {
       mode: "edit";
       categories: SelectCategories[];
+      classifications: SelectClassifications[];
       category: SelectCategories;
     };
 
 export const CategoryForm = (props: CategoryFormProps) => {
-  const { mode, categories } = props;
+  const { mode, categories, classifications } = props;
 
   const { form, state, isPending, onSubmit } = useCategoryForm(
     mode === "edit"
@@ -69,6 +76,13 @@ export const CategoryForm = (props: CategoryFormProps) => {
           control={control}
           name="parentUuid"
           categories={categories}
+        />
+
+        <ClassificationDropdown
+          control={control}
+          name="classificationUuid"
+          classifications={classifications}
+          error={errors.classificationUuid?.message}
         />
       </div>
 

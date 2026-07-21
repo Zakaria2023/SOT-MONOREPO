@@ -13,6 +13,7 @@ import {
   Network,
   Package,
   Search,
+  Shapes,
   Tags,
   Ticket,
 } from "lucide-react";
@@ -41,6 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: Award, label: "Brands", href: "/brands" },
       { icon: Tags, label: "Categories", href: "/categories" },
+      { icon: Shapes, label: "Classifications", href: "/classifications" },
       { icon: ListChecks, label: "Specifications", href: "/specifications" },
       { icon: GitCompare, label: "Compatibility Rules", href: "/rules" },
       { icon: Package, label: "Products", href: "/products" },

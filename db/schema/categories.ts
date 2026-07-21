@@ -9,6 +9,7 @@ import {
   varchar,
   type AnyMySqlColumn,
 } from "drizzle-orm/mysql-core";
+import { Classifications } from "./classifications";
 
 export const Categories = mysqlTable(
   "Categories",
@@ -18,6 +19,13 @@ export const Categories = mysqlTable(
 
     parentUuid: char("parent_uuid", { length: 36 }).references(
       (): AnyMySqlColumn => Categories.uuid,
+      { onDelete: "set null" },
+    ),
+
+    // The classification (solution group) this category belongs to. Set null
+    // if its classification is deleted — the category simply becomes unfiled.
+    classificationUuid: char("classification_uuid", { length: 36 }).references(
+      () => Classifications.uuid,
       { onDelete: "set null" },
     ),
 
@@ -32,7 +40,10 @@ export const Categories = mysqlTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
-  (table) => [index("idx_categories_parent_uuid").on(table.parentUuid)],
+  (table) => [
+    index("idx_categories_parent_uuid").on(table.parentUuid),
+    index("idx_categories_classification_uuid").on(table.classificationUuid),
+  ],
 );
 
 export type SelectCategories = InferSelectModel<typeof Categories>;
