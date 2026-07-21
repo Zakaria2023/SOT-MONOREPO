@@ -24,6 +24,10 @@ import {
   InsertCategories,
   SelectCategories,
 } from "../../../db/schema/categories";
+import {
+  Classifications,
+  SelectClassifications,
+} from "../../../db/schema/classifications";
 import { Products } from "../../../db/schema/products";
 
 export type { SelectCategories };
@@ -38,6 +42,7 @@ export type CategoryListItem = SelectCategories & {
 // other column's children.
 export type CategoryBoardItem = CategoryListItem & {
   childCount: number;
+  classificationName: SelectClassifications["name"] | null;
 };
 
 // One column of the reorder board: a parent (null = top level) with its total
@@ -79,6 +84,7 @@ const categoryBoardSelection = {
   parentName: ParentCategories.name,
   productCount: countDistinct(Products.id),
   childCount: countDistinct(ChildCategories.id),
+  classificationName: Classifications.name,
 };
 
 // Match a search term against the category name or its generated code.
@@ -167,6 +173,10 @@ export const getCategoryChildren = async (
       .leftJoin(
         ChildCategories,
         eq(ChildCategories.parentUuid, Categories.uuid),
+      )
+      .leftJoin(
+        Classifications,
+        eq(Categories.classificationUuid, Classifications.uuid),
       )
       .where(
         parentUuid

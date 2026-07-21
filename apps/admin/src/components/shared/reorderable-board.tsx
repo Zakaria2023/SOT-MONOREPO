@@ -25,6 +25,7 @@ import {
   ImageOff,
   Layers,
   Loader2,
+  Shapes,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -43,6 +44,8 @@ export type BoardItem = {
   image: string | null;
   productCount: number;
   childCount: number;
+  // Optional — categories carry a classification name; brands don't.
+  classificationName?: string | null;
 };
 
 // The loaded state of one on-screen column.
@@ -180,6 +183,12 @@ const CardContent = <T extends BoardItem>({
             <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-primary-tint px-2 py-0.5 text-[11px] font-semibold text-primary">
               <Layers size={11} />
               {item.childCount}
+            </span>
+          )}
+          {item.classificationName && (
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-hover px-2 py-0.5 text-[11px] font-medium text-secondary">
+              <Shapes size={11} />
+              {item.classificationName}
             </span>
           )}
         </div>
