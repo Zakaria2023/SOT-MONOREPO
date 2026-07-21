@@ -64,9 +64,7 @@ export const GuestCartView = () => {
   const { subtotal, vat, total } = summarizeCart(lines);
 
   // Same design check as the signed-in cart.
-  const findings = useCompatibility(lines);
-  const blockers = findings.filter((finding) => finding.status === "fail");
-  const warnings = findings.filter((finding) => finding.status === "warn");
+  const { blockers, warnings } = useCompatibility(lines);
 
   return (
     <main className="min-h-screen w-full bg-page">

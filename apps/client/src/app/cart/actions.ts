@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   addToCart,
+  checkCartPresence,
   checkCompatibility,
   createBoqFromCart,
   createOrderFromCart,
@@ -15,6 +16,7 @@ import {
   updateCartItemQuantity,
   type CartLineItem,
   type GuestCartItem,
+  type PresenceFinding,
   type RuleEvaluation,
   type SelectionInput,
 } from "services";
@@ -88,27 +90,74 @@ export const removeItem = async (cartItemUuid: string) => {
   await removeCartItem({ userUuid: user.uuid, cartItemUuid });
 };
 
-// Runs the compatibility rule engine over the cart. Advisory only — it never
-// blocks a purchase. Results are filtered to violations where the cart holds
-// BOTH sides of the rule: a customer buying only cameras (no switch) is left
-// alone, since the provider may already exist on their site.
-export const checkCartCompatibility = async (
+// A unified, customer-facing finding — from either engine, in one shape.
+export type DesignFinding = {
+  id: string;
+  title: string;
+  message: string;
+  tone: "block" | "warn";
+  suggestions: string[];
+};
+
+export type DesignCheckResult = {
+  blockers: DesignFinding[];
+  warnings: DesignFinding[];
+};
+
+const ruleToFinding = (result: RuleEvaluation): DesignFinding => ({
+  id: `rule:${result.ruleUuid}`,
+  title: result.name,
+  message: result.message,
+  tone: result.status === "fail" ? "block" : "warn",
+  suggestions: result.suggestions.map(
+    (suggestion) =>
+      `${suggestion.name}${
+        suggestion.capacity
+          ? ` (${suggestion.capacity}${result.unit ? ` ${result.unit}` : ""})`
+          : ""
+      }`,
+  ),
+});
+
+const presenceToFinding = (finding: PresenceFinding): DesignFinding => ({
+  id: `presence:${finding.ruleId}:${finding.groupDescription}`,
+  title: finding.name,
+  message: finding.message,
+  tone: finding.severity === "hard" ? "block" : "warn",
+  suggestions: [],
+});
+
+// The full design check over the cart: requires-companion (Presence — what's
+// MISSING) plus compatibility rules (Budget/Count/Match/Ratio — what conflicts).
+// Advisory by nature — a failure here must never break the cart. The UI splits
+// blockers from warnings; blockers gate checkout, warnings only caution.
+export const checkCartDesign = async (
   selection: SelectionInput[],
-): Promise<RuleEvaluation[]> => {
-  if (selection.length < 2) {
-    return [];
+): Promise<DesignCheckResult> => {
+  if (selection.length === 0) {
+    return { blockers: [], warnings: [] };
   }
   try {
-    const report = await checkCompatibility(selection);
-    // Every rule the design breaks — blockers (fail) and advisories (warn).
-    // The UI separates the two; blockers gate checkout, warnings only caution.
-    return report.results.filter(
-      (result) => result.status === "fail" || result.status === "warn",
-    );
+    const [report, presence] = await Promise.all([
+      checkCompatibility(selection),
+      checkCartPresence(selection),
+    ]);
+    const findings: DesignFinding[] = [
+      // Missing companions first — the most actionable for the buyer.
+      ...presence.findings.map(presenceToFinding),
+      ...report.results
+        .filter(
+          (result) => result.status === "fail" || result.status === "warn",
+        )
+        .map(ruleToFinding),
+    ];
+    return {
+      blockers: findings.filter((finding) => finding.tone === "block"),
+      warnings: findings.filter((finding) => finding.tone === "warn"),
+    };
   } catch (error) {
-    // The check is a courtesy — a failure here must never break the cart.
-    console.error("checkCartCompatibility failed:", error);
-    return [];
+    console.error("checkCartDesign failed:", error);
+    return { blockers: [], warnings: [] };
   }
 };
 

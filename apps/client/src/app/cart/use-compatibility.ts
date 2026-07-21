@@ -1,21 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { RuleEvaluation } from "services";
-import { checkCartCompatibility } from "./actions";
+import { checkCartDesign, type DesignFinding } from "./actions";
 
 type SelectionLine = {
   productUuid: string;
   quantity: number;
 };
 
+type DesignState = {
+  blockers: DesignFinding[];
+  warnings: DesignFinding[];
+};
+
+const EMPTY: DesignState = { blockers: [], warnings: [] };
+
 /**
- * Debounced advisory compatibility check over the current cart lines.
- * Quantities change in quick bursts (+/- steppers), so the check waits for
- * the cart to settle before calling the engine.
+ * Debounced design check over the current cart lines — requires-companion
+ * (Presence) plus compatibility rules. Quantities change in quick bursts
+ * (+/- steppers), so it waits for the cart to settle before calling the engine.
+ * Returns blockers (must fix) and warnings (advisory).
  */
-export const useCompatibility = (lines: SelectionLine[]) => {
-  const [warnings, setWarnings] = useState<RuleEvaluation[]>([]);
+export const useCompatibility = (lines: SelectionLine[]): DesignState => {
+  const [state, setState] = useState<DesignState>(EMPTY);
 
   // One entry per product, quantities summed — a product can appear both as
   // a solution line and an individual line.
@@ -37,16 +44,16 @@ export const useCompatibility = (lines: SelectionLine[]) => {
     let active = true;
     const timer = setTimeout(() => {
       if (!selectionKey) {
-        setWarnings([]);
+        setState(EMPTY);
         return;
       }
       const selection = selectionKey.split(",").map((entry) => {
         const [productUuid, quantity] = entry.split(":");
         return { productUuid, quantity: Number(quantity) };
       });
-      void checkCartCompatibility(selection).then((results) => {
+      void checkCartDesign(selection).then((result) => {
         if (active) {
-          setWarnings(results);
+          setState(result);
         }
       });
     }, 400);
@@ -57,5 +64,5 @@ export const useCompatibility = (lines: SelectionLine[]) => {
     };
   }, [selectionKey]);
 
-  return warnings;
+  return state;
 };
