@@ -12,6 +12,7 @@ import {
   ListChecks,
   Network,
   Package,
+  Percent,
   Search,
   Shapes,
   Tags,
@@ -53,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: FileText, label: "BOQs", href: "/boqs" },
       { icon: Network, label: "Partners", href: "/partners" },
+      { icon: Percent, label: "Partner Discounts", href: "/partner-discounts" },
       { icon: Landmark, label: "Government", href: "/government" },
       { icon: Ticket, label: "Offers", href: "/offers" },
     ],

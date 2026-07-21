@@ -1,17 +1,28 @@
-import { and, desc, eq, getTableColumns } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import {
+  applyPercentDiscount,
+  fromMinorUnits,
+  toMinorUnits,
+} from "utils";
 import { db } from "../../../db";
 import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
+import { CartItems, Carts } from "../../../db/schema/carts";
 import { Offers } from "../../../db/schema/offers";
+import {
+  OrderItems,
+  SelectOrderItems,
+} from "../../../db/schema/order-items";
 import {
   Invoices,
   Orders,
   SelectInvoices,
   SelectOrders,
 } from "../../../db/schema/orders";
+import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
 
-export type { SelectInvoices, SelectOrders };
+export type { SelectInvoices, SelectOrderItems, SelectOrders };
 
 export type OrderWithInvoice = {
   order: SelectOrders;
@@ -107,6 +118,103 @@ export const createOrderFromSelectedOffer = async ({
   }
   return order;
 };
+
+/**
+ * Direct (non-BOQ) order: turn the "product" items in the user's cart into an
+ * order (awaiting_payment) with no BOQ/offer. Each line snapshots the price the
+ * customer pays — the discounted unit price for a partner — so it can't drift.
+ * The ordered product items are cleared from the cart. Solutions stay for BOQ.
+ */
+export const createOrderFromCart = async ({
+  userUuid,
+  discountPercent = 0,
+}: {
+  userUuid: string;
+  discountPercent?: number;
+}): Promise<SelectOrders> => {
+  const items = (await getCart(userUuid)).filter(
+    (item) => item.kind === "product",
+  );
+  if (items.length === 0) {
+    throw new ValidationError("Your cart has no products to order");
+  }
+
+  const currency = items[0].currency ?? "SAR";
+  const lines = items.map((item) => {
+    const unitPrice = applyPercentDiscount(item.unitPrice, discountPercent);
+    const lineTotal = fromMinorUnits(toMinorUnits(unitPrice) * item.quantity);
+    return {
+      productUuid: item.productUuid,
+      name: item.name,
+      unitPrice,
+      quantity: item.quantity,
+      lineTotal,
+    };
+  });
+
+  const productTotalMinor = lines.reduce(
+    (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
+    0,
+  );
+  const grandTotal = fromMinorUnits(productTotalMinor).toFixed(2);
+
+  const uuid = randomUUID();
+  const reference = `ORD-${uuid.slice(0, 8).toUpperCase()}`;
+
+  await db.transaction(async (tx) => {
+    await tx.insert(Orders).values({
+      uuid,
+      reference,
+      userUuid,
+      discountPercent,
+      productTotal: grandTotal,
+      serviceTotal: "0.00",
+      grandTotal,
+      currency,
+    });
+
+    for (const line of lines) {
+      await tx.insert(OrderItems).values({
+        uuid: randomUUID(),
+        orderUuid: uuid,
+        productUuid: line.productUuid,
+        name: line.name,
+        unitPrice: line.unitPrice.toFixed(2),
+        quantity: line.quantity,
+        lineTotal: line.lineTotal.toFixed(2),
+      });
+    }
+
+    // Clear the ordered product items; leave solution items for the BOQ path.
+    const [cart] = await tx
+      .select({ uuid: Carts.uuid })
+      .from(Carts)
+      .where(eq(Carts.userUuid, userUuid));
+    if (cart) {
+      await tx
+        .delete(CartItems)
+        .where(
+          and(eq(CartItems.cartUuid, cart.uuid), eq(CartItems.kind, "product")),
+        );
+    }
+  });
+
+  const [order] = await db.select().from(Orders).where(eq(Orders.uuid, uuid));
+  if (!order) {
+    throw new Error("Failed to create order");
+  }
+  return order;
+};
+
+/** The line items for a direct order, oldest first. */
+export const getOrderItems = async (
+  orderUuid: string,
+): Promise<SelectOrderItems[]> =>
+  db
+    .select()
+    .from(OrderItems)
+    .where(eq(OrderItems.orderUuid, orderUuid))
+    .orderBy(asc(OrderItems.createdAt));
 
 /**
  * Settle an awaiting-payment order and raise its one invoice. Payment has no

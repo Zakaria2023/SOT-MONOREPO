@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { partnerCapabilities, type PartnerCapability } from "../../../db/enum";
+
+// Re-exported so existing consumers keep importing these from "validators".
+// The canonical capability list lives in db/enum.ts (services reads it there).
+export { partnerCapabilities };
+export type { PartnerCapability };
 
 export const partnerServiceScopes = [
   "installation",
@@ -6,19 +12,6 @@ export const partnerServiceScopes = [
 ] as const satisfies readonly string[];
 
 export type PartnerServiceScope = (typeof partnerServiceScopes)[number];
-
-// What a partner can do — chosen first, before their applicant type. A partner
-// picks one or more of these.
-export const partnerCapabilities = [
-  "system_integrator",
-  "stock",
-  "install_program",
-  "install_only",
-  "pre_sell",
-  "post_sell",
-] as const satisfies readonly string[];
-
-export type PartnerCapability = (typeof partnerCapabilities)[number];
 
 export const PARTNER_CAPABILITY_LABELS: Record<PartnerCapability, string> = {
   system_integrator: "System Integrator",

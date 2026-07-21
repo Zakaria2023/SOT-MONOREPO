@@ -14,10 +14,11 @@ import { Boqs } from "./boqs";
 import { Offers } from "./offers";
 import { Users } from "./users";
 
-// An order is a confirmed offer. It is created only from an offer the customer
-// selected (confirm-then-pay), snapshots the agreed totals, and carries the
-// BOQ from `offered` to `ordered`. Totals are stored, not recomputed, so the
-// price the customer agreed to can't drift if catalog prices change later.
+// An order is a confirmed purchase. It comes from one of two paths: a BOQ offer
+// the customer selected (confirm-then-pay — boqUuid + offerUuid set), or a
+// direct product order shopped straight from the catalog (both null, with line
+// items in OrderItems). Totals are stored, not recomputed, so the agreed price
+// can't drift if catalog prices change later.
 export const Orders = mysqlTable(
   "Orders",
   {
@@ -25,12 +26,14 @@ export const Orders = mysqlTable(
     uuid: char("uuid", { length: 36 }).notNull().unique(),
     reference: varchar("reference", { length: 50 }).notNull(),
 
-    boqUuid: char("boq_uuid", { length: 36 })
-      .notNull()
-      .references(() => Boqs.uuid, { onDelete: "restrict" }),
-    offerUuid: char("offer_uuid", { length: 36 })
-      .notNull()
-      .references(() => Offers.uuid, { onDelete: "restrict" }),
+    // Both null for a direct (non-BOQ) product order.
+    boqUuid: char("boq_uuid", { length: 36 }).references(() => Boqs.uuid, {
+      onDelete: "restrict",
+    }),
+    offerUuid: char("offer_uuid", { length: 36 }).references(
+      () => Offers.uuid,
+      { onDelete: "restrict" },
+    ),
     userUuid: char("user_uuid", { length: 36 })
       .notNull()
       .references(() => Users.uuid, { onDelete: "restrict" }),
@@ -39,7 +42,10 @@ export const Orders = mysqlTable(
       .default("awaiting_payment")
       .notNull(),
 
-    // Agreed totals snapshotted from the selected offer at confirm time.
+    // The partner discount applied to a direct order (0 for BOQ/regular orders).
+    discountPercent: int("discount_percent").default(0).notNull(),
+
+    // Agreed totals snapshotted at confirm time.
     productTotal: decimal("product_total", {
       precision: 12,
       scale: 2,

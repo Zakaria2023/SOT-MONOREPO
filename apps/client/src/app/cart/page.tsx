@@ -1,6 +1,7 @@
 import { CartView } from "@/components/cart/cart-view";
 import { GuestCartView } from "@/components/cart/guest-cart-view";
 import { getCurrentUser } from "@/lib/auth";
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import { getCart, isProfileComplete } from "services";
 
@@ -15,9 +16,18 @@ const CartPage = async () => {
     return <GuestCartView />;
   }
 
-  const items = await getCart(user.uuid);
+  const [items, viewerPricing] = await Promise.all([
+    getCart(user.uuid),
+    getViewerPartnerPricing(),
+  ]);
 
-  return <CartView items={items} needsProfile={!isProfileComplete(user)} />;
+  return (
+    <CartView
+      items={items}
+      needsProfile={!isProfileComplete(user)}
+      discountPercent={viewerPricing.discountPercent}
+    />
+  );
 };
 
 export default CartPage;

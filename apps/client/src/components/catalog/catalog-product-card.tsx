@@ -1,6 +1,7 @@
 "use client";
 
 import { addProductToCart } from "@/app/cart/actions";
+import { ProductPrice } from "@/components/shared/product-price";
 import { documentDownloadUrl } from "@/lib/documents";
 import { addToGuestCart } from "@/lib/guest-cart";
 import { cn } from "@/lib/utils";
@@ -10,11 +11,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { ProductListItem } from "services";
-import { formatPrice } from "utils";
 
 type CatalogProductCardProps = {
   product: ProductListItem;
   view: "grid" | "list";
+  // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
+  discountPercent?: number;
 };
 
 type ThumbProps = {
@@ -125,11 +127,15 @@ const AddButton = ({ product }: AddButtonProps) => {
 export const CatalogProductCard = ({
   product,
   view,
+  discountPercent = 0,
 }: CatalogProductCardProps) => {
   const price = (
-    <span className="font-grotesk text-lg font-bold tabular-nums text-ink">
-      {formatPrice(product.price, product.currency)}
-    </span>
+    <ProductPrice
+      price={product.price}
+      currency={product.currency}
+      discountPercent={discountPercent}
+      className="font-grotesk text-lg font-bold text-ink"
+    />
   );
 
   if (view === "list") {

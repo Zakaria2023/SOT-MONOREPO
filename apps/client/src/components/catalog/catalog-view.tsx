@@ -25,6 +25,8 @@ type CatalogViewProps = {
   selectedBrands: string[];
   sort: ProductSort;
   search: string;
+  // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
+  discountPercent: number;
 };
 
 export const CatalogView = ({
@@ -36,6 +38,7 @@ export const CatalogView = ({
   selectedBrands,
   sort,
   search,
+  discountPercent,
 }: CatalogViewProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -117,6 +120,13 @@ export const CatalogView = ({
             deployment.
           </p>
         </header>
+
+        {discountPercent > 0 && (
+          <div className="mt-6 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-tint px-4 py-3 text-sm font-semibold text-primary">
+            <SlidersHorizontal size={16} />
+            Partner pricing active — {discountPercent}% off every product.
+          </div>
+        )}
 
         <div className="mt-10 flex flex-col gap-8 lg:flex-row">
           {/* Desktop sidebar */}
@@ -260,7 +270,11 @@ export const CatalogView = ({
               >
                 {products.map((product) => (
                   <li key={product.uuid}>
-                    <CatalogProductCard product={product} view={view} />
+                    <CatalogProductCard
+                      product={product}
+                      view={view}
+                      discountPercent={discountPercent}
+                    />
                   </li>
                 ))}
               </ul>

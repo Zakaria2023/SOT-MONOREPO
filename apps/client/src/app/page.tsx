@@ -4,13 +4,15 @@ import { HowItWorks } from "@/components/home/how-it-works";
 import { ProductSection } from "@/components/home/product-section";
 import { TechHero } from "@/components/home/tech-hero";
 import { getCachedCategories } from "@/lib/data";
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { getBrands, getProducts } from "services";
 
 const HomePage = async () => {
-  const [products, categories, brands] = await Promise.all([
+  const [products, categories, brands, viewerPricing] = await Promise.all([
     getProducts(),
     getCachedCategories(),
     getBrands(),
+    getViewerPartnerPricing(),
   ]);
 
   return (
@@ -18,7 +20,10 @@ const HomePage = async () => {
       <TechHero />
       <HowItWorks />
       <CategorySection categories={categories} />
-      <ProductSection products={products} />
+      <ProductSection
+        products={products}
+        discountPercent={viewerPricing.discountPercent}
+      />
       <BrandSection brands={brands} />
     </>
   );

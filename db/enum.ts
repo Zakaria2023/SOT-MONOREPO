@@ -175,6 +175,20 @@ export const partnerTypes = [
 
 export type PartnerType = (typeof partnerTypes)[number];
 
+// What a partner can do — one or more capabilities, chosen on the partner
+// application. Drives the per-capability discount matrix. Labels live in
+// packages/validators (PARTNER_CAPABILITY_LABELS).
+export const partnerCapabilities = [
+  "system_integrator",
+  "stock",
+  "install_program",
+  "install_only",
+  "pre_sell",
+  "post_sell",
+] as const satisfies readonly string[];
+
+export type PartnerCapability = (typeof partnerCapabilities)[number];
+
 export const partnerRequestStatuses = [
   "pending",
   "approved",
