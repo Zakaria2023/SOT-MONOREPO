@@ -100,7 +100,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-3 py-3">
+      <nav className="flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-3 py-3 scrollbar-none">
         {groups.map((group) => (
           <div key={group.title} className="flex flex-col gap-1">
             <span className="mb-0.5 h-4 px-3 text-[11px] font-bold tracking-wider whitespace-nowrap text-faint uppercase opacity-0 transition-opacity duration-200 group-hover:opacity-100">
