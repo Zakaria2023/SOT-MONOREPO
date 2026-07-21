@@ -163,7 +163,13 @@ const assertAllocationValid = (fields: CompatibilityRuleFields): void => {
 const assertUnitsMatch = async (
   fields: CompatibilityRuleFields,
 ): Promise<void> => {
-  if (fields.kind === "count_limit") {
+  // Count compares a quantity vs a count-like capacity; ratio divides two
+  // (possibly different-unit) sums; spec_match compares select specs (no unit).
+  if (
+    fields.kind === "count_limit" ||
+    fields.kind === "ratio" ||
+    fields.kind === "spec_match"
+  ) {
     return;
   }
 

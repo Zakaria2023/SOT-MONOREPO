@@ -80,6 +80,7 @@ export const checkCompatibility = async (
         kind: rule.kind,
         comparator: rule.comparator,
         headroomPercent: rule.headroomPercent,
+        ratioLimit: rule.ratioLimit,
         allocation: rule.allocation,
         condition: rule.condition,
         severity: rule.severity,
