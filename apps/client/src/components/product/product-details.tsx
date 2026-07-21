@@ -28,9 +28,6 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
     fields.push({ label: "Category", value: product.categoryName });
   if (product.sku) fields.push({ label: "SKU", value: product.sku });
   if (product.model) fields.push({ label: "Model", value: product.model });
-  if (product.productFamily)
-    fields.push({ label: "Product Family", value: product.productFamily });
-  fields.push({ label: "Featured", value: product.isFeatured ? "Yes" : "No" });
   if (product.status)
     fields.push({
       label: "Status",

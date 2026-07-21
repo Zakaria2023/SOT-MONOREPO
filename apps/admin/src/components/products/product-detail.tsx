@@ -2,14 +2,7 @@ import type { ProductDetail as ProductDetailData } from "@/app/(dashboard)/produ
 import type { BoqItemRole, ProductStatus } from "@/db/enum";
 import { BOQ_ITEM_ROLE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
 import { documentDownloadUrl } from "@/lib/documents";
-import {
-  ArrowLeft,
-  FileText,
-  ImageOff,
-  Pencil,
-  Star,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowLeft, FileText, ImageOff, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -132,10 +125,6 @@ export const ProductDetail = ({ product }: ProductDetailProps) => {
           <Section title="Descriptions">
             <Field label="Short description" value={product.shortDescription} />
             <Field
-              label="Role in the network"
-              value={product.role}
-            />
-            <Field
               label="Description"
               value={
                 product.description ? (
@@ -185,18 +174,6 @@ export const ProductDetail = ({ product }: ProductDetailProps) => {
               >
                 {product.isAvailable ? "Available" : "Unavailable"}
               </span>
-              {product.isFeatured && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-semibold text-primary">
-                  <Star size={11} />
-                  Featured
-                </span>
-              )}
-              {product.needsSolutionReview && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-semibold text-warning">
-                  <TriangleAlert size={11} />
-                  Solution review
-                </span>
-              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Category" value={product.categoryName} />
@@ -226,33 +203,11 @@ export const ProductDetail = ({ product }: ProductDetailProps) => {
                 )
               }
             />
-            <div className="grid grid-cols-2 gap-4">
-              <Field
-                label="Cost"
-                value={
-                  product.priceCost
-                    ? formatPrice(product.priceCost, product.currency)
-                    : null
-                }
-              />
-              <Field
-                label="System integrator"
-                value={
-                  product.priceSystemIntegrator
-                    ? formatPrice(
-                        product.priceSystemIntegrator,
-                        product.currency,
-                      )
-                    : null
-                }
-              />
-            </div>
           </Section>
 
           <Section title="Identity">
             <div className="grid grid-cols-2 gap-4">
               <Field label="Slug" value={product.slug} />
-              <Field label="Product family" value={product.productFamily} />
               <Field label="Series code" value={product.seriesCode} />
               <Field
                 label="Datasheet"
@@ -277,10 +232,6 @@ export const ProductDetail = ({ product }: ProductDetailProps) => {
             <div className="grid grid-cols-2 gap-4">
               <Field label="Warranty period" value={product.warrantyPeriod} />
               <Field label="Warranty region" value={product.warrantyRegion} />
-              <Field
-                label="Extendable"
-                value={product.warrantyExtendable ? "Yes" : "No"}
-              />
               <Field
                 label="Country of origin"
                 value={product.countryOfOrigin}

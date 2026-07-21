@@ -76,7 +76,7 @@ const productOrder = (sort: ProductSort | undefined) => {
     case "name":
       return [asc(Products.name)];
     default:
-      return [desc(Products.isFeatured), asc(Products.order)];
+      return [asc(Products.order)];
   }
 };
 
@@ -149,7 +149,6 @@ export const getProducts = async (
           like(Products.name, term),
           like(Products.model, term),
           like(Products.sku, term),
-          like(Products.productFamily, term),
           like(Products.seriesCode, term),
           like(Products.shortDescription, term),
           like(Products.description, term),
