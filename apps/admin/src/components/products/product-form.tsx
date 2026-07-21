@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { Controller, FormProvider } from "react-hook-form";
+import { Controller, FormProvider, useWatch } from "react-hook-form";
 import {
   Button,
   Checkbox,
@@ -85,6 +85,12 @@ export const ProductForm = (props: ProductFormProps) => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingSubImages, setIsUploadingSubImages] = useState(false);
   const hasSubmittedRef = useRef(false);
+
+  // The selected brand may define an ID label (e.g. BOM / PID / Part Number).
+  // When it does, show an input for the per-product value of that label.
+  const selectedBrandUuid = useWatch({ control, name: "brandUuid" });
+  const selectedBrand = brands.find((brand) => brand.uuid === selectedBrandUuid);
+  const brandIdLabel = selectedBrand?.idLabel;
 
   // Applicable specs depend on the category, so clear chosen values on change.
   const handleCategoryChange = () => {
@@ -154,6 +160,16 @@ export const ProductForm = (props: ProductFormProps) => {
             brands={brands}
             error={errors.brandUuid?.message}
           />
+          {brandIdLabel && (
+            <Input
+              label={brandIdLabel}
+              labelIcon={<Hash size={15} />}
+              type="text"
+              placeholder={`Enter ${brandIdLabel}`}
+              {...register("brandIdValue")}
+              error={errors.brandIdValue?.message}
+            />
+          )}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-ink">Status</label>
             <Controller

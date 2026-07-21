@@ -13,6 +13,7 @@ export const productFormSchema = z.object({
   brandUuid: z.string().min(1, "Brand is required"),
   name: z.string().min(1, "Name is required").max(255),
   model: z.string().optional(),
+  brandIdValue: z.string().max(255).optional(),
   productFamily: z.string().optional(),
   seriesCode: z.string().max(4, "Max 4 characters").optional(),
   warrantyPeriod: z.string().optional(),

@@ -39,6 +39,11 @@ export const Products = mysqlTable(
     sku: varchar("sku", { length: 100 }).unique(),
     model: varchar("model", { length: 255 }),
 
+    // Value for the selected brand's ID label (Brands.idLabel — e.g. the brand's
+    // own BOM / PID / Part Number). The label comes from the brand; this is the
+    // per-product value entered against it.
+    brandIdValue: varchar("brand_id_value", { length: 255 }),
+
     // Vendor series/line — feeds the [SERIES] SKU segment and vendor mapping.
     productFamily: varchar("product_family", { length: 255 }),
     seriesCode: varchar("series_code", { length: 4 }),
