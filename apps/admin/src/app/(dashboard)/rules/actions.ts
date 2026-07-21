@@ -25,6 +25,7 @@ export type RuleActionInput = {
   comparator: RuleComparator;
   allocation: RuleAllocation;
   headroomPercent: number;
+  ratioLimit: number;
   conditionSpecKey: string;
   conditionValue: string;
   severity: RuleSeverity;
@@ -51,6 +52,7 @@ const toFields = (input: RuleActionInput) => ({
   comparator: input.comparator,
   allocation: input.allocation,
   headroomPercent: input.headroomPercent,
+  ratioLimit: input.kind === "ratio" ? String(input.ratioLimit) : null,
   condition:
     input.conditionSpecKey && input.conditionValue
       ? { specKey: input.conditionSpecKey, values: [input.conditionValue] }
