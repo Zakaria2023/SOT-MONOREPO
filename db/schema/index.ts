@@ -16,5 +16,6 @@ export * from "./payouts";
 export * from "./products";
 export * from "./specification-categories";
 export * from "./specification-groups";
+export * from "./specification-templates";
 export * from "./specifications";
 export * from "./users";

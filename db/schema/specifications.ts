@@ -36,6 +36,10 @@ export const Specifications = mysqlTable("Specifications", {
   valueType: mysqlEnum("value_type", specValueTypes)
     .default("select")
     .notNull(),
+  // The richer library-builder type (number/single_select/multi_select/
+  // boolean/text). valueType + allowMultiple stay the engine-facing truth;
+  // this drives the builder UI. Nullable — derived from valueType on old rows.
+  inputType: varchar("input_type", { length: 20 }),
   unit: varchar("unit", { length: 32 }),
 
   // "select" modifier: products may tick several options instead of one. The
