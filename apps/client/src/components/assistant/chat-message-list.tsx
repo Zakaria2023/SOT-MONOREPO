@@ -1,6 +1,6 @@
 import { Clock } from "lucide-react";
 import Image from "next/image";
-import type { AssistantReply } from "@/app/assistant/validation";
+import type { AssistantReply } from "services";
 import type { ChatTurn } from "@/app/assistant/actions";
 
 type ChatMessageListProps = {

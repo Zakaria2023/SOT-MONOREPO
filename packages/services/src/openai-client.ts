@@ -1,10 +1,10 @@
-import "server-only";
-
 import OpenAI from "openai";
 
 const requiredEnv = (name: string): string => {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
   return value;
 };
 

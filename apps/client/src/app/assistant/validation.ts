@@ -21,29 +21,3 @@ export type ChatMessageInput = {
   message: string;
   images: string[];
 };
-
-const valuePointsSchema = z.object({
-  benefits: z.array(z.string()),
-  features: z.array(z.string()),
-  useCases: z.array(z.string()),
-});
-
-const salesLeadSchema = z.object({
-  intent: z.literal("purchase"),
-  product: z.string(),
-  confidence: z.number().min(0).max(1),
-  status: z.literal("pending_sales_review"),
-  next_step: z.literal("send_to_salesman"),
-});
-
-export const assistantReplySchema = z.object({
-  answer: z.string(),
-  valuePoints: z.nullable(valuePointsSchema),
-  recommendation: z.nullable(z.string()),
-  salesLead: z.nullable(salesLeadSchema),
-});
-
-export type AssistantReply = z.infer<typeof assistantReplySchema>;
-export type SalesLead = z.infer<typeof salesLeadSchema>;
-
-export const assistantReplyJsonSchema = z.toJSONSchema(assistantReplySchema);
