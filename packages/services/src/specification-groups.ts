@@ -8,6 +8,11 @@ import {
 
 export type { SelectSpecificationGroups };
 
+export type SpecificationGroupFields = {
+  name: string;
+  domain: string | null;
+};
+
 export const getSpecificationGroups = async (): Promise<
   SelectSpecificationGroups[]
 > => {
@@ -23,24 +28,29 @@ export const getSpecificationGroups = async (): Promise<
 };
 
 export const createSpecificationGroup = async (
-  name: string,
+  fields: SpecificationGroupFields,
 ): Promise<string> => {
   const uuid = randomUUID();
   const [{ total }] = await db
     .select({ total: count() })
     .from(SpecificationGroups);
 
-  await db.insert(SpecificationGroups).values({ uuid, name, order: total });
+  await db.insert(SpecificationGroups).values({
+    uuid,
+    name: fields.name,
+    domain: fields.domain,
+    order: total,
+  });
   return uuid;
 };
 
 export const updateSpecificationGroup = async (
   uuid: string,
-  name: string,
+  fields: SpecificationGroupFields,
 ): Promise<void> => {
   await db
     .update(SpecificationGroups)
-    .set({ name })
+    .set({ name: fields.name, domain: fields.domain })
     .where(eq(SpecificationGroups.uuid, uuid));
 };
 
@@ -51,4 +61,21 @@ export const deleteSpecificationGroup = async (
   await db
     .delete(SpecificationGroups)
     .where(eq(SpecificationGroups.uuid, uuid));
+};
+
+/** Persist a new group order: each group's `order` becomes its list index. */
+export const reorderSpecificationGroups = async (
+  orderedUuids: string[],
+): Promise<void> => {
+  if (orderedUuids.length === 0) {
+    return;
+  }
+  await db.transaction(async (tx) => {
+    for (let index = 0; index < orderedUuids.length; index++) {
+      await tx
+        .update(SpecificationGroups)
+        .set({ order: index })
+        .where(eq(SpecificationGroups.uuid, orderedUuids[index]));
+    }
+  });
 };

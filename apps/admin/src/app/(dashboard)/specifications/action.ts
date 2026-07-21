@@ -57,7 +57,9 @@ const resolveGroupUuid = async (
 ): Promise<string | null> => {
   const newName = input.newGroupName.trim();
   if (newName) {
-    return await createSpecificationGroup(newName);
+    // Inline-created groups start with no domain; assign one on the groups
+    // management page.
+    return await createSpecificationGroup({ name: newName, domain: null });
   }
   return input.groupUuid || null;
 };

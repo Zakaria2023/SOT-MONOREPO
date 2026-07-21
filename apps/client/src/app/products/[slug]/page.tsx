@@ -9,68 +9,49 @@ import {
   getComparableProducts,
   getProductDetailBySlug,
   getRelatedProducts,
-  getSpecificationsForCategory,
+  getSpecificationsForKeys,
 } from "services";
 
 type Props = {
   params: Promise<{ slug: string }>;
 };
 
-type SpecTemplateNode = {
-  key: string;
-  label: string;
-  options: { value: string; children: SpecTemplateNode[] }[];
-};
-
-// Walk the template along the product's chosen values: a field shows only when
-// filled, and an option's sub-fields show only when that option is selected.
-const flattenSpecAttributes = (
-  fields: SpecTemplateNode[],
-  values: Record<string, string> | null | undefined,
-): { label: string; value: string }[] =>
-  fields.flatMap((field) => {
-    const value = values?.[field.key] ?? "";
-    if (!value) {
-      return [];
-    }
-    const option = field.options.find((candidate) => candidate.value === value);
-    return [
-      { label: field.label, value },
-      ...(option ? flattenSpecAttributes(option.children, values) : []),
-    ];
-  });
-
-// Every field in the template (ignoring selection) — the stable column set for
-// the comparison table, where each product fills in its own chosen value.
-const collectSpecFields = (
-  fields: SpecTemplateNode[],
-): { key: string; label: string }[] =>
-  fields.flatMap((field) => [
-    { key: field.key, label: field.label },
-    ...field.options.flatMap((option) => collectSpecFields(option.children)),
-  ]);
+// Multi-select values are stored comma-joined; render them spaced.
+const displayValue = (value: string): string =>
+  value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
 
 const ProductPage = async ({ params }: Props) => {
   const { slug } = await params;
   const product = await getProductDetailBySlug(slug);
   if (!product) notFound();
 
-  const [comparables, related, specTemplate, viewerPricing] = await Promise.all([
+  // The attributes chosen for this product (fallback to whatever it has values
+  // for, for products created before per-product selection).
+  const specKeys =
+    product.specKeys ?? Object.keys(product.technicalAttributes ?? {});
+
+  const [comparables, related, specs, viewerPricing] = await Promise.all([
     getComparableProducts(product.categoryUuid, product.uuid),
     getRelatedProducts(product.uuid),
-    getSpecificationsForCategory(product.categoryUuid),
+    getSpecificationsForKeys(specKeys),
     getViewerPartnerPricing(),
   ]);
 
-  // Spec template = the specifications assigned to this product's category (and
-  // its ancestors). `attributes` follows the product's selected path (skipping
-  // branches it didn't choose); `specFields` is every field, for the compare
-  // columns.
-  const attributes = flattenSpecAttributes(
-    specTemplate,
-    product.technicalAttributes,
-  );
-  const specFields = collectSpecFields(specTemplate);
+  const attributes = specs
+    .map((spec) => ({
+      label: spec.label,
+      value: displayValue(product.technicalAttributes?.[spec.key] ?? ""),
+    }))
+    .filter((attribute) => attribute.value !== "");
+
+  const specFields = specs.map((spec) => ({
+    key: spec.key,
+    label: spec.label,
+  }));
 
   return (
     <main className="min-h-screen bg-page pb-16">

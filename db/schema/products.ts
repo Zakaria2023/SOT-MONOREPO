@@ -76,8 +76,14 @@ export const Products = mysqlTable(
     // Phase-1 signal until the real-time Odoo stock link arrives.
     isAvailable: boolean("is_available").default(true).notNull(),
 
-    // Dropdown-only values filled from the category's spec template, keyed by
-    // SpecField.key. Machine-reasonable specs for filtering and the AI builder.
+    // The library attributes chosen for THIS product (ordered spec keys),
+    // picked from the specification library on the product form. Values live in
+    // technicalAttributes keyed by the same key. Empty/absent falls back to the
+    // keys present in technicalAttributes (older products).
+    specKeys: json("spec_keys").$type<string[]>(),
+
+    // Values for the product's chosen attributes, keyed by SpecField.key.
+    // Machine-reasonable specs for filtering, rules, and the AI builder.
     technicalAttributes: json("technical_attributes").$type<
       Record<string, string>
     >(),
