@@ -39,6 +39,8 @@ export type EngineRule = {
   kind: SelectCompatibilityRules["kind"];
   comparator: SelectCompatibilityRules["comparator"];
   headroomPercent: SelectCompatibilityRules["headroomPercent"];
+  // Only the "ratio" kind uses this; optional so other rules omit it.
+  ratioLimit?: SelectCompatibilityRules["ratioLimit"];
   allocation: SelectCompatibilityRules["allocation"];
   condition: SelectCompatibilityRules["condition"];
   severity: SelectCompatibilityRules["severity"];
@@ -230,12 +232,141 @@ const findSuggestions = (
     .slice(0, 3);
 };
 
+// spec_match: does a consumer's chosen SELECT value(s) fit a provider's?
+//   in         → consumer values ⊆ provider set (impedance ∈ supported)
+//   intersects → the two sets overlap (codec intersection ≠ ∅)
+//   eq / other → the two sets are equal (intercom system type match)
+const specMatchSatisfied = (
+  consumerValues: string[],
+  providerValues: string[],
+  comparator: EngineRule["comparator"],
+): boolean => {
+  const provider = new Set(providerValues);
+  if (comparator === "intersects") {
+    return consumerValues.some((value) => provider.has(value));
+  }
+  if (comparator === "in") {
+    return (
+      consumerValues.length > 0 &&
+      consumerValues.every((value) => provider.has(value))
+    );
+  }
+  const consumer = new Set(consumerValues);
+  return (
+    consumer.size === provider.size &&
+    [...consumer].every((value) => provider.has(value))
+  );
+};
+
+// The Match family over SELECT specs. Per-item: each consumer must find some
+// provider it's compatible with. Absence of a provider is a Presence concern,
+// so it reports not_applicable rather than failing here.
+const evaluateSpecMatch = (
+  rule: EngineRule,
+  selection: EngineItem[],
+): RuleEvaluation => {
+  const participant = (item: EngineItem): RuleParticipant => ({
+    productUuid: item.productUuid,
+    name: item.name,
+    quantity: item.quantity,
+    unitValue: 0,
+    totalValue: 0,
+  });
+
+  const base = {
+    ruleUuid: rule.uuid,
+    name: rule.name,
+    description: rule.description,
+    kind: rule.kind,
+    severity: rule.severity,
+    comparator: rule.comparator,
+    headroomPercent: rule.headroomPercent,
+    consumerLabel: rule.consumerSpec.label,
+    providerLabel: rule.providerSpec.label,
+    unit: rule.providerSpec.unit,
+    demand: 0,
+    capacity: 0,
+    effectiveCapacity: 0,
+    consumers: [] as RuleParticipant[],
+    providers: [] as RuleParticipant[],
+    failingItems: [] as RuleParticipant[],
+    suggestions: [] as RuleSuggestion[],
+    bins: [] as ProviderBin[],
+  };
+
+  const consumers = selection.filter(
+    (item) =>
+      parseSpecValues(item.attributes[rule.consumerSpec.key]).length > 0 &&
+      matchesCondition(item, rule.condition),
+  );
+  if (consumers.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `Nothing in the selection carries "${rule.consumerSpec.label}" — rule does not apply.`,
+    };
+  }
+
+  const providers = selection.filter(
+    (item) => parseSpecValues(item.attributes[rule.providerSpec.key]).length > 0,
+  );
+  base.consumers = consumers.map(participant);
+  base.providers = providers.map(participant);
+
+  if (providers.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `Nothing in the selection carries "${rule.providerSpec.label}" to match against.`,
+    };
+  }
+
+  const providerValues = [
+    ...new Set(
+      providers.flatMap((item) =>
+        parseSpecValues(item.attributes[rule.providerSpec.key]),
+      ),
+    ),
+  ];
+
+  const failing = consumers.filter(
+    (item) =>
+      !providers.some((provider) =>
+        specMatchSatisfied(
+          parseSpecValues(item.attributes[rule.consumerSpec.key]),
+          parseSpecValues(provider.attributes[rule.providerSpec.key]),
+          rule.comparator,
+        ),
+      ),
+  );
+
+  const violationStatus: RuleStatus = rule.severity === "warn" ? "warn" : "fail";
+  if (failing.length === 0) {
+    return {
+      ...base,
+      status: "pass",
+      message: `Every item's "${rule.consumerSpec.label}" is compatible with "${rule.providerSpec.label}".`,
+    };
+  }
+  return {
+    ...base,
+    status: violationStatus,
+    failingItems: failing.map(participant),
+    message: `${failing.length} item(s) have a "${rule.consumerSpec.label}" not compatible with the available "${rule.providerSpec.label}" (${providerValues.join(", ") || "none"}): ${failing.map((item) => item.name).join(", ")}.`,
+  };
+};
+
 /** Evaluate one rule against a selection — pure, no I/O. */
 export const evaluateRule = (
   rule: EngineRule,
   selection: EngineItem[],
   catalog: EngineCatalogProduct[],
 ): RuleEvaluation => {
+  // The Match-on-select family has its own set-comparison path.
+  if (rule.kind === "spec_match") {
+    return evaluateSpecMatch(rule, selection);
+  }
+
   const consumers: RuleParticipant[] = selection.flatMap((item) => {
     const unitValue = numericValue(item.attributes, rule.consumerSpec.key, "max");
     if (unitValue === null || !matchesCondition(item, rule.condition)) {
@@ -359,6 +490,26 @@ export const evaluateRule = (
     providers.reduce((sum, provider) => sum + provider.totalValue, 0),
   );
   const effective = round2((capacity * rule.headroomPercent) / 100);
+
+  // Ratio: demand ÷ supply must stay within the target contention ratio
+  // (e.g. uplink oversubscription). A designed derating, not a hard sum.
+  if (rule.kind === "ratio") {
+    const supply = capacity;
+    const target = Number(rule.ratioLimit ?? 0);
+    const actual = supply > 0 ? round2(demand / supply) : Infinity;
+    const pass = target > 0 && actual <= target;
+    const actualLabel = Number.isFinite(actual) ? `${actual}:1` : "∞";
+    return {
+      ...base,
+      status: pass ? "pass" : violationStatus,
+      demand,
+      capacity: supply,
+      effectiveCapacity: target,
+      message: pass
+        ? `Contention ${actualLabel} is within the target ${target}:1 (${formatValue(demand, rule.consumerSpec.unit)} demand ÷ ${formatValue(supply, rule.providerSpec.unit)} supply).`
+        : `Contention ${actualLabel} exceeds the target ${target}:1 — add supply or reduce demand.`,
+    };
+  }
 
   // Per-provider allocation: each provider unit is its own bin; consumers are
   // distributed by first-fit-decreasing and every unit must fit its share.

@@ -43,15 +43,19 @@ export const SPECIFICATION_DOMAIN_LABELS: Record<SpecificationDomain, string> = 
 };
 
 export const RULE_KIND_LABELS: Record<RuleKind, string> = {
-  sum_budget: "Sum vs budget",
-  count_limit: "Count vs limit",
-  per_item_threshold: "Per-item threshold",
+  sum_budget: "Budget — sum vs capacity",
+  count_limit: "Count — items vs slots",
+  per_item_threshold: "Match — per-item threshold",
+  ratio: "Ratio — demand ÷ supply",
+  spec_match: "Match — spec compatibility",
 };
 
 export const RULE_COMPARATOR_LABELS: Record<RuleComparator, string> = {
   lte: "must be ≤",
   gte: "must be ≥",
-  eq: "must be =",
+  eq: "must equal",
+  in: "must be one of",
+  intersects: "must overlap",
 };
 
 export const RULE_SEVERITY_LABELS: Record<RuleSeverity, string> = {

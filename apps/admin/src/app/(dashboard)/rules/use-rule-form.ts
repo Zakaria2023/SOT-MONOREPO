@@ -35,6 +35,7 @@ export const useRuleForm = (args: UseRuleFormArgs) => {
       comparator: rule?.comparator ?? "lte",
       allocation: rule?.allocation ?? "pooled",
       headroomPercent: rule?.headroomPercent ?? 100,
+      ratioLimit: rule?.ratioLimit ? Number(rule.ratioLimit) : 20,
       conditionSpecKey: rule?.condition?.specKey ?? "",
       conditionValue: rule?.condition?.values[0] ?? "",
       severity: rule?.severity ?? "block",

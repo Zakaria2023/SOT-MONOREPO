@@ -15,6 +15,8 @@ const COMPARATOR_SYMBOLS: Record<RuleComparator, string> = {
   lte: "≤",
   gte: "≥",
   eq: "=",
+  in: "∈",
+  intersects: "∩",
 };
 
 const specLabel = (label: string | null, unit: string | null): string =>
@@ -45,14 +47,23 @@ const columns: TableColumn<CompatibilityRuleListItem>[] = [
   {
     key: "binding",
     header: "Checks",
-    render: (rule) => (
-      <span className="text-muted">
-        {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)}{" "}
-        {COMPARATOR_SYMBOLS[rule.comparator]}{" "}
-        {rule.headroomPercent < 100 ? `${rule.headroomPercent}% of ` : ""}
-        {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)}
-      </span>
-    ),
+    render: (rule) =>
+      rule.kind === "ratio" ? (
+        <span className="text-muted">
+          {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)} ÷{" "}
+          {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)} ≤{" "}
+          {rule.ratioLimit ? `${Number(rule.ratioLimit)}:1` : "—"}
+        </span>
+      ) : (
+        <span className="text-muted">
+          {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)}{" "}
+          {COMPARATOR_SYMBOLS[rule.comparator]}{" "}
+          {rule.kind !== "spec_match" && rule.headroomPercent < 100
+            ? `${rule.headroomPercent}% of `
+            : ""}
+          {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)}
+        </span>
+      ),
   },
   {
     key: "condition",

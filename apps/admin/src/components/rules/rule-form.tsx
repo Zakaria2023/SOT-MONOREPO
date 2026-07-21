@@ -32,6 +32,10 @@ const KIND_HINTS: Record<RuleKind, string> = {
     "Counts the consuming items (quantities) and checks the count against the pooled capacity — e.g. number of devices vs switch port count.",
   per_item_threshold:
     "Checks each item's own value against the best provider value — e.g. one camera's draw vs the per-port maximum.",
+  ratio:
+    "Divides total demand by total supply and checks it stays within a target contention ratio — e.g. access bandwidth ÷ uplink ≤ 20:1. A designed derating, usually a warning.",
+  spec_match:
+    "Checks each item's chosen dropdown value against the companion's — e.g. a speaker's impedance must be one the amplifier supports, or two codec sets must overlap. Uses dropdown (select) specs, not numbers.",
 };
 
 export const RuleForm = (props: RuleFormProps) => {
@@ -52,12 +56,22 @@ export const RuleForm = (props: RuleFormProps) => {
   const consumerSpecUuid = useWatch({ control, name: "consumerSpecUuid" });
   const providerSpecUuid = useWatch({ control, name: "providerSpecUuid" });
 
-  // Per-device distribution only applies to aggregating rules with "fit
-  // within" — anything else silently means pooled.
-  const allocationApplies =
-    kind !== "per_item_threshold" && comparator === "lte";
+  const isRatio = kind === "ratio";
+  const isSpecMatch = kind === "spec_match";
 
-  // Rules aggregate numbers — only numeric specs can be bound.
+  // Per-device distribution only applies to aggregating sum/count rules with
+  // "fit within" — not per-item, ratio, or spec_match.
+  const allocationApplies =
+    !isRatio &&
+    !isSpecMatch &&
+    kind !== "per_item_threshold" &&
+    comparator === "lte";
+
+  // Headroom % applies to the aggregating/threshold kinds; ratio uses a target
+  // ratio instead, and spec_match has no numeric knob.
+  const showHeadroom = !isRatio && !isSpecMatch;
+
+  // Numeric rules bind number specs; spec_match binds dropdown (select) specs.
   const numericSpecs = useMemo(
     () =>
       specifications.filter(
@@ -114,6 +128,8 @@ export const RuleForm = (props: RuleFormProps) => {
     (specification) => specification.uuid === providerSpecUuid,
   )?.unit;
   const unitsMismatch =
+    !isRatio &&
+    !isSpecMatch &&
     kind !== "count_limit" &&
     Boolean(consumerSpecUuid) &&
     Boolean(providerSpecUuid) &&
@@ -121,7 +137,7 @@ export const RuleForm = (props: RuleFormProps) => {
 
   // Show each spec's categories so it's obvious rules span category trees —
   // a Switching spec on one side, an IP Camera spec on the other is normal.
-  const numericOptions = numericSpecs.map((specification) => {
+  const specOption = (specification: SpecificationWithCategories) => {
     const name = specification.unit
       ? `${specification.label} (${specification.unit})`
       : specification.label;
@@ -130,7 +146,26 @@ export const RuleForm = (props: RuleFormProps) => {
         ? ` — ${specification.categoryNames.join(", ")}`
         : "";
     return { value: specification.uuid, label: `${name}${categories}` };
-  });
+  };
+
+  const numericOptions = numericSpecs.map(specOption);
+  const selectOptions = specifications
+    .filter((specification) => specification.valueType === "select")
+    .map(specOption);
+  // spec_match binds dropdown specs; every other kind binds numeric specs.
+  const consumerProviderOptions = isSpecMatch ? selectOptions : numericOptions;
+
+  const comparatorOptions = isSpecMatch
+    ? [
+        { value: "in", label: "must be one of (∈)" },
+        { value: "intersects", label: "must overlap (∩)" },
+        { value: "eq", label: "must equal (=)" },
+      ]
+    : [
+        { value: "lte", label: "must fit within (≤)" },
+        { value: "gte", label: "must be at least (≥)" },
+        { value: "eq", label: "must equal (=)" },
+      ];
 
   return (
     <form
@@ -196,14 +231,27 @@ export const RuleForm = (props: RuleFormProps) => {
           <p className="text-xs text-muted">{KIND_HINTS[kind]}</p>
         </div>
 
-        <Input
-          label="Usable capacity (%)"
-          type="number"
-          min={1}
-          max={100}
-          {...register("headroomPercent", { valueAsNumber: true })}
-          error={errors.headroomPercent?.message}
-        />
+        {showHeadroom && (
+          <Input
+            label="Usable capacity (%)"
+            type="number"
+            min={1}
+            max={100}
+            {...register("headroomPercent", { valueAsNumber: true })}
+            error={errors.headroomPercent?.message}
+          />
+        )}
+        {isRatio && (
+          <Input
+            label="Target ratio (N : 1)"
+            type="number"
+            min={1}
+            step="any"
+            placeholder="e.g. 20"
+            {...register("ratioLimit", { valueAsNumber: true })}
+            error={errors.ratioLimit?.message}
+          />
+        )}
       </div>
 
       {allocationApplies && (
@@ -245,17 +293,24 @@ export const RuleForm = (props: RuleFormProps) => {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-ink">
-            Consumed specification
+            {isSpecMatch
+              ? "Device specification"
+              : isRatio
+                ? "Demand specification"
+                : "Consumed specification"}
           </label>
           <Controller
             control={control}
             name="consumerSpecUuid"
             render={({ field }) => (
               <Dropdown
+                searchable
                 value={field.value}
                 onChange={field.onChange}
-                placeholder="e.g. Power Consumption"
-                options={numericOptions}
+                placeholder={
+                  isSpecMatch ? "e.g. Speaker Impedance" : "e.g. Power Consumption"
+                }
+                options={consumerProviderOptions}
               />
             )}
           />
@@ -264,36 +319,45 @@ export const RuleForm = (props: RuleFormProps) => {
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-ink">Comparison</label>
-          <Controller
-            control={control}
-            name="comparator"
-            render={({ field }) => (
-              <Dropdown
-                value={field.value}
-                onChange={field.onChange}
-                options={[
-                  { value: "lte", label: "must fit within (≤)" },
-                  { value: "gte", label: "must be at least (≥)" },
-                  { value: "eq", label: "must equal (=)" },
-                ]}
-              />
-            )}
-          />
+          {isRatio ? (
+            <div className="flex h-10 items-center justify-center rounded-control border border-hairline bg-page text-sm text-muted">
+              demand ÷ supply ≤ ratio
+            </div>
+          ) : (
+            <Controller
+              control={control}
+              name="comparator"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={comparatorOptions}
+                />
+              )}
+            />
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-ink">
-            Capacity specification
+            {isSpecMatch
+              ? "Companion specification"
+              : isRatio
+                ? "Supply specification"
+                : "Capacity specification"}
           </label>
           <Controller
             control={control}
             name="providerSpecUuid"
             render={({ field }) => (
               <Dropdown
+                searchable
                 value={field.value}
                 onChange={field.onChange}
-                placeholder="e.g. PoE Budget"
-                options={numericOptions}
+                placeholder={
+                  isSpecMatch ? "e.g. Supported Impedance" : "e.g. PoE Budget"
+                }
+                options={consumerProviderOptions}
               />
             )}
           />

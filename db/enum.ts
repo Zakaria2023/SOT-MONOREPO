@@ -93,18 +93,29 @@ export type SpecValueType = (typeof specValueTypes)[number];
 //   (e.g. device count vs switch port count).
 // - per_item_threshold: each consumer item's own value vs the best provider
 //   value (e.g. one camera's draw vs the switch per-port maximum).
+// - ratio: SUM(demand) / SUM(supply) <= a tunable ratio (e.g. uplink
+//   oversubscription ~20:1). A designed contention ratio, not a hard sum.
+// - spec_match: per-item compatibility on SELECT specs — the consumer's chosen
+//   value(s) must fit the provider's (equal / member-of / overlap), e.g.
+//   speaker impedance ∈ amp supported impedances, codec sets intersect.
 export const ruleKinds = [
   "sum_budget",
   "count_limit",
   "per_item_threshold",
+  "ratio",
+  "spec_match",
 ] as const satisfies readonly string[];
 
 export type RuleKind = (typeof ruleKinds)[number];
 
+// lte/gte/eq are numeric; in/intersects are the spec_match set operators
+// (in = consumer values ⊆ provider set; intersects = the two sets overlap).
 export const ruleComparators = [
   "lte",
   "gte",
   "eq",
+  "in",
+  "intersects",
 ] as const satisfies readonly string[];
 
 export type RuleComparator = (typeof ruleComparators)[number];

@@ -322,3 +322,136 @@ describe("evaluateRules — the user's 20-camera example", () => {
     expect(report.passed).toBe(1);
   });
 });
+
+describe("evaluateRule — ratio (oversubscription)", () => {
+  const uplinkRatioRule: EngineRule = {
+    uuid: "ratio-1",
+    name: "Uplink oversubscription",
+    description: null,
+    kind: "ratio",
+    comparator: "lte",
+    headroomPercent: 100,
+    ratioLimit: "20",
+    condition: null,
+    allocation: "pooled",
+    severity: "warn",
+    consumerSpec: { key: "access-gbps", label: "Access demand", unit: "Gbps" },
+    providerSpec: { key: "uplink-gbps", label: "Uplink", unit: "Gbps" },
+  };
+
+  const accessDemand = (gbps: string, quantity: number): EngineItem => ({
+    productUuid: `access-${gbps}-${quantity}`,
+    name: "Access load",
+    quantity,
+    attributes: { "access-gbps": gbps },
+  });
+  const uplink = (gbps: string): EngineItem => ({
+    productUuid: "uplink",
+    name: "Uplink",
+    quantity: 1,
+    attributes: { "uplink-gbps": gbps },
+  });
+
+  it("passes when demand ÷ supply is within the target ratio", () => {
+    // 40 Gbps demand ÷ 10 Gbps uplink = 4:1, within 20:1.
+    const result = evaluateRule(
+      uplinkRatioRule,
+      [accessDemand("40", 1), uplink("10")],
+      [],
+    );
+    expect(result.status).toBe("pass");
+  });
+
+  it("warns when the ratio exceeds the target", () => {
+    // 480 Gbps demand ÷ 10 Gbps uplink = 48:1, over 20:1.
+    const result = evaluateRule(
+      uplinkRatioRule,
+      [accessDemand("48", 10), uplink("10")],
+      [],
+    );
+    expect(result.status).toBe("warn");
+    expect(result.demand).toBe(480);
+    expect(result.capacity).toBe(10);
+  });
+});
+
+describe("evaluateRule — spec_match (Match on select specs)", () => {
+  const impedanceRule: EngineRule = {
+    uuid: "match-1",
+    name: "Speaker impedance ∈ amp support",
+    description: null,
+    kind: "spec_match",
+    comparator: "in",
+    headroomPercent: 100,
+    condition: null,
+    allocation: "pooled",
+    severity: "block",
+    consumerSpec: { key: "impedance", label: "Impedance", unit: null },
+    providerSpec: {
+      key: "impedance-support",
+      label: "Supported impedance",
+      unit: null,
+    },
+  };
+
+  const speaker = (uuid: string, ohms: string): EngineItem => ({
+    productUuid: uuid,
+    name: `Speaker ${ohms}`,
+    quantity: 1,
+    attributes: { impedance: ohms },
+  });
+  const amp = (support: string): EngineItem => ({
+    productUuid: "amp",
+    name: "Amplifier",
+    quantity: 1,
+    attributes: { "impedance-support": support },
+  });
+
+  it("passes when every speaker's impedance is supported", () => {
+    const result = evaluateRule(
+      impedanceRule,
+      [speaker("s1", "8Ω"), amp("4Ω,6Ω,8Ω")],
+      [],
+    );
+    expect(result.status).toBe("pass");
+  });
+
+  it("fails the speaker whose impedance the amp doesn't support", () => {
+    const result = evaluateRule(
+      impedanceRule,
+      [speaker("s1", "8Ω"), speaker("s2", "2Ω"), amp("4Ω,6Ω,8Ω")],
+      [],
+    );
+    expect(result.status).toBe("fail");
+    expect(result.failingItems.map((item) => item.productUuid)).toEqual(["s2"]);
+  });
+
+  it("is not applicable when no provider is present (Presence handles that)", () => {
+    const result = evaluateRule(impedanceRule, [speaker("s1", "8Ω")], []);
+    expect(result.status).toBe("not_applicable");
+  });
+
+  it("intersects: passes when codec sets overlap", () => {
+    const codecRule: EngineRule = {
+      ...impedanceRule,
+      uuid: "match-2",
+      comparator: "intersects",
+      severity: "warn",
+      consumerSpec: { key: "codecs", label: "Phone codecs", unit: null },
+      providerSpec: { key: "pbx-codecs", label: "PBX codecs", unit: null },
+    };
+    const phone: EngineItem = {
+      productUuid: "phone",
+      name: "Phone",
+      quantity: 1,
+      attributes: { codecs: "G.711,Opus" },
+    };
+    const pbx: EngineItem = {
+      productUuid: "pbx",
+      name: "PBX",
+      quantity: 1,
+      attributes: { "pbx-codecs": "G.729,Opus" },
+    };
+    expect(evaluateRule(codecRule, [phone, pbx], []).status).toBe("pass");
+  });
+});
