@@ -15,6 +15,9 @@ export const SpecificationGroups = mysqlTable("SpecificationGroups", {
   uuid: char("uuid", { length: 36 }).notNull().unique(),
 
   name: varchar("name", { length: 255 }).notNull(),
+  // Navigation domain (see specificationDomains in db/enum.ts). Nullable so a
+  // group can be unfiled; stored as a plain key, validated in the app.
+  domain: varchar("domain", { length: 50 }),
   order: int("order").default(0).notNull(),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

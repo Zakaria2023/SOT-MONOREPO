@@ -13,6 +13,7 @@ export const measurementUnits = [
   "Ah",
   "mAh",
   // Counts
+  "count",
   "ports",
   "channels",
   "devices",
@@ -43,9 +44,35 @@ export const measurementUnits = [
   "%",
   "min",
   "h",
+  // Added for the specification library
+  "Mpps",
+  "Hz",
+  "years",
+  "months",
+  "inches",
+  "U",
+  "°",
+  "calls",
 ] as const satisfies readonly string[];
 
 export type MeasurementUnit = (typeof measurementUnits)[number];
+
+// Navigation domains for the specification library — a functional grouping
+// above SpecificationGroups (never brand-based). A stable universe, so it lives
+// in code. Labels in db/label.ts (SPECIFICATION_DOMAIN_LABELS).
+export const specificationDomains = [
+  "core",
+  "networking",
+  "control_panel",
+  "video",
+  "access",
+  "unified_comms",
+  "audio",
+  "power_racks",
+  "passive",
+] as const satisfies readonly string[];
+
+export type SpecificationDomain = (typeof specificationDomains)[number];
 
 // How a specification's value is entered on a product: picked from dropdown
 // options, or typed as a number (with a unit). Numeric specs are what the

@@ -20,6 +20,7 @@ import {
   RuleComparator,
   RuleKind,
   RuleSeverity,
+  SpecificationDomain,
   SpecValueType,
   UserType,
 } from "./enum";
@@ -27,6 +28,18 @@ import {
 export const SPEC_VALUE_TYPE_LABELS: Record<SpecValueType, string> = {
   select: "Dropdown",
   number: "Number",
+};
+
+export const SPECIFICATION_DOMAIN_LABELS: Record<SpecificationDomain, string> = {
+  core: "Core",
+  networking: "Networking & Connectivity",
+  control_panel: "Control-Panel Systems",
+  video: "Video Surveillance",
+  access: "Access Control & Intercom",
+  unified_comms: "Unified Communications",
+  audio: "Audio & Multiroom",
+  power_racks: "Power Protection & Racks",
+  passive: "Passive / Cabling",
 };
 
 export const RULE_KIND_LABELS: Record<RuleKind, string> = {

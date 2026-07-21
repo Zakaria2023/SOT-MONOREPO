@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { asc, count, eq, inArray, like, or } from "drizzle-orm";
 import { db } from "../../../db";
+import { specificationDomains } from "../../../db/enum";
 import { Categories } from "../../../db/schema/categories";
 import {
   InsertSpecifications,
@@ -26,6 +27,121 @@ export type SpecificationWithCategories = SelectSpecifications & {
   groupName: SelectSpecificationGroups["name"] | null;
   categoryUuids: string[];
   categoryNames: string[];
+};
+
+// The library as domains → groups → attributes, for the admin library view and
+// the product attribute picker.
+export type LibraryGroup = {
+  group: SelectSpecificationGroups;
+  attributes: SelectSpecifications[];
+};
+
+export type LibraryDomain = {
+  domain: string | null;
+  groups: LibraryGroup[];
+};
+
+/**
+ * The whole specification library, bucketed by navigation domain (in enum
+ * order) then group (in group order), each group carrying its attributes.
+ * Groups with no/unknown domain, and attributes with no group, fall into a
+ * trailing "Other" bucket so nothing is ever hidden.
+ */
+export const getSpecificationLibrary = async (): Promise<LibraryDomain[]> => {
+  const [groups, specs] = await Promise.all([
+    db
+      .select()
+      .from(SpecificationGroups)
+      .orderBy(asc(SpecificationGroups.order)),
+    db.select().from(Specifications).orderBy(asc(Specifications.order)),
+  ]);
+
+  const specsByGroup = new Map<string, SelectSpecifications[]>();
+  const ungrouped: SelectSpecifications[] = [];
+  for (const spec of specs) {
+    if (!spec.groupUuid) {
+      ungrouped.push(spec);
+      continue;
+    }
+    const list = specsByGroup.get(spec.groupUuid) ?? [];
+    list.push(spec);
+    specsByGroup.set(spec.groupUuid, list);
+  }
+
+  const knownDomains = specificationDomains as readonly string[];
+  const byDomain = new Map<string, LibraryGroup[]>();
+  const otherGroups: LibraryGroup[] = [];
+  for (const group of groups) {
+    const libraryGroup: LibraryGroup = {
+      group,
+      attributes: specsByGroup.get(group.uuid) ?? [],
+    };
+    if (group.domain && knownDomains.includes(group.domain)) {
+      const list = byDomain.get(group.domain) ?? [];
+      list.push(libraryGroup);
+      byDomain.set(group.domain, list);
+    } else {
+      otherGroups.push(libraryGroup);
+    }
+  }
+
+  const domains: LibraryDomain[] = [];
+  for (const domain of specificationDomains) {
+    const groupsInDomain = byDomain.get(domain);
+    if (groupsInDomain && groupsInDomain.length > 0) {
+      domains.push({ domain, groups: groupsInDomain });
+    }
+  }
+
+  if (otherGroups.length > 0 || ungrouped.length > 0) {
+    const trailing = [...otherGroups];
+    if (ungrouped.length > 0) {
+      trailing.push({
+        group: {
+          id: 0,
+          uuid: "",
+          name: "Ungrouped",
+          domain: null,
+          order: Number.MAX_SAFE_INTEGER,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        attributes: ungrouped,
+      });
+    }
+    domains.push({ domain: null, groups: trailing });
+  }
+
+  return domains;
+};
+
+// A resolved attribute for display: its label and unit, for a product's chosen
+// spec keys. Returned in the given key order; keys with no matching attribute
+// (deleted/renamed) fall back to the key as the label.
+export type ResolvedSpecification = {
+  key: string;
+  label: string;
+  unit: SelectSpecifications["unit"];
+};
+
+export const getSpecificationsForKeys = async (
+  keys: string[],
+): Promise<ResolvedSpecification[]> => {
+  if (keys.length === 0) {
+    return [];
+  }
+  const rows = await db
+    .select({
+      key: Specifications.key,
+      label: Specifications.label,
+      unit: Specifications.unit,
+    })
+    .from(Specifications)
+    .where(inArray(Specifications.key, keys));
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  return keys.map(
+    (key) => byKey.get(key) ?? { key, label: key, unit: null },
+  );
 };
 
 /** All specifications, each with the categories it's directly assigned to. */
