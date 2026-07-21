@@ -32,6 +32,8 @@ import { Products, SelectProducts } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
 import { checkCompatibility } from "./check-compatibility";
 import { ConflictError, ValidationError } from "./errors";
+import { checkBoqPresence } from "./presence-rules";
+import type { PresenceFinding } from "./presence-engine";
 import type { CompatibilityReport } from "./rule-engine";
 import {
   getApprovedPartnerOptions,
@@ -51,6 +53,9 @@ export type BoqDetail = {
 export type ValidateBoqResult = {
   boq: SelectBoqs;
   report: CompatibilityReport;
+  // Requires-companion findings (what's MISSING from the design). Hard findings
+  // block validation just like a compatibility failure; soft ones only warn.
+  presenceFindings: PresenceFinding[];
   validated: boolean;
 };
 
@@ -260,8 +265,13 @@ export const validateBoq = async (
       ? [{ productUuid: item.productUuid, quantity: item.quantity }]
       : [],
   );
-  const report = await checkCompatibility(selection);
-  const validated = report.failures === 0;
+  const [report, presence] = await Promise.all([
+    checkCompatibility(selection),
+    checkBoqPresence(boqUuid),
+  ]);
+  // The purchase gate: a clean pass needs both no compatibility failures and no
+  // HARD requires-companion gaps (a camera with no recorder, etc.).
+  const validated = report.failures === 0 && !presence.gate.blocked;
 
   if (validated) {
     await db
@@ -274,7 +284,7 @@ export const validateBoq = async (
   if (!boq) {
     throw new Error("Failed to load BOQ after validation");
   }
-  return { boq, report, validated };
+  return { boq, report, presenceFindings: presence.findings, validated };
 };
 
 // The fulfilment stages, in order — the Service & Handover progression. Each
