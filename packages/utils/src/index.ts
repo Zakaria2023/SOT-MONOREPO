@@ -122,6 +122,22 @@ export const lineTotal = (
   quantity: number,
 ): number => fromMinorUnits(toMinorUnits(unitPrice) * quantity);
 
+/**
+ * Apply a whole-number percent discount to a price, returning the discounted
+ * amount in major units. All math runs in integer minor units to avoid
+ * floating-point drift; a null price counts as 0. The percent is clamped to
+ * 0–100 (stacked partner discounts are already capped at 100).
+ */
+export const applyPercentDiscount = (
+  price: string | number | null,
+  percent: number,
+): number => {
+  const safePercent = Math.min(100, Math.max(0, percent));
+  return fromMinorUnits(
+    Math.round((toMinorUnits(price) * (100 - safePercent)) / 100),
+  );
+};
+
 export type CartTotals = {
   subtotal: number;
   vat: number;

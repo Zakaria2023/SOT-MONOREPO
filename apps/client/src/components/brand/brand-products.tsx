@@ -8,9 +8,14 @@ import type { ProductListItem, SelectBrands } from "services";
 type BrandProductsProps = {
   brand: SelectBrands;
   products: ProductListItem[];
+  discountPercent?: number;
 };
 
-export const BrandProducts = ({ brand, products }: BrandProductsProps) => (
+export const BrandProducts = ({
+  brand,
+  products,
+  discountPercent = 0,
+}: BrandProductsProps) => (
   <main className="min-h-screen bg-page">
     <div className="mx-auto px-6 py-14 lg:px-12 xl:px-20">
       <p className="font-grotesk text-xs font-bold tracking-widest text-primary uppercase">
@@ -57,7 +62,11 @@ export const BrandProducts = ({ brand, products }: BrandProductsProps) => (
         <ul className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((product) => (
             <li key={product.uuid}>
-              <CatalogProductCard product={product} view="grid" />
+              <CatalogProductCard
+                product={product}
+                view="grid"
+                discountPercent={discountPercent}
+              />
             </li>
           ))}
         </ul>

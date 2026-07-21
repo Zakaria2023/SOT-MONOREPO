@@ -1,5 +1,6 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
 import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import { getBrands, getCategories, getProducts } from "services";
 
@@ -62,12 +63,15 @@ const ProductsPage = async ({ searchParams }: Props) => {
         ]
       : undefined;
 
-  const products = await getProducts({
-    search,
-    categoryUuids,
-    brandUuids,
-    sort,
-  });
+  const [products, viewerPricing] = await Promise.all([
+    getProducts({
+      search,
+      categoryUuids,
+      brandUuids,
+      sort,
+    }),
+    getViewerPartnerPricing(),
+  ]);
 
   const total = categories.reduce(
     (sum, category) => sum + category.productCount,
@@ -84,6 +88,7 @@ const ProductsPage = async ({ searchParams }: Props) => {
       selectedBrands={selectedBrands}
       sort={sort}
       search={search ?? ""}
+      discountPercent={viewerPricing.discountPercent}
     />
   );
 };

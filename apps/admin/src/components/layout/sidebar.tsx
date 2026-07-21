@@ -12,6 +12,7 @@ import {
   ListChecks,
   Network,
   Package,
+  Percent,
   Search,
   Shapes,
   Tags,
@@ -53,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: FileText, label: "BOQs", href: "/boqs" },
       { icon: Network, label: "Partners", href: "/partners" },
+      { icon: Percent, label: "Partner Discounts", href: "/partner-discounts" },
       { icon: Landmark, label: "Government", href: "/government" },
       { icon: Ticket, label: "Offers", href: "/offers" },
     ],
@@ -98,7 +100,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-3 py-3">
+      <nav className="flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-3 py-3 scrollbar-none">
         {groups.map((group) => (
           <div key={group.title} className="flex flex-col gap-1">
             <span className="mb-0.5 h-4 px-3 text-[11px] font-bold tracking-wider whitespace-nowrap text-faint uppercase opacity-0 transition-opacity duration-200 group-hover:opacity-100">

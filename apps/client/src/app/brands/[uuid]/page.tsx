@@ -1,4 +1,5 @@
 import { BrandProducts } from "@/components/brand/brand-products";
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getBrand, getProductsByBrand } from "services";
@@ -19,16 +20,23 @@ export const generateMetadata = async ({
 
 const BrandPage = async ({ params }: Props) => {
   const { uuid } = await params;
-  const [brand, products] = await Promise.all([
+  const [brand, products, viewerPricing] = await Promise.all([
     getBrand(uuid),
     getProductsByBrand(uuid),
+    getViewerPartnerPricing(),
   ]);
 
   if (!brand) {
     notFound();
   }
 
-  return <BrandProducts brand={brand} products={products} />;
+  return (
+    <BrandProducts
+      brand={brand}
+      products={products}
+      discountPercent={viewerPricing.discountPercent}
+    />
+  );
 };
 
 export default BrandPage;

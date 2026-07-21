@@ -7,7 +7,9 @@ import {
   addToCart,
   checkCompatibility,
   createBoqFromCart,
+  createOrderFromCart,
   getCartPreview,
+  getPartnerPricingForClerkUser,
   isProfileComplete,
   removeCartItem,
   updateCartItemQuantity,
@@ -132,4 +134,27 @@ export const checkout = async (formData: FormData) => {
 
   const boq = await createBoqFromCart(user.uuid, categoryUuid);
   redirect(`/boq/${boq.uuid}`);
+};
+
+// Direct checkout: turn the individual "product" items in the cart into an order
+// (no BOQ), applying the partner discount for partners. Lands on the order page,
+// where the (stubbed) payment is taken.
+export const checkoutProducts = async () => {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  if (!isProfileComplete(user)) {
+    redirect("/complete-profile?next=/cart");
+  }
+
+  const { discountPercent } = await getPartnerPricingForClerkUser(
+    user.clerkUserId,
+  );
+  const order = await createOrderFromCart({
+    userUuid: user.uuid,
+    discountPercent,
+  });
+  redirect(`/orders/${order.uuid}`);
 };

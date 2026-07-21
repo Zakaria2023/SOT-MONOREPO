@@ -1,6 +1,11 @@
 "use client";
 
-import { checkout, removeItem, updateQuantity } from "@/app/cart/actions";
+import {
+  checkout,
+  checkoutProducts,
+  removeItem,
+  updateQuantity,
+} from "@/app/cart/actions";
 import { useCompatibility } from "@/app/cart/use-compatibility";
 import { CompatibilityGateModal } from "@/components/cart/compatibility-gate-modal";
 import { CompatibilityWarnings } from "@/components/cart/compatibility-warnings";
@@ -9,7 +14,6 @@ import { documentDownloadUrl } from "@/lib/documents";
 import {
   ArrowLeft,
   ArrowRight,
-  Clock,
   CreditCard,
   Loader2,
   Minus,
@@ -22,11 +26,12 @@ import Link from "next/link";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { CartLineItem } from "services";
-import { formatMoney, lineTotal, summarizeCart } from "utils";
+import { applyPercentDiscount, formatMoney, lineTotal, summarizeCart } from "utils";
 
 type CartViewProps = {
   items: CartLineItem[];
   needsProfile: boolean;
+  discountPercent?: number;
 };
 
 type CartRowProps = {
@@ -206,17 +211,17 @@ const BoqSubmitButton = () => {
   );
 };
 
-const ProductCheckout = () => {
-  const [soon, setSoon] = useState(false);
+const ProductCheckoutButton = () => {
+  const { pending } = useFormStatus();
 
   return (
     <button
-      type="button"
-      onClick={() => setSoon(true)}
-      className="bg-accent-gradient font-grotesk inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-[#07101F] transition-opacity hover:opacity-90"
+      type="submit"
+      disabled={pending}
+      className="bg-accent-gradient font-grotesk inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-[#07101F] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-70"
     >
-      {soon ? <Clock size={17} /> : <CreditCard size={17} />}
-      {soon ? "Coming soon" : "Checkout & pay"}
+      {pending ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
+      {pending ? "Placing order…" : "Checkout & pay"}
     </button>
   );
 };
@@ -224,6 +229,7 @@ const ProductCheckout = () => {
 export const CartView = ({
   items: initialItems,
   needsProfile,
+  discountPercent = 0,
 }: CartViewProps) => {
   const [items, setItems] = useState(initialItems);
   const [showProfileGate, setShowProfileGate] = useState(false);
@@ -262,6 +268,17 @@ export const CartView = ({
   const currency = items[0]?.currency ?? "SAR";
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const products = items.filter((item) => item.kind === "product");
+  // Partners pay the discounted price — reflect it in the product lines/totals.
+  const displayProducts =
+    discountPercent > 0
+      ? products.map((item) => ({
+          ...item,
+          unitPrice: applyPercentDiscount(
+            item.unitPrice,
+            discountPercent,
+          ).toFixed(2),
+        }))
+      : products;
 
   // Each solution (a whole category added at once) gets its own checkout card,
   // keyed by the category its products belong to.
@@ -343,12 +360,28 @@ export const CartView = ({
             {products.length > 0 && (
               <CartSection
                 title="Products"
-                subtitle="Buy individually — checkout and pay right away."
-                items={products}
+                subtitle={
+                  discountPercent > 0
+                    ? `Buy individually — partner pricing (${discountPercent}% off) applied.`
+                    : "Buy individually — checkout and pay right away."
+                }
+                items={displayProducts}
                 currency={currency}
                 onQuantity={onQuantity}
                 onRemove={onRemove}
-                footer={<ProductCheckout />}
+                footer={
+                  <form
+                    action={checkoutProducts}
+                    onSubmit={(event) => {
+                      if (needsProfile) {
+                        event.preventDefault();
+                        setShowProfileGate(true);
+                      }
+                    }}
+                  >
+                    <ProductCheckoutButton />
+                  </form>
+                }
               />
             )}
           </div>

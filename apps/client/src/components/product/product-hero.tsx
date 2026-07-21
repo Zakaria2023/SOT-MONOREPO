@@ -1,8 +1,8 @@
 import { AddToCartButton } from "@/components/home/add-to-cart-button";
 import { BusinessLineChips } from "@/components/catalog/business-line-chips";
 import { BuyNowButton } from "@/components/product/buy-now-button";
+import { ProductPrice } from "@/components/shared/product-price";
 import { documentDownloadUrl } from "@/lib/documents";
-import { formatPrice } from "utils";
 import {
   ArrowLeft,
   Cpu,
@@ -28,11 +28,16 @@ type SpecAttribute = {
 type ProductHeroProps = {
   product: ProductDetail;
   attributes: SpecAttribute[];
+  discountPercent: number;
 };
 
 const STAT_ICONS: LucideIcon[] = [Gauge, ShieldCheck, Users, Layers, Cpu, Network];
 
-export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
+export const ProductHero = ({
+  product,
+  attributes,
+  discountPercent,
+}: ProductHeroProps) => {
   const chipAttributes = attributes.slice(0, 2);
   const statAttributes = attributes.slice(0, 4);
   const subImages = product.images ?? [];
@@ -146,9 +151,12 @@ export const ProductHero = ({ product, attributes }: ProductHeroProps) => {
 
           <div className="mt-6 flex flex-col gap-4 rounded-card border border-hairline bg-surface-2 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-heading text-3xl text-ink">
-                {formatPrice(product.price, product.currency)}
-              </p>
+              <ProductPrice
+                price={product.price}
+                currency={product.currency}
+                discountPercent={discountPercent}
+                className="font-heading text-3xl text-ink"
+              />
               <p className="mt-0.5 text-sm text-faint">per unit</p>
             </div>
             {product.isAvailable ? (

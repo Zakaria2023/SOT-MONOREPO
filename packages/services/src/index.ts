@@ -11,6 +11,7 @@ export * from "./government";
 export * from "./handovers";
 export * from "./offers";
 export * from "./orders";
+export * from "./partner-discounts";
 export * from "./partners";
 export * from "./payouts";
 export * from "./pricing";
