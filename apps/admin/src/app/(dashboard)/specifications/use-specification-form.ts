@@ -36,6 +36,8 @@ const toSpecFields = (fields: SpecFieldForm[]): SpecField[] =>
       label: field.label,
       valueType,
       unit: valueType === "number" ? field.unit : null,
+      allowMultiple: valueType === "select" ? field.allowMultiple : false,
+      allowRange: valueType === "number" ? field.allowRange : false,
       options:
         valueType === "number"
           ? field.numericValues.map((value) => ({
@@ -61,6 +63,8 @@ const toFormFields = (fields: SpecField[]): SpecFieldForm[] =>
       label: field.label,
       valueType,
       unit: field.unit ?? "",
+      allowMultiple: field.allowMultiple ?? false,
+      allowRange: field.allowRange ?? false,
       options: valueType === "number" ? [] : toFormOptions(field.options),
       numericValues:
         valueType === "number"
@@ -97,6 +101,8 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
       newGroupName: "",
       valueType: specification?.valueType ?? "select",
       unit: specification?.unit ?? "",
+      allowMultiple: specification?.allowMultiple ?? false,
+      allowRange: specification?.allowRange ?? false,
       options:
         specification?.valueType === "number"
           ? []
@@ -125,6 +131,8 @@ export const useSpecificationForm = (args: UseSpecificationFormArgs) => {
         newGroupName: values.newGroupName,
         valueType: values.valueType,
         unit: values.unit,
+        allowMultiple: values.allowMultiple,
+        allowRange: values.allowRange,
         options:
           values.valueType === "number"
             ? values.numericValues.map((value) => ({

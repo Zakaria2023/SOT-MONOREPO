@@ -1,5 +1,6 @@
 import { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
+  boolean,
   char,
   int,
   json,
@@ -36,6 +37,14 @@ export const Specifications = mysqlTable("Specifications", {
     .default("select")
     .notNull(),
   unit: varchar("unit", { length: 32 }),
+
+  // "select" modifier: products may tick several options instead of one. The
+  // chosen values are stored comma-joined in the product's attribute map.
+  allowMultiple: boolean("allow_multiple").default(false).notNull(),
+  // "number" modifier: products enter a from–to range instead of a single
+  // value. Stored as "from - to"; the rule engine budgets a range consumer at
+  // its max and a range provider at its min.
+  allowRange: boolean("allow_range").default(false).notNull(),
 
   options: json("options").$type<SpecOption[]>(),
 

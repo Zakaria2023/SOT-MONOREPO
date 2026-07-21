@@ -1,3 +1,4 @@
+import { parseSpecRange, parseSpecValues } from "utils";
 import type { SelectCompatibilityRules } from "../../../db/schema/compatibility-rules";
 import type { SelectProducts } from "../../../db/schema/products";
 import type { SelectSpecifications } from "../../../db/schema/specifications";
@@ -124,14 +125,21 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 // Read a numeric spec value off a product's attribute map. Values are stored
 // as strings (the map is shared with dropdown specs) — non-numeric or absent
-// means the product doesn't carry this spec.
+// means the product doesn't carry this spec. A range spec ("from - to") is
+// reduced to a single bound: a consumer reads its max (worst-case demand), a
+// provider reads its min (guaranteed capacity).
 const numericValue = (
   attributes: Record<string, string>,
   key: string,
+  bound: "min" | "max" = "max",
 ): number | null => {
   const raw = attributes[key];
   if (raw === undefined || raw.trim() === "") {
     return null;
+  }
+  const range = parseSpecRange(raw);
+  if (range) {
+    return bound === "min" ? range.min : range.max;
   }
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
@@ -144,7 +152,10 @@ const matchesCondition = (
   if (!condition || condition.values.length === 0) {
     return true;
   }
-  return condition.values.includes(item.attributes[condition.specKey] ?? "");
+  // The condition spec may be multi-select (comma-joined) — it matches when any
+  // ticked value is one the condition asks for.
+  const selected = parseSpecValues(item.attributes[condition.specKey]);
+  return selected.some((value) => condition.values.includes(value));
 };
 
 const compare = (
@@ -200,7 +211,11 @@ const findSuggestions = (
   }
   return catalog
     .flatMap((product) => {
-      const capacity = numericValue(product.attributes, rule.providerSpec.key);
+      const capacity = numericValue(
+        product.attributes,
+        rule.providerSpec.key,
+        "min",
+      );
       if (capacity === null) {
         return [];
       }
@@ -222,7 +237,7 @@ export const evaluateRule = (
   catalog: EngineCatalogProduct[],
 ): RuleEvaluation => {
   const consumers: RuleParticipant[] = selection.flatMap((item) => {
-    const unitValue = numericValue(item.attributes, rule.consumerSpec.key);
+    const unitValue = numericValue(item.attributes, rule.consumerSpec.key, "max");
     if (unitValue === null || !matchesCondition(item, rule.condition)) {
       return [];
     }
@@ -238,7 +253,7 @@ export const evaluateRule = (
   });
 
   const providers: RuleParticipant[] = selection.flatMap((item) => {
-    const unitValue = numericValue(item.attributes, rule.providerSpec.key);
+    const unitValue = numericValue(item.attributes, rule.providerSpec.key, "min");
     if (unitValue === null) {
       return [];
     }

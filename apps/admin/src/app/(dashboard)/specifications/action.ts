@@ -23,6 +23,8 @@ export type SpecificationActionInput = {
   newGroupName: string;
   valueType: SpecValueType;
   unit: string;
+  allowMultiple: boolean;
+  allowRange: boolean;
   options: SpecOption[];
   rules: SpecRule[];
   categoryUuids: string[];
@@ -68,6 +70,9 @@ const toFields = async (input: SpecificationActionInput) => ({
   groupUuid: await resolveGroupUuid(input),
   valueType: input.valueType,
   unit: input.valueType === "number" ? input.unit.trim() || null : null,
+  // Each flag only applies to its own value type — normalize the other away.
+  allowMultiple: input.valueType === "select" ? input.allowMultiple : false,
+  allowRange: input.valueType === "number" ? input.allowRange : false,
   options: input.options,
   rules: input.rules,
 });

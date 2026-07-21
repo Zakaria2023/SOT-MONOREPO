@@ -8,7 +8,7 @@ import {
   useFormContext,
   useWatch,
 } from "react-hook-form";
-import { Button, Combobox, Dropdown, FormError, Input } from "ui";
+import { Button, Checkbox, Combobox, Dropdown, FormError, Input } from "ui";
 import { NumericValuesEditor } from "@/components/specifications/numeric-values-editor";
 
 type SpecFieldListProps = {
@@ -33,6 +33,7 @@ type SpecOptionListProps = {
 const SpecFieldRow = ({ name, index, depth, onRemove }: SpecFieldRowProps) => {
   const { control, register, getFieldState, formState } = useFormContext();
   const valueType = useWatch({ control, name: `${name}.${index}.valueType` });
+  const allowRange = useWatch({ control, name: `${name}.${index}.allowRange` });
   const unitError = getFieldState(`${name}.${index}.unit`, formState).error
     ?.message as string | undefined;
 
@@ -97,18 +98,32 @@ const SpecFieldRow = ({ name, index, depth, onRemove }: SpecFieldRowProps) => {
       </div>
 
       {valueType === "number" ? (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted">
-            Allowed values (optional)
-          </label>
-          <p className="text-xs text-faint">
-            Fixed numeric choices — leave empty to let products type any
-            number. Either way, rules can compute with the value.
-          </p>
-          <NumericValuesEditor name={`${name}.${index}.numericValues`} />
-        </div>
+        <>
+          <Checkbox
+            label="Allow range (from–to)"
+            {...register(`${name}.${index}.allowRange`)}
+          />
+          {!allowRange && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted">
+                Allowed values (optional)
+              </label>
+              <p className="text-xs text-faint">
+                Fixed numeric choices — leave empty to let products type any
+                number. Either way, rules can compute with the value.
+              </p>
+              <NumericValuesEditor name={`${name}.${index}.numericValues`} />
+            </div>
+          )}
+        </>
       ) : (
-        <SpecOptionList name={`${name}.${index}.options`} depth={depth + 1} />
+        <>
+          <Checkbox
+            label="Allow multiple selection"
+            {...register(`${name}.${index}.allowMultiple`)}
+          />
+          <SpecOptionList name={`${name}.${index}.options`} depth={depth + 1} />
+        </>
       )}
     </div>
   );
@@ -141,6 +156,8 @@ const SpecFieldList = ({ name, depth }: SpecFieldListProps) => {
             label: "",
             valueType: "select",
             unit: "",
+            allowMultiple: false,
+            allowRange: false,
             options: [],
             numericValues: [],
           })

@@ -294,6 +294,8 @@ export const getSpecificationsForCategory = async (
         label: Specifications.label,
         valueType: Specifications.valueType,
         unit: Specifications.unit,
+        allowMultiple: Specifications.allowMultiple,
+        allowRange: Specifications.allowRange,
         options: Specifications.options,
         order: Specifications.order,
       })
@@ -319,6 +321,8 @@ export const getSpecificationsForCategory = async (
         options: row.options ?? [],
         valueType: row.valueType,
         unit: row.unit,
+        allowMultiple: row.allowMultiple,
+        allowRange: row.allowRange,
       });
     }
     return specs;

@@ -13,6 +13,9 @@ export type SpecFieldForm = {
   label: string;
   valueType: "select" | "number";
   unit: string;
+  // "select" sub-field: tick several options. "number" sub-field: from–to range.
+  allowMultiple: boolean;
+  allowRange: boolean;
   options: SpecOptionForm[];
   numericValues: string[];
 };
@@ -30,6 +33,8 @@ const specFieldSchema: z.ZodType<SpecFieldForm, SpecFieldForm> = z.lazy(() =>
       label: z.string().min(1, "Required"),
       valueType: z.enum(["select", "number"]),
       unit: z.string().max(32),
+      allowMultiple: z.boolean(),
+      allowRange: z.boolean(),
       options: z.array(specOptionSchema),
       numericValues: z.array(numericValueSchema),
     })
@@ -69,6 +74,10 @@ export const specificationFormSchema = z
     newGroupName: z.string().max(255),
     valueType: z.enum(["select", "number"]),
     unit: z.string().max(32),
+    // "select" spec: let products tick several options. "number" spec: let
+    // products enter a from–to range instead of a single value.
+    allowMultiple: z.boolean(),
+    allowRange: z.boolean(),
     options: z.array(specOptionSchema),
     // Optional fixed choices for a numeric spec (e.g. 24 / 32 / 52 ports).
     // Products then pick from a dropdown instead of typing a free number.

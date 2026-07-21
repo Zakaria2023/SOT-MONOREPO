@@ -142,6 +142,64 @@ describe("evaluateRule — sum_budget", () => {
   });
 });
 
+describe("evaluateRule — range & multi-select specs", () => {
+  it("budgets a range consumer at its max (worst case)", () => {
+    const rangeCamera: EngineItem = {
+      productUuid: "rng-cam",
+      name: "Range Camera",
+      quantity: 8,
+      attributes: { "power-consumption": "6.5 - 9", poe: "Yes" },
+    };
+    const result = evaluateRule(
+      poeBudgetRule,
+      [smallSwitch, rangeCamera],
+      catalog,
+    );
+    // reads the max (9): 8 x 9 = 72 <= 130 x 90% = 117
+    expect(result.demand).toBe(72);
+    expect(result.status).toBe("pass");
+  });
+
+  it("counts a range provider at its min (guaranteed capacity)", () => {
+    const rangeSwitch: EngineItem = {
+      productUuid: "rng-switch",
+      name: "Range Switch",
+      quantity: 1,
+      attributes: {
+        "poe-budget": "100 - 130",
+        "port-count": "8",
+        "poe-per-port-max": "30",
+      },
+    };
+    const result = evaluateRule(
+      poeBudgetRule,
+      [rangeSwitch, camera("b850", "12", 10)],
+      catalog,
+    );
+    // reads the min (100): usable 100 x 90% = 90; demand 10 x 12 = 120 > 90
+    expect(result.capacity).toBe(100);
+    expect(result.effectiveCapacity).toBe(90);
+    expect(result.status).toBe("fail");
+  });
+
+  it("matches a multi-select condition on any ticked value", () => {
+    const multiCamera: EngineItem = {
+      productUuid: "multi-cam",
+      name: "Multi Camera",
+      quantity: 4,
+      attributes: { "power-consumption": "6.5", poe: "Yes, PoE+" },
+    };
+    const result = evaluateRule(
+      poeBudgetRule,
+      [smallSwitch, multiCamera],
+      catalog,
+    );
+    // the condition asks for "Yes"; the device ticked "Yes, PoE+" — it counts
+    expect(result.consumers).toHaveLength(1);
+    expect(result.demand).toBe(26); // 4 x 6.5
+  });
+});
+
 describe("evaluateRule — count_limit", () => {
   it("fails when there are more devices than ports", () => {
     const result = evaluateRule(

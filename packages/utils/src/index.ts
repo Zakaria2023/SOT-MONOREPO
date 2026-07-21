@@ -188,6 +188,65 @@ export const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+// A multi-select spec's chosen options are stored comma-joined in the product's
+// flat attribute map (e.g. "802.3af, 802.3at"). These two helpers move between
+// that stored string and the individual option values the UI works with.
+export const parseSpecValues = (raw: string | null | undefined): string[] =>
+  raw
+    ? raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
+
+export const serializeSpecValues = (values: string[]): string =>
+  values.join(", ");
+
+// A range spec's value is stored as "from - to" (e.g. "10 - 20", "-20 - 60") —
+// a plain number never contains " - ", so that separator distinguishes the two.
+export const RANGE_SEPARATOR = " - ";
+
+export const serializeSpecRange = (from: string, to: string): string =>
+  `${from.trim()}${RANGE_SEPARATOR}${to.trim()}`;
+
+/** Splits a stored range value into its raw "from"/"to" parts for editing. */
+export const splitSpecRange = (
+  raw: string | null | undefined,
+): [string, string] => {
+  if (!raw) {
+    return ["", ""];
+  }
+  const at = raw.indexOf(RANGE_SEPARATOR);
+  if (at === -1) {
+    return [raw, ""];
+  }
+  return [raw.slice(0, at), raw.slice(at + RANGE_SEPARATOR.length)];
+};
+
+/**
+ * Parses a stored range spec value back into numeric bounds, or null when it
+ * isn't a valid "from - to" pair. The rule engine reads these bounds: a range
+ * consumer is budgeted at its max (worst case), a range provider at its min
+ * (guaranteed capacity).
+ */
+export const parseSpecRange = (
+  raw: string | null | undefined,
+): { min: number; max: number } | null => {
+  if (!raw) {
+    return null;
+  }
+  const at = raw.indexOf(RANGE_SEPARATOR);
+  if (at === -1) {
+    return null;
+  }
+  const min = Number(raw.slice(0, at).trim());
+  const max = Number(raw.slice(at + RANGE_SEPARATOR.length).trim());
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return null;
+  }
+  return { min, max };
+};
+
 /** Turns a slug/key back into a readable Title Case label, e.g. "poe-standard" -> "Poe Standard". */
 export const humanizeSlug = (value: string): string =>
   value

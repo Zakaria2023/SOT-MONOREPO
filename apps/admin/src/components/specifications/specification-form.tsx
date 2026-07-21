@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { measurementUnits } from "@/db/enum";
 import { Controller, FormProvider, useWatch } from "react-hook-form";
-import { Button, Combobox, Dropdown, FormError, Input } from "ui";
+import { Button, Checkbox, Combobox, Dropdown, FormError, Input } from "ui";
 import type {
   SelectSpecificationGroups,
   SpecificationWithCategories,
@@ -88,6 +88,7 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
 
   const watchedCategoryUuids = useWatch({ control, name: "categoryUuids" });
   const valueType = useWatch({ control, name: "valueType" });
+  const allowRange = useWatch({ control, name: "allowRange" });
 
   // The numericValues error may sit on the array itself or on one entry.
   const numericValuesError = Array.isArray(errors.numericValues)
@@ -214,6 +215,10 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
                 Dropdown values products pick from. An option can reveal its
                 own sub-fields when selected.
               </p>
+              <Checkbox
+                label="Allow multiple — products can tick several options"
+                {...register("allowMultiple")}
+              />
               <SpecOptionList name="options" depth={0} />
             </div>
 
@@ -229,17 +234,31 @@ export const SpecificationForm = (props: SpecificationFormProps) => {
         {valueType === "number" && (
           <>
             <div className="flex flex-col gap-2 border-t border-hairline pt-6">
-              <label className="text-sm font-semibold text-ink">
-                Allowed values (optional)
-              </label>
+              <Checkbox
+                label="Allow range — products enter a from–to value (e.g. 10 – 20)"
+                {...register("allowRange")}
+              />
               <p className="text-xs text-muted">
-                Fixed numeric choices products pick from — e.g. 24 / 32 / 52
-                ports. Leave empty to let products type any number. Either
-                way, compatibility rules can compute with the value.
+                For values that span a range, like operating temperature. In
+                compatibility rules a range is budgeted at its max as a
+                consumer, and counted at its min as a provider.
               </p>
-              <NumericValuesEditor name="numericValues" />
-              <FormError message={numericValuesError} />
             </div>
+
+            {!allowRange && (
+              <div className="flex flex-col gap-2 border-t border-hairline pt-6">
+                <label className="text-sm font-semibold text-ink">
+                  Allowed values (optional)
+                </label>
+                <p className="text-xs text-muted">
+                  Fixed numeric choices products pick from — e.g. 24 / 32 / 52
+                  ports. Leave empty to let products type any number. Either
+                  way, compatibility rules can compute with the value.
+                </p>
+                <NumericValuesEditor name="numericValues" />
+                <FormError message={numericValuesError} />
+              </div>
+            )}
 
             <p className="rounded-control border border-dashed border-hairline p-4 text-xs text-muted">
               Products enter a numeric value for this specification (in the
