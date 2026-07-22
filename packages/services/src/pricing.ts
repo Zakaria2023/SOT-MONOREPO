@@ -1,3 +1,5 @@
+import { applyPercentDiscount, fromMinorUnits, toMinorUnits } from "utils";
+
 // The partner discount off MSRP — both the partner's buy-in discount and the
 // margin pool (one number, no ladder). What a partner does is captured by their
 // capabilities, so every partner prices at this System Integrator rate. Set by
@@ -20,12 +22,17 @@ export type PartnerCartPricing = {
 export const computePartnerCartPricing = (
   subtotalMsrp: number,
 ): PartnerCartPricing => {
-  const discountAmount =
-    Math.round(subtotalMsrp * PARTNER_DISCOUNT_PERCENT) / 100;
+  // Runs through the same integer minor-unit helper the cart and orders use,
+  // so `discountAmount + total` is exactly `subtotal`. Subtracting a rounded
+  // discount from a float subtotal used to leave drift (0.10 -> 0.09000000001).
+  const total = applyPercentDiscount(subtotalMsrp, PARTNER_DISCOUNT_PERCENT);
+  const discountAmount = fromMinorUnits(
+    toMinorUnits(subtotalMsrp) - toMinorUnits(total),
+  );
   return {
     subtotal: subtotalMsrp,
     discountPercent: PARTNER_DISCOUNT_PERCENT,
     discountAmount,
-    total: subtotalMsrp - discountAmount,
+    total,
   };
 };

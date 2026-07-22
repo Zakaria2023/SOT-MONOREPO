@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyPercentDiscount,
   capitalize,
   formatMoney,
   formatSpecValue,
@@ -240,5 +241,40 @@ describe("formatSpecValue", () => {
 
   it("handles an open-ended range", () => {
     expect(formatSpecValue("10 - ", "V")).toBe("10 V");
+  });
+});
+
+// The live partner-discount path: cart lines, displayed product prices, and
+// the unit price written onto an order (orders.ts).
+describe("applyPercentDiscount", () => {
+  it("takes a whole percent off", () => {
+    expect(applyPercentDiscount("100.00", 12)).toBe(88);
+    expect(applyPercentDiscount(250, 20)).toBe(200);
+  });
+
+  it("returns the price unchanged at 0%", () => {
+    expect(applyPercentDiscount("4200.55", 0)).toBe(4200.55);
+  });
+
+  it("returns 0 at 100%", () => {
+    expect(applyPercentDiscount("4200.55", 100)).toBe(0);
+  });
+
+  it("clamps out-of-range percents instead of inverting the price", () => {
+    // A negative percent must not inflate the price above MSRP.
+    expect(applyPercentDiscount("100.00", -30)).toBe(100);
+    // Over 100 must not produce a negative price the customer is owed.
+    expect(applyPercentDiscount("100.00", 130)).toBe(0);
+  });
+
+  it("rounds to the halala without floating-point drift", () => {
+    // 12% off 1234.56 is 1086.4128 -> 1086.41
+    expect(applyPercentDiscount("1234.56", 12)).toBe(1086.41);
+    // 12% off 0.10 is 0.088 -> 0.09
+    expect(applyPercentDiscount("0.10", 12)).toBe(0.09);
+  });
+
+  it("treats a null price as zero", () => {
+    expect(applyPercentDiscount(null, 12)).toBe(0);
   });
 });
