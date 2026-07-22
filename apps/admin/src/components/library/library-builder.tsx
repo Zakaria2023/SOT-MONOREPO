@@ -6,15 +6,18 @@ import {
   deleteAttributeAction,
   deleteGroupAction,
   moveAttributeAction,
-  renameGroupAction,
   reorderGroupsAction,
+  updateGroupAction,
   updateAttributeAction,
   type AttributeInput,
   type LibraryBuilderGroup,
 } from "@/app/(dashboard)/library/action";
-import type { SpecInputType } from "@/db/enum";
-import { specInputTypes } from "@/db/enum";
-import { SPEC_INPUT_TYPE_LABELS } from "@/db/label";
+import type { SpecificationDomain, SpecInputType } from "@/db/enum";
+import { specInputTypes, specificationDomains } from "@/db/enum";
+import {
+  SPECIFICATION_DOMAIN_LABELS,
+  SPEC_INPUT_TYPE_LABELS,
+} from "@/db/label";
 import type { SelectCategories } from "@/db/schema/categories";
 import { buildCategoryTreeOptions } from "@/lib/categories";
 import {
@@ -34,7 +37,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Dropdown, Input, Textarea } from "ui";
+import { Button, Checkbox, Dropdown, Input, Textarea } from "ui";
 import type { DropdownOption } from "ui";
 
 type LibraryBuilderProps = {
@@ -66,6 +69,16 @@ const INPUT_TYPES: { value: SpecInputType; label: string }[] =
     value: type,
     label: SPEC_INPUT_TYPE_LABELS[type],
   }));
+
+// The navigation domain a group is bucketed under. "" means no domain — the
+// group falls into the trailing "Other" bucket.
+const DOMAIN_OPTIONS: DropdownOption[] = [
+  { value: "", label: "No domain" },
+  ...specificationDomains.map((domain) => ({
+    value: domain,
+    label: SPECIFICATION_DOMAIN_LABELS[domain],
+  })),
+];
 
 const TYPE_META: Record<
   SpecInputType,
@@ -116,6 +129,7 @@ const AttributeForm = ({
     initial?.inputType ?? "single_select",
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
+  const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [optionsText, setOptionsText] = useState(
     (initial?.options ?? []).join(" | "),
   );
@@ -162,6 +176,7 @@ const AttributeForm = ({
       label,
       inputType,
       unit: inputType === "number" ? unit : null,
+      allowRange: inputType === "number" ? allowRange : false,
       options,
       reveals: prunedReveals,
       categoryUuids,
@@ -208,15 +223,46 @@ const AttributeForm = ({
         </div>
       </div>
       {inputType === "number" && (
-        <div>
-          <label className="text-xs font-semibold text-ink">Unit</label>
-          <Input
-            value={unit}
-            onChange={(event) => setUnit(event.target.value)}
-            placeholder="e.g. W"
-            className="mt-1"
-          />
-        </div>
+        <>
+          <div>
+            <label className="text-xs font-semibold text-ink">Unit</label>
+            <Input
+              value={unit}
+              onChange={(event) => setUnit(event.target.value)}
+              placeholder="e.g. W"
+              className="mt-1"
+            />
+          </div>
+          <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
+            <Checkbox
+              label="Range — the product enters a from–to pair"
+              checked={allowRange}
+              onChange={(event) => setAllowRange(event.target.checked)}
+            />
+            <p className="text-xs text-faint">
+              Use this for spans like an input voltage range. Rules budget a
+              range at its max when consuming and its min when providing.
+            </p>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-faint">Product sees:</span>
+              {allowRange ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="rounded-control border border-hairline bg-page px-2 py-1 text-xs text-faint">
+                    From
+                  </span>
+                  <span className="text-xs text-faint">–</span>
+                  <span className="rounded-control border border-hairline bg-page px-2 py-1 text-xs text-faint">
+                    To {unit.trim()}
+                  </span>
+                </span>
+              ) : (
+                <span className="rounded-control border border-hairline bg-page px-2 py-1 text-xs text-faint">
+                  0 {unit.trim()}
+                </span>
+              )}
+            </div>
+          </div>
+        </>
       )}
       {(inputType === "single_select" || inputType === "multi_select") && (
         <div>
@@ -317,9 +363,13 @@ export const LibraryBuilder = ({
     groups.find((group) => group.uuid === selectedUuid) ?? realGroups[0];
 
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDomain, setNewGroupDomain] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
-  const [renamingGroup, setRenamingGroup] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
+  // The inline group editor holds name + domain together, so saving one can
+  // never blank the other.
+  const [editingGroup, setEditingGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupDomain, setGroupDomain] = useState("");
   const [addingAttribute, setAddingAttribute] = useState(false);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
   const [movingUuid, setMovingUuid] = useState<string | null>(null);
@@ -339,14 +389,34 @@ export const LibraryBuilder = ({
     const name = newGroupName.trim();
     if (!name) return;
     run(async () => {
-      const result = await addGroupAction(name);
+      const result = await addGroupAction(name, newGroupDomain || null);
       if (!result.error) {
         setNewGroupName("");
+        setNewGroupDomain("");
         setAddingGroup(false);
       }
       return result;
     });
   };
+
+  const openGroupEditor = (group: LibraryBuilderGroup) => {
+    setEditingGroup(true);
+    setGroupName(group.name);
+    setGroupDomain(group.domain ?? "");
+  };
+
+  const saveGroup = (uuid: string) =>
+    run(async () => {
+      const result = await updateGroupAction(
+        uuid,
+        groupName,
+        groupDomain || null,
+      );
+      if (!result.error) {
+        setEditingGroup(false);
+      }
+      return result;
+    });
 
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
@@ -377,16 +447,31 @@ export const LibraryBuilder = ({
           </div>
 
           {addingGroup && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 rounded-control border border-primary/40 bg-primary-tint/20 p-3">
               <Input
                 value={newGroupName}
                 onChange={(event) => setNewGroupName(event.target.value)}
                 placeholder="Group name"
                 onKeyDown={(event) => event.key === "Enter" && addGroup()}
               />
-              <Button type="button" onClick={addGroup} disabled={isPending}>
-                <Check size={15} />
-              </Button>
+              <Dropdown
+                value={newGroupDomain}
+                onChange={setNewGroupDomain}
+                placeholder="No domain"
+                options={DOMAIN_OPTIONS}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAddingGroup(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" onClick={addGroup} disabled={isPending}>
+                  <Check size={15} /> Add group
+                </Button>
+              </div>
             </div>
           )}
 
@@ -406,14 +491,27 @@ export const LibraryBuilder = ({
                       type="button"
                       onClick={() => {
                         setSelectedUuid(group.uuid);
-                        setRenamingGroup(false);
+                        setEditingGroup(false);
                         setAddingAttribute(false);
                         setEditingUuid(null);
                       }}
-                      className="flex flex-1 items-center justify-between gap-2 text-left text-sm"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm"
                     >
-                      <span className="line-clamp-1 font-medium">
-                        {group.name}
+                      <span className="min-w-0">
+                        <span className="line-clamp-1 font-medium">
+                          {group.name}
+                        </span>
+                        <span
+                          className={`line-clamp-1 text-xs ${
+                            isActive ? "text-white/70" : "text-faint"
+                          }`}
+                        >
+                          {group.domain
+                            ? (SPECIFICATION_DOMAIN_LABELS[
+                                group.domain as SpecificationDomain
+                              ] ?? group.domain)
+                            : "No domain"}
+                        </span>
                       </span>
                       <span
                         className={isActive ? "text-white/70" : "text-faint"}
@@ -443,11 +541,8 @@ export const LibraryBuilder = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setRenamingGroup(true);
-                            setRenameValue(group.name);
-                          }}
-                          aria-label="Rename"
+                          onClick={() => openGroupEditor(group)}
+                          aria-label="Edit group"
                           className="rounded p-1 hover:bg-white/15"
                         >
                           <Pencil size={13} />
@@ -465,28 +560,54 @@ export const LibraryBuilder = ({
                       </div>
                     )}
                   </div>
-                  {isActive && renamingGroup && (
-                    <div className="mt-1 flex items-center gap-2">
-                      <Input
-                        value={renameValue}
-                        onChange={(event) => setRenameValue(event.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        onClick={() =>
-                          run(async () => {
-                            const result = await renameGroupAction(
-                              group.uuid,
-                              renameValue,
-                            );
-                            if (!result.error) setRenamingGroup(false);
-                            return result;
-                          })
-                        }
-                        disabled={isPending}
-                      >
-                        <Check size={15} />
-                      </Button>
+                  {isActive && editingGroup && (
+                    <div className="mt-1 flex flex-col gap-2 rounded-control border border-hairline bg-page p-3">
+                      <div>
+                        <label className="text-xs font-semibold text-ink">
+                          Name
+                        </label>
+                        <Input
+                          value={groupName}
+                          onChange={(event) => setGroupName(event.target.value)}
+                          className="mt-1"
+                          onKeyDown={(event) =>
+                            event.key === "Enter" && saveGroup(group.uuid)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-ink">
+                          Domain
+                        </label>
+                        <p className="mt-0.5 text-xs text-faint">
+                          Buckets this group in the library and on the product
+                          attribute picker.
+                        </p>
+                        <div className="mt-1">
+                          <Dropdown
+                            value={groupDomain}
+                            onChange={setGroupDomain}
+                            placeholder="No domain"
+                            options={DOMAIN_OPTIONS}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setEditingGroup(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => saveGroup(group.uuid)}
+                          disabled={isPending}
+                        >
+                          <Check size={15} /> Save
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </li>
@@ -547,6 +668,7 @@ export const LibraryBuilder = ({
                       label: attribute.label,
                       inputType: attribute.inputType,
                       unit: attribute.unit,
+                      allowRange: attribute.allowRange,
                       options: attribute.options,
                       reveals: attribute.optionReveals,
                       categoryUuids: attribute.categoryUuids,
@@ -576,6 +698,11 @@ export const LibraryBuilder = ({
                         >
                           {TYPE_META[attribute.inputType].label}
                         </span>
+                        {attribute.allowRange && (
+                          <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                            range
+                          </span>
+                        )}
                         {attribute.relationshipCount > 0 && (
                           <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                             <GitCompare size={10} />

@@ -68,7 +68,7 @@ const CARDS: StatCardConfig[] = [
     key: "specifications",
     icon: ListChecks,
     label: "Specifications",
-    href: "/specifications",
+    href: "/library",
     statusLabels: {},
   },
   {

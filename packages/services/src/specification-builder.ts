@@ -30,6 +30,9 @@ export type LibraryAttribute = {
   label: string;
   inputType: SpecInputType;
   unit: string | null;
+  // "number" modifier: the product enters a from–to range instead of a single
+  // value.
+  allowRange: boolean;
   options: string[];
   // Per-option reveal links: option value → library attribute keys auto-added
   // to a product when that option is chosen. Empty for options with no links.
@@ -45,6 +48,8 @@ export type LibraryAttribute = {
 export type LibraryBuilderGroup = {
   uuid: string;
   name: string;
+  // Navigation domain the group is bucketed under (Power, Networking, ...).
+  domain: string | null;
   order: number;
   attributes: LibraryAttribute[];
 };
@@ -54,6 +59,8 @@ export type AttributeInput = {
   label: string;
   inputType: SpecInputType;
   unit: string | null;
+  // "number" only: the product enters a from–to range. Ignored for other types.
+  allowRange: boolean;
   // Raw option strings (for select/multi_select). Ignored for other types.
   options: string[];
   // Per-option reveal links: option value → library attribute keys to auto-add
@@ -92,7 +99,7 @@ const engineFieldsFor = (input: AttributeInput) => {
       return {
         valueType: "number" as const,
         allowMultiple: false,
-        allowRange: false,
+        allowRange: input.allowRange,
         unit: input.unit?.trim() || null,
         options: [] as SpecOption[],
       };
@@ -150,6 +157,7 @@ const toLibraryAttribute = (
     label: spec.label,
     inputType: resolveInputType(spec),
     unit: spec.unit,
+    allowRange: spec.allowRange,
     options: (spec.options ?? []).map((option) => option.value),
     optionReveals,
     categoryUuids,
@@ -227,6 +235,7 @@ export const getLibraryBuilder = async (): Promise<LibraryBuilderGroup[]> => {
   const result: LibraryBuilderGroup[] = groups.map((group) => ({
     uuid: group.uuid,
     name: group.name,
+    domain: group.domain,
     order: group.order,
     attributes: byGroup.get(group.uuid) ?? [],
   }));
@@ -235,6 +244,7 @@ export const getLibraryBuilder = async (): Promise<LibraryBuilderGroup[]> => {
     result.push({
       uuid: "",
       name: "Ungrouped",
+      domain: null,
       order: Number.MAX_SAFE_INTEGER,
       attributes: ungrouped,
     });

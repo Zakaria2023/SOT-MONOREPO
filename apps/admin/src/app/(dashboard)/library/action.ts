@@ -58,13 +58,14 @@ export const getTemplates = async (): Promise<SpecificationTemplate[]> => {
 // --- Groups ---
 export const addGroupAction = async (
   name: string,
+  domain: string | null,
 ): Promise<LibraryActionResult> => {
   await requireAdmin();
   if (!name.trim()) {
     return { error: "Name is required" };
   }
   try {
-    await createSpecificationGroup({ name: name.trim(), domain: null });
+    await createSpecificationGroup({ name: name.trim(), domain });
   } catch (error) {
     return fail(error, "Failed to add group");
   }
@@ -72,18 +73,21 @@ export const addGroupAction = async (
   return {};
 };
 
-export const renameGroupAction = async (
+// Saves the group's name and domain together — both come from the same inline
+// editor, so neither is ever written blind over the other.
+export const updateGroupAction = async (
   uuid: string,
   name: string,
+  domain: string | null,
 ): Promise<LibraryActionResult> => {
   await requireAdmin();
   if (!name.trim()) {
     return { error: "Name is required" };
   }
   try {
-    await updateSpecificationGroup(uuid, { name: name.trim(), domain: null });
+    await updateSpecificationGroup(uuid, { name: name.trim(), domain });
   } catch (error) {
-    return fail(error, "Failed to rename group");
+    return fail(error, "Failed to update group");
   }
   revalidate();
   return {};
