@@ -104,18 +104,14 @@ const TYPE_META: Record<
   text: { label: "text", className: "bg-hover text-secondary" },
 };
 
-// Options are edited as readable " | "-separated tokens. Users type a space to
-// split instead of reaching for the pipe key. A trailing space is kept as a
-// dangling " | " so the separator shows the moment they press space; on submit
-// the values are split on "|" and trimmed, so the surrounding spaces drop out.
-const toPipeSeparated = (raw: string): string => {
-  const keepTrailing = /\s$/.test(raw);
-  const tokens = raw.split(/[\s|]+/).filter(Boolean);
-  if (tokens.length === 0) {
-    return "";
-  }
-  return tokens.join(" | ") + (keepTrailing ? " | " : "");
-};
+// Options are edited one per line. They must be able to contain spaces —
+// "802.3at (PoE+)" is a single option — so the separator can only be the
+// newline, never whitespace.
+const parseOptionLines = (raw: string): string[] =>
+  raw
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
 // Total auto-add links across all of an attribute's options.
 const revealCount = (optionReveals: Record<string, string[]>): number =>
@@ -148,7 +144,7 @@ const AttributeForm = ({
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [optionsText, setOptionsText] = useState(
-    (initial?.options ?? []).join(" | "),
+    (initial?.options ?? []).join("\n"),
   );
   const [reveals, setReveals] = useState<Record<string, string[]>>(
     initial?.reveals ?? {},
@@ -164,7 +160,7 @@ const AttributeForm = ({
     inputType === "boolean"
       ? ["Yes", "No"]
       : inputType === "single_select" || inputType === "multi_select"
-        ? optionsText.split("|").map((value) => value.trim()).filter(Boolean)
+        ? parseOptionLines(optionsText)
         : [];
 
   const revealOptions = revealTargets.map((target) => ({
@@ -187,7 +183,7 @@ const AttributeForm = ({
   const submit = () => {
     const options =
       inputType === "single_select" || inputType === "multi_select"
-        ? optionsText.split("|").map((value) => value.trim()).filter(Boolean)
+        ? parseOptionLines(optionsText)
         : [];
     // Keep only reveal links whose option value still exists.
     const prunedReveals: Record<string, string[]> = {};
@@ -300,12 +296,16 @@ const AttributeForm = ({
       {(inputType === "single_select" || inputType === "multi_select") && (
         <div>
           <label className="text-xs font-semibold text-ink">
-            Options — press space to separate
+            Options — one per line
           </label>
-          <Input
+          <p className="mt-0.5 text-xs text-faint">
+            An option can contain spaces and brackets, e.g. 802.3at (PoE+).
+          </p>
+          <Textarea
             value={optionsText}
-            onChange={(event) => setOptionsText(toPipeSeparated(event.target.value))}
-            placeholder="AC DC PoE Battery"
+            onChange={(event) => setOptionsText(event.target.value)}
+            rows={Math.min(8, Math.max(3, optionValues.length + 1))}
+            placeholder={"802.3af (PoE)\n802.3at (PoE+)\n802.3bt (PoE++)"}
             className="mt-1"
           />
         </div>

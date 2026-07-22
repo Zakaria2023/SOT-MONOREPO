@@ -333,6 +333,30 @@ export const SpecificationComposer = ({
       );
     }
 
+    // A free-text attribute is stored as a select with no options, so without
+    // this branch it would render as a dropdown containing only "—".
+    if (resolveSpecInputType(spec) === "text") {
+      return (
+        <input
+          type="text"
+          value={values[spec.key] ?? ""}
+          onChange={(event) => setValueFor(spec.key, event.target.value)}
+          placeholder="Type a value"
+          className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 text-sm text-ink outline-none focus:border-primary"
+        />
+      );
+    }
+
+    // A select with nothing to choose from is a library gap, not a value the
+    // admin can fill — say so instead of showing an empty dropdown.
+    if (options.length === 0) {
+      return (
+        <p className="rounded-control border border-dashed border-hairline px-3 py-2.5 text-xs text-faint">
+          No options defined for this attribute in the library.
+        </p>
+      );
+    }
+
     return (
       <Dropdown
         value={values[spec.key] ?? ""}
