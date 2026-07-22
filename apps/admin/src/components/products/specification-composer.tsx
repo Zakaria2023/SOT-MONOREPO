@@ -1,12 +1,6 @@
 "use client";
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
-import type { SpecificationDomain } from "@/db/enum";
-import { specInputTypes } from "@/db/enum";
-import {
-  SPECIFICATION_DOMAIN_LABELS,
-  SPEC_INPUT_TYPE_LABELS,
-} from "@/db/label";
 import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -33,19 +27,14 @@ type LibrarySpec = LibrarySpecification & {
   domain: string | null;
 };
 
-// A picker entry, carrying the attribute's input type and categories so the
-// filters can narrow the list down.
+// A picker entry. The label is just the attribute name — the group is a filter
+// rather than a prefix on every row — and the rest is what the filters match on.
 type PickerOption = {
   value: string;
   label: string;
-  inputType: string;
+  groupUuid: string;
   categoryUuids: string[];
 };
-
-const TYPE_FILTER_OPTIONS = specInputTypes.map((type) => ({
-  value: type,
-  label: SPEC_INPUT_TYPE_LABELS[type],
-}));
 
 export const SpecificationComposer = ({
   library,
@@ -58,16 +47,20 @@ export const SpecificationComposer = ({
   const appliedKeys = useMemo(() => watchedKeys ?? [], [watchedKeys]);
   const values = useMemo(() => watchedValues ?? {}, [watchedValues]);
 
-  // Flatten the library once: a key → spec map, and the picker options.
-  const { specByKey, pickerOptions } = useMemo(() => {
+  // Flatten the library once: a key → spec map, the picker options, and the
+  // groups that actually hold attributes (the group filter's choices).
+  const { specByKey, pickerOptions, groupFilterOptions } = useMemo(() => {
     const byKey = new Map<string, LibrarySpec>();
     const options: PickerOption[] = [];
+    const groupChoices: { value: string; label: string }[] = [];
     for (const domain of library) {
-      const domainLabel = domain.domain
-        ? (SPECIFICATION_DOMAIN_LABELS[domain.domain as SpecificationDomain] ??
-          domain.domain)
-        : "Other";
       for (const group of domain.groups) {
+        if (group.attributes.length > 0) {
+          groupChoices.push({
+            value: group.group.uuid,
+            label: group.group.name,
+          });
+        }
         for (const attribute of group.attributes) {
           const spec: LibrarySpec = {
             ...attribute,
@@ -77,18 +70,22 @@ export const SpecificationComposer = ({
           byKey.set(attribute.key, spec);
           options.push({
             value: attribute.key,
-            label: `${domainLabel} · ${group.group.name} · ${attribute.label}`,
-            inputType: resolveSpecInputType(attribute),
+            label: attribute.label,
+            groupUuid: group.group.uuid,
             categoryUuids: attribute.categoryUuids,
           });
         }
       }
     }
-    return { specByKey: byKey, pickerOptions: options };
+    return {
+      specByKey: byKey,
+      pickerOptions: options,
+      groupFilterOptions: groupChoices,
+    };
   }, [library]);
 
-  // Input types the picker is narrowed to. Empty = show every attribute.
-  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  // Groups the picker is narrowed to. Empty = show every attribute.
+  const [groupFilter, setGroupFilter] = useState<string[]>([]);
 
   // The chosen category plus its ancestors — an attribute assigned to any of
   // them applies here, matching how category inheritance is resolved.
@@ -102,7 +99,10 @@ export const SpecificationComposer = ({
     () =>
       pickerOptions
         .filter((option) => {
-          if (typeFilter.length > 0 && !typeFilter.includes(option.inputType)) {
+          if (
+            groupFilter.length > 0 &&
+            !groupFilter.includes(option.groupUuid)
+          ) {
             return false;
           }
           // An attribute with no categories is universal. One with categories
@@ -113,7 +113,7 @@ export const SpecificationComposer = ({
           return option.categoryUuids.some((uuid) => categoryChain.has(uuid));
         })
         .map((option) => ({ value: option.value, label: option.label })),
-    [pickerOptions, typeFilter, categoryChain],
+    [pickerOptions, groupFilter, categoryChain],
   );
 
   // Keys this component auto-added because some option revealed them, so they
@@ -387,13 +387,15 @@ export const SpecificationComposer = ({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="sm:w-56">
+        <div className="sm:w-80">
           <Dropdown
             multiple
-            value={typeFilter}
-            onChange={setTypeFilter}
-            placeholder="All types"
-            options={TYPE_FILTER_OPTIONS}
+            searchable
+            value={groupFilter}
+            onChange={setGroupFilter}
+            placeholder="All groups"
+            searchPlaceholder="Search groups…"
+            options={groupFilterOptions}
           />
         </div>
         <div className="sm:max-w-md sm:flex-1">
