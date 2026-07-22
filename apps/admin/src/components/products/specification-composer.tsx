@@ -387,7 +387,7 @@ export const SpecificationComposer = ({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="sm:w-80">
+        <div className="sm:max-w-md sm:flex-1">
           <Dropdown
             multiple
             searchable
