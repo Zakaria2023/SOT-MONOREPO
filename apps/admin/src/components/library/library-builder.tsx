@@ -36,9 +36,18 @@ type LibraryBuilderProps = {
   groups: LibraryBuilderGroup[];
 };
 
+type RevealTarget = {
+  key: string;
+  label: string;
+  groupName: string;
+};
+
 type AttributeFormProps = {
   groupUuid: string | null;
   initial?: AttributeInput & { uuid: string };
+  // Every other library attribute an option can auto-add (reveal), the current
+  // attribute excluded so it can't reveal itself.
+  revealTargets: RevealTarget[];
   onSubmit: (input: AttributeInput) => void;
   onCancel: () => void;
   pending: boolean;
@@ -90,6 +99,7 @@ const TypeIcon = ({ type }: { type: SpecInputType }) => {
 const AttributeForm = ({
   groupUuid,
   initial,
+  revealTargets,
   onSubmit,
   onCancel,
   pending,
@@ -102,17 +112,48 @@ const AttributeForm = ({
   const [optionsText, setOptionsText] = useState(
     (initial?.options ?? []).join(" | "),
   );
+  const [reveals, setReveals] = useState<Record<string, string[]>>(
+    initial?.reveals ?? {},
+  );
+
+  // The option values that currently exist for this attribute: Yes/No for a
+  // boolean, the parsed tokens for a select, nothing otherwise. These are the
+  // values that can carry reveal links.
+  const optionValues =
+    inputType === "boolean"
+      ? ["Yes", "No"]
+      : inputType === "single_select" || inputType === "multi_select"
+        ? optionsText.split("|").map((value) => value.trim()).filter(Boolean)
+        : [];
+
+  const revealOptions = revealTargets.map((target) => ({
+    value: target.key,
+    label: `${target.groupName} · ${target.label}`,
+  }));
+
+  const setRevealsFor = (optionValue: string, keys: string[]) =>
+    setReveals((prev) => ({ ...prev, [optionValue]: keys }));
 
   const submit = () => {
+    const options =
+      inputType === "single_select" || inputType === "multi_select"
+        ? optionsText.split("|").map((value) => value.trim()).filter(Boolean)
+        : [];
+    // Keep only reveal links whose option value still exists.
+    const prunedReveals: Record<string, string[]> = {};
+    for (const value of optionValues) {
+      const keys = reveals[value]?.filter(Boolean) ?? [];
+      if (keys.length > 0) {
+        prunedReveals[value] = keys;
+      }
+    }
     onSubmit({
       groupUuid,
       label,
       inputType,
       unit: inputType === "number" ? unit : null,
-      options:
-        inputType === "single_select" || inputType === "multi_select"
-          ? optionsText.split("|").map((value) => value.trim()).filter(Boolean)
-          : [],
+      options,
+      reveals: prunedReveals,
     });
   };
 
@@ -174,6 +215,37 @@ const AttributeForm = ({
           />
         </div>
       )}
+
+      {optionValues.length > 0 && revealOptions.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
+          <div>
+            <label className="text-xs font-semibold text-ink">
+              Auto-add attributes
+            </label>
+            <p className="mt-0.5 text-xs text-faint">
+              When a product picks an option below, the chosen attributes are
+              added to it automatically (and removed if the option changes).
+            </p>
+          </div>
+          {optionValues.map((value) => (
+            <div key={value} className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-secondary">
+                {value}
+              </span>
+              <Dropdown
+                multiple
+                searchable
+                value={reveals[value] ?? []}
+                onChange={(keys) => setRevealsFor(value, keys)}
+                placeholder="Nothing extra"
+                searchPlaceholder="Search attributes…"
+                options={revealOptions}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
@@ -192,6 +264,19 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
   const [error, setError] = useState<string | undefined>(undefined);
 
   const realGroups = groups.filter((group) => group.uuid);
+
+  // Every attribute in the library, flattened — the pool of reveal targets an
+  // option can auto-add. Excludes the attribute itself at each call site.
+  const allTargets: RevealTarget[] = groups.flatMap((group) =>
+    group.attributes.map((attribute) => ({
+      key: attribute.key,
+      label: attribute.label,
+      groupName: group.name,
+    })),
+  );
+  const revealTargetsExcluding = (key?: string) =>
+    allTargets.filter((target) => target.key !== key);
+
   const [selectedUuid, setSelectedUuid] = useState<string>(
     realGroups[0]?.uuid ?? "",
   );
@@ -401,6 +486,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
             <AttributeForm
               groupUuid={selected.uuid}
               pending={isPending}
+              revealTargets={revealTargetsExcluding()}
               onCancel={() => setAddingAttribute(false)}
               onSubmit={(input) =>
                 run(async () => {
@@ -419,6 +505,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
                   <AttributeForm
                     groupUuid={attribute.groupUuid}
                     pending={isPending}
+                    revealTargets={revealTargetsExcluding(attribute.key)}
                     initial={{
                       uuid: attribute.uuid,
                       groupUuid: attribute.groupUuid,
@@ -426,6 +513,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
                       inputType: attribute.inputType,
                       unit: attribute.unit,
                       options: attribute.options,
+                      reveals: attribute.optionReveals,
                     }}
                     onCancel={() => setEditingUuid(null)}
                     onSubmit={(input) =>

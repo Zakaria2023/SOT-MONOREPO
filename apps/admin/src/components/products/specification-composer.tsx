@@ -4,7 +4,7 @@ import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import type { SpecificationDomain } from "@/db/enum";
 import { SPECIFICATION_DOMAIN_LABELS } from "@/db/label";
 import { Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import type { LibraryDomain, SelectSpecifications } from "services";
 import { Checkbox, Dropdown } from "ui";
@@ -61,17 +61,69 @@ export const SpecificationComposer = ({
     return { specByKey: byKey, pickerOptions: options };
   }, [library]);
 
-  const availableOptions = useMemo(
-    () => pickerOptions.filter((option) => !appliedKeys.includes(option.value)),
-    [pickerOptions, appliedKeys],
-  );
+  // Keys this component auto-added because some option revealed them, so they
+  // can be auto-removed when that option is un-chosen — manually-added keys
+  // (never recorded here) are left alone.
+  const autoAddedRef = useRef<Set<string>>(new Set());
 
-  const addAttribute = (key: string) => {
-    if (!key || appliedKeys.includes(key)) {
+  // The set of attribute keys the currently-chosen option values reveal.
+  const revealedKeys = useMemo(() => {
+    const desired = new Set<string>();
+    for (const key of appliedKeys) {
+      const spec = specByKey.get(key);
+      if (!spec?.options) {
+        continue;
+      }
+      const chosen = spec.allowMultiple
+        ? parseSpecValues(values[key])
+        : [values[key] ?? ""];
+      for (const option of spec.options) {
+        if (!option.reveals || !chosen.includes(option.value)) {
+          continue;
+        }
+        for (const revealKey of option.reveals) {
+          // Only reveal keys that still exist in the library.
+          if (specByKey.has(revealKey)) {
+            desired.add(revealKey);
+          }
+        }
+      }
+    }
+    return desired;
+  }, [appliedKeys, values, specByKey]);
+
+  // Reconcile the applied keys with what the chosen options reveal: add the
+  // freshly-revealed ones, drop the ones we auto-added that are no longer
+  // revealed (clearing their stored value too), and leave manual keys intact.
+  useEffect(() => {
+    const toAdd = [...revealedKeys].filter((key) => !appliedKeys.includes(key));
+    const toRemove = [...autoAddedRef.current].filter(
+      (key) => !revealedKeys.has(key) && appliedKeys.includes(key),
+    );
+
+    autoAddedRef.current = new Set([
+      ...[...autoAddedRef.current].filter((key) => revealedKeys.has(key)),
+      ...toAdd,
+    ]);
+
+    if (toAdd.length === 0 && toRemove.length === 0) {
       return;
     }
-    setValue("specKeys", [...appliedKeys, key], { shouldDirty: true });
-  };
+
+    const nextKeys = [
+      ...appliedKeys.filter((key) => !toRemove.includes(key)),
+      ...toAdd,
+    ];
+    setValue("specKeys", nextKeys, { shouldDirty: true });
+
+    if (toRemove.length > 0) {
+      const nextValues = { ...values };
+      for (const key of toRemove) {
+        delete nextValues[key];
+      }
+      setValue("technicalAttributes", nextValues, { shouldDirty: true });
+    }
+  }, [revealedKeys, appliedKeys, values, setValue]);
 
   const removeAttribute = (key: string) => {
     setValue(
@@ -82,6 +134,20 @@ export const SpecificationComposer = ({
     const next = { ...values };
     delete next[key];
     setValue("technicalAttributes", next, { shouldDirty: true });
+  };
+
+  // The picker is a multi-select over the whole library: keys stay listed and
+  // highlighted once added, and toggling one off also drops its stored value.
+  const setAppliedKeys = (keys: string[]) => {
+    setValue("specKeys", keys, { shouldDirty: true });
+    const removed = appliedKeys.filter((applied) => !keys.includes(applied));
+    if (removed.length > 0) {
+      const next = { ...values };
+      for (const key of removed) {
+        delete next[key];
+      }
+      setValue("technicalAttributes", next, { shouldDirty: true });
+    }
   };
 
   const setValueFor = (key: string, value: string) => {
@@ -219,12 +285,13 @@ export const SpecificationComposer = ({
 
       <div className="sm:max-w-md">
         <Dropdown
+          multiple
           searchable
           searchPlaceholder="Search the library..."
-          value=""
-          onChange={addAttribute}
+          value={appliedKeys}
+          onChange={setAppliedKeys}
           placeholder="+ Add attribute"
-          options={availableOptions}
+          options={pickerOptions}
         />
       </div>
 

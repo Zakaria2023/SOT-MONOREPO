@@ -14,6 +14,10 @@ import { SpecValueType } from "./enum";
 export type SpecOption = {
   value: string;
   children: SpecField[];
+  // Library attribute keys that are auto-added to a product when this option is
+  // chosen (and auto-removed when it's un-chosen). e.g. PoE "Yes" reveals the
+  // "PoE Standard" attribute. Absent/empty = the option reveals nothing.
+  reveals?: string[];
 };
 
 export type SpecField = {

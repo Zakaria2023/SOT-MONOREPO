@@ -30,6 +30,9 @@ export type LibraryAttribute = {
   inputType: SpecInputType;
   unit: string | null;
   options: string[];
+  // Per-option reveal links: option value → library attribute keys auto-added
+  // to a product when that option is chosen. Empty for options with no links.
+  optionReveals: Record<string, string[]>;
   order: number;
   // How many compatibility relationships reference this attribute.
   relationshipCount: number;
@@ -49,6 +52,10 @@ export type AttributeInput = {
   unit: string | null;
   // Raw option strings (for select/multi_select). Ignored for other types.
   options: string[];
+  // Per-option reveal links: option value → library attribute keys to auto-add
+  // when chosen. Keys for values not in `options` (or Yes/No for boolean) are
+  // ignored. Absent = no links.
+  reveals?: Record<string, string[]>;
 };
 
 // Derive the UX inputType for a legacy row that predates the column.
@@ -73,11 +80,21 @@ const resolveInputType = (spec: SelectSpecifications): SpecInputType => {
   return values.length === 0 ? "text" : "single_select";
 };
 
-const toSpecOptions = (values: string[]): SpecOption[] =>
+const toSpecOptions = (
+  values: string[],
+  reveals?: Record<string, string[]>,
+): SpecOption[] =>
   values
     .map((value) => value.trim())
     .filter((value) => value.length > 0)
-    .map((value) => ({ value, children: [] }));
+    .map((value) => {
+      const links = (reveals?.[value] ?? []).filter(
+        (key) => key.trim().length > 0,
+      );
+      return links.length > 0
+        ? { value, children: [], reveals: links }
+        : { value, children: [] };
+    });
 
 // Map the builder's inputType down to the engine-facing columns.
 const engineFieldsFor = (input: AttributeInput) => {
@@ -96,7 +113,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         allowMultiple: true,
         allowRange: false,
         unit: null,
-        options: toSpecOptions(input.options),
+        options: toSpecOptions(input.options, input.reveals),
       };
     case "boolean":
       return {
@@ -104,7 +121,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         allowMultiple: false,
         allowRange: false,
         unit: null,
-        options: toSpecOptions(["Yes", "No"]),
+        options: toSpecOptions(["Yes", "No"], input.reveals),
       };
     case "text":
       return {
@@ -121,7 +138,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         allowMultiple: false,
         allowRange: false,
         unit: null,
-        options: toSpecOptions(input.options),
+        options: toSpecOptions(input.options, input.reveals),
       };
   }
 };
@@ -129,17 +146,26 @@ const engineFieldsFor = (input: AttributeInput) => {
 const toLibraryAttribute = (
   spec: SelectSpecifications,
   relationshipCount: number,
-): LibraryAttribute => ({
-  uuid: spec.uuid,
-  groupUuid: spec.groupUuid,
-  key: spec.key,
-  label: spec.label,
-  inputType: resolveInputType(spec),
-  unit: spec.unit,
-  options: (spec.options ?? []).map((option) => option.value),
-  order: spec.order,
-  relationshipCount,
-});
+): LibraryAttribute => {
+  const optionReveals: Record<string, string[]> = {};
+  for (const option of spec.options ?? []) {
+    if (option.reveals && option.reveals.length > 0) {
+      optionReveals[option.value] = option.reveals;
+    }
+  }
+  return {
+    uuid: spec.uuid,
+    groupUuid: spec.groupUuid,
+    key: spec.key,
+    label: spec.label,
+    inputType: resolveInputType(spec),
+    unit: spec.unit,
+    options: (spec.options ?? []).map((option) => option.value),
+    optionReveals,
+    order: spec.order,
+    relationshipCount,
+  };
+};
 
 // A unique key derived from the label, so products store values under a stable
 // slug that survives renames elsewhere.
