@@ -35,11 +35,13 @@ import {
   ListChecks,
   Pencil,
   Plus,
+  Search,
   ToggleLeft,
   Trash2,
   Type,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, Checkbox, Combobox, Dropdown, Input, Textarea } from "ui";
@@ -54,6 +56,12 @@ type RevealTarget = {
   key: string;
   label: string;
   groupName: string;
+};
+
+// An attribute in the list. When a search is active it comes from any group,
+// so it carries that group's name to stay locatable.
+type SearchResult = LibraryBuilderGroup["attributes"][number] & {
+  groupLabel?: string;
 };
 
 type AttributeFormProps = {
@@ -403,6 +411,7 @@ export const LibraryBuilder = ({
   const [editingGroup, setEditingGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDomain, setGroupDomain] = useState("");
+  const [attributeSearch, setAttributeSearch] = useState("");
   const [addingAttribute, setAddingAttribute] = useState(false);
   const [editingUuid, setEditingUuid] = useState<string | null>(null);
   const [movingUuid, setMovingUuid] = useState<string | null>(null);
@@ -450,6 +459,27 @@ export const LibraryBuilder = ({
       }
       return result;
     });
+
+  // Searching looks across every group, not just the selected one — otherwise
+  // finding an attribute means clicking through groups one at a time. Matches
+  // carry their group name so the result stays locatable.
+  const searchTerm = attributeSearch.trim().toLowerCase();
+  const searchResults: SearchResult[] =
+    searchTerm === ""
+      ? []
+      : groups.flatMap((group) =>
+          group.attributes
+            .filter(
+              (attribute) =>
+                attribute.label.toLowerCase().includes(searchTerm) ||
+                attribute.key.toLowerCase().includes(searchTerm),
+            )
+            .map((attribute) => ({ ...attribute, groupLabel: group.name })),
+        );
+  const isSearching = searchTerm !== "";
+  const visibleAttributes: SearchResult[] = isSearching
+    ? searchResults
+    : (selected?.attributes ?? []);
 
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
@@ -653,10 +683,11 @@ export const LibraryBuilder = ({
         <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-ink">
-              {selected ? selected.name : "Select a group"} ·{" "}
-              {selected?.attributes.length ?? 0} attributes
+              {isSearching
+                ? `Found ${searchResults.length} across all groups`
+                : `${selected ? selected.name : "Select a group"} · ${selected?.attributes.length ?? 0} attributes`}
             </span>
-            {selected?.uuid && (
+            {selected?.uuid && !isSearching && (
               <Button
                 type="button"
                 onClick={() => {
@@ -668,6 +699,25 @@ export const LibraryBuilder = ({
               </Button>
             )}
           </div>
+
+          <Input
+            value={attributeSearch}
+            onChange={(event) => setAttributeSearch(event.target.value)}
+            placeholder="Search every attribute by name or key…"
+            icon={<Search size={15} />}
+            rightSlot={
+              attributeSearch ? (
+                <button
+                  type="button"
+                  onClick={() => setAttributeSearch("")}
+                  aria-label="Clear search"
+                  className="text-faint hover:text-ink"
+                >
+                  <X size={15} />
+                </button>
+              ) : undefined
+            }
+          />
 
           {addingAttribute && selected?.uuid && (
             <AttributeForm
@@ -687,7 +737,7 @@ export const LibraryBuilder = ({
           )}
 
           <ul className="flex flex-col divide-y divide-hairline">
-            {(selected?.attributes ?? []).map((attribute) => (
+            {visibleAttributes.map((attribute) => (
               <li key={attribute.uuid} className="py-2.5">
                 {editingUuid === attribute.uuid ? (
                   <AttributeForm
@@ -738,7 +788,7 @@ export const LibraryBuilder = ({
                         )}
                         {revealCount(attribute.optionReveals) > 0 && (
                           <span
-                            title="Options here auto-add other attributes"
+                            title={`${revealCount(attribute.optionReveals)} auto-add link(s) — an option here adds another attribute`}
                             className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary"
                           >
                             <CornerDownRight size={10} />
@@ -746,13 +796,20 @@ export const LibraryBuilder = ({
                           </span>
                         )}
                         {attribute.relationshipCount > 0 && (
-                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          <Link
+                            href={`/rules?search=${encodeURIComponent(attribute.label)}`}
+                            title={`${attribute.relationshipCount} compatibility rule(s) use this attribute — view them`}
+                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary-tint"
+                          >
                             <GitCompare size={10} />
                             {attribute.relationshipCount}
-                          </span>
+                          </Link>
                         )}
                       </div>
                       <p className="line-clamp-1 text-xs text-faint">
+                        {attribute.groupLabel
+                          ? `${attribute.groupLabel} · `
+                          : ""}
                         {attribute.unit ? `${attribute.unit} · ` : ""}
                         {attribute.options.length > 0
                           ? `${attribute.options.slice(0, 4).join(", ")}${attribute.options.length > 4 ? " …" : ""} · `
@@ -830,11 +887,19 @@ export const LibraryBuilder = ({
                 )}
               </li>
             ))}
-            {selected && selected.attributes.length === 0 && !addingAttribute && (
+            {isSearching && searchResults.length === 0 && (
               <li className="py-6 text-center text-sm text-faint">
-                No attributes in this group yet.
+                Nothing matches “{attributeSearch.trim()}” in any group.
               </li>
             )}
+            {!isSearching &&
+              selected &&
+              selected.attributes.length === 0 &&
+              !addingAttribute && (
+                <li className="py-6 text-center text-sm text-faint">
+                  No attributes in this group yet.
+                </li>
+              )}
           </ul>
         </div>
       </div>
