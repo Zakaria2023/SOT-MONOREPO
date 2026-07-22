@@ -61,18 +61,6 @@ export const SpecificationComposer = ({
     return { specByKey: byKey, pickerOptions: options };
   }, [library]);
 
-  const availableOptions = useMemo(
-    () => pickerOptions.filter((option) => !appliedKeys.includes(option.value)),
-    [pickerOptions, appliedKeys],
-  );
-
-  const addAttribute = (key: string) => {
-    if (!key || appliedKeys.includes(key)) {
-      return;
-    }
-    setValue("specKeys", [...appliedKeys, key], { shouldDirty: true });
-  };
-
   const removeAttribute = (key: string) => {
     setValue(
       "specKeys",
@@ -82,6 +70,20 @@ export const SpecificationComposer = ({
     const next = { ...values };
     delete next[key];
     setValue("technicalAttributes", next, { shouldDirty: true });
+  };
+
+  // The picker is a multi-select over the whole library: keys stay listed and
+  // highlighted once added, and toggling one off also drops its stored value.
+  const setAppliedKeys = (keys: string[]) => {
+    setValue("specKeys", keys, { shouldDirty: true });
+    const removed = appliedKeys.filter((applied) => !keys.includes(applied));
+    if (removed.length > 0) {
+      const next = { ...values };
+      for (const key of removed) {
+        delete next[key];
+      }
+      setValue("technicalAttributes", next, { shouldDirty: true });
+    }
   };
 
   const setValueFor = (key: string, value: string) => {
@@ -219,12 +221,13 @@ export const SpecificationComposer = ({
 
       <div className="sm:max-w-md">
         <Dropdown
+          multiple
           searchable
           searchPlaceholder="Search the library..."
-          value=""
-          onChange={addAttribute}
+          value={appliedKeys}
+          onChange={setAppliedKeys}
           placeholder="+ Add attribute"
-          options={availableOptions}
+          options={pickerOptions}
         />
       </div>
 
