@@ -1,20 +1,10 @@
 import { LibraryWorkspace } from "@/components/library/library-workspace";
-import { getBuilder, getReadModel, getTemplates } from "./action";
+import { getBuilder } from "./action";
 
 const LibraryPage = async () => {
-  const [groups, templates, readModel] = await Promise.all([
-    getBuilder(),
-    getTemplates(),
-    getReadModel(),
-  ]);
+  const groups = await getBuilder();
 
-  return (
-    <LibraryWorkspace
-      groups={groups}
-      templates={templates}
-      readModel={readModel}
-    />
-  );
+  return <LibraryWorkspace groups={groups} />;
 };
 
 export default LibraryPage;

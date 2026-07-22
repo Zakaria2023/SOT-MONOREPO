@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Dropdown, Input } from "ui";
+import { Button, Dropdown, Input, Textarea } from "ui";
 
 type LibraryBuilderProps = {
   groups: LibraryBuilderGroup[];
@@ -63,6 +63,19 @@ const TYPE_META: Record<
   text: { label: "text", className: "bg-hover text-secondary" },
 };
 
+// Options are edited as readable " | "-separated tokens. Users type a space to
+// split instead of reaching for the pipe key. A trailing space is kept as a
+// dangling " | " so the separator shows the moment they press space; on submit
+// the values are split on "|" and trimmed, so the surrounding spaces drop out.
+const toPipeSeparated = (raw: string): string => {
+  const keepTrailing = /\s$/.test(raw);
+  const tokens = raw.split(/[\s|]+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return "";
+  }
+  return tokens.join(" | ") + (keepTrailing ? " | " : "");
+};
+
 const TypeIcon = ({ type }: { type: SpecInputType }) => {
   if (type === "number") return <Hash size={15} className="text-faint" />;
   if (type === "boolean") return <ToggleLeft size={15} className="text-faint" />;
@@ -87,7 +100,7 @@ const AttributeForm = ({
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [optionsText, setOptionsText] = useState(
-    (initial?.options ?? []).join("|"),
+    (initial?.options ?? []).join(" | "),
   );
 
   const submit = () => {
@@ -138,12 +151,25 @@ const AttributeForm = ({
       {(inputType === "single_select" || inputType === "multi_select") && (
         <div>
           <label className="text-xs font-semibold text-ink">
-            Options — separate with |
+            Options — press space to separate
           </label>
           <Input
             value={optionsText}
-            onChange={(event) => setOptionsText(event.target.value)}
-            placeholder="AC|Built-in AC|DC|PoE"
+            onChange={(event) => setOptionsText(toPipeSeparated(event.target.value))}
+            placeholder="AC DC PoE Battery"
+            className="mt-1"
+          />
+        </div>
+      )}
+      {inputType === "text" && (
+        <div>
+          <label className="text-xs font-semibold text-ink">
+            Free-text field
+          </label>
+          <Textarea
+            disabled
+            rows={3}
+            placeholder="A text attribute — the product fills this in as free text."
             className="mt-1"
           />
         </div>

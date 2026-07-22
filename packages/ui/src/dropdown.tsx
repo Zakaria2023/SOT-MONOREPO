@@ -48,9 +48,12 @@ type MultiDropdownProps = DropdownBaseProps & {
 type DropdownProps = SingleDropdownProps | MultiDropdownProps;
 
 type MenuPosition = {
-  top: number;
   left: number;
   width: number;
+  maxHeight: number;
+  // Exactly one of these is set: anchored below (top) or flipped above (bottom).
+  top?: number;
+  bottom?: number;
 };
 
 export const Dropdown = (props: DropdownProps) => {
@@ -84,12 +87,28 @@ export const Dropdown = (props: DropdownProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Anchor the portalled menu to the trigger in viewport coordinates.
+  // Anchor the portalled menu to the trigger in viewport coordinates. The menu
+  // is position:fixed, so it can't be reached by page scroll — instead of
+  // letting it spill past the viewport edge, flip it above the trigger when
+  // there's more room there, and always cap its height to the space available.
   const updatePosition = useCallback(() => {
     const trigger = containerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
-    setPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    const margin = 8;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(160, Math.floor(openUp ? spaceAbove : spaceBelow));
+    setPosition({
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+      ...(openUp
+        ? { bottom: window.innerHeight - rect.top + gap }
+        : { top: rect.bottom + gap }),
+    });
   }, []);
 
   // Keep it anchored while open (scroll uses capture to catch any ancestor).
@@ -352,13 +371,15 @@ export const Dropdown = (props: DropdownProps) => {
             style={{
               position: "fixed",
               top: position.top,
+              bottom: position.bottom,
               left: position.left,
               width: position.width,
+              maxHeight: position.maxHeight,
             }}
-            className="z-50 overflow-hidden rounded-control border border-hairline bg-overlay shadow-lg"
+            className="z-50 flex flex-col overflow-hidden rounded-control border border-hairline bg-overlay shadow-lg"
           >
             {searchable && (
-              <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
+              <div className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2">
                 <Search size={15} className="shrink-0 text-faint" />
                 <input
                   ref={searchRef}
@@ -382,7 +403,7 @@ export const Dropdown = (props: DropdownProps) => {
               id={listboxId}
               role="listbox"
               aria-multiselectable={props.multiple ? true : undefined}
-              className="max-h-72 overflow-y-auto"
+              className="min-h-0 flex-1 overflow-y-auto"
             >
               {rows.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-faint">{emptyMessage}</li>
