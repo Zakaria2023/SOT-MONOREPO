@@ -180,6 +180,29 @@ export const SpecificationComposer = ({
     }
   }, [revealedKeys, appliedKeys, values, setValue]);
 
+  // The label of the attribute + option currently revealing `key`, or null if
+  // nothing does. Drives the "auto" chip and the disabled remove button.
+  const revealSourceOf = (key: string): string | null => {
+    if (!revealedKeys.has(key)) {
+      return null;
+    }
+    for (const appliedKey of appliedKeys) {
+      const spec = specByKey.get(appliedKey);
+      if (!spec?.options) {
+        continue;
+      }
+      const chosen = spec.allowMultiple
+        ? parseSpecValues(values[appliedKey])
+        : [values[appliedKey] ?? ""];
+      for (const option of spec.options) {
+        if (option.reveals?.includes(key) && chosen.includes(option.value)) {
+          return `${spec.label} = ${option.value}`;
+        }
+      }
+    }
+    return null;
+  };
+
   const removeAttribute = (key: string) => {
     setValue(
       "specKeys",
@@ -357,8 +380,9 @@ export const SpecificationComposer = ({
             value={appliedKeys}
             onChange={setAppliedKeys}
             placeholder="+ Add attribute"
+            triggerLabel="+ Add attribute"
             options={visibleOptions}
-            emptyMessage="No attributes of this type"
+            emptyMessage="No attributes match these filters"
           />
         </div>
       </div>
@@ -394,6 +418,10 @@ export const SpecificationComposer = ({
                 </div>
               );
             }
+            // Revealed by another attribute's chosen option — removing it here
+            // would only bring it straight back, so the remove button is
+            // disabled and the source is named instead.
+            const revealedBy = revealSourceOf(key);
             return (
               <div key={key} className="flex flex-col gap-2">
                 <label className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
@@ -402,12 +430,26 @@ export const SpecificationComposer = ({
                     <span className="ml-1 text-xs font-normal text-faint">
                       · {spec.groupName}
                     </span>
+                    {revealedBy && (
+                      <span
+                        title={`Added automatically by ${revealedBy}`}
+                        className="ml-1.5 rounded bg-primary-tint px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                      >
+                        auto
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"
                     onClick={() => removeAttribute(key)}
+                    disabled={Boolean(revealedBy)}
+                    title={
+                      revealedBy
+                        ? `Required by ${revealedBy} — change that value to remove this`
+                        : undefined
+                    }
                     aria-label={`Remove ${spec.label}`}
-                    className="shrink-0 text-faint hover:text-danger"
+                    className="shrink-0 text-faint hover:text-danger disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-faint"
                   >
                     <Trash2 size={14} />
                   </button>

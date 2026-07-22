@@ -13,7 +13,11 @@ import {
   type LibraryBuilderGroup,
 } from "@/app/(dashboard)/library/action";
 import type { SpecificationDomain, SpecInputType } from "@/db/enum";
-import { specInputTypes, specificationDomains } from "@/db/enum";
+import {
+  measurementUnits,
+  specInputTypes,
+  specificationDomains,
+} from "@/db/enum";
 import {
   SPECIFICATION_DOMAIN_LABELS,
   SPEC_INPUT_TYPE_LABELS,
@@ -24,6 +28,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  CornerDownRight,
   GitCompare,
   Hash,
   List,
@@ -37,7 +42,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Checkbox, Dropdown, Input, Textarea } from "ui";
+import { Button, Checkbox, Combobox, Dropdown, Input, Textarea } from "ui";
 import type { DropdownOption } from "ui";
 
 type LibraryBuilderProps = {
@@ -104,6 +109,10 @@ const toPipeSeparated = (raw: string): string => {
   return tokens.join(" | ") + (keepTrailing ? " | " : "");
 };
 
+// Total auto-add links across all of an attribute's options.
+const revealCount = (optionReveals: Record<string, string[]>): number =>
+  Object.values(optionReveals).reduce((total, keys) => total + keys.length, 0);
+
 const TypeIcon = ({ type }: { type: SpecInputType }) => {
   if (type === "number") return <Hash size={15} className="text-faint" />;
   if (type === "boolean") return <ToggleLeft size={15} className="text-faint" />;
@@ -154,6 +163,15 @@ const AttributeForm = ({
     value: target.key,
     label: `${target.groupName} · ${target.label}`,
   }));
+
+  // The canonical unit list, plus whatever this attribute already stores if it
+  // predates the list — so opening the form never silently drops its unit.
+  const unitOptions = [
+    ...((unit && !(measurementUnits as readonly string[]).includes(unit)
+      ? [{ value: unit, label: `${unit} (existing)` }]
+      : []) as DropdownOption[]),
+    ...measurementUnits.map((value) => ({ value, label: value })),
+  ];
 
   const setRevealsFor = (optionValue: string, keys: string[]) =>
     setReveals((prev) => ({ ...prev, [optionValue]: keys }));
@@ -226,12 +244,19 @@ const AttributeForm = ({
         <>
           <div>
             <label className="text-xs font-semibold text-ink">Unit</label>
-            <Input
-              value={unit}
-              onChange={(event) => setUnit(event.target.value)}
-              placeholder="e.g. W"
-              className="mt-1"
-            />
+            <p className="mt-0.5 text-xs text-faint">
+              Rules compare units as text, so pick from the list rather than
+              inventing a spelling.
+            </p>
+            <div className="mt-1">
+              <Combobox
+                value={unit}
+                onChange={setUnit}
+                placeholder="Pick a unit"
+                searchPlaceholder="Search units…"
+                options={unitOptions}
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
             <Checkbox
@@ -289,6 +314,14 @@ const AttributeForm = ({
             className="mt-1"
           />
         </div>
+      )}
+
+      {optionValues.length === 0 && (
+        <p className="rounded-control border border-dashed border-hairline p-3 text-xs text-faint">
+          Auto-add links hang off option values, so they need an option-based
+          type. Switch to Single-select, Multi-select or Yes / No to link other
+          attributes to a chosen option.
+        </p>
       )}
 
       {optionValues.length > 0 && revealOptions.length > 0 && (
@@ -703,6 +736,15 @@ export const LibraryBuilder = ({
                             range
                           </span>
                         )}
+                        {revealCount(attribute.optionReveals) > 0 && (
+                          <span
+                            title="Options here auto-add other attributes"
+                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                          >
+                            <CornerDownRight size={10} />
+                            {revealCount(attribute.optionReveals)}
+                          </span>
+                        )}
                         {attribute.relationshipCount > 0 && (
                           <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                             <GitCompare size={10} />
@@ -750,6 +792,7 @@ export const LibraryBuilder = ({
                           setAddingAttribute(false);
                         }}
                         aria-label="Edit"
+                        title="Edit attribute"
                         className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
                       >
                         <Pencil size={14} />
@@ -762,6 +805,7 @@ export const LibraryBuilder = ({
                           )
                         }
                         aria-label="Move to another group"
+                        title="Move to another group"
                         className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
                       >
                         {movingUuid === attribute.uuid ? (
@@ -776,6 +820,7 @@ export const LibraryBuilder = ({
                           run(() => deleteAttributeAction(attribute.uuid))
                         }
                         aria-label="Delete"
+                        title="Delete attribute"
                         className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
                       >
                         <Trash2 size={14} />

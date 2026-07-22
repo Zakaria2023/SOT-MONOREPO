@@ -31,6 +31,9 @@ type DropdownBaseProps = {
   searchable?: boolean;
   searchPlaceholder?: string;
   emptyMessage?: string;
+  // Pins the trigger's text regardless of what's selected. For menus that are
+  // an action ("+ Add attribute") rather than a display of the current value.
+  triggerLabel?: string;
 };
 
 type SingleDropdownProps = DropdownBaseProps & {
@@ -63,6 +66,7 @@ export const Dropdown = (props: DropdownProps) => {
     searchable = false,
     searchPlaceholder = "Search...",
     emptyMessage = "No results",
+    triggerLabel: fixedLabel,
   } = props;
   const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
@@ -155,6 +159,9 @@ export const Dropdown = (props: DropdownProps) => {
       : props.value === optionValue;
 
   const triggerLabel = (() => {
+    if (fixedLabel) {
+      return fixedLabel;
+    }
     if (props.multiple) {
       const selected = options.filter((option) =>
         props.value.includes(option.value),
@@ -171,7 +178,7 @@ export const Dropdown = (props: DropdownProps) => {
     );
   })();
 
-  const isPlaceholder = triggerLabel === placeholder;
+  const isPlaceholder = !fixedLabel && triggerLabel === placeholder;
 
   // Rows to render: while searching, a flat list of label matches (no tree,
   // no collapse). Otherwise the tree with collapsed parents' subtrees hidden.
