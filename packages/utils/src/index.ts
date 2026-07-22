@@ -239,6 +239,49 @@ export const splitSpecRange = (
   return [raw.slice(0, at), raw.slice(at + RANGE_SEPARATOR.length)];
 };
 
+/**
+ * Renders a stored spec value for display, appending the unit.
+ *
+ * Handles the three storage shapes a spec value can take:
+ *   range  "220 - 240" + "V" → "220 – 240 V"   (unit once, en dash)
+ *   multi  "802.3af, 802.3at" → "802.3af, 802.3at"  (option labels, no unit)
+ *   plain  "45" + "W" → "45 W"
+ *
+ * Returns "" for an empty value so callers can filter unset attributes.
+ */
+export const formatSpecValue = (
+  raw: string | null | undefined,
+  unit?: string | null,
+): string => {
+  // The separator is checked before trimming: "10 - " trims to "10 -", which
+  // would no longer look like a range.
+  const stored = raw ?? "";
+  const value = stored.trim();
+  if (value === "") {
+    return "";
+  }
+  const trimmedUnit = unit?.trim() ?? "";
+  const suffix = trimmedUnit === "" ? "" : ` ${trimmedUnit}`;
+
+  // A half-filled range ("10 - ") must not render its dangling separator.
+  if (stored.includes(RANGE_SEPARATOR)) {
+    const [rawFrom, rawTo] = splitSpecRange(stored);
+    const from = rawFrom.trim();
+    const to = rawTo.trim();
+    if (from !== "" && to !== "") {
+      return `${from} – ${to}${suffix}`;
+    }
+    const only = from === "" ? to : from;
+    return only === "" ? "" : `${only}${suffix}`;
+  }
+
+  const parts = parseSpecValues(value);
+  if (parts.length > 1) {
+    return parts.join(", ");
+  }
+  return `${value}${suffix}`;
+};
+
 // The UX-facing input type of a library attribute. Kept structural (no db
 // import) so both the server library builder and client components can share
 // one resolver.

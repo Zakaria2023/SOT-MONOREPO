@@ -3,10 +3,12 @@ import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ProductDetail, ProductListItem } from "services";
+import { formatSpecValue } from "utils";
 
 type SpecField = {
   key: string;
   label: string;
+  unit: string | null;
 };
 
 type ProductCompareProps = {
@@ -26,8 +28,9 @@ export const ProductCompare = ({
 
   const products = [current, ...others];
 
-  const valueFor = (product: ProductListItem, key: string): string =>
-    product.technicalAttributes?.[key] || "—";
+  const valueFor = (product: ProductListItem, field: SpecField): string =>
+    formatSpecValue(product.technicalAttributes?.[field.key], field.unit) ||
+    "—";
 
   // Only show rows where at least one product has a value to compare.
   const rows = specFields.filter((field) =>
@@ -101,7 +104,7 @@ export const ProductCompare = ({
                       key={product.uuid}
                       className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary-tint/30 font-semibold text-ink" : "text-muted"}`}
                     >
-                      {valueFor(product, field.key)}
+                      {valueFor(product, field)}
                     </td>
                   );
                 })}

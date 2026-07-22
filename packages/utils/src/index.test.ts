@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   capitalize,
   formatMoney,
+  formatSpecValue,
   formatPrice,
   formatSar,
   fromMinorUnits,
@@ -207,5 +208,37 @@ describe("getReviewerName", () => {
       getReviewerName({ id: "u1", fullName: null, primaryEmailAddress: null }),
     ).toBe("u1");
     expect(getReviewerName(null)).toBeUndefined();
+  });
+});
+
+describe("formatSpecValue", () => {
+  it("appends the unit to a plain value", () => {
+    expect(formatSpecValue("45", "W")).toBe("45 W");
+  });
+
+  it("renders a range once, with an en dash", () => {
+    expect(formatSpecValue("220 - 240", "V")).toBe("220 – 240 V");
+  });
+
+  it("joins multi-select values and omits the unit", () => {
+    expect(formatSpecValue("802.3af, 802.3at", null)).toBe(
+      "802.3af, 802.3at",
+    );
+  });
+
+  it("omits the suffix when there is no unit", () => {
+    expect(formatSpecValue("Yes", null)).toBe("Yes");
+    expect(formatSpecValue("Yes", "   ")).toBe("Yes");
+  });
+
+  it("returns an empty string for an unset value", () => {
+    expect(formatSpecValue("", "W")).toBe("");
+    expect(formatSpecValue(null, "W")).toBe("");
+    expect(formatSpecValue(undefined, "W")).toBe("");
+    expect(formatSpecValue("   ", "W")).toBe("");
+  });
+
+  it("handles an open-ended range", () => {
+    expect(formatSpecValue("10 - ", "V")).toBe("10 V");
   });
 });

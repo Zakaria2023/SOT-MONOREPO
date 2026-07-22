@@ -146,6 +146,9 @@ export type ResolvedSpecification = {
   key: string;
   label: string;
   unit: SelectSpecifications["unit"];
+  // The library group it belongs to, so the storefront can section the spec
+  // table the same way the library is organised. Null for ungrouped.
+  groupName: SelectSpecificationGroups["name"] | null;
 };
 
 export const getSpecificationsForKeys = async (
@@ -159,12 +162,17 @@ export const getSpecificationsForKeys = async (
       key: Specifications.key,
       label: Specifications.label,
       unit: Specifications.unit,
+      groupName: SpecificationGroups.name,
     })
     .from(Specifications)
+    .leftJoin(
+      SpecificationGroups,
+      eq(Specifications.groupUuid, SpecificationGroups.uuid),
+    )
     .where(inArray(Specifications.key, keys));
   const byKey = new Map(rows.map((row) => [row.key, row]));
   return keys.map(
-    (key) => byKey.get(key) ?? { key, label: key, unit: null },
+    (key) => byKey.get(key) ?? { key, label: key, unit: null, groupName: null },
   );
 };
 

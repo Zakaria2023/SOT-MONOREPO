@@ -11,18 +11,11 @@ import {
   getRelatedProducts,
   getSpecificationsForKeys,
 } from "services";
+import { formatSpecValue } from "utils";
 
 type Props = {
   params: Promise<{ slug: string }>;
 };
-
-// Multi-select values are stored comma-joined; render them spaced.
-const displayValue = (value: string): string =>
-  value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
 
 const ProductPage = async ({ params }: Props) => {
   const { slug } = await params;
@@ -41,16 +34,34 @@ const ProductPage = async ({ params }: Props) => {
     getViewerPartnerPricing(),
   ]);
 
+  // Values are rendered through the shared formatter, so a range reads
+  // "220 – 240 V" and a plain number carries its unit — same as the admin form.
   const attributes = specs
     .map((spec) => ({
       label: spec.label,
-      value: displayValue(product.technicalAttributes?.[spec.key] ?? ""),
+      group: spec.groupName,
+      value: formatSpecValue(product.technicalAttributes?.[spec.key], spec.unit),
     }))
     .filter((attribute) => attribute.value !== "");
+
+  // Sectioned by library group, groups in first-seen order so the table reads
+  // the way the library is organised. Ungrouped attributes trail behind.
+  const specGroups = attributes.reduce<
+    { name: string | null; attributes: typeof attributes }[]
+  >((groups, attribute) => {
+    const existing = groups.find((group) => group.name === attribute.group);
+    if (existing) {
+      existing.attributes.push(attribute);
+    } else {
+      groups.push({ name: attribute.group, attributes: [attribute] });
+    }
+    return groups;
+  }, []);
 
   const specFields = specs.map((spec) => ({
     key: spec.key,
     label: spec.label,
+    unit: spec.unit,
   }));
 
   return (
@@ -61,7 +72,7 @@ const ProductPage = async ({ params }: Props) => {
         discountPercent={viewerPricing.discountPercent}
       />
       <ProductDetails product={product} />
-      <ProductSpecs attributes={attributes} />
+      <ProductSpecs groups={specGroups} />
       <ProductCompare
         current={product}
         others={comparables}
