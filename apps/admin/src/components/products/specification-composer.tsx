@@ -10,7 +10,9 @@ import {
 import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import type { LibraryDomain, SelectSpecifications } from "services";
+import type { SelectCategories } from "@/db/schema/categories";
+import { categoryWithAncestors } from "@/lib/categories";
+import type { LibraryDomain, LibrarySpecification } from "services";
 import { Checkbox, Dropdown } from "ui";
 import {
   parseSpecValues,
@@ -22,20 +24,22 @@ import {
 
 type SpecificationComposerProps = {
   library: LibraryDomain[];
+  categories: SelectCategories[];
 };
 
 // A spec resolved from the library, tagged with where it sits for the picker.
-type LibrarySpec = SelectSpecifications & {
+type LibrarySpec = LibrarySpecification & {
   groupName: string;
   domain: string | null;
 };
 
-// A picker entry, carrying the attribute's input type so the type filter can
-// narrow the list down.
+// A picker entry, carrying the attribute's input type and categories so the
+// filters can narrow the list down.
 type PickerOption = {
   value: string;
   label: string;
   inputType: string;
+  categoryUuids: string[];
 };
 
 const TYPE_FILTER_OPTIONS = specInputTypes.map((type) => ({
@@ -45,10 +49,12 @@ const TYPE_FILTER_OPTIONS = specInputTypes.map((type) => ({
 
 export const SpecificationComposer = ({
   library,
+  categories,
 }: SpecificationComposerProps) => {
   const { control, setValue } = useFormContext<ProductFormValues>();
   const watchedKeys = useWatch({ control, name: "specKeys" });
   const watchedValues = useWatch({ control, name: "technicalAttributes" });
+  const categoryUuid = useWatch({ control, name: "categoryUuid" });
   const appliedKeys = useMemo(() => watchedKeys ?? [], [watchedKeys]);
   const values = useMemo(() => watchedValues ?? {}, [watchedValues]);
 
@@ -73,6 +79,7 @@ export const SpecificationComposer = ({
             value: attribute.key,
             label: `${domainLabel} · ${group.group.name} · ${attribute.label}`,
             inputType: resolveSpecInputType(attribute),
+            categoryUuids: attribute.categoryUuids,
           });
         }
       }
@@ -83,15 +90,30 @@ export const SpecificationComposer = ({
   // Input types the picker is narrowed to. Empty = show every attribute.
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
 
+  // The chosen category plus its ancestors — an attribute assigned to any of
+  // them applies here, matching how category inheritance is resolved.
+  const categoryChain = useMemo(
+    () =>
+      categoryUuid ? new Set(categoryWithAncestors(categoryUuid, categories)) : null,
+    [categoryUuid, categories],
+  );
+
   const visibleOptions = useMemo(
     () =>
-      (typeFilter.length === 0
-        ? pickerOptions
-        : pickerOptions.filter((option) =>
-            typeFilter.includes(option.inputType),
-          )
-      ).map((option) => ({ value: option.value, label: option.label })),
-    [pickerOptions, typeFilter],
+      pickerOptions
+        .filter((option) => {
+          if (typeFilter.length > 0 && !typeFilter.includes(option.inputType)) {
+            return false;
+          }
+          // An attribute with no categories is universal. One with categories
+          // shows only when the product's category (or an ancestor) matches.
+          if (option.categoryUuids.length === 0 || !categoryChain) {
+            return true;
+          }
+          return option.categoryUuids.some((uuid) => categoryChain.has(uuid));
+        })
+        .map((option) => ({ value: option.value, label: option.label })),
+    [pickerOptions, typeFilter, categoryChain],
   );
 
   // Keys this component auto-added because some option revealed them, so they
@@ -312,7 +334,8 @@ export const SpecificationComposer = ({
         </label>
         <p className="mt-1 text-xs text-muted">
           Add the attributes that apply to this product from the library, then
-          set each value. Only the attributes you add appear.
+          set each value. The picker shows attributes assigned to this
+          product&apos;s category (plus the ones that apply everywhere).
         </p>
       </div>
 

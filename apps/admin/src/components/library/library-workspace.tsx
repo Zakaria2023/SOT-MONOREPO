@@ -2,12 +2,17 @@
 
 import { LibraryBuilder } from "@/components/library/library-builder";
 import type { LibraryBuilderGroup } from "@/app/(dashboard)/library/action";
+import type { SelectCategories } from "@/db/schema/categories";
 
 type LibraryWorkspaceProps = {
   groups: LibraryBuilderGroup[];
+  categories: SelectCategories[];
 };
 
-export const LibraryWorkspace = ({ groups }: LibraryWorkspaceProps) => (
+export const LibraryWorkspace = ({
+  groups,
+  categories,
+}: LibraryWorkspaceProps) => (
   <div className="flex flex-col gap-5">
     <div>
       <h1 className="font-heading text-2xl text-ink">Specification library</h1>
@@ -17,6 +22,6 @@ export const LibraryWorkspace = ({ groups }: LibraryWorkspaceProps) => (
       </p>
     </div>
 
-    <LibraryBuilder groups={groups} />
+    <LibraryBuilder groups={groups} categories={categories} />
   </div>
 );

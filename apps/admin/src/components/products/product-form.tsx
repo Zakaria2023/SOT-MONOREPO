@@ -280,7 +280,7 @@ export const ProductForm = (props: ProductFormProps) => {
           )}
         />
 
-        <SpecificationComposer library={library} />
+        <SpecificationComposer library={library} categories={categories} />
 
         <FormError message={state.error} />
 

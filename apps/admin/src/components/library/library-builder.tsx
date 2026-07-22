@@ -15,6 +15,8 @@ import {
 import type { SpecInputType } from "@/db/enum";
 import { specInputTypes } from "@/db/enum";
 import { SPEC_INPUT_TYPE_LABELS } from "@/db/label";
+import type { SelectCategories } from "@/db/schema/categories";
+import { buildCategoryTreeOptions } from "@/lib/categories";
 import {
   ArrowDown,
   ArrowUp,
@@ -33,9 +35,11 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, Dropdown, Input, Textarea } from "ui";
+import type { DropdownOption } from "ui";
 
 type LibraryBuilderProps = {
   groups: LibraryBuilderGroup[];
+  categories: SelectCategories[];
 };
 
 type RevealTarget = {
@@ -50,6 +54,8 @@ type AttributeFormProps = {
   // Every other library attribute an option can auto-add (reveal), the current
   // attribute excluded so it can't reveal itself.
   revealTargets: RevealTarget[];
+  // Depth-ordered category options the attribute can be assigned to.
+  categoryOptions: DropdownOption[];
   onSubmit: (input: AttributeInput) => void;
   onCancel: () => void;
   pending: boolean;
@@ -100,6 +106,7 @@ const AttributeForm = ({
   groupUuid,
   initial,
   revealTargets,
+  categoryOptions,
   onSubmit,
   onCancel,
   pending,
@@ -114,6 +121,9 @@ const AttributeForm = ({
   );
   const [reveals, setReveals] = useState<Record<string, string[]>>(
     initial?.reveals ?? {},
+  );
+  const [categoryUuids, setCategoryUuids] = useState<string[]>(
+    initial?.categoryUuids ?? [],
   );
 
   // The option values that currently exist for this attribute: Yes/No for a
@@ -154,6 +164,7 @@ const AttributeForm = ({
       unit: inputType === "number" ? unit : null,
       options,
       reveals: prunedReveals,
+      categoryUuids,
     });
   };
 
@@ -175,6 +186,24 @@ const AttributeForm = ({
             value={inputType}
             onChange={(value) => setInputType(value as SpecInputType)}
             options={INPUT_TYPES}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-ink">Categories</label>
+        <p className="mt-0.5 text-xs text-faint">
+          Products in these categories (and their sub-categories) can use this
+          attribute. Leave empty to make it available everywhere.
+        </p>
+        <div className="mt-1">
+          <Dropdown
+            multiple
+            searchable
+            value={categoryUuids}
+            onChange={setCategoryUuids}
+            placeholder="All categories"
+            searchPlaceholder="Search categories…"
+            options={categoryOptions}
           />
         </div>
       </div>
@@ -258,8 +287,12 @@ const AttributeForm = ({
   );
 };
 
-export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
+export const LibraryBuilder = ({
+  groups,
+  categories,
+}: LibraryBuilderProps) => {
   const router = useRouter();
+  const categoryOptions = buildCategoryTreeOptions(categories);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -487,6 +520,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
               groupUuid={selected.uuid}
               pending={isPending}
               revealTargets={revealTargetsExcluding()}
+              categoryOptions={categoryOptions}
               onCancel={() => setAddingAttribute(false)}
               onSubmit={(input) =>
                 run(async () => {
@@ -506,6 +540,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
                     groupUuid={attribute.groupUuid}
                     pending={isPending}
                     revealTargets={revealTargetsExcluding(attribute.key)}
+                    categoryOptions={categoryOptions}
                     initial={{
                       uuid: attribute.uuid,
                       groupUuid: attribute.groupUuid,
@@ -514,6 +549,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
                       unit: attribute.unit,
                       options: attribute.options,
                       reveals: attribute.optionReveals,
+                      categoryUuids: attribute.categoryUuids,
                     }}
                     onCancel={() => setEditingUuid(null)}
                     onSubmit={(input) =>

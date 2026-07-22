@@ -4,6 +4,7 @@ import { resolveSpecInputType, slugify } from "utils";
 import { db } from "../../../db";
 import type { SpecInputType } from "../../../db/enum";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
+import { SpecificationCategories } from "../../../db/schema/specification-categories";
 import {
   SelectSpecificationGroups,
   SpecificationGroups,
@@ -33,6 +34,9 @@ export type LibraryAttribute = {
   // Per-option reveal links: option value → library attribute keys auto-added
   // to a product when that option is chosen. Empty for options with no links.
   optionReveals: Record<string, string[]>;
+  // Categories this attribute applies to (plus their descendants, resolved at
+  // read time). Empty = universal, applies to every category.
+  categoryUuids: string[];
   order: number;
   // How many compatibility relationships reference this attribute.
   relationshipCount: number;
@@ -56,6 +60,8 @@ export type AttributeInput = {
   // when chosen. Keys for values not in `options` (or Yes/No for boolean) are
   // ignored. Absent = no links.
   reveals?: Record<string, string[]>;
+  // Categories the attribute applies to. Empty = universal.
+  categoryUuids: string[];
 };
 
 // Derive the UX inputType for a legacy row that predates the column. Shared
@@ -129,6 +135,7 @@ const engineFieldsFor = (input: AttributeInput) => {
 const toLibraryAttribute = (
   spec: SelectSpecifications,
   relationshipCount: number,
+  categoryUuids: string[],
 ): LibraryAttribute => {
   const optionReveals: Record<string, string[]> = {};
   for (const option of spec.options ?? []) {
@@ -145,6 +152,7 @@ const toLibraryAttribute = (
     unit: spec.unit,
     options: (spec.options ?? []).map((option) => option.value),
     optionReveals,
+    categoryUuids,
     order: spec.order,
     relationshipCount,
   };
@@ -166,7 +174,7 @@ const uniqueKey = (label: string, taken: Set<string>): string => {
 
 /** Groups (in order) each with their attributes and link counts. */
 export const getLibraryBuilder = async (): Promise<LibraryBuilderGroup[]> => {
-  const [groups, specs, rules] = await Promise.all([
+  const [groups, specs, rules, categoryLinks] = await Promise.all([
     db.select().from(SpecificationGroups).orderBy(asc(SpecificationGroups.order)),
     db.select().from(Specifications).orderBy(asc(Specifications.order)),
     db
@@ -175,7 +183,20 @@ export const getLibraryBuilder = async (): Promise<LibraryBuilderGroup[]> => {
         provider: CompatibilityRules.providerSpecUuid,
       })
       .from(CompatibilityRules),
+    db
+      .select({
+        specificationUuid: SpecificationCategories.specificationUuid,
+        categoryUuid: SpecificationCategories.categoryUuid,
+      })
+      .from(SpecificationCategories),
   ]);
+
+  const categoriesBySpec = new Map<string, string[]>();
+  for (const link of categoryLinks) {
+    const list = categoriesBySpec.get(link.specificationUuid) ?? [];
+    list.push(link.categoryUuid);
+    categoriesBySpec.set(link.specificationUuid, list);
+  }
 
   const linkCount = new Map<string, number>();
   for (const rule of rules) {
@@ -189,7 +210,11 @@ export const getLibraryBuilder = async (): Promise<LibraryBuilderGroup[]> => {
   const byGroup = new Map<string, LibraryAttribute[]>();
   const ungrouped: LibraryAttribute[] = [];
   for (const spec of specs) {
-    const attribute = toLibraryAttribute(spec, linkCount.get(spec.uuid) ?? 0);
+    const attribute = toLibraryAttribute(
+      spec,
+      linkCount.get(spec.uuid) ?? 0,
+      categoriesBySpec.get(spec.uuid) ?? [],
+    );
     if (!spec.groupUuid) {
       ungrouped.push(attribute);
       continue;
@@ -218,6 +243,32 @@ export const getLibraryBuilder = async (): Promise<LibraryBuilderGroup[]> => {
   return result;
 };
 
+// The transaction handle drizzle passes to a db.transaction callback.
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// Replace an attribute's category links with the given set (deduped, blanks
+// dropped). Runs on the caller's transaction so the spec row and its links are
+// written atomically.
+const replaceCategoryLinks = async (
+  tx: Tx,
+  specificationUuid: string,
+  categoryUuids: string[],
+): Promise<void> => {
+  await tx
+    .delete(SpecificationCategories)
+    .where(eq(SpecificationCategories.specificationUuid, specificationUuid));
+  const unique = [...new Set(categoryUuids.filter((uuid) => uuid.length > 0))];
+  if (unique.length > 0) {
+    await tx.insert(SpecificationCategories).values(
+      unique.map((categoryUuid) => ({
+        uuid: randomUUID(),
+        specificationUuid,
+        categoryUuid,
+      })),
+    );
+  }
+};
+
 export const createLibraryAttribute = async (
   input: AttributeInput,
 ): Promise<string> => {
@@ -232,18 +283,21 @@ export const createLibraryAttribute = async (
     new Set(existing.map((row) => row.key)),
   );
 
-  await db.insert(Specifications).values({
-    uuid,
-    groupUuid: input.groupUuid,
-    label: input.label,
-    key,
-    inputType: input.inputType,
-    valueType: engine.valueType,
-    allowMultiple: engine.allowMultiple,
-    allowRange: engine.allowRange,
-    unit: engine.unit,
-    options: engine.options,
-    order: total,
+  await db.transaction(async (tx) => {
+    await tx.insert(Specifications).values({
+      uuid,
+      groupUuid: input.groupUuid,
+      label: input.label,
+      key,
+      inputType: input.inputType,
+      valueType: engine.valueType,
+      allowMultiple: engine.allowMultiple,
+      allowRange: engine.allowRange,
+      unit: engine.unit,
+      options: engine.options,
+      order: total,
+    });
+    await replaceCategoryLinks(tx, uuid, input.categoryUuids);
   });
   return uuid;
 };
@@ -255,18 +309,21 @@ export const updateLibraryAttribute = async (
   input: AttributeInput,
 ): Promise<void> => {
   const engine = engineFieldsFor(input);
-  await db
-    .update(Specifications)
-    .set({
-      label: input.label,
-      inputType: input.inputType,
-      valueType: engine.valueType,
-      allowMultiple: engine.allowMultiple,
-      allowRange: engine.allowRange,
-      unit: engine.unit,
-      options: engine.options,
-    })
-    .where(eq(Specifications.uuid, uuid));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(Specifications)
+      .set({
+        label: input.label,
+        inputType: input.inputType,
+        valueType: engine.valueType,
+        allowMultiple: engine.allowMultiple,
+        allowRange: engine.allowRange,
+        unit: engine.unit,
+        options: engine.options,
+      })
+      .where(eq(Specifications.uuid, uuid));
+    await replaceCategoryLinks(tx, uuid, input.categoryUuids);
+  });
 };
 
 export const deleteLibraryAttribute = async (uuid: string): Promise<void> => {

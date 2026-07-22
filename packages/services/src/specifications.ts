@@ -29,11 +29,18 @@ export type SpecificationWithCategories = SelectSpecifications & {
   categoryNames: string[];
 };
 
+// A library attribute carries the categories it's assigned to, so the product
+// picker can narrow the library to the product's category. An attribute with
+// no categories is universal — it applies to every category.
+export type LibrarySpecification = SelectSpecifications & {
+  categoryUuids: string[];
+};
+
 // The library as domains → groups → attributes, for the admin library view and
 // the product attribute picker.
 export type LibraryGroup = {
   group: SelectSpecificationGroups;
-  attributes: SelectSpecifications[];
+  attributes: LibrarySpecification[];
 };
 
 export type LibraryDomain = {
@@ -48,17 +55,34 @@ export type LibraryDomain = {
  * trailing "Other" bucket so nothing is ever hidden.
  */
 export const getSpecificationLibrary = async (): Promise<LibraryDomain[]> => {
-  const [groups, specs] = await Promise.all([
+  const [groups, specs, categoryLinks] = await Promise.all([
     db
       .select()
       .from(SpecificationGroups)
       .orderBy(asc(SpecificationGroups.order)),
     db.select().from(Specifications).orderBy(asc(Specifications.order)),
+    db
+      .select({
+        specificationUuid: SpecificationCategories.specificationUuid,
+        categoryUuid: SpecificationCategories.categoryUuid,
+      })
+      .from(SpecificationCategories),
   ]);
 
-  const specsByGroup = new Map<string, SelectSpecifications[]>();
-  const ungrouped: SelectSpecifications[] = [];
-  for (const spec of specs) {
+  const categoriesBySpec = new Map<string, string[]>();
+  for (const link of categoryLinks) {
+    const list = categoriesBySpec.get(link.specificationUuid) ?? [];
+    list.push(link.categoryUuid);
+    categoriesBySpec.set(link.specificationUuid, list);
+  }
+
+  const specsByGroup = new Map<string, LibrarySpecification[]>();
+  const ungrouped: LibrarySpecification[] = [];
+  for (const row of specs) {
+    const spec: LibrarySpecification = {
+      ...row,
+      categoryUuids: categoriesBySpec.get(row.uuid) ?? [],
+    };
     if (!spec.groupUuid) {
       ungrouped.push(spec);
       continue;
