@@ -239,6 +239,50 @@ export const splitSpecRange = (
   return [raw.slice(0, at), raw.slice(at + RANGE_SEPARATOR.length)];
 };
 
+// The UX-facing input type of a library attribute. Kept structural (no db
+// import) so both the server library builder and client components can share
+// one resolver.
+export type ResolvedSpecInputType =
+  | "number"
+  | "single_select"
+  | "multi_select"
+  | "boolean"
+  | "text";
+
+type SpecInputTypeSource = {
+  inputType?: string | null;
+  valueType?: string | null;
+  allowMultiple?: boolean | null;
+  options?: { value: string }[] | null;
+};
+
+/**
+ * The attribute's input type, derived for legacy rows that predate the
+ * `inputType` column: a numeric spec is a number, an exactly-Yes/No option set
+ * is a boolean, a multi-value select is multi_select, and an option-less
+ * select is free text.
+ */
+export const resolveSpecInputType = (
+  spec: SpecInputTypeSource,
+): ResolvedSpecInputType => {
+  if (spec.inputType) {
+    return spec.inputType as ResolvedSpecInputType;
+  }
+  if (spec.valueType === "number") {
+    return "number";
+  }
+  const values = (spec.options ?? []).map((option) => option.value);
+  const isYesNo =
+    values.length === 2 && values.includes("Yes") && values.includes("No");
+  if (isYesNo) {
+    return "boolean";
+  }
+  if (spec.allowMultiple) {
+    return "multi_select";
+  }
+  return values.length === 0 ? "text" : "single_select";
+};
+
 /**
  * Parses a stored range spec value back into numeric bounds, or null when it
  * isn't a valid "from - to" pair. The rule engine reads these bounds: a range

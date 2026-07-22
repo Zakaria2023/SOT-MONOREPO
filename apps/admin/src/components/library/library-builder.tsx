@@ -13,6 +13,8 @@ import {
   type LibraryBuilderGroup,
 } from "@/app/(dashboard)/library/action";
 import type { SpecInputType } from "@/db/enum";
+import { specInputTypes } from "@/db/enum";
+import { SPEC_INPUT_TYPE_LABELS } from "@/db/label";
 import {
   ArrowDown,
   ArrowUp,
@@ -53,13 +55,11 @@ type AttributeFormProps = {
   pending: boolean;
 };
 
-const INPUT_TYPES: { value: SpecInputType; label: string }[] = [
-  { value: "number", label: "Number" },
-  { value: "single_select", label: "Single-select" },
-  { value: "multi_select", label: "Multi-select" },
-  { value: "boolean", label: "Yes / No" },
-  { value: "text", label: "Text" },
-];
+const INPUT_TYPES: { value: SpecInputType; label: string }[] =
+  specInputTypes.map((type) => ({
+    value: type,
+    label: SPEC_INPUT_TYPE_LABELS[type],
+  }));
 
 const TYPE_META: Record<
   SpecInputType,

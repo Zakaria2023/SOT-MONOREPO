@@ -2,14 +2,19 @@
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import type { SpecificationDomain } from "@/db/enum";
-import { SPECIFICATION_DOMAIN_LABELS } from "@/db/label";
+import { specInputTypes } from "@/db/enum";
+import {
+  SPECIFICATION_DOMAIN_LABELS,
+  SPEC_INPUT_TYPE_LABELS,
+} from "@/db/label";
 import { Trash2 } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import type { LibraryDomain, SelectSpecifications } from "services";
 import { Checkbox, Dropdown } from "ui";
 import {
   parseSpecValues,
+  resolveSpecInputType,
   serializeSpecRange,
   serializeSpecValues,
   splitSpecRange,
@@ -25,6 +30,19 @@ type LibrarySpec = SelectSpecifications & {
   domain: string | null;
 };
 
+// A picker entry, carrying the attribute's input type so the type filter can
+// narrow the list down.
+type PickerOption = {
+  value: string;
+  label: string;
+  inputType: string;
+};
+
+const TYPE_FILTER_OPTIONS = specInputTypes.map((type) => ({
+  value: type,
+  label: SPEC_INPUT_TYPE_LABELS[type],
+}));
+
 export const SpecificationComposer = ({
   library,
 }: SpecificationComposerProps) => {
@@ -37,7 +55,7 @@ export const SpecificationComposer = ({
   // Flatten the library once: a key → spec map, and the picker options.
   const { specByKey, pickerOptions } = useMemo(() => {
     const byKey = new Map<string, LibrarySpec>();
-    const options: { value: string; label: string }[] = [];
+    const options: PickerOption[] = [];
     for (const domain of library) {
       const domainLabel = domain.domain
         ? (SPECIFICATION_DOMAIN_LABELS[domain.domain as SpecificationDomain] ??
@@ -54,12 +72,27 @@ export const SpecificationComposer = ({
           options.push({
             value: attribute.key,
             label: `${domainLabel} · ${group.group.name} · ${attribute.label}`,
+            inputType: resolveSpecInputType(attribute),
           });
         }
       }
     }
     return { specByKey: byKey, pickerOptions: options };
   }, [library]);
+
+  // Input types the picker is narrowed to. Empty = show every attribute.
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+
+  const visibleOptions = useMemo(
+    () =>
+      (typeFilter.length === 0
+        ? pickerOptions
+        : pickerOptions.filter((option) =>
+            typeFilter.includes(option.inputType),
+          )
+      ).map((option) => ({ value: option.value, label: option.label })),
+    [pickerOptions, typeFilter],
+  );
 
   // Keys this component auto-added because some option revealed them, so they
   // can be auto-removed when that option is un-chosen — manually-added keys
@@ -283,16 +316,28 @@ export const SpecificationComposer = ({
         </p>
       </div>
 
-      <div className="sm:max-w-md">
-        <Dropdown
-          multiple
-          searchable
-          searchPlaceholder="Search the library..."
-          value={appliedKeys}
-          onChange={setAppliedKeys}
-          placeholder="+ Add attribute"
-          options={pickerOptions}
-        />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="sm:w-56">
+          <Dropdown
+            multiple
+            value={typeFilter}
+            onChange={setTypeFilter}
+            placeholder="All types"
+            options={TYPE_FILTER_OPTIONS}
+          />
+        </div>
+        <div className="sm:max-w-md sm:flex-1">
+          <Dropdown
+            multiple
+            searchable
+            searchPlaceholder="Search the library..."
+            value={appliedKeys}
+            onChange={setAppliedKeys}
+            placeholder="+ Add attribute"
+            options={visibleOptions}
+            emptyMessage="No attributes of this type"
+          />
+        </div>
       </div>
 
       {appliedKeys.length === 0 ? (

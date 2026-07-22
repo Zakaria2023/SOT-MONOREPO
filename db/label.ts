@@ -21,6 +21,7 @@ import {
   RuleKind,
   RuleSeverity,
   SpecificationDomain,
+  SpecInputType,
   SpecValueType,
   UserType,
 } from "./enum";
@@ -206,4 +207,12 @@ export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {
   smb_sme_channels: "SMB & SME Channels",
   smb_sme_projects: "SMB & SME Projects",
   enterprise: "Enterprise",
+};
+
+export const SPEC_INPUT_TYPE_LABELS: Record<SpecInputType, string> = {
+  number: "Number",
+  single_select: "Single-select",
+  multi_select: "Multi-select",
+  boolean: "Yes / No",
+  text: "Text",
 };

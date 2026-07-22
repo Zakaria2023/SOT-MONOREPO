@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { asc, count, eq } from "drizzle-orm";
-import { slugify } from "utils";
+import { resolveSpecInputType, slugify } from "utils";
 import { db } from "../../../db";
 import type { SpecInputType } from "../../../db/enum";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
@@ -58,27 +58,10 @@ export type AttributeInput = {
   reveals?: Record<string, string[]>;
 };
 
-// Derive the UX inputType for a legacy row that predates the column.
-const resolveInputType = (spec: SelectSpecifications): SpecInputType => {
-  if (spec.inputType) {
-    return spec.inputType as SpecInputType;
-  }
-  if (spec.valueType === "number") {
-    return "number";
-  }
-  const values = (spec.options ?? []).map((option) => option.value);
-  const isYesNo =
-    values.length === 2 &&
-    values.includes("Yes") &&
-    values.includes("No");
-  if (isYesNo) {
-    return "boolean";
-  }
-  if (spec.allowMultiple) {
-    return "multi_select";
-  }
-  return values.length === 0 ? "text" : "single_select";
-};
+// Derive the UX inputType for a legacy row that predates the column. Shared
+// with the client-side attribute picker via packages/utils.
+const resolveInputType = (spec: SelectSpecifications): SpecInputType =>
+  resolveSpecInputType(spec) as SpecInputType;
 
 const toSpecOptions = (
   values: string[],
