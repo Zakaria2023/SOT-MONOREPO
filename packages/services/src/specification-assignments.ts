@@ -301,61 +301,115 @@ export type ShopperPreview = {
   products: PreviewProduct[];
 };
 
-// Every category at or beneath the given one.
-const getSubtree = async (categoryUuid: string): Promise<SelectCategories[]> => {
-  const all = await db.select().from(Categories);
-  const childrenOf = new Map<string, SelectCategories[]>();
-  for (const category of all) {
-    if (!category.parentUuid) {
-      continue;
-    }
-    const list = childrenOf.get(category.parentUuid) ?? [];
-    list.push(category);
-    childrenOf.set(category.parentUuid, list);
-  }
-
-  const subtree: SelectCategories[] = [];
-  const walk = (uuid: string) => {
-    for (const child of childrenOf.get(uuid) ?? []) {
-      subtree.push(child);
-      walk(child.uuid);
-    }
-  };
-  walk(categoryUuid);
-  return subtree;
-};
-
 /**
  * What a shopper standing on this category can see beneath it: the descendant
  * categories with the values each one is able to offer, and the products with
  * the values they actually carry. The panel greys either against the shopper's
  * facet choices.
+ *
+ * Four queries, whatever the tree looks like. Resolving each descendant
+ * through getCategoryAssignments would re-read the whole Categories table
+ * once per descendant and open three connections each — a 30-category subtree
+ * exhausts the shared pool and times out. So everything is loaded once and
+ * the pure resolver is run in memory per descendant instead.
  */
 export const getShopperPreview = async (
   categoryUuid: string,
 ): Promise<ShopperPreview> => {
   try {
-    const descendants = await getSubtree(categoryUuid);
-    const uuids = [categoryUuid, ...descendants.map((row) => row.uuid)];
+    const allCategories = await db.select().from(Categories);
 
-    // Each descendant's own resolved slices — what it is capable of offering.
-    const categories: PreviewCategory[] = await Promise.all(
-      descendants.map(async (category) => {
-        const resolved = await getCategoryAssignments(category.uuid);
-        return {
-          uuid: category.uuid,
-          name: category.name,
-          path: category.path,
-          offeredByKey: Object.fromEntries(
-            resolved.map((assignment) => [
-              assignment.definition.key,
-              assignment.offeredOptions.map((option) => option.value),
-            ]),
-          ),
-        };
-      }),
+    const parentOf = new Map(
+      allCategories.map((category) => [category.uuid, category.parentUuid]),
     );
+    const childrenOf = new Map<string, SelectCategories[]>();
+    for (const category of allCategories) {
+      if (!category.parentUuid) {
+        continue;
+      }
+      const list = childrenOf.get(category.parentUuid) ?? [];
+      list.push(category);
+      childrenOf.set(category.parentUuid, list);
+    }
 
+    const descendants: SelectCategories[] = [];
+    const walk = (uuid: string) => {
+      for (const child of childrenOf.get(uuid) ?? []) {
+        descendants.push(child);
+        walk(child.uuid);
+      }
+    };
+    walk(categoryUuid);
+
+    // Nearest-first ancestor chain, walked in memory. `seen` also guards a
+    // cycle introduced by bad parent data.
+    const chainFor = (uuid: string): string[] => {
+      const chain: string[] = [];
+      const seen = new Set<string>();
+      let current: string | null = uuid;
+      while (current && !seen.has(current)) {
+        seen.add(current);
+        chain.push(current);
+        current = parentOf.get(current) ?? null;
+      }
+      return chain;
+    };
+
+    const chains = new Map(
+      descendants.map((category) => [category.uuid, chainFor(category.uuid)]),
+    );
+    // Only the categories that actually appear in some chain can contribute an
+    // assignment, so that's all the rows worth loading.
+    const relevant = [...new Set([...chains.values()].flat())];
+
+    const rows =
+      relevant.length > 0
+        ? await db
+            .select({
+              specificationUuid: SpecificationCategories.specificationUuid,
+              categoryUuid: SpecificationCategories.categoryUuid,
+              isFilter: SpecificationCategories.isFilter,
+              isRule: SpecificationCategories.isRule,
+              scope: SpecificationCategories.scope,
+              showIf: SpecificationCategories.showIf,
+              audience: SpecificationCategories.audience,
+              enabledValues: SpecificationCategories.enabledValues,
+              order: SpecificationCategories.order,
+            })
+            .from(SpecificationCategories)
+            .where(inArray(SpecificationCategories.categoryUuid, relevant))
+        : [];
+
+    const specUuids = [...new Set(rows.map((row) => row.specificationUuid))];
+    const definitions: AssignmentDefinition[] =
+      specUuids.length > 0
+        ? await db
+            .select(DEFINITION_COLUMNS)
+            .from(Specifications)
+            .where(inArray(Specifications.uuid, specUuids))
+            .orderBy(asc(Specifications.order))
+        : [];
+
+    const categories: PreviewCategory[] = descendants.map((category) => {
+      const resolved = resolveAssignments({
+        chain: chains.get(category.uuid) ?? [category.uuid],
+        rows: rows satisfies AssignmentRow[],
+        definitions,
+      });
+      return {
+        uuid: category.uuid,
+        name: category.name,
+        path: category.path,
+        offeredByKey: Object.fromEntries(
+          resolved.map((assignment) => [
+            assignment.definition.key,
+            assignment.offeredOptions.map((option) => option.value),
+          ]),
+        ),
+      };
+    });
+
+    const subtreeUuids = [categoryUuid, ...descendants.map((row) => row.uuid)];
     const productRows = await db
       .select({
         uuid: Products.uuid,
@@ -364,7 +418,7 @@ export const getShopperPreview = async (
         technicalAttributes: Products.technicalAttributes,
       })
       .from(Products)
-      .where(inArray(Products.categoryUuid, uuids));
+      .where(inArray(Products.categoryUuid, subtreeUuids));
 
     const products: PreviewProduct[] = productRows.map((product) => ({
       uuid: product.uuid,

@@ -3,6 +3,7 @@ import { CategoryTree } from "@/components/assignments/category-tree";
 import { AsyncSection } from "@/components/shared/async-section";
 import {
   getCategories,
+  getCategory,
   getCategoryAssignmentRows,
   getShopperPreview,
   getSpecifications,
@@ -20,14 +21,16 @@ type WorkspaceProps = {
 // so switching tabs and flipping switches stays instant — only changing the
 // selected category costs a round trip.
 const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
-  const [categories, assignments, library, preview] = await Promise.all([
-    getCategories(),
+  // The tree already loaded every category for the sidebar; this panel only
+  // needs the one it is showing, so it reads a single row rather than the
+  // whole table a second time.
+  const [category, assignments, library, preview] = await Promise.all([
+    getCategory(categoryUuid),
     getCategoryAssignmentRows(categoryUuid),
     getSpecifications(),
     getShopperPreview(categoryUuid),
   ]);
 
-  const category = categories.find((item) => item.uuid === categoryUuid);
   if (!category) {
     return (
       <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">
