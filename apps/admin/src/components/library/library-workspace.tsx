@@ -49,12 +49,10 @@ const Orientation = () => (
       <p className="mt-1.5 flex items-start gap-1.5 text-xs text-muted">
         <GitCompare size={13} className="mt-0.5 shrink-0 text-primary" />
         <span>
-          <strong className="font-semibold text-secondary">
-            Compatibility rules
-          </strong>{" "}
-          — set in{" "}
-          <Link href="/rules" className="text-primary hover:underline">
-            Compatibility Rules
+          <strong className="font-semibold text-secondary">Relations</strong>{" "}
+          — authored on the attribute itself in{" "}
+          <Link href="/assignments" className="text-primary hover:underline">
+            Assignments
           </Link>
           . They validate a selection, e.g. the PoE budget covers the devices.
         </span>

@@ -274,3 +274,81 @@ export const deleteCompatibilityRule = async (uuid: string): Promise<void> => {
     .delete(CompatibilityRules)
     .where(eq(CompatibilityRules.uuid, uuid));
 };
+
+// A rule as the assignment card shows it: which side this attribute sits on,
+// and what it is measured against.
+export type SpecRelation = SelectCompatibilityRules & {
+  otherSpecUuid: string | null;
+  otherSpecLabel: string | null;
+  otherSpecUnit: string | null;
+  // "demand" = this attribute is the consumed side, "supply" = the capacity.
+  side: "demand" | "supply";
+};
+
+/**
+ * Every rule touching any of these specs, grouped by spec uuid. A rule that
+ * binds two of them appears under both, once as demand and once as supply —
+ * which is correct: it is the same rule seen from either attribute.
+ */
+export const getRelationsBySpec = async (
+  specUuids: string[],
+): Promise<Record<string, SpecRelation[]>> => {
+  if (specUuids.length === 0) {
+    return {};
+  }
+  try {
+    const [rules, specs] = await Promise.all([
+      db
+        .select()
+        .from(CompatibilityRules)
+        .where(
+          or(
+            inArray(CompatibilityRules.consumerSpecUuid, specUuids),
+            inArray(CompatibilityRules.providerSpecUuid, specUuids),
+          ),
+        ),
+      db
+        .select({
+          uuid: Specifications.uuid,
+          label: Specifications.label,
+          unit: Specifications.unit,
+        })
+        .from(Specifications),
+    ]);
+
+    const specByUuid = new Map(specs.map((spec) => [spec.uuid, spec]));
+    const wanted = new Set(specUuids);
+    const grouped: Record<string, SpecRelation[]> = {};
+
+    const push = (
+      specUuid: string,
+      rule: (typeof rules)[number],
+      otherUuid: string | null,
+      side: "demand" | "supply",
+    ) => {
+      const other = otherUuid ? specByUuid.get(otherUuid) : undefined;
+      const list = grouped[specUuid] ?? [];
+      list.push({
+        ...rule,
+        otherSpecUuid: otherUuid,
+        otherSpecLabel: other?.label ?? null,
+        otherSpecUnit: other?.unit ?? null,
+        side,
+      });
+      grouped[specUuid] = list;
+    };
+
+    for (const rule of rules) {
+      if (rule.consumerSpecUuid && wanted.has(rule.consumerSpecUuid)) {
+        push(rule.consumerSpecUuid, rule, rule.providerSpecUuid, "demand");
+      }
+      if (rule.providerSpecUuid && wanted.has(rule.providerSpecUuid)) {
+        push(rule.providerSpecUuid, rule, rule.consumerSpecUuid, "supply");
+      }
+    }
+    return grouped;
+  } catch (error) {
+    console.error("getRelationsBySpec failed:", error);
+    throw new Error("Failed to fetch relations", { cause: error });
+  }
+};

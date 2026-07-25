@@ -11,7 +11,7 @@ import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
 import { documentDownloadUrl } from "@/lib/documents";
-import type { LibraryDomain } from "services";
+import type { ProductFormAttribute } from "services";
 import {
   ArrowUpDown,
   Coins,
@@ -39,13 +39,13 @@ type ProductFormProps =
       mode: "add";
       categories: SelectCategories[];
       brands: SelectBrands[];
-      library: LibraryDomain[];
+      attributesByCategory: Record<string, ProductFormAttribute[]>;
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
-      library: LibraryDomain[];
+      attributesByCategory: Record<string, ProductFormAttribute[]>;
       product: SelectProducts;
     };
 
@@ -60,7 +60,7 @@ const availabilityOptions = [
 ];
 
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands, library } = props;
+  const { mode, categories, brands, attributesByCategory } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -280,7 +280,7 @@ export const ProductForm = (props: ProductFormProps) => {
           )}
         />
 
-        <SpecificationComposer library={library} categories={categories} />
+        <SpecificationComposer attributesByCategory={attributesByCategory} />
 
         <FormError message={state.error} />
 

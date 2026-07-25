@@ -5,7 +5,7 @@ import {
   getCategories,
   getCategory,
   getCategoryAssignmentRows,
-  getShopperPreview,
+  getRelationsBySpec,
   getSpecifications,
 } from "services";
 
@@ -24,12 +24,17 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
   // The tree already loaded every category for the sidebar; this panel only
   // needs the one it is showing, so it reads a single row rather than the
   // whole table a second time.
-  const [category, assignments, library, preview] = await Promise.all([
+  const [category, assignments, library] = await Promise.all([
     getCategory(categoryUuid),
     getCategoryAssignmentRows(categoryUuid),
     getSpecifications(),
-    getShopperPreview(categoryUuid),
   ]);
+
+  // Relations are keyed by attribute, so they load once the assignments are
+  // known — a second, bounded query rather than one per card.
+  const relations = await getRelationsBySpec(
+    assignments.map((assignment) => assignment.specificationUuid),
+  );
 
   if (!category) {
     return (
@@ -46,7 +51,7 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
       categoryPath={category.path}
       assignments={assignments}
       library={library}
-      preview={preview}
+      relations={relations}
     />
   );
 };

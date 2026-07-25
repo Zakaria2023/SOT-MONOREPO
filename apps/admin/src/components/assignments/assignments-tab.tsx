@@ -2,6 +2,8 @@
 
 import type { SpecificationWithCategories } from "@/app/(dashboard)/assignments/actions";
 import type { DraftRow } from "@/components/assignments/assignment-workspace";
+import { RelationSection } from "@/components/assignments/relation-section";
+import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
 import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
 import { Dropdown } from "ui";
@@ -9,6 +11,8 @@ import { Dropdown } from "ui";
 type AssignmentsTabProps = {
   rows: DraftRow[];
   library: SpecificationWithCategories[];
+  // Rules touching each assigned attribute, keyed by spec uuid.
+  relations: Record<string, SpecRelation[]>;
   onChange: (specificationUuid: string, patch: Partial<DraftRow>) => void;
   onReset: (specificationUuid: string) => void;
   onRemove: (specificationUuid: string) => void;
@@ -17,6 +21,11 @@ type AssignmentsTabProps = {
 
 type AssignmentCardProps = {
   row: DraftRow;
+  relations: SpecRelation[];
+  otherSpecs: { value: string; label: string }[];
+  // How many other attributes this category carries at all, so an empty
+  // controller list can explain itself rather than look broken.
+  siblingCount: number;
   // Other attributes on this category that could gate this one.
   controllers: { value: string; label: string }[];
   controllerOptions: Record<string, string[]>;
@@ -38,8 +47,8 @@ const Switch = ({ active, onClick, children }: SwitchProps) => (
     aria-pressed={active}
     className={
       active
-        ? "flex items-center gap-1.5 rounded-control bg-primary px-3 py-1.5 text-xs font-semibold text-white"
-        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3 py-1.5 text-xs font-medium text-faint transition-colors hover:border-primary hover:text-primary"
+        ? "flex items-center gap-1.5 rounded-control bg-primary px-3.5 py-2 text-sm font-semibold text-white"
+        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary"
     }
   >
     {children}
@@ -48,6 +57,9 @@ const Switch = ({ active, onClick, children }: SwitchProps) => (
 
 const AssignmentCard = ({
   row,
+  relations,
+  otherSpecs,
+  siblingCount,
   controllers,
   controllerOptions,
   onChange,
@@ -93,22 +105,22 @@ const AssignmentCard = ({
   return (
     <li className="flex flex-col gap-2.5 rounded-control border border-hairline bg-page p-3.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold text-ink">{row.label}</span>
-        <span className="rounded bg-primary-tint px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+        <span className="text-base font-semibold text-ink">{row.label}</span>
+        <span className="rounded bg-primary-tint px-1.5 py-0.5 text-xs font-semibold text-primary">
           {isBoolean ? "yes / no" : row.valueType === "number" ? "number" : "select"}
         </span>
         {hasOptions && (
-          <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted">
+          <span className="rounded bg-surface px-1.5 py-0.5 text-sm font-medium text-muted">
             {row.ordered ? "ordered · ceiling" : "unordered · inclusion"}
           </span>
         )}
         {row.inherited && !row.owned ? (
-          <span className="flex items-center gap-1 text-[10px] font-medium text-faint">
-            <ArrowUpFromLine size={10} />
+          <span className="flex items-center gap-1 text-sm font-medium text-faint">
+            <ArrowUpFromLine size={15} />
             from {row.sourceCategoryName ?? "an ancestor"}
           </span>
         ) : (
-          <span className="text-[10px] font-medium text-faint">own</span>
+          <span className="text-sm font-medium text-faint">own</span>
         )}
 
         <span className="ml-auto flex items-center gap-1">
@@ -116,7 +128,7 @@ const AssignmentCard = ({
             <button
               type="button"
               onClick={() => onReset(row.specificationUuid)}
-              className="rounded px-2 py-1 text-[11px] text-muted transition-colors hover:bg-surface hover:text-ink"
+              className="rounded px-2 py-1 text-sm text-muted transition-colors hover:bg-surface hover:text-ink"
             >
               Reset to inherited
             </button>
@@ -140,7 +152,7 @@ const AssignmentCard = ({
             onChange(row.specificationUuid, { isFilter: !row.isFilter })
           }
         >
-          {row.isFilter ? <Eye size={12} /> : <EyeOff size={12} />}
+          {row.isFilter ? <Eye size={15} /> : <EyeOff size={15} />}
           Filter
         </Switch>
         <Switch
@@ -149,7 +161,7 @@ const AssignmentCard = ({
             onChange(row.specificationUuid, { isRule: !row.isRule })
           }
         >
-          {row.isRule ? <Zap size={12} /> : <ZapOff size={12} />}
+          {row.isRule ? <Zap size={15} /> : <ZapOff size={15} />}
           Rule
         </Switch>
         {(["branch", "leaf"] as AssignmentScope[]).map((scope) => (
@@ -183,14 +195,14 @@ const AssignmentCard = ({
       </div>
 
       {!row.isFilter && row.isRule && (
-        <p className="text-[11px] text-faint">
+        <p className="text-sm text-faint">
           Living, not showing — the engine reads this value, no shopper sees it.
         </p>
       )}
 
       {hasOptions && (
         <div>
-          <p className="text-[11px] text-muted">
+          <p className="text-sm text-muted">
             {isBoolean
               ? "Enabled values: any yes / no"
               : "Enabled values (slice of the master list):"}
@@ -205,8 +217,8 @@ const AssignmentCard = ({
                   aria-pressed={enabled.has(option)}
                   className={
                     enabled.has(option)
-                      ? "rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-white"
-                      : "rounded-md border border-hairline bg-surface px-2 py-0.5 text-[11px] text-faint"
+                      ? "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-white"
+                      : "rounded-md border border-hairline bg-surface px-2.5 py-1 text-sm text-faint"
                   }
                 >
                   {option}
@@ -218,25 +230,36 @@ const AssignmentCard = ({
       )}
 
       <div className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1 text-[11px] text-muted">
-          <EyeOff size={11} />
+        <span className="flex items-center gap-1 text-sm text-muted">
+          <EyeOff size={14} />
           Show-if
         </span>
-        <Dropdown
-          value={row.showIf?.specKey ?? ""}
-          onChange={(specKey) =>
-            onChange(row.specificationUuid, {
-              showIf: specKey ? { specKey, values: [] } : null,
-            })
-          }
-          options={[
-            { value: "", label: "— always shown —" },
-            ...controllers,
-          ]}
-        />
+        {controllers.length === 0 ? (
+          // An empty dropdown reads as a bug. Say which of the two reasons it
+          // is: nothing else is assigned here, or what is assigned has no
+          // values to test against.
+          <p className="rounded-control border border-dashed border-hairline px-3 py-2 text-sm text-faint">
+            {siblingCount === 0
+              ? "Always shown — this is the only attribute on this category, so there is nothing to condition it on. Assign another and it can gate this one."
+              : "Always shown — the other attributes here are numbers with no option list, and a condition tests against values. Assign one with options to gate this."}
+          </p>
+        ) : (
+          <Dropdown
+            value={row.showIf?.specKey ?? ""}
+            onChange={(specKey) =>
+              onChange(row.specificationUuid, {
+                showIf: specKey ? { specKey, values: [] } : null,
+              })
+            }
+            options={[
+              { value: "", label: "— always shown —" },
+              ...controllers,
+            ]}
+          />
+        )}
         {row.showIf && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-muted">is</span>
+            <span className="text-sm text-muted">is</span>
             {(controllerOptions[row.showIf.specKey] ?? []).map((value) => (
               <button
                 key={value}
@@ -245,21 +268,29 @@ const AssignmentCard = ({
                 aria-pressed={showIfValues.includes(value)}
                 className={
                   showIfValues.includes(value)
-                    ? "rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-white"
-                    : "rounded-md border border-hairline bg-surface px-2 py-0.5 text-[11px] text-faint"
+                    ? "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-white"
+                    : "rounded-md border border-hairline bg-surface px-2.5 py-1 text-sm text-faint"
                 }
               >
                 {value}
               </button>
             ))}
             {showIfValues.length === 0 && (
-              <span className="text-[11px] text-amber-700">
+              <span className="text-sm text-amber-700">
                 pick a value, or it is always hidden
               </span>
             )}
           </div>
         )}
       </div>
+
+      <RelationSection
+        specUuid={row.specificationUuid}
+        specLabel={row.label}
+        specUnit={row.unit}
+        relations={relations}
+        otherSpecs={otherSpecs}
+      />
     </li>
   );
 };
@@ -267,6 +298,7 @@ const AssignmentCard = ({
 export const AssignmentsTab = ({
   rows,
   library,
+  relations,
   onChange,
   onReset,
   onRemove,
@@ -297,6 +329,19 @@ export const AssignmentsTab = ({
     rows.map((row) => [row.key, row.masterOptions]),
   );
 
+  // A relation can bind any attribute in the library, not only ones this
+  // category carries — a camera's power draw is measured against a switch's
+  // budget, and those live in different trees.
+  const otherSpecsFor = (specificationUuid: string) =>
+    library
+      .filter((specification) => specification.uuid !== specificationUuid)
+      .map((specification) => ({
+        value: specification.uuid,
+        label: specification.unit
+          ? `${specification.label} (${specification.unit})`
+          : specification.label,
+      }));
+
   return (
     <div className="flex flex-col gap-3">
       {rows.length === 0 ? (
@@ -309,6 +354,9 @@ export const AssignmentsTab = ({
             <AssignmentCard
               key={row.specificationUuid}
               row={row}
+              relations={relations[row.specificationUuid] ?? []}
+              otherSpecs={otherSpecsFor(row.specificationUuid)}
+              siblingCount={rows.length - 1}
               controllers={controllersFor(row.specificationUuid)}
               controllerOptions={controllerOptions}
               onChange={onChange}

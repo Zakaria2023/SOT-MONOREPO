@@ -77,3 +77,30 @@ body {
     cursor: pointer;
   }
 }
+
+/* A slim, unobtrusive scrollbar for panels that scroll inside the page — the
+   platform default is chunky enough to dominate a narrow column like the
+   category tree. Firefox gets the standard properties, WebKit the pseudo
+   elements; both fall back to the native bar if unsupported. */
+@utility scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-hairline);
+    border-radius: 9999px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-faint);
+  }
+}
