@@ -1,11 +1,8 @@
 import { Playground } from "@/components/rules/playground";
-import { getProducts, getProjectVariables } from "services";
+import { getProducts } from "services";
 
 const PlaygroundPage = async () => {
-  const [products, variables] = await Promise.all([
-    getProducts(),
-    getProjectVariables(),
-  ]);
+  const products = await getProducts();
 
   return (
     <div className="flex flex-col gap-5">
@@ -17,7 +14,7 @@ const PlaygroundPage = async () => {
         </p>
       </div>
 
-      <Playground products={products} variables={variables} />
+      <Playground products={products} />
     </div>
   );
 };

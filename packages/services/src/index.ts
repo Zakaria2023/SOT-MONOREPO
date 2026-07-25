@@ -20,7 +20,6 @@ export * from "./presence-rules";
 export * from "./presence-rules-data";
 export * from "./pricing";
 export * from "./products";
-export * from "./project-variables";
 export * from "./rule-engine";
 export * from "./specification-assignments";
 export * from "./specification-builder";

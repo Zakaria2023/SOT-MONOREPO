@@ -16,17 +16,12 @@ import { Button, FormError } from "ui";
 import type {
   CompatibilityReport,
   ProductListItem,
-  ProjectVariableListItem,
   RuleEvaluation,
   RuleStatus,
 } from "services";
 
 type PlaygroundProps = {
   products: ProductListItem[];
-  // The design questions a rule may read. Without answers here, any rule
-  // bound to a variable reports not_applicable — which is correct, but makes
-  // the playground look like the rule is broken, so they're editable.
-  variables: ProjectVariableListItem[];
 };
 
 type StatusStyle = {
@@ -193,18 +188,8 @@ const ResultCard = ({ result }: ResultCardProps) => {
   );
 };
 
-export const Playground = ({ products, variables }: PlaygroundProps) => {
+export const Playground = ({ products }: PlaygroundProps) => {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  // Seeded from each variable's default so the playground starts where a real
-  // design would.
-  const [variableValues, setVariableValues] = useState<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        variables
-          .filter((variable) => variable.defaultValue !== null)
-          .map((variable) => [variable.key, String(variable.defaultValue)]),
-      ),
-  );
   const [report, setReport] = useState<CompatibilityReport | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isPending, startTransition] = useTransition();
@@ -232,7 +217,6 @@ export const Playground = ({ products, variables }: PlaygroundProps) => {
           productUuid,
           quantity,
         })),
-        variableValues,
       );
       if (result.error || !result.report) {
         setError(result.error ?? "Failed to check compatibility");
@@ -260,40 +244,6 @@ export const Playground = ({ products, variables }: PlaygroundProps) => {
             {isPending ? "Checking..." : "Check compatibility"}
           </Button>
         </div>
-
-        {variables.length > 0 && (
-          <div className="flex flex-col gap-2 rounded-control border border-hairline bg-page p-3">
-            <p className="text-xs font-semibold tracking-wide text-muted uppercase">
-              Project answers
-            </p>
-            {variables.map((variable) => (
-              <label
-                key={variable.uuid}
-                className="flex items-center justify-between gap-3"
-              >
-                <span className="text-xs text-ink">
-                  {variable.label}
-                  {variable.unit && (
-                    <span className="ml-1 text-faint">({variable.unit})</span>
-                  )}
-                </span>
-                <input
-                  type="number"
-                  step="any"
-                  value={variableValues[variable.key] ?? ""}
-                  onChange={(event) =>
-                    setVariableValues((current) => ({
-                      ...current,
-                      [variable.key]: event.target.value,
-                    }))
-                  }
-                  placeholder="unanswered"
-                  className="w-28 rounded-control border border-hairline bg-surface px-2 py-1 text-right text-xs text-ink outline-none focus:border-primary"
-                />
-              </label>
-            ))}
-          </div>
-        )}
 
         <div className="flex flex-col divide-y divide-hairline-soft">
           {products.map((product) => {

@@ -1,18 +1,11 @@
 import { RelationBuilder } from "@/components/rules/relation-builder";
-import { getProjectVariables, getSpecifications } from "services";
+import { getSpecifications } from "services";
 
 const NewRulePage = async () => {
-  const [specifications, variables] = await Promise.all([
-    getSpecifications(),
-    getProjectVariables(),
-  ]);
+  const specifications = await getSpecifications();
 
   return (
-    <RelationBuilder
-      mode="add"
-      specifications={specifications}
-      variables={variables}
-    />
+    <RelationBuilder mode="add" specifications={specifications} />
   );
 };
 

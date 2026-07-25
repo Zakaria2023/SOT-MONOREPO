@@ -21,11 +21,8 @@ export type RuleActionInput = {
   name: string;
   description: string;
   kind: RuleKind;
-  // Each side is a spec OR a variable — the empty string means "not this one".
   consumerSpecUuid: string;
   providerSpecUuid: string;
-  consumerVariableUuid: string;
-  providerVariableUuid: string;
   // "conditional" only: the lookup the limit is read from.
   lookupInputs: string[];
   lookupRows: LookupRow[];
@@ -54,12 +51,10 @@ const toFields = (input: RuleActionInput) => ({
   name: input.name,
   description: input.description.trim() || null,
   kind: input.kind,
-  // An unset operand is null in the row, not an empty string — the column is
-  // a foreign key.
+  // An unset capacity side is null in the row, not an empty string — the
+  // column is a foreign key.
   consumerSpecUuid: input.consumerSpecUuid || null,
   providerSpecUuid: input.providerSpecUuid || null,
-  consumerVariableUuid: input.consumerVariableUuid || null,
-  providerVariableUuid: input.providerVariableUuid || null,
   lookup:
     input.kind === "conditional"
       ? { inputs: input.lookupInputs, rows: input.lookupRows }
@@ -125,11 +120,9 @@ export const deleteRuleAction = async (
 
 export const checkCompatibilityAction = async (
   selection: SelectionInput[],
-  // The playground's answers to the project variables, keyed by variable key.
-  variableValues: Record<string, string> = {},
 ): Promise<CheckCompatibilityResult> => {
   try {
-    return { report: await checkCompatibility(selection, variableValues) };
+    return { report: await checkCompatibility(selection) };
   } catch (error) {
     return {
       error:

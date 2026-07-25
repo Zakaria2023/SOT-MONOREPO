@@ -20,7 +20,6 @@ import {
   ruleSeverities,
 } from "../enum";
 import { LookupTable, RuleCondition } from "../types";
-import { ProjectVariables } from "./project-variables";
 import { Specifications } from "./specifications";
 
 // A compatibility rule — one row per rule, created from the admin rule
@@ -40,23 +39,14 @@ export const CompatibilityRules = mysqlTable(
 
     kind: mysqlEnum("kind", ruleKinds).notNull(),
 
-    // Each side of a rule is ONE operand: either a product spec or a project
-    // variable, never both. Nullable because not every family fills both
-    // sides — a conditional rule's capacity is its lookup table, and a rule
-    // whose demand is a project decision (expected concurrent calls) has no
-    // consumer spec at all. The service asserts exactly one operand per side.
+    // Nullable because a conditional rule's capacity is its lookup table
+    // rather than another product's spec. The service asserts each side that
+    // a family does need.
     //
     // The numeric spec measured on consuming items (e.g. Power Consumption).
     consumerSpecUuid: char("consumer_spec_uuid", { length: 36 }),
     // The numeric spec supplying capacity (e.g. PoE Budget).
     providerSpecUuid: char("provider_spec_uuid", { length: 36 }),
-
-    // A project variable standing in for the demand side — the number nobody
-    // sells (expected concurrent calls, retention days), answered per BOQ.
-    consumerVariableUuid: char("consumer_variable_uuid", { length: 36 }),
-    // A project variable standing in for the capacity side. Rarer, but a
-    // designed cap (e.g. an agreed maximum spend of ports) belongs here.
-    providerVariableUuid: char("provider_variable_uuid", { length: 36 }),
 
     // "conditional" only: the table the limit is read from, keyed by the
     // item's own other spec values. Null for every other family.
@@ -103,16 +93,6 @@ export const CompatibilityRules = mysqlTable(
       name: "fk_compat_rules_provider_spec",
       columns: [table.providerSpecUuid],
       foreignColumns: [Specifications.uuid],
-    }).onDelete("cascade"),
-    foreignKey({
-      name: "fk_compat_rules_consumer_var",
-      columns: [table.consumerVariableUuid],
-      foreignColumns: [ProjectVariables.uuid],
-    }).onDelete("cascade"),
-    foreignKey({
-      name: "fk_compat_rules_provider_var",
-      columns: [table.providerVariableUuid],
-      foreignColumns: [ProjectVariables.uuid],
     }).onDelete("cascade"),
   ],
 );

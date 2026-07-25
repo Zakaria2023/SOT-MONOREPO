@@ -37,17 +37,7 @@ export type EngineSpec = {
   ordered?: SelectSpecifications["ordered"];
   // The master option values in scale order. Empty/absent for a numeric spec.
   scale?: string[];
-  // True when this side of the rule is a PROJECT VARIABLE rather than a
-  // product spec — a number the design answers (expected concurrent calls)
-  // instead of one a product carries. It resolves from the variables context
-  // rather than from any item's attributes, and contributes once, not per
-  // item, because a project answers the question once.
-  isVariable?: boolean;
 };
-
-// The design's answers to the project variables, keyed by variable key. Rules
-// with a variable operand read their number from here.
-export type VariableContext = Record<string, number>;
 
 // A rule with both specs resolved — the pure evaluator's input shape.
 export type EngineRule = {
@@ -569,7 +559,6 @@ export const evaluateRule = (
   rule: EngineRule,
   selection: EngineItem[],
   catalog: EngineCatalogProduct[],
-  variables: VariableContext = {},
 ): RuleEvaluation => {
   // The Match-on-select family has its own set-comparison path.
   if (rule.kind === "spec_match") {
@@ -580,68 +569,37 @@ export const evaluateRule = (
     return evaluateConditional(rule, selection);
   }
 
-  // A project variable contributes one value for the whole design, not one per
-  // item — the answer to "how many concurrent calls" doesn't multiply by how
-  // many phones are in the cart.
-  const variableParticipant = (spec: EngineSpec): RuleParticipant[] => {
-    const value = variables[spec.key];
-    if (value === undefined || !Number.isFinite(value)) {
+  const consumers: RuleParticipant[] = selection.flatMap((item) => {
+    const unitValue = numericValue(item.attributes, rule.consumerSpec.key, "max");
+    if (unitValue === null || !matchesCondition(item, rule.condition)) {
       return [];
     }
     return [
       {
-        productUuid: "",
-        name: `${spec.label} (project variable)`,
-        quantity: 1,
-        unitValue: value,
-        totalValue: round2(value),
+        productUuid: item.productUuid,
+        name: item.name,
+        quantity: item.quantity,
+        unitValue,
+        totalValue: round2(unitValue * item.quantity),
       },
     ];
-  };
+  });
 
-  const consumers: RuleParticipant[] = rule.consumerSpec.isVariable
-    ? variableParticipant(rule.consumerSpec)
-    : selection.flatMap((item) => {
-        const unitValue = numericValue(
-          item.attributes,
-          rule.consumerSpec.key,
-          "max",
-        );
-        if (unitValue === null || !matchesCondition(item, rule.condition)) {
-          return [];
-        }
-        return [
-          {
-            productUuid: item.productUuid,
-            name: item.name,
-            quantity: item.quantity,
-            unitValue,
-            totalValue: round2(unitValue * item.quantity),
-          },
-        ];
-      });
-
-  const providers: RuleParticipant[] = rule.providerSpec.isVariable
-    ? variableParticipant(rule.providerSpec)
-    : selection.flatMap((item) => {
-        const unitValue = numericValue(
-          item.attributes,
-          rule.providerSpec.key,
-          "min",
-        );
-        if (unitValue === null) {
-          return [];
-        }
-        return [
-          {
-            productUuid: item.productUuid,
-            name: item.name,
-            quantity: item.quantity,
-            unitValue,
-            totalValue: round2(unitValue * item.quantity),
-          },
-        ];
-      });
+  const providers: RuleParticipant[] = selection.flatMap((item) => {
+    const unitValue = numericValue(item.attributes, rule.providerSpec.key, "min");
+    if (unitValue === null) {
+      return [];
+    }
+    return [
+      {
+        productUuid: item.productUuid,
+        name: item.name,
+        quantity: item.quantity,
+        unitValue,
+        totalValue: round2(unitValue * item.quantity),
+      },
+    ];
+  });
 
   const base = {
     ruleUuid: rule.uuid,
@@ -668,20 +626,16 @@ export const evaluateRule = (
       demand: 0,
       capacity: 0,
       effectiveCapacity: 0,
-      message: rule.consumerSpec.isVariable
-        ? `This design hasn't answered "${rule.consumerSpec.label}" — rule does not apply until it does.`
-        : `Nothing in the selection carries "${rule.consumerSpec.label}" — rule does not apply.`,
+      message: `Nothing in the selection carries "${rule.consumerSpec.label}" — rule does not apply.`,
     };
   }
 
   const violationStatus: RuleStatus = rule.severity === "warn" ? "warn" : "fail";
 
   // Demand per kind: what the consumers collectively (or individually) ask of
-  // the provider capacity. A variable is the design's single answer, so it is
-  // read as-is — counting it would just count the one variable.
-  const demand = rule.consumerSpec.isVariable
-    ? round2(consumers[0].totalValue)
-    : rule.kind === "count_limit"
+  // the provider capacity.
+  const demand =
+    rule.kind === "count_limit"
       ? consumers.reduce((sum, consumer) => sum + consumer.quantity, 0)
       : round2(
           consumers.reduce((sum, consumer) => sum + consumer.totalValue, 0),
@@ -894,11 +848,8 @@ export const evaluateRules = (
   rules: EngineRule[],
   selection: EngineItem[],
   catalog: EngineCatalogProduct[],
-  variables: VariableContext = {},
 ): CompatibilityReport => {
-  const results = rules.map((rule) =>
-    evaluateRule(rule, selection, catalog, variables),
-  );
+  const results = rules.map((rule) => evaluateRule(rule, selection, catalog));
   return {
     results,
     passed: results.filter((result) => result.status === "pass").length,

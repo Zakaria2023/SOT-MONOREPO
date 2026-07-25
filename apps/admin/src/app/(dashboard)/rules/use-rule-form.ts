@@ -32,8 +32,6 @@ export const useRuleForm = (args: UseRuleFormArgs) => {
       kind: rule?.kind ?? "sum_budget",
       consumerSpecUuid: rule?.consumerSpecUuid ?? "",
       providerSpecUuid: rule?.providerSpecUuid ?? "",
-      consumerVariableUuid: rule?.consumerVariableUuid ?? "",
-      providerVariableUuid: rule?.providerVariableUuid ?? "",
       lookupInputs: rule?.lookup?.inputs ?? [],
       lookupRows: rule?.lookup?.rows ?? [],
       comparator: rule?.comparator ?? "lte",

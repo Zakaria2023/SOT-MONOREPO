@@ -15,12 +15,8 @@ export const ruleFormSchema = z
     // Derived from db/enum.ts so a new family can never be added in one place
     // and forgotten here.
     kind: z.enum(ruleKinds),
-    // Each side is a specification OR a project variable — the refinements
-    // below enforce exactly one, since the field alone can't express that.
-    consumerSpecUuid: z.string(),
+    consumerSpecUuid: z.string().min(1, "Pick the consumed specification"),
     providerSpecUuid: z.string(),
-    consumerVariableUuid: z.string(),
-    providerVariableUuid: z.string(),
     // "conditional" only.
     lookupInputs: z.array(z.string()),
     lookupRows: z.array(lookupRowSchema),
@@ -41,29 +37,17 @@ export const ruleFormSchema = z
     severity: z.enum(["block", "warn"]),
     enabled: z.boolean(),
   })
-  // Exactly one operand on the consumed side.
-  .refine(
-    (values) =>
-      [values.consumerSpecUuid, values.consumerVariableUuid].filter(Boolean)
-        .length === 1,
-    {
-      path: ["consumerSpecUuid"],
-      message: "Pick either a specification or a project variable — not both.",
-    },
-  )
-  // The capacity side is a lookup table on a conditional rule, so it takes no
-  // operand at all there; every other family needs exactly one.
+  // The capacity side is the lookup table on a conditional rule, so it takes
+  // no specification there; every other family needs one.
   .refine(
     (values) =>
       values.kind === "conditional"
-        ? [values.providerSpecUuid, values.providerVariableUuid].filter(Boolean)
-            .length === 0
-        : [values.providerSpecUuid, values.providerVariableUuid].filter(Boolean)
-            .length === 1,
+        ? !values.providerSpecUuid
+        : Boolean(values.providerSpecUuid),
     {
       path: ["providerSpecUuid"],
       message:
-        "A conditional rule reads its limit from the lookup table — leave the capacity side empty. Every other type needs exactly one.",
+        "A conditional rule reads its limit from the lookup table — leave the capacity side empty. Every other type needs one.",
     },
   )
   // A conditional rule with no rows has no limit to read.

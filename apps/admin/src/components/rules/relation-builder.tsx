@@ -21,7 +21,6 @@ import type { ReactNode } from "react";
 import { useWatch } from "react-hook-form";
 import type {
   CompatibilityRuleListItem,
-  ProjectVariableListItem,
   SpecificationWithCategories,
 } from "services";
 import { Button, Checkbox, Dropdown, FormError, Input, Textarea } from "ui";
@@ -30,12 +29,10 @@ type RelationBuilderProps =
   | {
       mode: "add";
       specifications: SpecificationWithCategories[];
-      variables: ProjectVariableListItem[];
     }
   | {
       mode: "edit";
       specifications: SpecificationWithCategories[];
-      variables: ProjectVariableListItem[];
       rule: CompatibilityRuleListItem;
     };
 
@@ -99,19 +96,6 @@ const FAMILIES: Record<RuleKind, FamilyMeta> = {
   },
 };
 
-const SPEC_PREFIX = "spec:";
-const VARIABLE_PREFIX = "var:";
-
-const operandValue = (specUuid: string, variableUuid: string): string => {
-  if (specUuid) {
-    return `${SPEC_PREFIX}${specUuid}`;
-  }
-  if (variableUuid) {
-    return `${VARIABLE_PREFIX}${variableUuid}`;
-  }
-  return "";
-};
-
 const Chip = ({ active, onClick, children }: ChipProps) => (
   <button
     type="button"
@@ -158,7 +142,7 @@ const FamilyCard = ({ kind, active, onClick }: FamilyCardProps) => {
 };
 
 export const RelationBuilder = (props: RelationBuilderProps) => {
-  const { mode, specifications, variables } = props;
+  const { mode, specifications } = props;
 
   const { form, state, isPending, onSubmit } = useRuleForm(
     mode === "edit" ? { mode: "edit", rule: props.rule } : { mode: "add" },
@@ -182,41 +166,12 @@ export const RelationBuilder = (props: RelationBuilderProps) => {
   const conditionValue = useWatch({ control, name: "conditionValue" });
   const consumerSpecUuid = useWatch({ control, name: "consumerSpecUuid" });
   const providerSpecUuid = useWatch({ control, name: "providerSpecUuid" });
-  const consumerVariableUuid = useWatch({
-    control,
-    name: "consumerVariableUuid",
-  });
-  const providerVariableUuid = useWatch({
-    control,
-    name: "providerVariableUuid",
-  });
   const lookupRows = useWatch({ control, name: "lookupRows" }) ?? [];
   const lookupInputs = useWatch({ control, name: "lookupInputs" }) ?? [];
 
   const isRatio = kind === "ratio";
   const isSpecMatch = kind === "spec_match";
   const isConditional = kind === "conditional";
-
-  // Writing one side clears the other operand field, so a relation can never
-  // end up bound to a spec and a variable at once.
-  const setOperand = (side: "consumer" | "provider", value: string) => {
-    const specField =
-      side === "consumer" ? "consumerSpecUuid" : "providerSpecUuid";
-    const variableField =
-      side === "consumer" ? "consumerVariableUuid" : "providerVariableUuid";
-    setValue(
-      specField,
-      value.startsWith(SPEC_PREFIX) ? value.slice(SPEC_PREFIX.length) : "",
-      { shouldDirty: true },
-    );
-    setValue(
-      variableField,
-      value.startsWith(VARIABLE_PREFIX)
-        ? value.slice(VARIABLE_PREFIX.length)
-        : "",
-      { shouldDirty: true },
-    );
-  };
 
   // Per-device distribution only applies to aggregating rules with "fit
   // within" — not per-item, ratio, match or conditional.
@@ -281,32 +236,17 @@ export const RelationBuilder = (props: RelationBuilderProps) => {
       specification.categoryNames.length > 0
         ? ` — ${specification.categoryNames.join(", ")}`
         : "";
-    return {
-      value: `${SPEC_PREFIX}${specification.uuid}`,
-      label: `${name}${categories}`,
-    };
+    return { value: specification.uuid, label: `${name}${categories}` };
   };
 
-  const specOptions = (
+  // Match binds dropdown specs; every other family binds numeric specs.
+  const operandOptions = (
     isSpecMatch
       ? specifications.filter(
           (specification) => specification.valueType === "select",
         )
       : numericSpecs
   ).map(specOption);
-
-  // Project variables are numeric answers to a design question, so they stand
-  // in only where a number is expected — never on a Match relation.
-  const variableOptions = isSpecMatch
-    ? []
-    : variables.map((variable) => ({
-        value: `${VARIABLE_PREFIX}${variable.uuid}`,
-        label: variable.unit
-          ? `${variable.label} (${variable.unit}) — project variable`
-          : `${variable.label} — project variable`,
-      }));
-
-  const operandOptions = [...specOptions, ...variableOptions];
 
   const lookupInputOptions = selectSpecs.map((specification) => ({
     value: specification.key,
@@ -322,26 +262,20 @@ export const RelationBuilder = (props: RelationBuilderProps) => {
 
   // Unit/label of whichever operand each side currently holds — drives both
   // the badges in the sentence and the mismatch warning.
-  const consumerUnit = consumerSpecUuid
-    ? numericSpecs.find(
-        (specification) => specification.uuid === consumerSpecUuid,
-      )?.unit
-    : variables.find((variable) => variable.uuid === consumerVariableUuid)
-        ?.unit;
-  const providerUnit = providerSpecUuid
-    ? numericSpecs.find(
-        (specification) => specification.uuid === providerSpecUuid,
-      )?.unit
-    : variables.find((variable) => variable.uuid === providerVariableUuid)
-        ?.unit;
+  const consumerUnit = numericSpecs.find(
+    (specification) => specification.uuid === consumerSpecUuid,
+  )?.unit;
+  const providerUnit = numericSpecs.find(
+    (specification) => specification.uuid === providerSpecUuid,
+  )?.unit;
 
   const unitsMismatch =
     !isRatio &&
     !isSpecMatch &&
     !isConditional &&
     kind !== "count_limit" &&
-    Boolean(consumerSpecUuid || consumerVariableUuid) &&
-    Boolean(providerSpecUuid || providerVariableUuid) &&
+    Boolean(consumerSpecUuid) &&
+    Boolean(providerSpecUuid) &&
     consumerUnit !== providerUnit;
 
   const pickedSpecsOrdered = [consumerSpecUuid, providerSpecUuid].some((uuid) =>
@@ -376,18 +310,12 @@ export const RelationBuilder = (props: RelationBuilderProps) => {
     family: kind,
     gate: severity === "block" ? "hard" : "soft",
     operands: {
-      demand: consumerSpecUuid
-        ? { type: "spec", id: consumerSpecUuid }
-        : consumerVariableUuid
-          ? { type: "variable", id: consumerVariableUuid }
-          : null,
+      demand: consumerSpecUuid ? { type: "spec", id: consumerSpecUuid } : null,
       supply: isConditional
         ? { type: "lookup" }
         : providerSpecUuid
           ? { type: "spec", id: providerSpecUuid }
-          : providerVariableUuid
-            ? { type: "variable", id: providerVariableUuid }
-            : null,
+          : null,
     },
     operator: isRatio ? "ratio" : comparator,
     ...(showHeadroom ? { headroom: headroomPercent } : {}),
@@ -478,12 +406,14 @@ export const RelationBuilder = (props: RelationBuilderProps) => {
           </span>
           <Dropdown
             searchable
-            value={operandValue(consumerSpecUuid, consumerVariableUuid)}
-            onChange={(value) => setOperand("consumer", value)}
+            value={consumerSpecUuid}
+            onChange={(value) =>
+              setValue("consumerSpecUuid", value, { shouldDirty: true })
+            }
             placeholder={
               isSpecMatch ? "e.g. Speaker Impedance" : "e.g. Power Consumption"
             }
-            searchPlaceholder="Search attributes and variables…"
+            searchPlaceholder="Search attributes…"
             options={operandOptions}
           />
           <FormError message={errors.consumerSpecUuid?.message} />
@@ -557,12 +487,14 @@ export const RelationBuilder = (props: RelationBuilderProps) => {
           ) : (
             <Dropdown
               searchable
-              value={operandValue(providerSpecUuid, providerVariableUuid)}
-              onChange={(value) => setOperand("provider", value)}
+              value={providerSpecUuid}
+              onChange={(value) =>
+                setValue("providerSpecUuid", value, { shouldDirty: true })
+              }
               placeholder={
                 isSpecMatch ? "e.g. Supported Impedance" : "e.g. PoE Budget"
               }
-              searchPlaceholder="Search attributes and variables…"
+              searchPlaceholder="Search attributes…"
               options={operandOptions}
             />
           )}

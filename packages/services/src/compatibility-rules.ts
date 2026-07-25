@@ -8,10 +8,6 @@ import {
   SelectCompatibilityRules,
 } from "../../../db/schema/compatibility-rules";
 import {
-  ProjectVariables,
-  SelectProjectVariables,
-} from "../../../db/schema/project-variables";
-import {
   SelectSpecifications,
   Specifications,
 } from "../../../db/schema/specifications";
@@ -23,23 +19,17 @@ export type CompatibilityRuleFields = Omit<
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
 
-// A rule enriched with the label/unit of whatever each side binds — a spec or
-// a project variable. Both are null on a side a conditional rule leaves empty.
+// A rule enriched with the bound specs' labels/units. Both are null on a side
+// a conditional rule leaves empty — its capacity is the lookup table.
 export type CompatibilityRuleListItem = SelectCompatibilityRules & {
   consumerSpecLabel: SelectSpecifications["label"] | null;
   consumerSpecUnit: SelectSpecifications["unit"] | null;
   providerSpecLabel: SelectSpecifications["label"] | null;
   providerSpecUnit: SelectSpecifications["unit"] | null;
-  consumerVariableLabel: SelectProjectVariables["label"] | null;
-  consumerVariableUnit: SelectProjectVariables["unit"] | null;
-  providerVariableLabel: SelectProjectVariables["label"] | null;
-  providerVariableUnit: SelectProjectVariables["unit"] | null;
 };
 
 const consumerSpec = alias(Specifications, "ConsumerSpec");
 const providerSpec = alias(Specifications, "ProviderSpec");
-const consumerVariable = alias(ProjectVariables, "ConsumerVariable");
-const providerVariable = alias(ProjectVariables, "ProviderVariable");
 
 const listSelection = {
   rule: CompatibilityRules,
@@ -47,10 +37,6 @@ const listSelection = {
   consumerSpecUnit: consumerSpec.unit,
   providerSpecLabel: providerSpec.label,
   providerSpecUnit: providerSpec.unit,
-  consumerVariableLabel: consumerVariable.label,
-  consumerVariableUnit: consumerVariable.unit,
-  providerVariableLabel: providerVariable.label,
-  providerVariableUnit: providerVariable.unit,
 };
 
 type ListRow = {
@@ -59,10 +45,6 @@ type ListRow = {
   consumerSpecUnit: string | null;
   providerSpecLabel: string | null;
   providerSpecUnit: string | null;
-  consumerVariableLabel: string | null;
-  consumerVariableUnit: string | null;
-  providerVariableLabel: string | null;
-  providerVariableUnit: string | null;
 };
 
 const toListItem = (row: ListRow): CompatibilityRuleListItem => ({
@@ -71,10 +53,6 @@ const toListItem = (row: ListRow): CompatibilityRuleListItem => ({
   consumerSpecUnit: row.consumerSpecUnit,
   providerSpecLabel: row.providerSpecLabel,
   providerSpecUnit: row.providerSpecUnit,
-  consumerVariableLabel: row.consumerVariableLabel,
-  consumerVariableUnit: row.consumerVariableUnit,
-  providerVariableLabel: row.providerVariableLabel,
-  providerVariableUnit: row.providerVariableUnit,
 });
 
 export type CompatibilityRulesListParams = {
@@ -113,14 +91,6 @@ export const getCompatibilityRules = async (
           providerSpec,
           eq(CompatibilityRules.providerSpecUuid, providerSpec.uuid),
         )
-        .leftJoin(
-          consumerVariable,
-          eq(CompatibilityRules.consumerVariableUuid, consumerVariable.uuid),
-        )
-        .leftJoin(
-          providerVariable,
-          eq(CompatibilityRules.providerVariableUuid, providerVariable.uuid),
-        )
         .where(where)
         .orderBy(desc(CompatibilityRules.createdAt))
         .limit(params.limit)
@@ -135,14 +105,6 @@ export const getCompatibilityRules = async (
         .leftJoin(
           providerSpec,
           eq(CompatibilityRules.providerSpecUuid, providerSpec.uuid),
-        )
-        .leftJoin(
-          consumerVariable,
-          eq(CompatibilityRules.consumerVariableUuid, consumerVariable.uuid),
-        )
-        .leftJoin(
-          providerVariable,
-          eq(CompatibilityRules.providerVariableUuid, providerVariable.uuid),
         )
         .where(where),
     ]);
@@ -168,14 +130,6 @@ export const getCompatibilityRule = async (
       .leftJoin(
         providerSpec,
         eq(CompatibilityRules.providerSpecUuid, providerSpec.uuid),
-      )
-      .leftJoin(
-        consumerVariable,
-        eq(CompatibilityRules.consumerVariableUuid, consumerVariable.uuid),
-      )
-      .leftJoin(
-        providerVariable,
-        eq(CompatibilityRules.providerVariableUuid, providerVariable.uuid),
       )
       .where(eq(CompatibilityRules.uuid, uuid));
 
@@ -237,38 +191,12 @@ const assertUnitsMatch = async (
           .where(inArray(Specifications.uuid, specUuids))
       : [];
 
-  // A variable operand carries its own unit and must agree with the spec on
-  // the other side just as two specs must — expected concurrent calls (calls)
-  // against a PBX's max concurrent calls (calls).
-  const variableUuids = [
-    fields.consumerVariableUuid,
-    fields.providerVariableUuid,
-  ].filter((uuid): uuid is string => Boolean(uuid));
-
-  const variableRows =
-    variableUuids.length > 0
-      ? await db
-          .select({ uuid: ProjectVariables.uuid, unit: ProjectVariables.unit })
-          .from(ProjectVariables)
-          .where(inArray(ProjectVariables.uuid, variableUuids))
-      : [];
-
-  const unitOf = (
-    specUuid: string | null | undefined,
-    variableUuid: string | null | undefined,
-  ): string | null | undefined =>
-    specUuid
-      ? specRows.find((row) => row.uuid === specUuid)?.unit
-      : variableRows.find((row) => row.uuid === variableUuid)?.unit;
-
-  const consumerUnit = unitOf(
-    fields.consumerSpecUuid,
-    fields.consumerVariableUuid,
-  );
-  const providerUnit = unitOf(
-    fields.providerSpecUuid,
-    fields.providerVariableUuid,
-  );
+  const consumerUnit = specRows.find(
+    (row) => row.uuid === fields.consumerSpecUuid,
+  )?.unit;
+  const providerUnit = specRows.find(
+    (row) => row.uuid === fields.providerSpecUuid,
+  )?.unit;
 
   if (consumerUnit !== providerUnit) {
     throw new Error(
@@ -277,37 +205,20 @@ const assertUnitsMatch = async (
   }
 };
 
-// Each side of a rule is exactly one operand. Two would be ambiguous, none
-// leaves the evaluator nothing to read — except on a conditional rule, whose
-// capacity is its lookup table rather than anything on the provider side.
+// Each side of a rule binds a specification. The capacity side is the only
+// one a family may leave empty — a conditional rule reads its limit from its
+// lookup table instead.
 const assertOperandsValid = (fields: CompatibilityRuleFields): void => {
-  const sides = [
-    {
-      name: "consumed",
-      spec: fields.consumerSpecUuid,
-      variable: fields.consumerVariableUuid,
-      required: true,
-    },
-    {
-      name: "capacity",
-      spec: fields.providerSpecUuid,
-      variable: fields.providerVariableUuid,
-      required: fields.kind !== "conditional",
-    },
-  ];
-
-  for (const side of sides) {
-    const count = [side.spec, side.variable].filter(Boolean).length;
-    if (count > 1) {
-      throw new Error(
-        `The ${side.name} side must be either a specification or a project variable, not both.`,
-      );
-    }
-    if (count === 0 && side.required) {
-      throw new Error(
-        `Pick a specification or a project variable for the ${side.name} side.`,
-      );
-    }
+  if (!fields.consumerSpecUuid) {
+    throw new Error("Pick the consumed specification.");
+  }
+  if (fields.kind !== "conditional" && !fields.providerSpecUuid) {
+    throw new Error("Pick the capacity specification.");
+  }
+  if (fields.kind === "conditional" && fields.providerSpecUuid) {
+    throw new Error(
+      "A conditional rule reads its limit from the lookup table — leave the capacity side empty.",
+    );
   }
 
   if (fields.kind !== "conditional") {

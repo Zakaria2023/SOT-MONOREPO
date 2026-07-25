@@ -1,10 +1,6 @@
 import { RelationBuilder } from "@/components/rules/relation-builder";
 import { notFound } from "next/navigation";
-import {
-  getCompatibilityRule,
-  getProjectVariables,
-  getSpecifications,
-} from "services";
+import { getCompatibilityRule, getSpecifications } from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;
@@ -13,10 +9,9 @@ type Props = {
 const EditRulePage = async ({ params }: Props) => {
   const { uuid } = await params;
 
-  const [rule, specifications, variables] = await Promise.all([
+  const [rule, specifications] = await Promise.all([
     getCompatibilityRule(uuid),
     getSpecifications(),
-    getProjectVariables(),
   ]);
 
   if (!rule) {
@@ -28,7 +23,6 @@ const EditRulePage = async ({ params }: Props) => {
       mode="edit"
       rule={rule}
       specifications={specifications}
-      variables={variables}
     />
   );
 };
