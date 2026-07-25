@@ -1,4 +1,4 @@
-import { RuleForm } from "@/components/rules/rule-form";
+import { RelationBuilder } from "@/components/rules/relation-builder";
 import { getProjectVariables, getSpecifications } from "services";
 
 const NewRulePage = async () => {
@@ -8,7 +8,7 @@ const NewRulePage = async () => {
   ]);
 
   return (
-    <RuleForm
+    <RelationBuilder
       mode="add"
       specifications={specifications}
       variables={variables}
