@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
-import type { AssignmentAudience } from "../../../db/enum";
+
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
 import {
@@ -21,6 +21,7 @@ import {
   type AssignmentRow,
   type AssignmentSwitches,
   type ResolvedAssignment,
+  type Viewer,
   facetAssignments,
   resolveAssignments,
 } from "./assignment-resolver";
@@ -169,7 +170,7 @@ export const getCategoryAssignments = async (
  */
 export const getCategoryFacets = async (
   categoryUuid: string,
-  viewer: AssignmentAudience = "all",
+  viewer: Viewer = "user",
 ): Promise<CategoryFacet[]> => {
   try {
     const resolved = await getCategoryAssignments(categoryUuid);

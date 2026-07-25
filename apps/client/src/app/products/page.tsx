@@ -83,7 +83,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
   const facets: CategoryFacet[] = selectedCategory
     ? await getCategoryFacets(
         selectedCategory,
-        viewerPricing.isPartner ? "partner" : "all",
+        // A signed-in partner is a different shopper from a regular user, not
+        // a wider one — each sees "everyone" plus their own side.
+        viewerPricing.isPartner ? "partner" : "user",
       )
     : [];
 

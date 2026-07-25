@@ -57,7 +57,7 @@ export const Specifications = mysqlTable("Specifications", {
   // attribute partner-only here cannot be undone by a category exposing it
   // publicly by mistake.
   audience: mysqlEnum("audience", assignmentAudiences)
-    .default("all")
+    .default("everyone")
     .notNull(),
 
   // Whether `options` is an ORDERED scale (802.3af < at < bt; 1G < 10G;

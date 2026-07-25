@@ -137,7 +137,7 @@ const AttributeForm = ({
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [audience, setAudience] = useState<AssignmentAudience>(
-    initial?.audience ?? "all",
+    initial?.audience ?? "everyone",
   );
   const [optionsText, setOptionsText] = useState(
     (initial?.options ?? []).join("\n"),
@@ -228,9 +228,9 @@ const AttributeForm = ({
       <div>
         <label className="text-xs font-semibold text-ink">Who is it for</label>
         <p className="mt-0.5 text-xs text-faint">
-          Set once, here. An installer certification is a partner concern
-          wherever it is used — a category can restrict this further, but never
-          widen it.
+          Set once, here. Users and partner users are separate audiences —
+          &ldquo;Everyone&rdquo; means both. An installer certification is a
+          partner concern wherever it is used, so a category cannot override it.
         </p>
         <div className="mt-1">
           <Dropdown
@@ -759,9 +759,9 @@ export const LibraryBuilder = ({
                             ordered
                           </span>
                         )}
-                        {attribute.audience !== "all" && (
+                        {attribute.audience !== "everyone" && (
                           <span
-                            title={`Only ${ASSIGNMENT_AUDIENCE_LABELS[attribute.audience]} see this — a category can narrow it further, never widen it`}
+                            title={`${ASSIGNMENT_AUDIENCE_LABELS[attribute.audience]} — a category cannot change this`}
                             className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
                           >
                             <ShieldCheck size={10} />

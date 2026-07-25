@@ -5,6 +5,7 @@ import type { DraftRow } from "@/components/assignments/assignment-workspace";
 import { RelationSection } from "@/components/assignments/relation-section";
 import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
+import { ASSIGNMENT_AUDIENCE_LABELS } from "@/db/label";
 import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { Dropdown } from "ui";
@@ -42,13 +43,6 @@ type SwitchProps = {
   disabled?: boolean;
   title?: string;
   children: ReactNode;
-};
-
-// Widest to narrowest — used to stop a category widening what the library set.
-const AUDIENCE_RANK: Record<AssignmentAudience, number> = {
-  all: 0,
-  partner: 1,
-  staff: 2,
 };
 
 const Switch = ({ active, onClick, disabled, title, children }: SwitchProps) => (
@@ -192,35 +186,31 @@ const AssignmentCard = ({
       {/* Audience. The library already fixed who the attribute is FOR; this
           can only narrow it, so anything wider is shown as unavailable. */}
       <div className="flex flex-wrap items-center gap-2">
-        {(["all", "partner", "staff"] as AssignmentAudience[]).map(
+        {(["everyone", "user", "partner"] as AssignmentAudience[]).map(
           (audience) => {
-            const widerThanDefinition =
-              AUDIENCE_RANK[audience] < AUDIENCE_RANK[row.definitionAudience];
+            // Once the library has picked a side, a category cannot move it.
+            const lockedByDefinition =
+              row.definitionAudience !== "everyone" &&
+              audience !== row.definitionAudience;
             return (
               <Switch
                 key={audience}
-                active={row.audience === audience && !widerThanDefinition}
-                disabled={widerThanDefinition}
+                active={row.effectiveAudience === audience}
+                disabled={lockedByDefinition}
                 title={
-                  widerThanDefinition
-                    ? `This attribute is ${row.definitionAudience}-only in the library — a category cannot widen that`
+                  lockedByDefinition
+                    ? `The library marks this attribute ${ASSIGNMENT_AUDIENCE_LABELS[row.definitionAudience]} — a category cannot change that`
                     : undefined
                 }
                 onClick={() => onChange(row.specificationUuid, { audience })}
               >
-                {audience === "all"
-                  ? "All"
-                  : audience === "partner"
-                    ? "Partner"
-                    : "Staff"}
+                {ASSIGNMENT_AUDIENCE_LABELS[audience]}
               </Switch>
             );
           },
         )}
-        {row.definitionAudience !== "all" && (
-          <span className="text-sm text-faint">
-            {row.definitionAudience}-only in the library
-          </span>
+        {row.definitionAudience !== "everyone" && (
+          <span className="text-sm text-faint">set in the library</span>
         )}
       </div>
 
