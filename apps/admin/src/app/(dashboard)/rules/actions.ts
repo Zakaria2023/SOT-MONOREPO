@@ -10,8 +10,10 @@ import {
   checkCompatibility,
   createCompatibilityRule,
   deleteCompatibilityRule,
+  installRuleBlueprint,
   updateCompatibilityRule,
 } from "services";
+import type { LookupRow } from "@/db/types";
 import type { CompatibilityReport, SelectionInput } from "services";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -20,8 +22,14 @@ export type RuleActionInput = {
   name: string;
   description: string;
   kind: RuleKind;
+  // Each side is a spec OR a variable — the empty string means "not this one".
   consumerSpecUuid: string;
   providerSpecUuid: string;
+  consumerVariableUuid: string;
+  providerVariableUuid: string;
+  // "conditional" only: the lookup the limit is read from.
+  lookupInputs: string[];
+  lookupRows: LookupRow[];
   comparator: RuleComparator;
   allocation: RuleAllocation;
   headroomPercent: number;
@@ -47,8 +55,16 @@ const toFields = (input: RuleActionInput) => ({
   name: input.name,
   description: input.description.trim() || null,
   kind: input.kind,
-  consumerSpecUuid: input.consumerSpecUuid,
-  providerSpecUuid: input.providerSpecUuid,
+  // An unset operand is null in the row, not an empty string — the column is
+  // a foreign key.
+  consumerSpecUuid: input.consumerSpecUuid || null,
+  providerSpecUuid: input.providerSpecUuid || null,
+  consumerVariableUuid: input.consumerVariableUuid || null,
+  providerVariableUuid: input.providerVariableUuid || null,
+  lookup:
+    input.kind === "conditional"
+      ? { inputs: input.lookupInputs, rows: input.lookupRows }
+      : null,
   comparator: input.comparator,
   allocation: input.allocation,
   headroomPercent: input.headroomPercent,
@@ -110,15 +126,32 @@ export const deleteRuleAction = async (
 
 export const checkCompatibilityAction = async (
   selection: SelectionInput[],
+  // The playground's answers to the project variables, keyed by variable key.
+  variableValues: Record<string, string> = {},
 ): Promise<CheckCompatibilityResult> => {
   try {
-    return { report: await checkCompatibility(selection) };
+    return { report: await checkCompatibility(selection, variableValues) };
   } catch (error) {
     return {
       error:
         error instanceof Error
           ? error.message
           : "Failed to check compatibility",
+    };
+  }
+};
+
+export const installBlueprintAction = async (
+  id: string,
+): Promise<RuleActionResult> => {
+  try {
+    await installRuleBlueprint(id);
+    revalidatePath("/rules");
+    return { success: true };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to install the rule",
     };
   }
 };

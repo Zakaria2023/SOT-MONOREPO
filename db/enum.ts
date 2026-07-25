@@ -142,12 +142,18 @@ export type AssignmentAudience = (typeof assignmentAudiences)[number];
 // - spec_match: per-item compatibility on SELECT specs — the consumer's chosen
 //   value(s) must fit the provider's (equal / member-of / overlap), e.g.
 //   speaker impedance ∈ amp supported impedances, codec sets intersect.
+// - conditional: the limit is looked up from a table keyed by the item's OWN
+//   other spec values, then its measured value is compared against that limit
+//   — e.g. max cable run length depends on cable grade × link speed, so Cat6
+//   at 10G allows 55 m while Cat6a at 10G allows 100 m. There is no provider
+//   product on the other side; the table IS the capacity.
 export const ruleKinds = [
   "sum_budget",
   "count_limit",
   "per_item_threshold",
   "ratio",
   "spec_match",
+  "conditional",
 ] as const satisfies readonly string[];
 
 export type RuleKind = (typeof ruleKinds)[number];

@@ -2,6 +2,7 @@ import { parseSpecRange, parseSpecValues } from "utils";
 import type { SelectCompatibilityRules } from "../../../db/schema/compatibility-rules";
 import type { SelectProducts } from "../../../db/schema/products";
 import type { SelectSpecifications } from "../../../db/schema/specifications";
+import type { LookupTable } from "../../../db/types";
 
 // ---------------------------------------------------------------------------
 // The generic compatibility evaluator. It knows nothing about PoE, cameras,
@@ -36,7 +37,17 @@ export type EngineSpec = {
   ordered?: SelectSpecifications["ordered"];
   // The master option values in scale order. Empty/absent for a numeric spec.
   scale?: string[];
+  // True when this side of the rule is a PROJECT VARIABLE rather than a
+  // product spec — a number the design answers (expected concurrent calls)
+  // instead of one a product carries. It resolves from the variables context
+  // rather than from any item's attributes, and contributes once, not per
+  // item, because a project answers the question once.
+  isVariable?: boolean;
 };
+
+// The design's answers to the project variables, keyed by variable key. Rules
+// with a variable operand read their number from here.
+export type VariableContext = Record<string, number>;
 
 // A rule with both specs resolved — the pure evaluator's input shape.
 export type EngineRule = {
@@ -53,6 +64,10 @@ export type EngineRule = {
   severity: SelectCompatibilityRules["severity"];
   consumerSpec: EngineSpec;
   providerSpec: EngineSpec;
+  // "conditional" only: the table the limit is read from. The capacity side of
+  // a conditional rule is this table, not a provider product, so providerSpec
+  // carries only a label/unit for reporting.
+  lookup?: LookupTable | null;
 };
 
 export type EngineItem = {
@@ -415,48 +430,218 @@ const evaluateSpecMatch = (
   };
 };
 
+// The first lookup row every one of whose `when` entries matches the item's
+// own spec values, or null when the table has no row for this combination.
+// Rows are tried in author order, so a more specific row can be listed above a
+// catch-all.
+const matchLookupRow = (
+  lookup: LookupTable,
+  attributes: EngineItem["attributes"],
+) =>
+  lookup.rows.find((row) =>
+    Object.entries(row.when).every(([key, wanted]) =>
+      parseSpecValues(attributes[key]).includes(wanted),
+    ),
+  ) ?? null;
+
+// The Conditional family. The limit is not supplied by another product — it is
+// read from the rule's own table, keyed by the item's other spec values. Max
+// cable run is the canonical case: Cat6 at 10G runs 55 m, Cat6a at 10G runs
+// 100 m, so the same measured length passes or fails depending on the grade
+// and speed of the very same item.
+const evaluateConditional = (
+  rule: EngineRule,
+  selection: EngineItem[],
+): RuleEvaluation => {
+  const participant = (item: EngineItem, unitValue: number): RuleParticipant => ({
+    productUuid: item.productUuid,
+    name: item.name,
+    quantity: item.quantity,
+    unitValue,
+    totalValue: round2(unitValue * item.quantity),
+  });
+
+  const base = {
+    ruleUuid: rule.uuid,
+    name: rule.name,
+    description: rule.description,
+    kind: rule.kind,
+    severity: rule.severity,
+    comparator: rule.comparator,
+    headroomPercent: rule.headroomPercent,
+    consumerLabel: rule.consumerSpec.label,
+    providerLabel: rule.providerSpec.label,
+    unit: rule.consumerSpec.unit,
+    demand: 0,
+    capacity: 0,
+    effectiveCapacity: 0,
+    consumers: [] as RuleParticipant[],
+    providers: [] as RuleParticipant[],
+    failingItems: [] as RuleParticipant[],
+    suggestions: [] as RuleSuggestion[],
+    bins: [] as ProviderBin[],
+  };
+
+  const lookup = rule.lookup;
+  if (!lookup || lookup.rows.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `"${rule.name}" has no lookup table to read a limit from.`,
+    };
+  }
+
+  // Only items that carry the measured spec AND match a row participate. An
+  // item with no matching row is outside what the table describes, which is a
+  // gap in the table rather than a failure by the item.
+  const judged = selection.flatMap((item) => {
+    const unitValue = numericValue(item.attributes, rule.consumerSpec.key, "max");
+    if (unitValue === null || !matchesCondition(item, rule.condition)) {
+      return [];
+    }
+    const row = matchLookupRow(lookup, item.attributes);
+    if (!row) {
+      return [];
+    }
+    return [{ item, unitValue, limit: row.limit, when: row.when }];
+  });
+
+  if (judged.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `Nothing in the selection carries "${rule.consumerSpec.label}" with a combination this table covers — rule does not apply.`,
+    };
+  }
+
+  const describe = (when: Record<string, string>): string =>
+    Object.values(when).join(" · ");
+
+  const failing = judged.filter(
+    ({ unitValue, limit }) =>
+      !compare(
+        unitValue,
+        round2((limit * rule.headroomPercent) / 100),
+        rule.comparator,
+      ),
+  );
+
+  const consumers = judged.map(({ item, unitValue }) =>
+    participant(item, unitValue),
+  );
+  const worst = Math.max(...judged.map(({ unitValue }) => unitValue));
+  const tightest = Math.min(...judged.map(({ limit }) => limit));
+  const violationStatus: RuleStatus = rule.severity === "warn" ? "warn" : "fail";
+
+  if (failing.length === 0) {
+    return {
+      ...base,
+      status: "pass",
+      consumers,
+      demand: worst,
+      capacity: tightest,
+      effectiveCapacity: round2((tightest * rule.headroomPercent) / 100),
+      message: `Every item's "${rule.consumerSpec.label}" is within the limit its own configuration allows (tightest: ${formatValue(tightest, rule.consumerSpec.unit)}).`,
+    };
+  }
+
+  return {
+    ...base,
+    status: violationStatus,
+    consumers,
+    demand: worst,
+    capacity: tightest,
+    effectiveCapacity: round2((tightest * rule.headroomPercent) / 100),
+    failingItems: failing.map(({ item, unitValue }) =>
+      participant(item, unitValue),
+    ),
+    message: `${failing.length} item(s) exceed the limit their configuration allows: ${failing
+      .map(
+        ({ item, unitValue, limit, when }) =>
+          `${item.name} (${describe(when)} allows ${formatValue(limit, rule.consumerSpec.unit)}, has ${formatValue(unitValue, rule.consumerSpec.unit)})`,
+      )
+      .join(", ")}.`,
+  };
+};
+
 /** Evaluate one rule against a selection — pure, no I/O. */
 export const evaluateRule = (
   rule: EngineRule,
   selection: EngineItem[],
   catalog: EngineCatalogProduct[],
+  variables: VariableContext = {},
 ): RuleEvaluation => {
   // The Match-on-select family has its own set-comparison path.
   if (rule.kind === "spec_match") {
     return evaluateSpecMatch(rule, selection);
   }
+  // The Conditional family reads its limit from a table, not from a provider.
+  if (rule.kind === "conditional") {
+    return evaluateConditional(rule, selection);
+  }
 
-  const consumers: RuleParticipant[] = selection.flatMap((item) => {
-    const unitValue = numericValue(item.attributes, rule.consumerSpec.key, "max");
-    if (unitValue === null || !matchesCondition(item, rule.condition)) {
+  // A project variable contributes one value for the whole design, not one per
+  // item — the answer to "how many concurrent calls" doesn't multiply by how
+  // many phones are in the cart.
+  const variableParticipant = (spec: EngineSpec): RuleParticipant[] => {
+    const value = variables[spec.key];
+    if (value === undefined || !Number.isFinite(value)) {
       return [];
     }
     return [
       {
-        productUuid: item.productUuid,
-        name: item.name,
-        quantity: item.quantity,
-        unitValue,
-        totalValue: round2(unitValue * item.quantity),
+        productUuid: "",
+        name: `${spec.label} (project variable)`,
+        quantity: 1,
+        unitValue: value,
+        totalValue: round2(value),
       },
     ];
-  });
+  };
 
-  const providers: RuleParticipant[] = selection.flatMap((item) => {
-    const unitValue = numericValue(item.attributes, rule.providerSpec.key, "min");
-    if (unitValue === null) {
-      return [];
-    }
-    return [
-      {
-        productUuid: item.productUuid,
-        name: item.name,
-        quantity: item.quantity,
-        unitValue,
-        totalValue: round2(unitValue * item.quantity),
-      },
-    ];
-  });
+  const consumers: RuleParticipant[] = rule.consumerSpec.isVariable
+    ? variableParticipant(rule.consumerSpec)
+    : selection.flatMap((item) => {
+        const unitValue = numericValue(
+          item.attributes,
+          rule.consumerSpec.key,
+          "max",
+        );
+        if (unitValue === null || !matchesCondition(item, rule.condition)) {
+          return [];
+        }
+        return [
+          {
+            productUuid: item.productUuid,
+            name: item.name,
+            quantity: item.quantity,
+            unitValue,
+            totalValue: round2(unitValue * item.quantity),
+          },
+        ];
+      });
+
+  const providers: RuleParticipant[] = rule.providerSpec.isVariable
+    ? variableParticipant(rule.providerSpec)
+    : selection.flatMap((item) => {
+        const unitValue = numericValue(
+          item.attributes,
+          rule.providerSpec.key,
+          "min",
+        );
+        if (unitValue === null) {
+          return [];
+        }
+        return [
+          {
+            productUuid: item.productUuid,
+            name: item.name,
+            quantity: item.quantity,
+            unitValue,
+            totalValue: round2(unitValue * item.quantity),
+          },
+        ];
+      });
 
   const base = {
     ruleUuid: rule.uuid,
@@ -483,16 +668,20 @@ export const evaluateRule = (
       demand: 0,
       capacity: 0,
       effectiveCapacity: 0,
-      message: `Nothing in the selection carries "${rule.consumerSpec.label}" — rule does not apply.`,
+      message: rule.consumerSpec.isVariable
+        ? `This design hasn't answered "${rule.consumerSpec.label}" — rule does not apply until it does.`
+        : `Nothing in the selection carries "${rule.consumerSpec.label}" — rule does not apply.`,
     };
   }
 
   const violationStatus: RuleStatus = rule.severity === "warn" ? "warn" : "fail";
 
   // Demand per kind: what the consumers collectively (or individually) ask of
-  // the provider capacity.
-  const demand =
-    rule.kind === "count_limit"
+  // the provider capacity. A variable is the design's single answer, so it is
+  // read as-is — counting it would just count the one variable.
+  const demand = rule.consumerSpec.isVariable
+    ? round2(consumers[0].totalValue)
+    : rule.kind === "count_limit"
       ? consumers.reduce((sum, consumer) => sum + consumer.quantity, 0)
       : round2(
           consumers.reduce((sum, consumer) => sum + consumer.totalValue, 0),
@@ -705,8 +894,11 @@ export const evaluateRules = (
   rules: EngineRule[],
   selection: EngineItem[],
   catalog: EngineCatalogProduct[],
+  variables: VariableContext = {},
 ): CompatibilityReport => {
-  const results = rules.map((rule) => evaluateRule(rule, selection, catalog));
+  const results = rules.map((rule) =>
+    evaluateRule(rule, selection, catalog, variables),
+  );
   return {
     results,
     passed: results.filter((result) => result.status === "pass").length,

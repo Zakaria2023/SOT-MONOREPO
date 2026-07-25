@@ -15,6 +15,7 @@ import {
   Percent,
   Search,
   Shapes,
+  SlidersHorizontal,
   Tags,
   Ticket,
 } from "lucide-react";
@@ -46,6 +47,11 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Shapes, label: "Classifications", href: "/classifications" },
       { icon: Library, label: "Spec Library", href: "/library" },
       { icon: GitCompare, label: "Compatibility Rules", href: "/rules" },
+      {
+        icon: SlidersHorizontal,
+        label: "Project Variables",
+        href: "/project-variables",
+      },
       { icon: Package, label: "Products", href: "/products" },
     ],
   },

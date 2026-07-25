@@ -22,6 +22,20 @@ const COMPARATOR_SYMBOLS: Record<RuleComparator, string> = {
 const specLabel = (label: string | null, unit: string | null): string =>
   label ? (unit ? `${label} (${unit})` : label) : "—";
 
+// A side of a rule is a spec, a project variable, or (on a conditional rule's
+// capacity side) the lookup table itself.
+const operandLabel = (
+  specLabelText: string | null,
+  specUnit: string | null,
+  variableLabelText: string | null,
+  variableUnit: string | null,
+): string =>
+  specLabelText
+    ? specLabel(specLabelText, specUnit)
+    : variableLabelText
+      ? `${specLabel(variableLabelText, variableUnit)} ⟨project⟩`
+      : "—";
+
 const columns: TableColumn<CompatibilityRuleListItem>[] = [
   {
     key: "name",
@@ -48,20 +62,55 @@ const columns: TableColumn<CompatibilityRuleListItem>[] = [
     key: "binding",
     header: "Checks",
     render: (rule) =>
-      rule.kind === "ratio" ? (
+      rule.kind === "conditional" ? (
         <span className="text-muted">
-          {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)} ÷{" "}
-          {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)} ≤{" "}
-          {rule.ratioLimit ? `${Number(rule.ratioLimit)}:1` : "—"}
+          {operandLabel(
+            rule.consumerSpecLabel,
+            rule.consumerSpecUnit,
+            rule.consumerVariableLabel,
+            rule.consumerVariableUnit,
+          )}{" "}
+          {COMPARATOR_SYMBOLS[rule.comparator]} limit from{" "}
+          {rule.lookup?.rows.length ?? 0} lookup row(s)
+          {rule.lookup && rule.lookup.inputs.length > 0
+            ? ` by ${rule.lookup.inputs.join(" × ")}`
+            : ""}
+        </span>
+      ) : rule.kind === "ratio" ? (
+        <span className="text-muted">
+          {operandLabel(
+            rule.consumerSpecLabel,
+            rule.consumerSpecUnit,
+            rule.consumerVariableLabel,
+            rule.consumerVariableUnit,
+          )}{" "}
+          ÷{" "}
+          {operandLabel(
+            rule.providerSpecLabel,
+            rule.providerSpecUnit,
+            rule.providerVariableLabel,
+            rule.providerVariableUnit,
+          )}{" "}
+          ≤ {rule.ratioLimit ? `${Number(rule.ratioLimit)}:1` : "—"}
         </span>
       ) : (
         <span className="text-muted">
-          {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)}{" "}
+          {operandLabel(
+            rule.consumerSpecLabel,
+            rule.consumerSpecUnit,
+            rule.consumerVariableLabel,
+            rule.consumerVariableUnit,
+          )}{" "}
           {COMPARATOR_SYMBOLS[rule.comparator]}{" "}
           {rule.kind !== "spec_match" && rule.headroomPercent < 100
             ? `${rule.headroomPercent}% of `
             : ""}
-          {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)}
+          {operandLabel(
+            rule.providerSpecLabel,
+            rule.providerSpecUnit,
+            rule.providerVariableLabel,
+            rule.providerVariableUnit,
+          )}
         </span>
       ),
   },

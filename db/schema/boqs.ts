@@ -4,6 +4,7 @@ import {
   decimal,
   index,
   int,
+  json,
   mysqlEnum,
   mysqlTable,
   timestamp,
@@ -33,6 +34,12 @@ export const Boqs = mysqlTable(
 
     assignedPreSellerId: varchar("assigned_pre_seller_id", { length: 64 }),
     assignedPreSellerName: varchar("assigned_pre_seller_name", { length: 255 }),
+
+    // This design's answers to the project variables (ProjectVariables.key →
+    // the entered number, as a string so it round-trips like every other spec
+    // value). A key with no answer falls back to the variable's default, so a
+    // rule reading it still has a number rather than quietly not applying.
+    variableValues: json("variable_values").$type<Record<string, string>>(),
 
     submittedAt: timestamp("submitted_at"),
 

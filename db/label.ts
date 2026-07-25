@@ -51,6 +51,7 @@ export const RULE_KIND_LABELS: Record<RuleKind, string> = {
   per_item_threshold: "Match — per-item threshold",
   ratio: "Ratio — demand ÷ supply",
   spec_match: "Match — spec compatibility",
+  conditional: "Conditional — limit from a lookup",
 };
 
 export const RULE_COMPARATOR_LABELS: Record<RuleComparator, string> = {

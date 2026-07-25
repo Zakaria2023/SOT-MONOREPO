@@ -4,12 +4,14 @@ import { useRuleForm } from "@/app/(dashboard)/rules/use-rule-form";
 import type { RuleKind } from "@/db/enum";
 import { ruleKinds } from "@/db/enum";
 import { RULE_KIND_LABELS } from "@/db/label";
+import { LookupEditor } from "@/components/rules/lookup-editor";
 import { GitCompare } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Controller, useWatch } from "react-hook-form";
 import type {
   CompatibilityRuleListItem,
+  ProjectVariableListItem,
   SpecificationWithCategories,
 } from "services";
 import { Button, Checkbox, Dropdown, FormError, Input, Textarea } from "ui";
@@ -18,10 +20,12 @@ type RuleFormProps =
   | {
       mode: "add";
       specifications: SpecificationWithCategories[];
+      variables: ProjectVariableListItem[];
     }
   | {
       mode: "edit";
       specifications: SpecificationWithCategories[];
+      variables: ProjectVariableListItem[];
       rule: CompatibilityRuleListItem;
     };
 
@@ -36,10 +40,27 @@ const KIND_HINTS: Record<RuleKind, string> = {
     "Divides total demand by total supply and checks it stays within a target contention ratio — e.g. access bandwidth ÷ uplink ≤ 20:1. A designed derating, usually a warning.",
   spec_match:
     "Checks each item's chosen dropdown value against the companion's — e.g. a speaker's impedance must be one the amplifier supports, or two codec sets must overlap. Uses dropdown (select) specs, not numbers. On an attribute marked as an ordered scale in the library, ≤ and ≥ compare position on that scale, so an 802.3af device fits an 802.3at switch.",
+  conditional:
+    "Reads the limit from a table keyed by the item's OWN other attributes, then checks the item against it — e.g. max cable run depends on grade × speed, so Cat6 at 10G allows 55 m while Cat6a at 10G allows 100 m. There is no capacity product on the other side: the table is the capacity.",
+};
+
+// A side of a rule is one operand — a spec or a project variable. The dropdown
+// carries both in one list, prefixed so the two form fields can be recovered.
+const SPEC_PREFIX = "spec:";
+const VARIABLE_PREFIX = "var:";
+
+const operandValue = (specUuid: string, variableUuid: string): string => {
+  if (specUuid) {
+    return `${SPEC_PREFIX}${specUuid}`;
+  }
+  if (variableUuid) {
+    return `${VARIABLE_PREFIX}${variableUuid}`;
+  }
+  return "";
 };
 
 export const RuleForm = (props: RuleFormProps) => {
-  const { mode, specifications } = props;
+  const { mode, specifications, variables } = props;
 
   const { form, state, isPending, onSubmit } = useRuleForm(
     mode === "edit" ? { mode: "edit", rule: props.rule } : { mode: "add" },
@@ -47,6 +68,7 @@ export const RuleForm = (props: RuleFormProps) => {
   const {
     register,
     control,
+    setValue,
     formState: { errors },
   } = form;
 
@@ -55,9 +77,36 @@ export const RuleForm = (props: RuleFormProps) => {
   const conditionSpecKey = useWatch({ control, name: "conditionSpecKey" });
   const consumerSpecUuid = useWatch({ control, name: "consumerSpecUuid" });
   const providerSpecUuid = useWatch({ control, name: "providerSpecUuid" });
+  const consumerVariableUuid = useWatch({
+    control,
+    name: "consumerVariableUuid",
+  });
+  const providerVariableUuid = useWatch({
+    control,
+    name: "providerVariableUuid",
+  });
+  const lookupRows = useWatch({ control, name: "lookupRows" }) ?? [];
+  const lookupInputs = useWatch({ control, name: "lookupInputs" }) ?? [];
 
   const isRatio = kind === "ratio";
   const isSpecMatch = kind === "spec_match";
+  const isConditional = kind === "conditional";
+
+  // Writing one side clears the other operand field, so a rule can never end
+  // up bound to a spec and a variable at once.
+  const setOperand = (side: "consumer" | "provider", value: string) => {
+    const specField = side === "consumer" ? "consumerSpecUuid" : "providerSpecUuid";
+    const variableField =
+      side === "consumer" ? "consumerVariableUuid" : "providerVariableUuid";
+    setValue(specField, value.startsWith(SPEC_PREFIX) ? value.slice(SPEC_PREFIX.length) : "", { shouldDirty: true });
+    setValue(
+      variableField,
+      value.startsWith(VARIABLE_PREFIX)
+        ? value.slice(VARIABLE_PREFIX.length)
+        : "",
+      { shouldDirty: true },
+    );
+  };
 
   // Per-device distribution only applies to aggregating sum/count rules with
   // "fit within" — not per-item, ratio, or spec_match.
@@ -153,7 +202,36 @@ export const RuleForm = (props: RuleFormProps) => {
     .filter((specification) => specification.valueType === "select")
     .map(specOption);
   // spec_match binds dropdown specs; every other kind binds numeric specs.
-  const consumerProviderOptions = isSpecMatch ? selectOptions : numericOptions;
+  const specOptions = (isSpecMatch ? selectOptions : numericOptions).map(
+    (option) => ({ ...option, value: `${SPEC_PREFIX}${option.value}` }),
+  );
+
+  // Project variables are numeric answers to a design question, so they only
+  // stand in where a number is expected — never on a spec_match rule.
+  const variableOptions = isSpecMatch
+    ? []
+    : variables.map((variable) => ({
+        value: `${VARIABLE_PREFIX}${variable.uuid}`,
+        label: variable.unit
+          ? `${variable.label} (${variable.unit}) — project variable`
+          : `${variable.label} — project variable`,
+      }));
+
+  const consumerProviderOptions = [...specOptions, ...variableOptions];
+
+  // The attributes a conditional rule's table can be keyed by: any dropdown
+  // spec, since the table matches an item's own chosen values.
+  const lookupInputOptions = selectSpecs.map((specification) => ({
+    value: specification.key,
+    label: specification.label,
+  }));
+
+  const lookupValuesByKey = Object.fromEntries(
+    selectSpecs.map((specification) => [
+      specification.key,
+      (specification.options ?? []).map((option) => option.value),
+    ]),
+  );
 
   const comparatorOptions = isSpecMatch
     ? [
@@ -318,20 +396,14 @@ export const RuleForm = (props: RuleFormProps) => {
                 ? "Demand specification"
                 : "Consumed specification"}
           </label>
-          <Controller
-            control={control}
-            name="consumerSpecUuid"
-            render={({ field }) => (
-              <Dropdown
-                searchable
-                value={field.value}
-                onChange={field.onChange}
-                placeholder={
-                  isSpecMatch ? "e.g. Speaker Impedance" : "e.g. Power Consumption"
-                }
-                options={consumerProviderOptions}
-              />
-            )}
+          <Dropdown
+            searchable
+            value={operandValue(consumerSpecUuid, consumerVariableUuid)}
+            onChange={(value) => setOperand("consumer", value)}
+            placeholder={
+              isSpecMatch ? "e.g. Speaker Impedance" : "e.g. Power Consumption"
+            }
+            options={consumerProviderOptions}
           />
           <FormError message={errors.consumerSpecUuid?.message} />
         </div>
@@ -359,30 +431,49 @@ export const RuleForm = (props: RuleFormProps) => {
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-ink">
-            {isSpecMatch
-              ? "Companion specification"
-              : isRatio
-                ? "Supply specification"
-                : "Capacity specification"}
+            {isConditional
+              ? "Capacity"
+              : isSpecMatch
+                ? "Companion specification"
+                : isRatio
+                  ? "Supply specification"
+                  : "Capacity specification"}
           </label>
-          <Controller
-            control={control}
-            name="providerSpecUuid"
-            render={({ field }) => (
-              <Dropdown
-                searchable
-                value={field.value}
-                onChange={field.onChange}
-                placeholder={
-                  isSpecMatch ? "e.g. Supported Impedance" : "e.g. PoE Budget"
-                }
-                options={consumerProviderOptions}
-              />
-            )}
-          />
+          {isConditional ? (
+            <div className="flex h-10 items-center justify-center rounded-control border border-dashed border-hairline bg-page px-3 text-center text-xs text-muted">
+              the lookup table below
+            </div>
+          ) : (
+            <Dropdown
+              searchable
+              value={operandValue(providerSpecUuid, providerVariableUuid)}
+              onChange={(value) => setOperand("provider", value)}
+              placeholder={
+                isSpecMatch ? "e.g. Supported Impedance" : "e.g. PoE Budget"
+              }
+              options={consumerProviderOptions}
+            />
+          )}
           <FormError message={errors.providerSpecUuid?.message} />
         </div>
       </div>
+
+      {isConditional && (
+        <>
+          <LookupEditor
+            inputs={lookupInputs}
+            rows={lookupRows}
+            inputOptions={lookupInputOptions}
+            valuesByKey={lookupValuesByKey}
+            limitUnit={consumerUnit}
+            onChange={(inputs, rows) => {
+              setValue("lookupInputs", inputs, { shouldDirty: true });
+              setValue("lookupRows", rows, { shouldDirty: true });
+            }}
+          />
+          <FormError message={errors.lookupRows?.message} />
+        </>
+      )}
 
       {unitsMismatch && (
         <p className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
