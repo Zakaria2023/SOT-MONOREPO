@@ -1,232 +1,120 @@
 "use client";
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
-import { Trash2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { EyeOff, Zap } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import type { SelectCategories } from "@/db/schema/categories";
-import { categoryWithAncestors } from "@/lib/categories";
-import type { LibraryDomain, LibrarySpecification } from "services";
+import type { ProductFormAttribute } from "services";
 import { Checkbox, Dropdown } from "ui";
 import {
   parseSpecValues,
-  resolveSpecInputType,
   serializeSpecRange,
   serializeSpecValues,
   splitSpecRange,
 } from "utils";
 
 type SpecificationComposerProps = {
-  library: LibraryDomain[];
-  categories: SelectCategories[];
+  // Every category's resolved attributes, keyed by category uuid. Options are
+  // already narrowed to each category's enabled slice, so this form can never
+  // offer a value the category has disabled.
+  attributesByCategory: Record<string, ProductFormAttribute[]>;
 };
 
-// A spec resolved from the library, tagged with where it sits for the picker.
-type LibrarySpec = LibrarySpecification & {
-  groupName: string;
-  domain: string | null;
-};
-
-// A picker entry. The label is just the attribute name — the group is a filter
-// rather than a prefix on every row — and the rest is what the filters match on.
-type PickerOption = {
+// A value the product still stores although its category no longer assigns the
+// attribute — an older product, or one moved between categories. Surfaced so
+// it can be seen and cleared rather than silently orphaned.
+type StrandedValue = {
+  key: string;
   value: string;
-  label: string;
-  groupUuid: string;
-  categoryUuids: string[];
+};
+
+const showIfSatisfied = (
+  attribute: ProductFormAttribute,
+  values: Record<string, string>,
+): boolean => {
+  if (!attribute.showIf) {
+    return true;
+  }
+  // A multi-select controller is stored comma-joined; the condition holds if
+  // any chosen value is listed.
+  const chosen = parseSpecValues(values[attribute.showIf.specKey]);
+  return chosen.some((value) => attribute.showIf?.values.includes(value));
 };
 
 export const SpecificationComposer = ({
-  library,
-  categories,
+  attributesByCategory,
 }: SpecificationComposerProps) => {
   const { control, setValue } = useFormContext<ProductFormValues>();
-  const watchedKeys = useWatch({ control, name: "specKeys" });
   const watchedValues = useWatch({ control, name: "technicalAttributes" });
   const categoryUuid = useWatch({ control, name: "categoryUuid" });
-  const appliedKeys = useMemo(() => watchedKeys ?? [], [watchedKeys]);
   const values = useMemo(() => watchedValues ?? {}, [watchedValues]);
 
-  // Flatten the library once: a key → spec map, the picker options, and the
-  // groups that actually hold attributes (the group filter's choices).
-  const { specByKey, pickerOptions, groupFilterOptions } = useMemo(() => {
-    const byKey = new Map<string, LibrarySpec>();
-    const options: PickerOption[] = [];
-    const groupChoices: { value: string; label: string }[] = [];
-    for (const domain of library) {
-      for (const group of domain.groups) {
-        if (group.attributes.length > 0) {
-          groupChoices.push({
-            value: group.group.uuid,
-            label: group.group.name,
-          });
-        }
-        for (const attribute of group.attributes) {
-          const spec: LibrarySpec = {
-            ...attribute,
-            groupName: group.group.name,
-            domain: domain.domain,
-          };
-          byKey.set(attribute.key, spec);
-          options.push({
-            value: attribute.key,
-            label: attribute.label,
-            groupUuid: group.group.uuid,
-            categoryUuids: attribute.categoryUuids,
-          });
-        }
-      }
-    }
-    return {
-      specByKey: byKey,
-      pickerOptions: options,
-      groupFilterOptions: groupChoices,
-    };
-  }, [library]);
-
-  // Groups the picker is narrowed to. Empty = show every attribute.
-  const [groupFilter, setGroupFilter] = useState<string[]>([]);
-
-  // The chosen category plus its ancestors — an attribute assigned to any of
-  // them applies here, matching how category inheritance is resolved.
-  const categoryChain = useMemo(
-    () =>
-      categoryUuid ? new Set(categoryWithAncestors(categoryUuid, categories)) : null,
-    [categoryUuid, categories],
+  const assigned = useMemo(
+    () => (categoryUuid ? (attributesByCategory[categoryUuid] ?? []) : []),
+    [attributesByCategory, categoryUuid],
   );
 
-  const visibleOptions = useMemo(
-    () =>
-      pickerOptions
-        .filter((option) => {
-          if (
-            groupFilter.length > 0 &&
-            !groupFilter.includes(option.groupUuid)
-          ) {
-            return false;
-          }
-          // An attribute with no categories is universal. One with categories
-          // shows only when the product's category (or an ancestor) matches.
-          if (option.categoryUuids.length === 0 || !categoryChain) {
-            return true;
-          }
-          return option.categoryUuids.some((uuid) => categoryChain.has(uuid));
-        })
-        .map((option) => ({ value: option.value, label: option.label })),
-    [pickerOptions, groupFilter, categoryChain],
+  // Show-if, run to a fixed point: hiding a controller hides whatever depends
+  // on it in turn. Bounded by the attribute count so a circular condition
+  // settles instead of spinning.
+  const visible = useMemo(() => {
+    let current = assigned;
+    for (let pass = 0; pass <= assigned.length; pass += 1) {
+      const present = new Set(current.map((attribute) => attribute.key));
+      const next = current.filter(
+        (attribute) =>
+          showIfSatisfied(attribute, values) &&
+          (!attribute.showIf || present.has(attribute.showIf.specKey)),
+      );
+      if (next.length === current.length) {
+        return next;
+      }
+      current = next;
+    }
+    return current;
+  }, [assigned, values]);
+
+  const visibleKeys = useMemo(
+    () => visible.map((attribute) => attribute.key),
+    [visible],
   );
 
-  // Keys this component auto-added because some option revealed them, so they
-  // can be auto-removed when that option is un-chosen — manually-added keys
-  // (never recorded here) are left alone.
-  const autoAddedRef = useRef<Set<string>>(new Set());
-
-  // The set of attribute keys the currently-chosen option values reveal.
-  const revealedKeys = useMemo(() => {
-    const desired = new Set<string>();
-    for (const key of appliedKeys) {
-      const spec = specByKey.get(key);
-      if (!spec?.options) {
-        continue;
-      }
-      const chosen = spec.allowMultiple
-        ? parseSpecValues(values[key])
-        : [values[key] ?? ""];
-      for (const option of spec.options) {
-        if (!option.reveals || !chosen.includes(option.value)) {
-          continue;
-        }
-        for (const revealKey of option.reveals) {
-          // Only reveal keys that still exist in the library.
-          if (specByKey.has(revealKey)) {
-            desired.add(revealKey);
-          }
-        }
-      }
-    }
-    return desired;
-  }, [appliedKeys, values, specByKey]);
-
-  // Reconcile the applied keys with what the chosen options reveal: add the
-  // freshly-revealed ones, drop the ones we auto-added that are no longer
-  // revealed (clearing their stored value too), and leave manual keys intact.
+  // Two things happen here, and the second is the one that's easy to miss.
+  //
+  // specKeys is derived, not picked: the category decides what a product
+  // carries, so the stored list is kept equal to what the form shows.
+  //
+  // And a hidden attribute's value is CLEARED, not merely hidden. A PoE budget
+  // left behind on a product whose PoE is now "No" would let the engine size a
+  // switch off a number that no longer applies. Values whose key this category
+  // never assigns are left alone — those belong to an older product, and
+  // dropping them here would destroy data this form knows nothing about.
   useEffect(() => {
-    const toAdd = [...revealedKeys].filter((key) => !appliedKeys.includes(key));
-    const toRemove = [...autoAddedRef.current].filter(
-      (key) => !revealedKeys.has(key) && appliedKeys.includes(key),
+    const assignedKeys = new Set(assigned.map((attribute) => attribute.key));
+    const shown = new Set(visibleKeys);
+    const stale = Object.keys(values).filter(
+      (key) => assignedKeys.has(key) && !shown.has(key),
     );
 
-    autoAddedRef.current = new Set([
-      ...[...autoAddedRef.current].filter((key) => revealedKeys.has(key)),
-      ...toAdd,
-    ]);
-
-    if (toAdd.length === 0 && toRemove.length === 0) {
-      return;
-    }
-
-    const nextKeys = [
-      ...appliedKeys.filter((key) => !toRemove.includes(key)),
-      ...toAdd,
-    ];
-    setValue("specKeys", nextKeys, { shouldDirty: true });
-
-    if (toRemove.length > 0) {
-      const nextValues = { ...values };
-      for (const key of toRemove) {
-        delete nextValues[key];
-      }
-      setValue("technicalAttributes", nextValues, { shouldDirty: true });
-    }
-  }, [revealedKeys, appliedKeys, values, setValue]);
-
-  // The label of the attribute + option currently revealing `key`, or null if
-  // nothing does. Drives the "auto" chip and the disabled remove button.
-  const revealSourceOf = (key: string): string | null => {
-    if (!revealedKeys.has(key)) {
-      return null;
-    }
-    for (const appliedKey of appliedKeys) {
-      const spec = specByKey.get(appliedKey);
-      if (!spec?.options) {
-        continue;
-      }
-      const chosen = spec.allowMultiple
-        ? parseSpecValues(values[appliedKey])
-        : [values[appliedKey] ?? ""];
-      for (const option of spec.options) {
-        if (option.reveals?.includes(key) && chosen.includes(option.value)) {
-          return `${spec.label} = ${option.value}`;
-        }
-      }
-    }
-    return null;
-  };
-
-  const removeAttribute = (key: string) => {
-    setValue(
-      "specKeys",
-      appliedKeys.filter((applied) => applied !== key),
-      { shouldDirty: true },
-    );
-    const next = { ...values };
-    delete next[key];
-    setValue("technicalAttributes", next, { shouldDirty: true });
-  };
-
-  // The picker is a multi-select over the whole library: keys stay listed and
-  // highlighted once added, and toggling one off also drops its stored value.
-  const setAppliedKeys = (keys: string[]) => {
-    setValue("specKeys", keys, { shouldDirty: true });
-    const removed = appliedKeys.filter((applied) => !keys.includes(applied));
-    if (removed.length > 0) {
+    if (stale.length > 0) {
       const next = { ...values };
-      for (const key of removed) {
+      for (const key of stale) {
         delete next[key];
       }
       setValue("technicalAttributes", next, { shouldDirty: true });
     }
-  };
+  }, [assigned, visibleKeys, values, setValue]);
+
+  useEffect(() => {
+    setValue("specKeys", visibleKeys, { shouldDirty: false });
+  }, [visibleKeys, setValue]);
+
+  const stranded: StrandedValue[] = useMemo(() => {
+    const assignedKeys = new Set(assigned.map((attribute) => attribute.key));
+    return Object.entries(values)
+      .filter(([key]) => !assignedKeys.has(key))
+      .map(([key, value]) => ({ key, value }));
+  }, [assigned, values]);
 
   const setValueFor = (key: string, value: string) => {
     const next = { ...values };
@@ -258,18 +146,19 @@ export const SpecificationComposer = ({
     );
   };
 
-  const renderInput = (spec: LibrarySpec) => {
-    const options = spec.options ?? [];
-    if (spec.valueType === "number") {
-      if (spec.allowRange) {
-        const [from, to] = splitSpecRange(values[spec.key]);
+  const renderInput = (attribute: ProductFormAttribute) => {
+    if (attribute.valueType === "number") {
+      if (attribute.allowRange) {
+        const [from, to] = splitSpecRange(values[attribute.key]);
         return (
           <div className="flex items-center gap-2">
             <input
               type="number"
               step="any"
               value={from}
-              onChange={(event) => setRange(spec.key, "from", event.target.value)}
+              onChange={(event) =>
+                setRange(attribute.key, "from", event.target.value)
+              }
               placeholder="From"
               className="w-full flex-1 rounded-control border border-hairline bg-surface px-4 py-2.5 text-sm text-ink outline-none focus:border-primary"
             />
@@ -279,13 +168,15 @@ export const SpecificationComposer = ({
                 type="number"
                 step="any"
                 value={to}
-                onChange={(event) => setRange(spec.key, "to", event.target.value)}
+                onChange={(event) =>
+                  setRange(attribute.key, "to", event.target.value)
+                }
                 placeholder="To"
                 className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 pr-14 text-sm text-ink outline-none focus:border-primary"
               />
-              {spec.unit && (
+              {attribute.unit && (
                 <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs font-medium text-faint">
-                  {spec.unit}
+                  {attribute.unit}
                 </span>
               )}
             </div>
@@ -297,34 +188,36 @@ export const SpecificationComposer = ({
           <input
             type="number"
             step="any"
-            value={values[spec.key] ?? ""}
-            onChange={(event) => setValueFor(spec.key, event.target.value)}
+            value={values[attribute.key] ?? ""}
+            onChange={(event) => setValueFor(attribute.key, event.target.value)}
             placeholder="0"
             className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 pr-14 text-sm text-ink outline-none focus:border-primary"
           />
-          {spec.unit && (
+          {attribute.unit && (
             <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs font-medium text-faint">
-              {spec.unit}
+              {attribute.unit}
             </span>
           )}
         </div>
       );
     }
 
-    if (spec.allowMultiple) {
-      const selected = parseSpecValues(values[spec.key]);
+    if (attribute.allowMultiple) {
+      const selected = parseSpecValues(values[attribute.key]);
       return (
         <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
-          {options.length === 0 ? (
-            <span className="text-sm text-faint">No options defined.</span>
+          {attribute.options.length === 0 ? (
+            <span className="text-sm text-faint">
+              This category enables no values for this attribute.
+            </span>
           ) : (
-            options.map((option) => (
+            attribute.options.map((option) => (
               <Checkbox
-                key={option.value}
-                label={option.value}
-                checked={selected.includes(option.value)}
+                key={option}
+                label={option}
+                checked={selected.includes(option)}
                 onChange={(event) =>
-                  toggleMulti(spec.key, option.value, event.target.checked)
+                  toggleMulti(attribute.key, option, event.target.checked)
                 }
               />
             ))
@@ -333,45 +226,37 @@ export const SpecificationComposer = ({
       );
     }
 
-    // A free-text attribute is stored as a select with no options, so without
+    // A select with no options is free text in the library's model — without
     // this branch it would render as a dropdown containing only "—".
-    if (resolveSpecInputType(spec) === "text") {
+    if (attribute.options.length === 0) {
       return (
         <input
           type="text"
-          value={values[spec.key] ?? ""}
-          onChange={(event) => setValueFor(spec.key, event.target.value)}
+          value={values[attribute.key] ?? ""}
+          onChange={(event) => setValueFor(attribute.key, event.target.value)}
           placeholder="Type a value"
           className="w-full rounded-control border border-hairline bg-surface px-4 py-2.5 text-sm text-ink outline-none focus:border-primary"
         />
       );
     }
 
-    // A select with nothing to choose from is a library gap, not a value the
-    // admin can fill — say so instead of showing an empty dropdown.
-    if (options.length === 0) {
-      return (
-        <p className="rounded-control border border-dashed border-hairline px-3 py-2.5 text-xs text-faint">
-          No options defined for this attribute in the library.
-        </p>
-      );
-    }
-
     return (
       <Dropdown
-        value={values[spec.key] ?? ""}
-        onChange={(value) => setValueFor(spec.key, value)}
+        value={values[attribute.key] ?? ""}
+        onChange={(value) => setValueFor(attribute.key, value)}
         placeholder="Select"
         options={[
           { value: "", label: "—" },
-          ...options.map((option) => ({
-            value: option.value,
-            label: option.value,
+          ...attribute.options.map((option) => ({
+            value: option,
+            label: option,
           })),
         ]}
       />
     );
   };
+
+  const hiddenCount = assigned.length - visible.length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -380,110 +265,87 @@ export const SpecificationComposer = ({
           Technical specifications
         </label>
         <p className="mt-1 text-xs text-muted">
-          Add the attributes that apply to this product from the library, then
-          set each value. The picker shows attributes assigned to this
-          product&apos;s category (plus the ones that apply everywhere).
+          These come from the product&apos;s category — every attribute it is
+          assigned, offering only the values that category enables. Change what
+          appears here in Assignments, not on the product.
+          {hiddenCount > 0 && (
+            <span className="ml-1 font-semibold text-amber-700">
+              {hiddenCount} hidden by a show-if condition.
+            </span>
+          )}
         </p>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="sm:max-w-md sm:flex-1">
-          <Dropdown
-            multiple
-            searchable
-            value={groupFilter}
-            onChange={setGroupFilter}
-            placeholder="All groups"
-            searchPlaceholder="Search groups…"
-            options={groupFilterOptions}
-          />
-        </div>
-        <div className="sm:max-w-md sm:flex-1">
-          <Dropdown
-            multiple
-            searchable
-            searchPlaceholder="Search the library..."
-            value={appliedKeys}
-            onChange={setAppliedKeys}
-            placeholder="+ Add attribute"
-            triggerLabel="+ Add attribute"
-            options={visibleOptions}
-            emptyMessage="No attributes match these filters"
-          />
-        </div>
-      </div>
-
-      {appliedKeys.length === 0 ? (
-        <p className="rounded-control border border-dashed border-hairline p-4 text-sm text-faint">
-          No attributes added yet. Use the picker above to add the ones that
-          apply to this product.
+      {!categoryUuid ? (
+        <p className="rounded-control border border-dashed border-hairline p-6 text-center text-sm text-faint">
+          Pick a category first — it decides which attributes this product
+          carries.
+        </p>
+      ) : visible.length === 0 ? (
+        <p className="rounded-control border border-dashed border-hairline p-6 text-center text-sm text-faint">
+          This category assigns no attributes yet. Assign some in Assignments
+          and they appear here.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {appliedKeys.map((key) => {
-            const spec = specByKey.get(key);
-            if (!spec) {
-              // An applied key whose attribute is missing from the library
-              // (deleted/renamed) — let the user drop it.
-              return (
-                <div key={key} className="flex flex-col gap-2">
-                  <label className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
-                    <span className="line-clamp-1 text-faint">{key}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeAttribute(key)}
-                      aria-label={`Remove ${key}`}
-                      className="text-faint hover:text-danger"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </label>
-                  <p className="rounded-control border border-dashed border-hairline px-3 py-2 text-xs text-faint">
-                    Attribute no longer in the library.
-                  </p>
-                </div>
-              );
-            }
-            // Revealed by another attribute's chosen option — removing it here
-            // would only bring it straight back, so the remove button is
-            // disabled and the source is named instead.
-            const revealedBy = revealSourceOf(key);
-            return (
-              <div key={key} className="flex flex-col gap-2">
-                <label className="flex items-center justify-between gap-2 text-sm font-semibold text-ink">
-                  <span className="line-clamp-1">
-                    {spec.label}
-                    <span className="ml-1 text-xs font-normal text-faint">
-                      · {spec.groupName}
-                    </span>
-                    {revealedBy && (
-                      <span
-                        title={`Added automatically by ${revealedBy}`}
-                        className="ml-1.5 rounded bg-primary-tint px-1.5 py-0.5 text-[10px] font-semibold text-primary"
-                      >
-                        auto
-                      </span>
-                    )}
+          {visible.map((attribute) => (
+            <div key={attribute.key} className="flex flex-col gap-1.5">
+              <label className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-ink">
+                <span className="line-clamp-1">{attribute.label}</span>
+                {attribute.unit && (
+                  <span className="text-xs font-normal text-faint">
+                    ({attribute.unit})
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => removeAttribute(key)}
-                    disabled={Boolean(revealedBy)}
-                    title={
-                      revealedBy
-                        ? `Required by ${revealedBy} — change that value to remove this`
-                        : undefined
-                    }
-                    aria-label={`Remove ${spec.label}`}
-                    className="shrink-0 text-faint hover:text-danger disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-faint"
+                )}
+                {attribute.groupName && (
+                  <span className="rounded bg-page px-1 py-0.5 text-[10px] font-medium text-muted">
+                    {attribute.groupName}
+                  </span>
+                )}
+                {!attribute.isFilter && attribute.isRule && (
+                  <span
+                    title="The engine reads this value; no shopper filters by it"
+                    className="flex items-center gap-0.5 rounded bg-primary-tint px-1 py-0.5 text-[10px] font-medium text-primary"
                   >
-                    <Trash2 size={14} />
-                  </button>
-                </label>
-                {renderInput(spec)}
-              </div>
-            );
-          })}
+                    <Zap size={9} />
+                    rules only
+                  </span>
+                )}
+                {attribute.showIf && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-faint">
+                    <EyeOff size={9} />
+                    conditional
+                  </span>
+                )}
+              </label>
+              {renderInput(attribute)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {stranded.length > 0 && (
+        <div className="rounded-control border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-amber-800">
+            Values this category no longer assigns
+          </p>
+          <p className="mt-0.5 text-[11px] text-amber-700">
+            Left over from an earlier category or an older product. Nothing
+            reads them; they are kept until you clear them.
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {stranded.map((entry) => (
+              <li key={entry.key}>
+                <button
+                  type="button"
+                  onClick={() => setValueFor(entry.key, "")}
+                  className="rounded-md border border-amber-300 bg-surface px-2 py-1 text-[11px] text-amber-800 transition-colors hover:border-amber-500"
+                >
+                  {entry.key}: {entry.value} ✕
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

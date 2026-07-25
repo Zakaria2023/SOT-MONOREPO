@@ -5,7 +5,14 @@ import { db } from "../../../db";
 import type { AssignmentAudience } from "../../../db/enum";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
-import { SpecificationCategories } from "../../../db/schema/specification-categories";
+import {
+  SelectSpecificationCategories,
+  SpecificationCategories,
+} from "../../../db/schema/specification-categories";
+import {
+  SelectSpecificationGroups,
+  SpecificationGroups,
+} from "../../../db/schema/specification-groups";
 import {
   SelectSpecifications,
   Specifications,
@@ -437,5 +444,121 @@ export const getShopperPreview = async (
   } catch (error) {
     console.error("getShopperPreview failed:", error);
     throw new Error("Failed to build the shopper preview", { cause: error });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// The product form's view of assignments.
+// ---------------------------------------------------------------------------
+
+// One attribute a product in a given category fills in. Options are already
+// the category's enabled slice, so the form can never offer a value the
+// category has disabled.
+export type ProductFormAttribute = {
+  key: SelectSpecifications["key"];
+  label: SelectSpecifications["label"];
+  unit: SelectSpecifications["unit"];
+  valueType: SelectSpecifications["valueType"];
+  allowMultiple: SelectSpecifications["allowMultiple"];
+  allowRange: SelectSpecifications["allowRange"];
+  ordered: SelectSpecifications["ordered"];
+  options: string[];
+  isFilter: SelectSpecificationCategories["isFilter"];
+  isRule: SelectSpecificationCategories["isRule"];
+  showIf: SelectSpecificationCategories["showIf"];
+  audience: SelectSpecificationCategories["audience"];
+  groupName: string | null;
+};
+
+/**
+ * Every category's resolved attributes, keyed by category uuid — what a
+ * product in that category is asked to fill in.
+ *
+ * Returned for ALL categories in one go because the product form lets an admin
+ * change a product's category without leaving the page; resolving on each
+ * change would mean a round trip per keystroke of indecision. Three queries,
+ * resolved in memory.
+ */
+export const getProductFormAttributes = async (): Promise<
+  Record<string, ProductFormAttribute[]>
+> => {
+  try {
+    const [categoryRows, assignmentRows, specRows] = await Promise.all([
+      db
+        .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
+        .from(Categories),
+      db
+        .select({
+          specificationUuid: SpecificationCategories.specificationUuid,
+          categoryUuid: SpecificationCategories.categoryUuid,
+          isFilter: SpecificationCategories.isFilter,
+          isRule: SpecificationCategories.isRule,
+          scope: SpecificationCategories.scope,
+          showIf: SpecificationCategories.showIf,
+          audience: SpecificationCategories.audience,
+          enabledValues: SpecificationCategories.enabledValues,
+          order: SpecificationCategories.order,
+        })
+        .from(SpecificationCategories),
+      db
+        .select({
+          ...DEFINITION_COLUMNS,
+          groupName: SpecificationGroups.name,
+        })
+        .from(Specifications)
+        .leftJoin(
+          SpecificationGroups,
+          eq(Specifications.groupUuid, SpecificationGroups.uuid),
+        )
+        .orderBy(asc(Specifications.order)),
+    ]);
+
+    const parentOf = new Map(
+      categoryRows.map((category) => [category.uuid, category.parentUuid]),
+    );
+    const groupByUuid = new Map(
+      specRows.map((spec) => [spec.uuid, spec.groupName]),
+    );
+    const definitions: AssignmentDefinition[] = specRows.map(
+      ({ groupName: _groupName, ...definition }) => definition,
+    );
+
+    const byCategory: Record<string, ProductFormAttribute[]> = {};
+    for (const category of categoryRows) {
+      const chain: string[] = [];
+      const seen = new Set<string>();
+      let current: string | null = category.uuid;
+      while (current && !seen.has(current)) {
+        seen.add(current);
+        chain.push(current);
+        current = parentOf.get(current) ?? null;
+      }
+
+      byCategory[category.uuid] = resolveAssignments({
+        chain,
+        rows: assignmentRows satisfies AssignmentRow[],
+        definitions,
+      }).map((assignment) => ({
+        key: assignment.definition.key,
+        label: assignment.definition.label,
+        unit: assignment.definition.unit,
+        valueType: assignment.definition.valueType,
+        allowMultiple: assignment.definition.allowMultiple,
+        allowRange: assignment.definition.allowRange,
+        ordered: assignment.definition.ordered,
+        options: assignment.offeredOptions.map((option) => option.value),
+        isFilter: assignment.isFilter,
+        isRule: assignment.isRule,
+        showIf: assignment.showIf,
+        audience: assignment.audience,
+        groupName: groupByUuid.get(assignment.definition.uuid) ?? null,
+      }));
+    }
+    return byCategory;
+  } catch (error) {
+    console.error("getProductFormAttributes failed:", error);
+    throw new Error("Failed to fetch product form attributes", {
+      cause: error,
+    });
   }
 };
