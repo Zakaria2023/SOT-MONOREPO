@@ -3,7 +3,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Award,
-  Building2,
   FileText,
   Landmark,
   Layers,

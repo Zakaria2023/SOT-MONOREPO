@@ -56,7 +56,7 @@ export const SpecificationCategories = mysqlTable(
 
     // Who the attribute is surfaced to. Never gates rule participation.
     audience: mysqlEnum("audience", assignmentAudiences)
-      .default("all")
+      .default("everyone")
       .notNull(),
 
     // The slice of the library's master option list this category OFFERS, as

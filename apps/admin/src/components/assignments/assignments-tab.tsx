@@ -5,7 +5,9 @@ import type { DraftRow } from "@/components/assignments/assignment-workspace";
 import { RelationSection } from "@/components/assignments/relation-section";
 import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
+import { ASSIGNMENT_AUDIENCE_LABELS } from "@/db/label";
 import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
+import type { ReactNode } from "react";
 import { Dropdown } from "ui";
 
 type AssignmentsTabProps = {
@@ -23,6 +25,7 @@ type AssignmentCardProps = {
   row: DraftRow;
   relations: SpecRelation[];
   otherSpecs: { value: string; label: string }[];
+  lookupSpecs: { key: string; label: string; options: string[] }[];
   // How many other attributes this category carries at all, so an empty
   // controller list can explain itself rather than look broken.
   siblingCount: number;
@@ -37,18 +40,22 @@ type AssignmentCardProps = {
 type SwitchProps = {
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  disabled?: boolean;
+  title?: string;
+  children: ReactNode;
 };
 
-const Switch = ({ active, onClick, children }: SwitchProps) => (
+const Switch = ({ active, onClick, disabled, title, children }: SwitchProps) => (
   <button
     type="button"
     onClick={onClick}
+    disabled={disabled}
+    title={title}
     aria-pressed={active}
     className={
       active
         ? "flex items-center gap-1.5 rounded-control bg-primary px-3.5 py-2 text-sm font-semibold text-white"
-        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary"
+        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-hairline disabled:hover:text-faint"
     }
   >
     {children}
@@ -59,6 +66,7 @@ const AssignmentCard = ({
   row,
   relations,
   otherSpecs,
+  lookupSpecs,
   siblingCount,
   controllers,
   controllerOptions,
@@ -175,22 +183,34 @@ const AssignmentCard = ({
         ))}
       </div>
 
-      {/* Audience. */}
+      {/* Audience. The library already fixed who the attribute is FOR; this
+          can only narrow it, so anything wider is shown as unavailable. */}
       <div className="flex flex-wrap items-center gap-2">
-        {(["all", "partner", "staff"] as AssignmentAudience[]).map(
-          (audience) => (
-            <Switch
-              key={audience}
-              active={row.audience === audience}
-              onClick={() => onChange(row.specificationUuid, { audience })}
-            >
-              {audience === "all"
-                ? "All"
-                : audience === "partner"
-                  ? "Partner"
-                  : "Staff"}
-            </Switch>
-          ),
+        {(["everyone", "user", "partner"] as AssignmentAudience[]).map(
+          (audience) => {
+            // Once the library has picked a side, a category cannot move it.
+            const lockedByDefinition =
+              row.definitionAudience !== "everyone" &&
+              audience !== row.definitionAudience;
+            return (
+              <Switch
+                key={audience}
+                active={row.effectiveAudience === audience}
+                disabled={lockedByDefinition}
+                title={
+                  lockedByDefinition
+                    ? `The library marks this attribute ${ASSIGNMENT_AUDIENCE_LABELS[row.definitionAudience]} — a category cannot change that`
+                    : undefined
+                }
+                onClick={() => onChange(row.specificationUuid, { audience })}
+              >
+                {ASSIGNMENT_AUDIENCE_LABELS[audience]}
+              </Switch>
+            );
+          },
+        )}
+        {row.definitionAudience !== "everyone" && (
+          <span className="text-sm text-faint">set in the library</span>
         )}
       </div>
 
@@ -290,6 +310,7 @@ const AssignmentCard = ({
         specUnit={row.unit}
         relations={relations}
         otherSpecs={otherSpecs}
+        lookupSpecs={lookupSpecs}
       />
     </li>
   );
@@ -329,6 +350,16 @@ export const AssignmentsTab = ({
     rows.map((row) => [row.key, row.masterOptions]),
   );
 
+  // A conditional table is keyed by chosen values, so only attributes with an
+  // option list can key one.
+  const lookupSpecs = library
+    .filter((specification) => (specification.options ?? []).length > 0)
+    .map((specification) => ({
+      key: specification.key,
+      label: specification.label,
+      options: (specification.options ?? []).map((option) => option.value),
+    }));
+
   // A relation can bind any attribute in the library, not only ones this
   // category carries — a camera's power draw is measured against a switch's
   // budget, and those live in different trees.
@@ -356,6 +387,7 @@ export const AssignmentsTab = ({
               row={row}
               relations={relations[row.specificationUuid] ?? []}
               otherSpecs={otherSpecsFor(row.specificationUuid)}
+              lookupSpecs={lookupSpecs}
               siblingCount={rows.length - 1}
               controllers={controllersFor(row.specificationUuid)}
               controllerOptions={controllerOptions}

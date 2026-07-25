@@ -51,10 +51,16 @@ export type AssignmentDefinition = Pick<
   | "ordered"
   | "options"
   | "order"
+  | "audience"
 >;
 
 export type ResolvedAssignment = AssignmentSwitches & {
   definition: AssignmentDefinition;
+  // Who actually sees it. The definition decides who an attribute is FOR; a
+  // category may pick a side only when the definition left it open. A
+  // partner-only attribute cannot leak to users because one category was set
+  // to "everyone".
+  effectiveAudience: AssignmentAudience;
   // Which category in the chain authored the winning row.
   sourceCategoryUuid: AssignmentRow["categoryUuid"];
   // True when the winning row came from an ancestor rather than the category
@@ -73,13 +79,9 @@ export type ResolveAssignmentsInput = {
   definitions: AssignmentDefinition[];
 };
 
-// Widest to narrowest. A viewer sees an assignment when their own rank is at
-// least the assignment's.
-const AUDIENCE_RANK: Record<AssignmentAudience, number> = {
-  all: 0,
-  partner: 1,
-  staff: 2,
-};
+// Who is actually looking, in the client app. Staff are not a shopper
+// audience — the admin panel shows everything.
+export type Viewer = Exclude<AssignmentAudience, "everyone">;
 
 /** Position of a value in an attribute's master option list, or -1. */
 export const optionIndex = (
@@ -172,6 +174,8 @@ export const resolveAssignments = ({
       enabledValues: row.enabledValues,
       order: row.order,
       definition,
+      effectiveAudience:
+        definition.audience === "everyone" ? row.audience : definition.audience,
       sourceCategoryUuid: row.categoryUuid,
       inherited: rowDistance > 0,
       offeredOptions: sliceOptions(definition, row.enabledValues),
@@ -186,11 +190,18 @@ export const resolveAssignments = ({
   );
 };
 
-/** Whether a viewer of the given audience level may see this assignment. */
+/**
+ * Whether this viewer sees an attribute marked for that audience.
+ *
+ * Set membership, not a ladder: "everyone" is the union of the two, and a
+ * partner does NOT see a user-only attribute any more than a user sees a
+ * partner-only one. Trade pricing and installer certifications are for
+ * partners; consumer-facing copy can be for users alone.
+ */
 export const isVisibleTo = (
   audience: AssignmentAudience,
-  viewer: AssignmentAudience,
-): boolean => AUDIENCE_RANK[audience] <= AUDIENCE_RANK[viewer];
+  viewer: Viewer,
+): boolean => audience === "everyone" || audience === viewer;
 
 /**
  * The assignments offered as storefront facets on a category page.
@@ -203,12 +214,12 @@ export const isVisibleTo = (
  */
 export const facetAssignments = (
   resolved: ResolvedAssignment[],
-  viewer: AssignmentAudience,
+  viewer: Viewer,
 ): ResolvedAssignment[] =>
   resolved.filter(
     (assignment) =>
       assignment.isFilter &&
-      isVisibleTo(assignment.audience, viewer) &&
+      isVisibleTo(assignment.effectiveAudience, viewer) &&
       (!assignment.inherited || assignment.scope === "branch") &&
       assignment.offeredOptions.length > 0,
   );

@@ -116,14 +116,18 @@ export const assignmentScopes = [
 
 export type AssignmentScope = (typeof assignmentScopes)[number];
 
-// Who an assignment is surfaced to, on both the storefront facet and the admin
-// product form. Widest to narrowest: "all" is public, "partner" additionally
-// requires a signed-in partner, "staff" is admin-only. Audience never affects
-// rule participation — a staff-only attribute still feeds the engine.
+// Which kind of CLIENT-APP viewer an attribute is surfaced to. These are
+// shopper audiences, not staff roles — everyone in the admin panel sees
+// everything, because that is where the catalog is authored.
+//
+// Not a ladder: "user" and "partner" are siblings, and "everyone" is their
+// union. A partner does not see a user-only attribute, and vice versa.
+// Audience never affects rule participation — a partner-only attribute still
+// feeds the engine for every shopper.
 export const assignmentAudiences = [
-  "all",
+  "everyone",
+  "user",
   "partner",
-  "staff",
 ] as const satisfies readonly string[];
 
 export type AssignmentAudience = (typeof assignmentAudiences)[number];

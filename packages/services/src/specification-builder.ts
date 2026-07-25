@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { asc, count, eq } from "drizzle-orm";
 import { resolveSpecInputType, slugify } from "utils";
 import { db } from "../../../db";
-import type { SpecInputType } from "../../../db/enum";
+import type { AssignmentAudience, SpecInputType } from "../../../db/enum";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
 import { SpecificationCategories } from "../../../db/schema/specification-categories";
 import {
@@ -36,10 +36,9 @@ export type LibraryAttribute = {
   // Whether `options` is an ordered scale rather than an unordered set. Drives
   // the ≤/≥ comparators in rules and the ceiling reading of a category slice.
   ordered: boolean;
+  // Who this attribute is for. A category may narrow it, never widen it.
+  audience: AssignmentAudience;
   options: string[];
-  // Per-option reveal links: option value → library attribute keys auto-added
-  // to a product when that option is chosen. Empty for options with no links.
-  optionReveals: Record<string, string[]>;
   // Categories this attribute applies to (plus their descendants, resolved at
   // read time). Empty = universal, applies to every category.
   categoryUuids: string[];
@@ -67,12 +66,10 @@ export type AttributeInput = {
   // Marks the option list as a low-to-high scale. Only meaningful for the
   // option-based types; forced off for number/text.
   ordered: boolean;
+  // Who the attribute is for — the default every assignment inherits.
+  audience: AssignmentAudience;
   // Raw option strings (for select/multi_select). Ignored for other types.
   options: string[];
-  // Per-option reveal links: option value → library attribute keys to auto-add
-  // when chosen. Keys for values not in `options` (or Yes/No for boolean) are
-  // ignored. Absent = no links.
-  reveals?: Record<string, string[]>;
   // Categories the attribute applies to. Empty = universal.
   categoryUuids: string[];
 };
@@ -82,21 +79,11 @@ export type AttributeInput = {
 const resolveInputType = (spec: SelectSpecifications): SpecInputType =>
   resolveSpecInputType(spec) as SpecInputType;
 
-const toSpecOptions = (
-  values: string[],
-  reveals?: Record<string, string[]>,
-): SpecOption[] =>
+const toSpecOptions = (values: string[]): SpecOption[] =>
   values
     .map((value) => value.trim())
     .filter((value) => value.length > 0)
-    .map((value) => {
-      const links = (reveals?.[value] ?? []).filter(
-        (key) => key.trim().length > 0,
-      );
-      return links.length > 0
-        ? { value, children: [], reveals: links }
-        : { value, children: [] };
-    });
+    .map((value) => ({ value, children: [] }));
 
 // Map the builder's inputType down to the engine-facing columns.
 const engineFieldsFor = (input: AttributeInput) => {
@@ -118,7 +105,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         allowRange: false,
         ordered: input.ordered,
         unit: null,
-        options: toSpecOptions(input.options, input.reveals),
+        options: toSpecOptions(input.options),
       };
     case "boolean":
       return {
@@ -128,7 +115,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         // Yes/No is a set, not a scale.
         ordered: false,
         unit: null,
-        options: toSpecOptions(["Yes", "No"], input.reveals),
+        options: toSpecOptions(["Yes", "No"]),
       };
     case "text":
       return {
@@ -148,7 +135,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         allowRange: false,
         ordered: input.ordered,
         unit: null,
-        options: toSpecOptions(input.options, input.reveals),
+        options: toSpecOptions(input.options),
       };
   }
 };
@@ -158,12 +145,6 @@ const toLibraryAttribute = (
   relationshipCount: number,
   categoryUuids: string[],
 ): LibraryAttribute => {
-  const optionReveals: Record<string, string[]> = {};
-  for (const option of spec.options ?? []) {
-    if (option.reveals && option.reveals.length > 0) {
-      optionReveals[option.value] = option.reveals;
-    }
-  }
   return {
     uuid: spec.uuid,
     groupUuid: spec.groupUuid,
@@ -173,8 +154,8 @@ const toLibraryAttribute = (
     unit: spec.unit,
     allowRange: spec.allowRange,
     ordered: spec.ordered,
+    audience: spec.audience,
     options: (spec.options ?? []).map((option) => option.value),
-    optionReveals,
     categoryUuids,
     order: spec.order,
     relationshipCount,
@@ -341,6 +322,7 @@ export const createLibraryAttribute = async (
       allowMultiple: engine.allowMultiple,
       allowRange: engine.allowRange,
       ordered: engine.ordered,
+      audience: input.audience,
       unit: engine.unit,
       options: engine.options,
       order: total,
@@ -367,6 +349,7 @@ export const updateLibraryAttribute = async (
         allowMultiple: engine.allowMultiple,
         allowRange: engine.allowRange,
         ordered: engine.ordered,
+        audience: input.audience,
         unit: engine.unit,
         options: engine.options,
       })

@@ -30,6 +30,7 @@ const definition = (
   ordered: false,
   options: [],
   order: 0,
+  audience: "everyone",
   ...overrides,
 });
 
@@ -41,7 +42,7 @@ const row = (
   isRule: true,
   scope: "branch",
   showIf: null,
-  audience: "all",
+  audience: "everyone",
   enabledValues: null,
   order: 0,
   ...overrides,
@@ -244,18 +245,20 @@ describe("facetAssignments", () => {
       definitions: [COLOR],
     });
 
-    expect(facetAssignments(partnerOnly, "all")).toHaveLength(0);
+    expect(facetAssignments(partnerOnly, "user")).toHaveLength(0);
     expect(facetAssignments(partnerOnly, "partner")).toHaveLength(1);
-    expect(facetAssignments(partnerOnly, "staff")).toHaveLength(1);
     // Still alive for the engine regardless of who can see it.
     expect(partnerOnly[0].isRule).toBe(true);
   });
 
-  it("ranks audiences widest to narrowest", () => {
-    expect(isVisibleTo("all", "all")).toBe(true);
-    expect(isVisibleTo("partner", "all")).toBe(false);
-    expect(isVisibleTo("staff", "partner")).toBe(false);
-    expect(isVisibleTo("partner", "staff")).toBe(true);
+  it("treats user and partner as siblings, not a ladder", () => {
+    // "everyone" is the union; neither side inherits the other's attributes.
+    expect(isVisibleTo("everyone", "user")).toBe(true);
+    expect(isVisibleTo("everyone", "partner")).toBe(true);
+    expect(isVisibleTo("user", "user")).toBe(true);
+    expect(isVisibleTo("user", "partner")).toBe(false);
+    expect(isVisibleTo("partner", "user")).toBe(false);
+    expect(isVisibleTo("partner", "partner")).toBe(true);
   });
 });
 
@@ -378,5 +381,65 @@ describe("show-if", () => {
     expect(
       visibleAssignments(circular, { poe: "Yes", color: "Black" }),
     ).toHaveLength(2);
+  });
+});
+
+describe("audience — definition vs assignment", () => {
+  // The definition says who an attribute is FOR; a category may restrict it
+  // further but never widen it. Otherwise one category set to "all" would leak
+  // a partner-only attribute to the public.
+  const PARTNER_ONLY = definition({
+    uuid: "spec-cert",
+    key: "installer-certification",
+    label: "Installer Certification",
+    audience: "partner",
+    options: options("Certified", "Not certified"),
+  });
+
+  const resolvedWith = (assignmentAudience: "everyone" | "user" | "partner") =>
+    resolveAssignments({
+      chain: CHAIN,
+      rows: [
+        row({
+          specificationUuid: "spec-cert",
+          categoryUuid: "smb",
+          isFilter: true,
+          audience: assignmentAudience,
+        }),
+      ],
+      definitions: [PARTNER_ONLY],
+    });
+
+  it("holds the definition's side however the category is set", () => {
+    const resolved = resolvedWith("everyone");
+    expect(resolved[0].effectiveAudience).toBe("partner");
+    expect(facetAssignments(resolved, "user")).toHaveLength(0);
+    expect(facetAssignments(resolved, "partner")).toHaveLength(1);
+  });
+
+  it("does not let a category flip a fixed attribute to the other side", () => {
+    // The library said partner; a category asking for users cannot override it.
+    const resolved = resolvedWith("user");
+    expect(resolved[0].effectiveAudience).toBe("partner");
+    expect(facetAssignments(resolved, "user")).toHaveLength(0);
+  });
+
+  it("lets a category pick a side when the definition left it open", () => {
+    const resolved = resolveAssignments({
+      chain: CHAIN,
+      rows: [
+        row({
+          specificationUuid: "spec-color",
+          categoryUuid: "smb",
+          isFilter: true,
+          audience: "partner",
+        }),
+      ],
+      definitions: [COLOR],
+    });
+    expect(COLOR.audience).toBe("everyone");
+    expect(resolved[0].effectiveAudience).toBe("partner");
+    expect(facetAssignments(resolved, "user")).toHaveLength(0);
+    expect(facetAssignments(resolved, "partner")).toHaveLength(1);
   });
 });

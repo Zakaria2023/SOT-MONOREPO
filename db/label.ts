@@ -226,7 +226,7 @@ export const ASSIGNMENT_SCOPE_LABELS: Record<AssignmentScope, string> = {
 };
 
 export const ASSIGNMENT_AUDIENCE_LABELS: Record<AssignmentAudience, string> = {
-  all: "Everyone",
-  partner: "Partners & staff",
-  staff: "Staff only",
+  everyone: "Everyone",
+  user: "Users only",
+  partner: "Partner users only",
 };

@@ -12,13 +12,19 @@ import {
   type AttributeInput,
   type LibraryBuilderGroup,
 } from "@/app/(dashboard)/library/action";
-import type { SpecificationDomain, SpecInputType } from "@/db/enum";
+import type {
+  AssignmentAudience,
+  SpecificationDomain,
+  SpecInputType,
+} from "@/db/enum";
 import {
+  assignmentAudiences,
   measurementUnits,
   specInputTypes,
   specificationDomains,
 } from "@/db/enum";
 import {
+  ASSIGNMENT_AUDIENCE_LABELS,
   SPECIFICATION_DOMAIN_LABELS,
   SPEC_INPUT_TYPE_LABELS,
 } from "@/db/label";
@@ -28,8 +34,8 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
-  CornerDownRight,
   GitCompare,
+  ShieldCheck,
   Hash,
   List,
   ListChecks,
@@ -41,7 +47,6 @@ import {
   Type,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, Checkbox, Combobox, Dropdown, Input, Textarea } from "ui";
@@ -50,12 +55,6 @@ import type { DropdownOption } from "ui";
 type LibraryBuilderProps = {
   groups: LibraryBuilderGroup[];
   categories: SelectCategories[];
-};
-
-type RevealTarget = {
-  key: string;
-  label: string;
-  groupName: string;
 };
 
 // An attribute in the list. When a search is active it comes from any group,
@@ -67,9 +66,6 @@ type SearchResult = LibraryBuilderGroup["attributes"][number] & {
 type AttributeFormProps = {
   groupUuid: string | null;
   initial?: AttributeInput & { uuid: string };
-  // Every other library attribute an option can auto-add (reveal), the current
-  // attribute excluded so it can't reveal itself.
-  revealTargets: RevealTarget[];
   // Depth-ordered category options the attribute can be assigned to.
   categoryOptions: DropdownOption[];
   onSubmit: (input: AttributeInput) => void;
@@ -114,9 +110,6 @@ const parseOptionLines = (raw: string): string[] =>
     .filter(Boolean);
 
 // Total auto-add links across all of an attribute's options.
-const revealCount = (optionReveals: Record<string, string[]>): number =>
-  Object.values(optionReveals).reduce((total, keys) => total + keys.length, 0);
-
 const TypeIcon = ({ type }: { type: SpecInputType }) => {
   if (type === "number") return <Hash size={15} className="text-faint" />;
   if (type === "boolean") return <ToggleLeft size={15} className="text-faint" />;
@@ -131,7 +124,6 @@ const TypeIcon = ({ type }: { type: SpecInputType }) => {
 const AttributeForm = ({
   groupUuid,
   initial,
-  revealTargets,
   categoryOptions,
   onSubmit,
   onCancel,
@@ -144,11 +136,11 @@ const AttributeForm = ({
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
+  const [audience, setAudience] = useState<AssignmentAudience>(
+    initial?.audience ?? "everyone",
+  );
   const [optionsText, setOptionsText] = useState(
     (initial?.options ?? []).join("\n"),
-  );
-  const [reveals, setReveals] = useState<Record<string, string[]>>(
-    initial?.reveals ?? {},
   );
   const [categoryUuids, setCategoryUuids] = useState<string[]>(
     initial?.categoryUuids ?? [],
@@ -164,11 +156,6 @@ const AttributeForm = ({
         ? parseOptionLines(optionsText)
         : [];
 
-  const revealOptions = revealTargets.map((target) => ({
-    value: target.key,
-    label: `${target.groupName} · ${target.label}`,
-  }));
-
   // The canonical unit list, plus whatever this attribute already stores if it
   // predates the list — so opening the form never silently drops its unit.
   const unitOptions = [
@@ -178,22 +165,11 @@ const AttributeForm = ({
     ...measurementUnits.map((value) => ({ value, label: value })),
   ];
 
-  const setRevealsFor = (optionValue: string, keys: string[]) =>
-    setReveals((prev) => ({ ...prev, [optionValue]: keys }));
-
   const submit = () => {
     const options =
       inputType === "single_select" || inputType === "multi_select"
         ? parseOptionLines(optionsText)
         : [];
-    // Keep only reveal links whose option value still exists.
-    const prunedReveals: Record<string, string[]> = {};
-    for (const value of optionValues) {
-      const keys = reveals[value]?.filter(Boolean) ?? [];
-      if (keys.length > 0) {
-        prunedReveals[value] = keys;
-      }
-    }
     onSubmit({
       groupUuid,
       label,
@@ -204,8 +180,8 @@ const AttributeForm = ({
         inputType === "single_select" || inputType === "multi_select"
           ? ordered
           : false,
+      audience,
       options,
-      reveals: prunedReveals,
       categoryUuids,
     });
   };
@@ -249,6 +225,25 @@ const AttributeForm = ({
           />
         </div>
       </div>
+      <div>
+        <label className="text-xs font-semibold text-ink">Who is it for</label>
+        <p className="mt-0.5 text-xs text-faint">
+          Set once, here. Users and partner users are separate audiences —
+          &ldquo;Everyone&rdquo; means both. An installer certification is a
+          partner concern wherever it is used, so a category cannot override it.
+        </p>
+        <div className="mt-1">
+          <Dropdown
+            value={audience}
+            onChange={(value) => setAudience(value as AssignmentAudience)}
+            options={assignmentAudiences.map((value) => ({
+              value,
+              label: ASSIGNMENT_AUDIENCE_LABELS[value],
+            }))}
+          />
+        </div>
+      </div>
+
       {inputType === "number" && (
         <>
           <div>
@@ -345,44 +340,6 @@ const AttributeForm = ({
         </div>
       )}
 
-      {optionValues.length === 0 && (
-        <p className="rounded-control border border-dashed border-hairline p-3 text-xs text-faint">
-          Auto-add links hang off option values, so they need an option-based
-          type. Switch to Single-select, Multi-select or Yes / No to link other
-          attributes to a chosen option.
-        </p>
-      )}
-
-      {optionValues.length > 0 && revealOptions.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
-          <div>
-            <label className="text-xs font-semibold text-ink">
-              Auto-add attributes
-            </label>
-            <p className="mt-0.5 text-xs text-faint">
-              When a product picks an option below, the chosen attributes are
-              added to it automatically (and removed if the option changes).
-            </p>
-          </div>
-          {optionValues.map((value) => (
-            <div key={value} className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-secondary">
-                {value}
-              </span>
-              <Dropdown
-                multiple
-                searchable
-                value={reveals[value] ?? []}
-                onChange={(keys) => setRevealsFor(value, keys)}
-                placeholder="Nothing extra"
-                searchPlaceholder="Search attributes…"
-                options={revealOptions}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
@@ -405,18 +362,6 @@ export const LibraryBuilder = ({
   const [error, setError] = useState<string | undefined>(undefined);
 
   const realGroups = groups.filter((group) => group.uuid);
-
-  // Every attribute in the library, flattened — the pool of reveal targets an
-  // option can auto-add. Excludes the attribute itself at each call site.
-  const allTargets: RevealTarget[] = groups.flatMap((group) =>
-    group.attributes.map((attribute) => ({
-      key: attribute.key,
-      label: attribute.label,
-      groupName: group.name,
-    })),
-  );
-  const revealTargetsExcluding = (key?: string) =>
-    allTargets.filter((target) => target.key !== key);
 
   const [selectedUuid, setSelectedUuid] = useState<string>(
     realGroups[0]?.uuid ?? "",
@@ -744,7 +689,6 @@ export const LibraryBuilder = ({
             <AttributeForm
               groupUuid={selected.uuid}
               pending={isPending}
-              revealTargets={revealTargetsExcluding()}
               categoryOptions={categoryOptions}
               onCancel={() => setAddingAttribute(false)}
               onSubmit={(input) =>
@@ -764,7 +708,6 @@ export const LibraryBuilder = ({
                   <AttributeForm
                     groupUuid={attribute.groupUuid}
                     pending={isPending}
-                    revealTargets={revealTargetsExcluding(attribute.key)}
                     categoryOptions={categoryOptions}
                     initial={{
                       uuid: attribute.uuid,
@@ -774,8 +717,8 @@ export const LibraryBuilder = ({
                       unit: attribute.unit,
                       allowRange: attribute.allowRange,
                       ordered: attribute.ordered,
+                      audience: attribute.audience,
                       options: attribute.options,
-                      reveals: attribute.optionReveals,
                       categoryUuids: attribute.categoryUuids,
                     }}
                     onCancel={() => setEditingUuid(null)}
@@ -808,24 +751,31 @@ export const LibraryBuilder = ({
                             range
                           </span>
                         )}
-                        {revealCount(attribute.optionReveals) > 0 && (
+                        {attribute.ordered && (
                           <span
-                            title={`${revealCount(attribute.optionReveals)} auto-add link(s) — an option here adds another attribute`}
-                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                            title="An ordered scale — ≤/≥ compare position on it, and a category slice reads as a ceiling"
+                            className="rounded bg-primary-tint px-1.5 py-0.5 text-[10px] font-semibold text-primary"
                           >
-                            <CornerDownRight size={10} />
-                            {revealCount(attribute.optionReveals)}
+                            ordered
+                          </span>
+                        )}
+                        {attribute.audience !== "everyone" && (
+                          <span
+                            title={`${ASSIGNMENT_AUDIENCE_LABELS[attribute.audience]} — a category cannot change this`}
+                            className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                          >
+                            <ShieldCheck size={10} />
+                            {attribute.audience}
                           </span>
                         )}
                         {attribute.relationshipCount > 0 && (
-                          <Link
-                            href={`/rules?search=${encodeURIComponent(attribute.label)}`}
-                            title={`${attribute.relationshipCount} compatibility rule(s) use this attribute — view them`}
-                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary-tint"
+                          <span
+                            title={`${attribute.relationshipCount} relation(s) use this attribute — edit them on the attribute's card in Assignments`}
+                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary"
                           >
                             <GitCompare size={10} />
                             {attribute.relationshipCount}
-                          </Link>
+                          </span>
                         )}
                       </div>
                       <p className="line-clamp-1 text-xs text-faint">

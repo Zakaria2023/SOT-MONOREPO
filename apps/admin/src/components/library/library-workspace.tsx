@@ -3,7 +3,7 @@
 import { LibraryBuilder } from "@/components/library/library-builder";
 import type { LibraryBuilderGroup } from "@/app/(dashboard)/library/action";
 import type { SelectCategories } from "@/db/schema/categories";
-import { CornerDownRight, GitCompare } from "lucide-react";
+import { GitCompare, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 type LibraryWorkspaceProps = {
@@ -39,7 +39,7 @@ const Orientation = () => (
         Two ways attributes relate
       </p>
       <p className="mt-1 flex items-start gap-1.5 text-xs text-muted">
-        <CornerDownRight size={13} className="mt-0.5 shrink-0 text-primary" />
+        <ShieldCheck size={13} className="mt-0.5 shrink-0 text-primary" />
         <span>
           <strong className="font-semibold text-secondary">Auto-add</strong> —
           set here, on an option. Choosing that option adds another attribute to

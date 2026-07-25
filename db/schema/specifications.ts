@@ -9,7 +9,7 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { specValueTypes } from "../enum";
+import { assignmentAudiences, specValueTypes } from "../enum";
 import { SpecOption, SpecRule } from "../types";
 import { SpecificationGroups } from "./specification-groups";
 
@@ -49,6 +49,16 @@ export const Specifications = mysqlTable("Specifications", {
   // value. Stored as "from - to"; the rule engine budgets a range consumer at
   // its max and a range provider at its min.
   allowRange: boolean("allow_range").default(false).notNull(),
+
+  // Who this attribute is for. Set once, where the attribute is born: an
+  // installer certification is a partner concern wherever it is used, not
+  // something each category should have to remember. A category may narrow
+  // this further on its assignment, but never widen it — so marking an
+  // attribute partner-only here cannot be undone by a category exposing it
+  // publicly by mistake.
+  audience: mysqlEnum("audience", assignmentAudiences)
+    .default("everyone")
+    .notNull(),
 
   // Whether `options` is an ORDERED scale (802.3af < at < bt; 1G < 10G;
   // Cat5e < Cat6 < Cat6a) rather than an unordered set (Black | White). Two
