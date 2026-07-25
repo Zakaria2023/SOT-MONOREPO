@@ -29,6 +29,13 @@ export type EngineSpec = {
   key: SelectSpecifications["key"];
   label: SelectSpecifications["label"];
   unit: SelectSpecifications["unit"];
+  // Whether this spec's option list is an ordered scale (802.3af < at < bt).
+  // The lte/gte comparators only mean something on a scale, so they compare a
+  // value's position in `scale` when this is on. Optional — a spec with no
+  // scale (every numeric spec, and any unordered select) is simply not ordered.
+  ordered?: SelectSpecifications["ordered"];
+  // The master option values in scale order. Empty/absent for a numeric spec.
+  scale?: string[];
 };
 
 // A rule with both specs resolved — the pure evaluator's input shape.
@@ -232,16 +239,33 @@ const findSuggestions = (
     .slice(0, 3);
 };
 
+// Position of a value on an ordered scale, searching the provider's option
+// list first then the consumer's — the two specs normally share a list, but a
+// value only present on one side still ranks. -1 when it's on neither.
+const rankOnScale = (value: string, scales: string[][]): number => {
+  for (const scale of scales) {
+    const index = scale.indexOf(value);
+    if (index >= 0) {
+      return index;
+    }
+  }
+  return -1;
+};
+
 // spec_match: does a consumer's chosen SELECT value(s) fit a provider's?
 //   in         → consumer values ⊆ provider set (impedance ∈ supported)
 //   intersects → the two sets overlap (codec intersection ≠ ∅)
+//   lte / gte  → position on the ordered scale (a PoE af device fits an at
+//                switch, but not the reverse; Cat6 fits a Cat6a run)
 //   eq / other → the two sets are equal (intercom system type match)
 const specMatchSatisfied = (
   consumerValues: string[],
   providerValues: string[],
-  comparator: EngineRule["comparator"],
+  rule: EngineRule,
 ): boolean => {
+  const comparator = rule.comparator;
   const provider = new Set(providerValues);
+
   if (comparator === "intersects") {
     return consumerValues.some((value) => provider.has(value));
   }
@@ -251,6 +275,41 @@ const specMatchSatisfied = (
       consumerValues.every((value) => provider.has(value))
     );
   }
+
+  if (comparator === "lte" || comparator === "gte") {
+    // A ceiling comparison is only meaningful on a scale. An unordered
+    // attribute has no "at most", so it degrades to plain membership rather
+    // than silently comparing alphabetical positions.
+    if (!rule.providerSpec.ordered && !rule.consumerSpec.ordered) {
+      return (
+        consumerValues.length > 0 &&
+        consumerValues.every((value) => provider.has(value))
+      );
+    }
+    const scales = [
+      rule.providerSpec.scale ?? [],
+      rule.consumerSpec.scale ?? [],
+    ];
+    const providerRanks = providerValues
+      .map((value) => rankOnScale(value, scales))
+      .filter((rank) => rank >= 0);
+    const consumerRanks = consumerValues
+      .map((value) => rankOnScale(value, scales))
+      .filter((rank) => rank >= 0);
+    if (providerRanks.length === 0 || consumerRanks.length === 0) {
+      return false;
+    }
+    // The provider offers its best rung: the highest it supports for "at
+    // most", the lowest it requires for "at least".
+    const best =
+      comparator === "lte"
+        ? Math.max(...providerRanks)
+        : Math.min(...providerRanks);
+    return consumerRanks.every((rank) =>
+      comparator === "lte" ? rank <= best : rank >= best,
+    );
+  }
+
   const consumer = new Set(consumerValues);
   return (
     consumer.size === provider.size &&
@@ -335,7 +394,7 @@ const evaluateSpecMatch = (
         specMatchSatisfied(
           parseSpecValues(item.attributes[rule.consumerSpec.key]),
           parseSpecValues(provider.attributes[rule.providerSpec.key]),
-          rule.comparator,
+          rule,
         ),
       ),
   );

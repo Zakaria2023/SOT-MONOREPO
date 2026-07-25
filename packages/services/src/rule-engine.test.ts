@@ -454,4 +454,95 @@ describe("evaluateRule — spec_match (Match on select specs)", () => {
     };
     expect(evaluateRule(codecRule, [phone, pbx], []).status).toBe("pass");
   });
+
+  describe("ordered scales", () => {
+    // PoE grades are a scale, so "at most what the switch supplies" is a
+    // position comparison, not set membership: an af device fits an at switch.
+    const POE_SCALE = ["802.3af", "802.3at", "802.3bt"];
+
+    const poeRule: EngineRule = {
+      ...impedanceRule,
+      uuid: "match-ordered",
+      comparator: "lte",
+      consumerSpec: {
+        key: "poe-required",
+        label: "PoE required",
+        unit: null,
+        ordered: true,
+        scale: POE_SCALE,
+      },
+      providerSpec: {
+        key: "poe-supplied",
+        label: "PoE supplied",
+        unit: null,
+        ordered: true,
+        scale: POE_SCALE,
+      },
+    };
+
+    const device = (uuid: string, grade: string): EngineItem => ({
+      productUuid: uuid,
+      name: `Device ${grade}`,
+      quantity: 1,
+      attributes: { "poe-required": grade },
+    });
+    const injector = (grade: string): EngineItem => ({
+      productUuid: "switch",
+      name: "Switch",
+      quantity: 1,
+      attributes: { "poe-supplied": grade },
+    });
+
+    it("passes a lower grade against a higher one", () => {
+      const result = evaluateRule(
+        poeRule,
+        [device("d1", "802.3af"), injector("802.3at")],
+        [],
+      );
+      expect(result.status).toBe("pass");
+    });
+
+    it("fails a higher grade against a lower one", () => {
+      const result = evaluateRule(
+        poeRule,
+        [device("d1", "802.3bt"), injector("802.3at")],
+        [],
+      );
+      expect(result.status).toBe("fail");
+      expect(result.failingItems.map((item) => item.productUuid)).toEqual([
+        "d1",
+      ]);
+    });
+
+    it("passes an equal grade", () => {
+      expect(
+        evaluateRule(poeRule, [device("d1", "802.3at"), injector("802.3at")], [])
+          .status,
+      ).toBe("pass");
+    });
+
+    it("degrades to membership when neither spec is an ordered scale", () => {
+      // Without a scale there is no "at most", so comparing alphabetically
+      // would be nonsense — fall back to consumer ⊆ provider.
+      const unordered: EngineRule = {
+        ...poeRule,
+        consumerSpec: { key: "poe-required", label: "PoE required", unit: null },
+        providerSpec: { key: "poe-supplied", label: "PoE supplied", unit: null },
+      };
+      expect(
+        evaluateRule(
+          unordered,
+          [device("d1", "802.3af"), injector("802.3at")],
+          [],
+        ).status,
+      ).toBe("fail");
+      expect(
+        evaluateRule(
+          unordered,
+          [device("d1", "802.3at"), injector("802.3at")],
+          [],
+        ).status,
+      ).toBe("pass");
+    });
+  });
 });

@@ -50,6 +50,22 @@ export const Specifications = mysqlTable("Specifications", {
   // its max and a range provider at its min.
   allowRange: boolean("allow_range").default(false).notNull(),
 
+  // Whether `options` is an ORDERED scale (802.3af < at < bt; 1G < 10G;
+  // Cat5e < Cat6 < Cat6a) rather than an unordered set (Black | White). Two
+  // behaviours read it:
+  //   - rules: the lte/gte comparators compare an option's INDEX in this list,
+  //     so "consumer's PoE type must be at most what the switch supplies" works
+  //     on a select spec.
+  //   - assignments: an enabled slice reads as a CEILING (everything up to the
+  //     highest enabled option) instead of plain set membership.
+  // Definition-level, never per-category — the ordering is a property of the
+  // attribute itself.
+  ordered: boolean("ordered").default(false).notNull(),
+
+  // The master option list. Categories narrow which of these they OFFER (see
+  // SpecificationCategories.enabledValues) but never edit this list — a
+  // per-category edit would fork the attribute and break every rule that
+  // compares across categories.
   options: json("options").$type<SpecOption[]>(),
 
   // Rules that force this specification's value when other specs' chosen

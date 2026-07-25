@@ -35,7 +35,7 @@ const KIND_HINTS: Record<RuleKind, string> = {
   ratio:
     "Divides total demand by total supply and checks it stays within a target contention ratio — e.g. access bandwidth ÷ uplink ≤ 20:1. A designed derating, usually a warning.",
   spec_match:
-    "Checks each item's chosen dropdown value against the companion's — e.g. a speaker's impedance must be one the amplifier supports, or two codec sets must overlap. Uses dropdown (select) specs, not numbers.",
+    "Checks each item's chosen dropdown value against the companion's — e.g. a speaker's impedance must be one the amplifier supports, or two codec sets must overlap. Uses dropdown (select) specs, not numbers. On an attribute marked as an ordered scale in the library, ≤ and ≥ compare position on that scale, so an 802.3af device fits an 802.3at switch.",
 };
 
 export const RuleForm = (props: RuleFormProps) => {
@@ -160,12 +160,31 @@ export const RuleForm = (props: RuleFormProps) => {
         { value: "in", label: "must be one of (∈)" },
         { value: "intersects", label: "must overlap (∩)" },
         { value: "eq", label: "must equal (=)" },
+        { value: "lte", label: "must be at most, on the scale (≤)" },
+        { value: "gte", label: "must be at least, on the scale (≥)" },
       ]
     : [
         { value: "lte", label: "must fit within (≤)" },
         { value: "gte", label: "must be at least (≥)" },
         { value: "eq", label: "must equal (=)" },
       ];
+
+  // A scale comparison on dropdown specs needs at least one side marked as an
+  // ordered scale in the library — otherwise there is no "at most" to read and
+  // the engine falls back to plain membership. Warn rather than block, since
+  // the author may be about to mark it ordered.
+  const scaleComparator =
+    isSpecMatch && (comparator === "lte" || comparator === "gte");
+  const pickedSpecsOrdered = [consumerSpecUuid, providerSpecUuid].some((uuid) =>
+    specifications.some(
+      (specification) => specification.uuid === uuid && specification.ordered,
+    ),
+  );
+  const scaleWithoutOrder =
+    scaleComparator &&
+    Boolean(consumerSpecUuid) &&
+    Boolean(providerSpecUuid) &&
+    !pickedSpecsOrdered;
 
   return (
     <form
@@ -371,6 +390,19 @@ export const RuleForm = (props: RuleFormProps) => {
           {consumerUnit ?? "no unit"} vs {providerUnit ?? "no unit"}). Sum and
           per-item rules compare values directly, so both sides must share one
           unit — only count rules may mix units (devices vs ports).
+        </p>
+      )}
+
+      {scaleWithoutOrder && (
+        <p className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+          Neither of these attributes is marked as an ordered scale, so
+          &ldquo;at most&rdquo; has no meaning here and the engine will fall
+          back to plain membership. Open the attribute in the{" "}
+          <Link href="/library" className="font-semibold underline">
+            specification library
+          </Link>{" "}
+          and turn on &ldquo;ordered scale&rdquo; if its options run
+          low-to-high (802.3af → at → bt, 100M → 1G → 10G).
         </p>
       )}
 

@@ -9,6 +9,7 @@ import {
   like,
   ne,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import {
@@ -62,8 +63,33 @@ export type ProductFilters = {
   categoryUuids?: string[];
   /** Restrict to these brand uuids (pass a whole subtree to include children). */
   brandUuids?: string[];
+  /**
+   * Specification facet selections, keyed by the attribute's spec key. Values
+   * within one key are OR'd (Cat6 or Cat6a) and the keys are AND'd (Cat6 AND
+   * black), which is what a shopper means by ticking several boxes.
+   */
+  specValues?: Record<string, string[]>;
   /** Column ordering applied in SQL. */
   sort?: ProductSort;
+};
+
+/**
+ * Match one spec facet against a product's `technicalAttributes` JSON.
+ *
+ * A multi-select attribute stores its chosen options comma-joined
+ * ("802.3af, 802.3at"), so a plain equality check would miss them. Normalising
+ * ", " to "," turns the stored value into a SET literal that FIND_IN_SET can
+ * search, which also covers the single-value case.
+ */
+const specValueCondition = (key: string, values: string[]): SQL | undefined => {
+  const wanted = values.filter((value) => value.trim().length > 0);
+  if (wanted.length === 0) {
+    return undefined;
+  }
+  const stored = sql`replace(json_unquote(json_extract(${Products.technicalAttributes}, ${`$."${key}"`})), ', ', ',')`;
+  return or(
+    ...wanted.map((value) => sql`find_in_set(${value}, ${stored}) > 0`),
+  );
 };
 
 // SQL ordering for each sort option.
@@ -162,6 +188,9 @@ export const getProducts = async (
     }
     if (filters.brandUuids && filters.brandUuids.length > 0) {
       conditions.push(inArray(Products.brandUuid, filters.brandUuids));
+    }
+    for (const [key, values] of Object.entries(filters.specValues ?? {})) {
+      conditions.push(specValueCondition(key, values));
     }
 
     return await db
