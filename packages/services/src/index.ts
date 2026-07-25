@@ -7,7 +7,6 @@ export * from "./categories";
 export * from "./check-compatibility";
 export * from "./classifications";
 export * from "./compatibility-rules";
-export * from "./compatibility-rules-data";
 export * from "./errors";
 export * from "./government";
 export * from "./handovers";

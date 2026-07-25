@@ -1,11 +1,10 @@
-import { BlueprintPanel } from "@/components/rules/blueprint-panel";
 import { RulesTable } from "@/components/rules/rules-table";
 import { ListSearch } from "@/components/shared/list-search";
 import { Pagination } from "@/components/shared/pagination";
 import { FlaskConical, Plus } from "lucide-react";
 import Link from "next/link";
 import { AsyncSection } from "@/components/shared/async-section";
-import { getBlueprints, getRulesPage } from "./action";
+import { getRulesPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
@@ -14,11 +13,6 @@ type Props = {
 type RulesListProps = {
   search?: string;
   page?: string;
-};
-
-const Blueprints = async () => {
-  const blueprints = await getBlueprints();
-  return <BlueprintPanel blueprints={blueprints} />;
 };
 
 const RulesList = async ({ search, page }: RulesListProps) => {
@@ -65,10 +59,6 @@ const RulesPage = async ({ searchParams }: Props) => {
           </Link>
         </div>
       </div>
-
-      <AsyncSection reloadKey="rule-blueprints">
-        <Blueprints />
-      </AsyncSection>
 
       <ListSearch placeholder="Search by rule name or spec..." />
 

@@ -10,7 +10,6 @@ import {
   checkCompatibility,
   createCompatibilityRule,
   deleteCompatibilityRule,
-  installRuleBlueprint,
   updateCompatibilityRule,
 } from "services";
 import type { LookupRow } from "@/db/types";
@@ -137,21 +136,6 @@ export const checkCompatibilityAction = async (
         error instanceof Error
           ? error.message
           : "Failed to check compatibility",
-    };
-  }
-};
-
-export const installBlueprintAction = async (
-  id: string,
-): Promise<RuleActionResult> => {
-  try {
-    await installRuleBlueprint(id);
-    revalidatePath("/rules");
-    return { success: true };
-  } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to install the rule",
     };
   }
 };
