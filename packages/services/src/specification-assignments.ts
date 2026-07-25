@@ -51,6 +51,10 @@ export type CategoryAssignment = AssignmentSwitches & {
   valueType: SelectSpecifications["valueType"];
   inputType: SelectSpecifications["inputType"];
   allowMultiple: SelectSpecifications["allowMultiple"];
+  // Who the attribute itself is for, and the narrower of that and this
+  // category's setting — what a viewer is actually judged against.
+  definitionAudience: SelectSpecifications["audience"];
+  effectiveAudience: SelectSpecifications["audience"];
   // The full master list, so the builder can show which options the slice
   // leaves out — it must never let a category edit this list.
   masterOptions: string[];
@@ -78,6 +82,7 @@ const DEFINITION_COLUMNS = {
   ordered: Specifications.ordered,
   options: Specifications.options,
   order: Specifications.order,
+  audience: Specifications.audience,
 };
 
 /**
@@ -222,6 +227,8 @@ export const getCategoryAssignmentRows = async (
       valueType: assignment.definition.valueType,
       inputType: assignment.definition.inputType,
       allowMultiple: assignment.definition.allowMultiple,
+      definitionAudience: assignment.definition.audience,
+      effectiveAudience: assignment.effectiveAudience,
       masterOptions: (assignment.definition.options ?? []).map(
         (option) => option.value,
       ),
@@ -384,7 +391,7 @@ export const getProductFormAttributes = async (): Promise<
         isFilter: assignment.isFilter,
         isRule: assignment.isRule,
         showIf: assignment.showIf,
-        audience: assignment.audience,
+        audience: assignment.effectiveAudience,
         groupName: groupByUuid.get(assignment.definition.uuid) ?? null,
       }));
     }

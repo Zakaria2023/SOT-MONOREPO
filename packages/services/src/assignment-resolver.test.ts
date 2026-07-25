@@ -30,6 +30,7 @@ const definition = (
   ordered: false,
   options: [],
   order: 0,
+  audience: "all",
   ...overrides,
 });
 
@@ -378,5 +379,63 @@ describe("show-if", () => {
     expect(
       visibleAssignments(circular, { poe: "Yes", color: "Black" }),
     ).toHaveLength(2);
+  });
+});
+
+describe("audience — definition vs assignment", () => {
+  // The definition says who an attribute is FOR; a category may restrict it
+  // further but never widen it. Otherwise one category set to "all" would leak
+  // a partner-only attribute to the public.
+  const PARTNER_ONLY = definition({
+    uuid: "spec-cert",
+    key: "installer-certification",
+    label: "Installer Certification",
+    audience: "partner",
+    options: options("Certified", "Not certified"),
+  });
+
+  const resolvedWith = (assignmentAudience: "all" | "partner" | "staff") =>
+    resolveAssignments({
+      chain: CHAIN,
+      rows: [
+        row({
+          specificationUuid: "spec-cert",
+          categoryUuid: "smb",
+          isFilter: true,
+          audience: assignmentAudience,
+        }),
+      ],
+      definitions: [PARTNER_ONLY],
+    });
+
+  it("keeps the definition's audience when the category is more permissive", () => {
+    const resolved = resolvedWith("all");
+    expect(resolved[0].effectiveAudience).toBe("partner");
+    expect(facetAssignments(resolved, "all")).toHaveLength(0);
+    expect(facetAssignments(resolved, "partner")).toHaveLength(1);
+  });
+
+  it("lets a category narrow further", () => {
+    const resolved = resolvedWith("staff");
+    expect(resolved[0].effectiveAudience).toBe("staff");
+    expect(facetAssignments(resolved, "partner")).toHaveLength(0);
+    expect(facetAssignments(resolved, "staff")).toHaveLength(1);
+  });
+
+  it("leaves a public attribute public", () => {
+    const resolved = resolveAssignments({
+      chain: CHAIN,
+      rows: [
+        row({
+          specificationUuid: "spec-color",
+          categoryUuid: "smb",
+          isFilter: true,
+          audience: "all",
+        }),
+      ],
+      definitions: [COLOR],
+    });
+    expect(resolved[0].effectiveAudience).toBe("all");
+    expect(facetAssignments(resolved, "all")).toHaveLength(1);
   });
 });

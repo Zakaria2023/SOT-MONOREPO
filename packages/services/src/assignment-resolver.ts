@@ -51,10 +51,16 @@ export type AssignmentDefinition = Pick<
   | "ordered"
   | "options"
   | "order"
+  | "audience"
 >;
 
 export type ResolvedAssignment = AssignmentSwitches & {
   definition: AssignmentDefinition;
+  // Who actually sees it: the NARROWER of the attribute's own audience and
+  // this category's. The definition sets who an attribute is for; a category
+  // may restrict further but never widen, so a partner-only attribute cannot
+  // leak to the public because one category was set to "all".
+  effectiveAudience: AssignmentAudience;
   // Which category in the chain authored the winning row.
   sourceCategoryUuid: AssignmentRow["categoryUuid"];
   // True when the winning row came from an ancestor rather than the category
@@ -172,6 +178,10 @@ export const resolveAssignments = ({
       enabledValues: row.enabledValues,
       order: row.order,
       definition,
+      effectiveAudience:
+        AUDIENCE_RANK[definition.audience] >= AUDIENCE_RANK[row.audience]
+          ? definition.audience
+          : row.audience,
       sourceCategoryUuid: row.categoryUuid,
       inherited: rowDistance > 0,
       offeredOptions: sliceOptions(definition, row.enabledValues),
@@ -208,7 +218,7 @@ export const facetAssignments = (
   resolved.filter(
     (assignment) =>
       assignment.isFilter &&
-      isVisibleTo(assignment.audience, viewer) &&
+      isVisibleTo(assignment.effectiveAudience, viewer) &&
       (!assignment.inherited || assignment.scope === "branch") &&
       assignment.offeredOptions.length > 0,
   );

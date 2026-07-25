@@ -6,6 +6,7 @@ import { RelationSection } from "@/components/assignments/relation-section";
 import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
 import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
+import type { ReactNode } from "react";
 import { Dropdown } from "ui";
 
 type AssignmentsTabProps = {
@@ -37,18 +38,29 @@ type AssignmentCardProps = {
 type SwitchProps = {
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  disabled?: boolean;
+  title?: string;
+  children: ReactNode;
 };
 
-const Switch = ({ active, onClick, children }: SwitchProps) => (
+// Widest to narrowest — used to stop a category widening what the library set.
+const AUDIENCE_RANK: Record<AssignmentAudience, number> = {
+  all: 0,
+  partner: 1,
+  staff: 2,
+};
+
+const Switch = ({ active, onClick, disabled, title, children }: SwitchProps) => (
   <button
     type="button"
     onClick={onClick}
+    disabled={disabled}
+    title={title}
     aria-pressed={active}
     className={
       active
         ? "flex items-center gap-1.5 rounded-control bg-primary px-3.5 py-2 text-sm font-semibold text-white"
-        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary"
+        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-hairline disabled:hover:text-faint"
     }
   >
     {children}
@@ -175,22 +187,38 @@ const AssignmentCard = ({
         ))}
       </div>
 
-      {/* Audience. */}
+      {/* Audience. The library already fixed who the attribute is FOR; this
+          can only narrow it, so anything wider is shown as unavailable. */}
       <div className="flex flex-wrap items-center gap-2">
         {(["all", "partner", "staff"] as AssignmentAudience[]).map(
-          (audience) => (
-            <Switch
-              key={audience}
-              active={row.audience === audience}
-              onClick={() => onChange(row.specificationUuid, { audience })}
-            >
-              {audience === "all"
-                ? "All"
-                : audience === "partner"
-                  ? "Partner"
-                  : "Staff"}
-            </Switch>
-          ),
+          (audience) => {
+            const widerThanDefinition =
+              AUDIENCE_RANK[audience] < AUDIENCE_RANK[row.definitionAudience];
+            return (
+              <Switch
+                key={audience}
+                active={row.audience === audience && !widerThanDefinition}
+                disabled={widerThanDefinition}
+                title={
+                  widerThanDefinition
+                    ? `This attribute is ${row.definitionAudience}-only in the library — a category cannot widen that`
+                    : undefined
+                }
+                onClick={() => onChange(row.specificationUuid, { audience })}
+              >
+                {audience === "all"
+                  ? "All"
+                  : audience === "partner"
+                    ? "Partner"
+                    : "Staff"}
+              </Switch>
+            );
+          },
+        )}
+        {row.definitionAudience !== "all" && (
+          <span className="text-sm text-faint">
+            {row.definitionAudience}-only in the library
+          </span>
         )}
       </div>
 

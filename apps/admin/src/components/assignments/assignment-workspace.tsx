@@ -113,6 +113,8 @@ export const AssignmentWorkspace = ({
         valueType: specification.valueType,
         inputType: specification.inputType,
         allowMultiple: specification.allowMultiple,
+        definitionAudience: specification.audience,
+        effectiveAudience: specification.audience,
         masterOptions: (specification.options ?? []).map(
           (option) => option.value,
         ),
@@ -128,7 +130,7 @@ export const AssignmentWorkspace = ({
         isRule: true,
         scope: "branch",
         showIf: null,
-        audience: "all",
+        audience: specification.audience,
         enabledValues: null,
         order: current.length,
         owned: true,

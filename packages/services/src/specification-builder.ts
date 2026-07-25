@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { asc, count, eq } from "drizzle-orm";
 import { resolveSpecInputType, slugify } from "utils";
 import { db } from "../../../db";
-import type { SpecInputType } from "../../../db/enum";
+import type { AssignmentAudience, SpecInputType } from "../../../db/enum";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
 import { SpecificationCategories } from "../../../db/schema/specification-categories";
 import {
@@ -36,6 +36,8 @@ export type LibraryAttribute = {
   // Whether `options` is an ordered scale rather than an unordered set. Drives
   // the ≤/≥ comparators in rules and the ceiling reading of a category slice.
   ordered: boolean;
+  // Who this attribute is for. A category may narrow it, never widen it.
+  audience: AssignmentAudience;
   options: string[];
   // Per-option reveal links: option value → library attribute keys auto-added
   // to a product when that option is chosen. Empty for options with no links.
@@ -67,6 +69,8 @@ export type AttributeInput = {
   // Marks the option list as a low-to-high scale. Only meaningful for the
   // option-based types; forced off for number/text.
   ordered: boolean;
+  // Who the attribute is for — the default every assignment inherits.
+  audience: AssignmentAudience;
   // Raw option strings (for select/multi_select). Ignored for other types.
   options: string[];
   // Per-option reveal links: option value → library attribute keys to auto-add
@@ -173,6 +177,7 @@ const toLibraryAttribute = (
     unit: spec.unit,
     allowRange: spec.allowRange,
     ordered: spec.ordered,
+    audience: spec.audience,
     options: (spec.options ?? []).map((option) => option.value),
     optionReveals,
     categoryUuids,
@@ -341,6 +346,7 @@ export const createLibraryAttribute = async (
       allowMultiple: engine.allowMultiple,
       allowRange: engine.allowRange,
       ordered: engine.ordered,
+      audience: input.audience,
       unit: engine.unit,
       options: engine.options,
       order: total,
@@ -367,6 +373,7 @@ export const updateLibraryAttribute = async (
         allowMultiple: engine.allowMultiple,
         allowRange: engine.allowRange,
         ordered: engine.ordered,
+        audience: input.audience,
         unit: engine.unit,
         options: engine.options,
       })

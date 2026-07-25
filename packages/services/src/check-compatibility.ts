@@ -67,6 +67,7 @@ export const checkCompatibility = async (
           allowMultiple: Specifications.allowMultiple,
           allowRange: Specifications.allowRange,
           order: Specifications.order,
+          audience: Specifications.audience,
         })
         .from(Specifications)
         .orderBy(asc(Specifications.order)),
@@ -175,6 +176,7 @@ export const checkCompatibility = async (
     ordered: spec.ordered,
     options: spec.options,
     order: spec.order,
+    audience: spec.audience,
   }));
 
   // Resolved once per category that actually has products in play, in memory.

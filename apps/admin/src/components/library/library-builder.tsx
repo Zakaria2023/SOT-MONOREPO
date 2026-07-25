@@ -12,13 +12,19 @@ import {
   type AttributeInput,
   type LibraryBuilderGroup,
 } from "@/app/(dashboard)/library/action";
-import type { SpecificationDomain, SpecInputType } from "@/db/enum";
+import type {
+  AssignmentAudience,
+  SpecificationDomain,
+  SpecInputType,
+} from "@/db/enum";
 import {
+  assignmentAudiences,
   measurementUnits,
   specInputTypes,
   specificationDomains,
 } from "@/db/enum";
 import {
+  ASSIGNMENT_AUDIENCE_LABELS,
   SPECIFICATION_DOMAIN_LABELS,
   SPEC_INPUT_TYPE_LABELS,
 } from "@/db/label";
@@ -144,6 +150,9 @@ const AttributeForm = ({
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
+  const [audience, setAudience] = useState<AssignmentAudience>(
+    initial?.audience ?? "all",
+  );
   const [optionsText, setOptionsText] = useState(
     (initial?.options ?? []).join("\n"),
   );
@@ -204,6 +213,7 @@ const AttributeForm = ({
         inputType === "single_select" || inputType === "multi_select"
           ? ordered
           : false,
+      audience,
       options,
       reveals: prunedReveals,
       categoryUuids,
@@ -249,6 +259,25 @@ const AttributeForm = ({
           />
         </div>
       </div>
+      <div>
+        <label className="text-xs font-semibold text-ink">Who is it for</label>
+        <p className="mt-0.5 text-xs text-faint">
+          Set once, here. An installer certification is a partner concern
+          wherever it is used — a category can restrict this further, but never
+          widen it.
+        </p>
+        <div className="mt-1">
+          <Dropdown
+            value={audience}
+            onChange={(value) => setAudience(value as AssignmentAudience)}
+            options={assignmentAudiences.map((value) => ({
+              value,
+              label: ASSIGNMENT_AUDIENCE_LABELS[value],
+            }))}
+          />
+        </div>
+      </div>
+
       {inputType === "number" && (
         <>
           <div>
@@ -774,6 +803,7 @@ export const LibraryBuilder = ({
                       unit: attribute.unit,
                       allowRange: attribute.allowRange,
                       ordered: attribute.ordered,
+                      audience: attribute.audience,
                       options: attribute.options,
                       reveals: attribute.optionReveals,
                       categoryUuids: attribute.categoryUuids,
