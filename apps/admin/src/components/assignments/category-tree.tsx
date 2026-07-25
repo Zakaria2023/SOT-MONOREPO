@@ -10,10 +10,17 @@ type CategoryTreeProps = {
 type TreeNode = {
   category: CategoryListItem;
   depth: number;
+  // Whether this node is the last child of its parent — decides an elbow (└)
+  // rather than a tee (├).
+  isLast: boolean;
+  // For each ancestor level, whether that ancestor still has siblings below it.
+  // A continuing line is drawn only where it does, so the guides trace the
+  // actual path back to the root instead of a solid grid.
+  ancestorLines: boolean[];
 };
 
-// Flatten the parent/child graph depth-first into render order, so the list can
-// stay a plain <ul> and still read as a tree.
+// Flatten the parent/child graph depth-first into render order, carrying the
+// guide-line state each row needs to draw its own connectors.
 const flatten = (categories: CategoryListItem[]): TreeNode[] => {
   const childrenOf = new Map<string | null, CategoryListItem[]>();
   for (const category of categories) {
@@ -24,13 +31,19 @@ const flatten = (categories: CategoryListItem[]): TreeNode[] => {
   }
 
   const nodes: TreeNode[] = [];
-  const walk = (parentUuid: string | null, depth: number) => {
-    for (const category of childrenOf.get(parentUuid) ?? []) {
-      nodes.push({ category, depth });
-      walk(category.uuid, depth + 1);
-    }
+  const walk = (
+    parentUuid: string | null,
+    depth: number,
+    ancestorLines: boolean[],
+  ) => {
+    const siblings = childrenOf.get(parentUuid) ?? [];
+    siblings.forEach((category, index) => {
+      const isLast = index === siblings.length - 1;
+      nodes.push({ category, depth, isLast, ancestorLines });
+      walk(category.uuid, depth + 1, [...ancestorLines, !isLast]);
+    });
   };
-  walk(null, 0);
+  walk(null, 0, []);
   return nodes;
 };
 
@@ -43,26 +56,59 @@ export const CategoryTree = ({ categories, selected }: CategoryTreeProps) => {
         Category tree
       </p>
 
-      <ul className="mt-3 flex max-h-[32rem] flex-col gap-0.5 overflow-y-auto">
-        {nodes.map(({ category, depth }) => {
+      <ul className="scrollbar-slim mt-3 flex max-h-136 flex-col overflow-y-auto pr-1">
+        {nodes.map(({ category, depth, isLast, ancestorLines }) => {
           const active = category.uuid === selected;
           return (
-            <li key={category.uuid}>
+            // The guides sit OUTSIDE the link, so a selected row's highlight
+            // never paints over the lines leading to it.
+            <li key={category.uuid} className="flex items-stretch">
+              {/* One column per ancestor level: a vertical line only where
+                  that ancestor still has siblings coming after it. */}
+              {ancestorLines.map((continues, level) => (
+                <span key={level} aria-hidden className="relative w-5 shrink-0">
+                  {continues && (
+                    <span className="absolute inset-y-0 left-1/2 w-px bg-faint/45" />
+                  )}
+                </span>
+              ))}
+
+              {/* This node's own connector: a tee or an elbow into the label,
+                  with a node dot where they meet. */}
+              {depth > 0 && (
+                <span aria-hidden className="relative w-5 shrink-0">
+                  <span
+                    className={
+                      isLast
+                        ? "absolute top-0 left-1/2 h-1/2 w-px bg-faint/45"
+                        : "absolute inset-y-0 left-1/2 w-px bg-faint/45"
+                    }
+                  />
+                  <span className="absolute top-1/2 right-1 left-1/2 h-px bg-faint/45" />
+                  <span
+                    className={
+                      active
+                        ? "absolute top-1/2 right-0.5 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary"
+                        : "absolute top-1/2 right-0.5 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-faint/60"
+                    }
+                  />
+                </span>
+              )}
+
               <Link
                 href={`/assignments?category=${category.uuid}`}
-                style={{ paddingLeft: 8 + depth * 16 }}
                 className={
                   active
-                    ? "flex items-center gap-2 rounded-lg bg-primary py-1.5 pr-2 text-sm font-semibold text-white"
-                    : "flex items-center gap-2 rounded-lg py-1.5 pr-2 text-sm text-ink transition-colors hover:bg-hover"
+                    ? "my-0.5 flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-primary px-2.5 py-2 text-base font-semibold text-white"
+                    : "my-0.5 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-base text-ink transition-colors hover:bg-hover"
                 }
               >
                 {category.path && (
                   <span
                     className={
                       active
-                        ? "font-mono text-[10px] text-white/70"
-                        : "font-mono text-[10px] text-faint"
+                        ? "font-mono text-xs text-white/70"
+                        : "font-mono text-xs text-faint"
                     }
                   >
                     {category.path}
@@ -75,7 +121,7 @@ export const CategoryTree = ({ categories, selected }: CategoryTreeProps) => {
         })}
       </ul>
 
-      <p className="mt-3 border-t border-hairline pt-3 text-xs text-faint">
+      <p className="mt-3 border-t border-hairline pt-3 text-sm text-faint">
         Pick a category — its attributes are what it inherits, plus its own.
       </p>
     </div>

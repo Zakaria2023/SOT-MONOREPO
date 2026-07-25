@@ -93,8 +93,8 @@ export const RelationSection = ({
 
   return (
     <div className="flex flex-col gap-2 border-t border-hairline pt-2.5">
-      <span className="flex items-center gap-1 text-[11px] font-semibold text-muted">
-        <Zap size={11} />
+      <span className="flex items-center gap-1 text-sm font-semibold text-muted">
+        <Zap size={14} />
         Relations
         <span className="font-normal text-faint">
           — what this attribute is compared against
@@ -108,10 +108,10 @@ export const RelationSection = ({
           {relations.map((relation) => (
             <li
               key={`${relation.uuid}-${relation.side}`}
-              className="flex flex-wrap items-center gap-1.5 rounded-md bg-surface px-2 py-1.5 text-[11px]"
+              className="flex flex-wrap items-center gap-1.5 rounded-md bg-surface px-2 py-1.5 text-sm"
             >
               <span className="font-semibold text-ink">{relation.name}</span>
-              <span className="rounded bg-page px-1 py-0.5 text-[10px] text-muted">
+              <span className="rounded bg-page px-1 py-0.5 text-sm text-muted">
                 {RULE_KIND_LABELS[relation.kind]}
               </span>
               <span className="text-muted">
@@ -121,7 +121,7 @@ export const RelationSection = ({
                   : `vs ${relation.otherSpecLabel ?? "—"}`}
               </span>
               {relation.severity === "warn" && (
-                <span className="rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700">
+                <span className="rounded bg-amber-50 px-1 py-0.5 text-sm font-medium text-amber-700">
                   soft
                 </span>
               )}
@@ -132,7 +132,7 @@ export const RelationSection = ({
                 aria-label={`Delete ${relation.name}`}
                 className="ml-auto rounded p-1 text-faint transition-colors hover:text-danger"
               >
-                <Trash2 size={12} />
+                <Trash2 size={15} />
               </button>
             </li>
           ))}
@@ -220,7 +220,7 @@ export const RelationSection = ({
           </div>
 
           {specUnit && (
-            <p className="text-[11px] text-faint">
+            <p className="text-sm text-faint">
               {specLabel} is measured in {specUnit} — the other side must use
               the same unit, except on a Count relation.
             </p>
@@ -231,7 +231,7 @@ export const RelationSection = ({
               type="button"
               disabled={isPending || !name.trim() || !otherSpecUuid}
               onClick={submit}
-              className="rounded-control bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-control bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPending ? "Saving…" : "Add relation"}
             </button>
@@ -248,9 +248,9 @@ export const RelationSection = ({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex w-fit items-center gap-1 rounded-md border border-hairline px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:border-primary hover:text-primary"
+          className="flex w-fit items-center gap-1 rounded-md border border-hairline px-2 py-1 text-sm font-medium text-muted transition-colors hover:border-primary hover:text-primary"
         >
-          <Plus size={11} />
+          <Plus size={14} />
           Add relation
         </button>
       )}

@@ -15,9 +15,6 @@ import type {
 import type {
   AssignmentInput as ServiceAssignmentInput,
   CategoryAssignment as ServiceCategoryAssignment,
-  PreviewCategory as ServicePreviewCategory,
-  PreviewProduct as ServicePreviewProduct,
-  ShopperPreview as ServiceShopperPreview,
   SpecRelation as ServiceSpecRelation,
   SpecificationWithCategories as ServiceSpecificationWithCategories,
 } from "services";
@@ -26,9 +23,6 @@ import type {
 // async functions.
 export type AssignmentInput = ServiceAssignmentInput;
 export type CategoryAssignment = ServiceCategoryAssignment;
-export type ShopperPreview = ServiceShopperPreview;
-export type PreviewCategory = ServicePreviewCategory;
-export type PreviewProduct = ServicePreviewProduct;
 export type SpecificationWithCategories = ServiceSpecificationWithCategories;
 
 export type SaveAssignmentsResult = {
