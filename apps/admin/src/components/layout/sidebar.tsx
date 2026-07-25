@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Tags,
   Ticket,
+  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -46,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Tags, label: "Categories", href: "/categories" },
       { icon: Shapes, label: "Classifications", href: "/classifications" },
       { icon: Library, label: "Spec Library", href: "/library" },
+      { icon: Workflow, label: "Assignments", href: "/assignments" },
       { icon: GitCompare, label: "Compatibility Rules", href: "/rules" },
       {
         icon: SlidersHorizontal,

@@ -63,7 +63,7 @@ export const CategoryForm = (props: CategoryFormProps) => {
         </h2>
         {mode === "edit" && (
           <Link
-            href={`/categories/${props.category.uuid}/assignments`}
+            href={`/assignments?category=${props.category.uuid}`}
             className="ml-auto flex items-center gap-1.5 rounded-control border border-hairline px-3 py-2 text-sm text-ink transition-colors hover:border-primary hover:text-primary"
           >
             <Layers size={15} />

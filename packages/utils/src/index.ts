@@ -426,3 +426,82 @@ export const splitFullName = (fullName: string) => {
 /** Best-effort display name for the Clerk reviewer recorded on a request. */
 export const getReviewerName = (user: ReviewerUser | null | undefined) =>
   user?.fullName?.trim() || user?.primaryEmailAddress?.emailAddress || user?.id;
+
+// ---------------------------------------------------------------------------
+// Facet matching — shared by the storefront filter and the admin's shopper
+// preview. Plain data in, plain verdict out: no db types, so client code can
+// import it.
+// ---------------------------------------------------------------------------
+
+export type FacetChoice = {
+  specKey: string;
+  value: string;
+  // The attribute's master option list in scale order, when it's ordered.
+  // Present = the choice is a CEILING; absent = plain set membership.
+  scale?: string[];
+};
+
+export type FacetVerdict = {
+  ok: boolean;
+  // Why it failed, phrased for a shopper ("needs 10G").
+  reason?: string;
+};
+
+/**
+ * Whether a set of offered values satisfies one facet choice.
+ *
+ * On an UNORDERED attribute the choice is membership: the shopper picked
+ * 6GHz, so anything that doesn't offer 6GHz is out.
+ *
+ * On an ORDERED attribute the choice is a ceiling, because the scale runs in
+ * a direction and the shopper is stating what they have. Picking Port Speed
+ * 1G means "my network gives 1G", so a NAS that needs 10G is out — its
+ * requirement sits above the ceiling. Anything at or below it still fits.
+ */
+export const evaluateFacet = (
+  offered: string[],
+  choice: FacetChoice,
+): FacetVerdict => {
+  // Carrying nothing for this attribute means the facet doesn't apply — a
+  // rack rail has no opinion about frequency band.
+  if (offered.length === 0) {
+    return { ok: true };
+  }
+
+  if (!choice.scale || choice.scale.length === 0) {
+    return offered.includes(choice.value)
+      ? { ok: true }
+      : { ok: false, reason: `needs ${offered.join(" or ")}` };
+  }
+
+  const ceiling = choice.scale.indexOf(choice.value);
+  if (ceiling < 0) {
+    return { ok: true };
+  }
+  // The cheapest rung it can live on: if even that is above the ceiling, no
+  // configuration of this item fits.
+  const ranks = offered
+    .map((value) => choice.scale?.indexOf(value) ?? -1)
+    .filter((rank) => rank >= 0);
+  if (ranks.length === 0) {
+    return { ok: true };
+  }
+  const lowest = Math.min(...ranks);
+  return lowest <= ceiling
+    ? { ok: true }
+    : { ok: false, reason: `needs ${choice.scale[lowest]}` };
+};
+
+/** First failing facet across several choices, or null when all pass. */
+export const firstFacetFailure = (
+  offeredByKey: Record<string, string[]>,
+  choices: FacetChoice[],
+): { specKey: string; reason: string } | null => {
+  for (const choice of choices) {
+    const verdict = evaluateFacet(offeredByKey[choice.specKey] ?? [], choice);
+    if (!verdict.ok && verdict.reason) {
+      return { specKey: choice.specKey, reason: verdict.reason };
+    }
+  }
+  return null;
+};
