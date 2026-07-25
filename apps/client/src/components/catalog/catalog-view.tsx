@@ -3,13 +3,20 @@
 import { BrandFilter } from "@/components/catalog/brand-filter";
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { CategoryFilter } from "@/components/catalog/category-filter";
-import { SORT_OPTIONS, type TreeNode } from "@/lib/catalog";
+import { SpecFilter } from "@/components/catalog/spec-filter";
+import {
+  SORT_OPTIONS,
+  SPEC_PARAM,
+  encodeSpecParam,
+  type TreeNode,
+} from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type {
   BrandListItem,
+  CategoryFacet,
   CategoryListItem,
   ProductListItem,
   ProductSort,
@@ -23,6 +30,10 @@ type CatalogViewProps = {
   total: number;
   selectedCategory: string | null;
   selectedBrands: string[];
+  // Specification facets the selected category offers this viewer. Empty until
+  // a category is chosen, since a facet belongs to a place in the tree.
+  facets: CategoryFacet[];
+  selectedSpecs: Record<string, string[]>;
   sort: ProductSort;
   search: string;
   // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
@@ -36,6 +47,8 @@ export const CatalogView = ({
   total,
   selectedCategory,
   selectedBrands,
+  facets,
+  selectedSpecs,
   sort,
   search,
   discountPercent,
@@ -71,6 +84,21 @@ export const CatalogView = ({
       } else {
         params.delete("category");
       }
+      // Facets belong to the category being viewed, so leaving it drops them.
+      // Carrying "Cat6" from Copper Cables into IP Cameras would filter the
+      // new category down to nothing for no visible reason.
+      params.delete(SPEC_PARAM);
+    });
+
+  const toggleSpec = (key: string, value: string) =>
+    updateParams((params) => {
+      const entry = encodeSpecParam(key, value);
+      const current = params.getAll(SPEC_PARAM);
+      params.delete(SPEC_PARAM);
+      const next = current.includes(entry)
+        ? current.filter((item) => item !== entry)
+        : [...current, entry];
+      next.forEach((item) => params.append(SPEC_PARAM, item));
     });
 
   const toggleBrand = (uuid: string) =>
@@ -142,6 +170,11 @@ export const CatalogView = ({
               selected={selectedBrandSet}
               onToggle={toggleBrand}
             />
+            <SpecFilter
+              facets={facets}
+              selected={selectedSpecs}
+              onToggle={toggleSpec}
+            />
           </aside>
 
           {/* Mobile filters drawer */}
@@ -180,6 +213,11 @@ export const CatalogView = ({
                   tree={brandTree}
                   selected={selectedBrandSet}
                   onToggle={toggleBrand}
+                />
+                <SpecFilter
+                  facets={facets}
+                  selected={selectedSpecs}
+                  onToggle={toggleSpec}
                 />
               </div>
             </div>

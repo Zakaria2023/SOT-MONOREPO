@@ -143,6 +143,7 @@ const AttributeForm = ({
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
+  const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [optionsText, setOptionsText] = useState(
     (initial?.options ?? []).join("\n"),
   );
@@ -199,6 +200,10 @@ const AttributeForm = ({
       inputType,
       unit: inputType === "number" ? unit : null,
       allowRange: inputType === "number" ? allowRange : false,
+      ordered:
+        inputType === "single_select" || inputType === "multi_select"
+          ? ordered
+          : false,
       options,
       reveals: prunedReveals,
       categoryUuids,
@@ -308,6 +313,22 @@ const AttributeForm = ({
             placeholder={"802.3af (PoE)\n802.3at (PoE+)\n802.3bt (PoE++)"}
             className="mt-1"
           />
+          <label className="mt-2 flex items-start gap-2">
+            <Checkbox
+              checked={ordered}
+              onChange={(event) => setOrdered(event.target.checked)}
+            />
+            <span className="text-xs text-ink">
+              These options are an ordered scale (low to high)
+              <span className="mt-0.5 block text-faint">
+                Turn this on when the list runs in a direction — 802.3af → at →
+                bt, 100M → 1G → 10G, Cat5e → Cat6 → Cat6a. Rules can then use
+                &ldquo;at most&rdquo; and &ldquo;at least&rdquo; on it, and a
+                category enabling one value offers everything up to it. Leave
+                off for a plain set like Black / White / Grey.
+              </span>
+            </span>
+          </label>
         </div>
       )}
       {inputType === "text" && (
@@ -752,6 +773,7 @@ export const LibraryBuilder = ({
                       inputType: attribute.inputType,
                       unit: attribute.unit,
                       allowRange: attribute.allowRange,
+                      ordered: attribute.ordered,
                       options: attribute.options,
                       reveals: attribute.optionReveals,
                       categoryUuids: attribute.categoryUuids,

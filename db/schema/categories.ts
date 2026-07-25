@@ -32,6 +32,12 @@ export const Categories = mysqlTable(
     name: varchar("name", { length: 255 }).notNull(),
     // Category code — the [CATEGORY] segment of the smart SKU (e.g. "SW").
     code: varchar("code", { length: 4 }),
+    // Hierarchical taxonomy code (e.g. "2.A.2") — the join key the ERP
+    // classification and the specification taxonomy share. Distinct from
+    // `code`, which is only the 4-char SKU segment; this one mirrors the
+    // parent chain and is what assignments are read by in exports and the RAG
+    // layer. Nullable while the tree is being coded up.
+    path: varchar("path", { length: 32 }),
     description: text("description"),
     order: int("order").default(0).notNull(),
 

@@ -1,3 +1,4 @@
+export * from "./assignment-resolver";
 export * from "./auth";
 export * from "./boq";
 export * from "./brands";
@@ -20,6 +21,7 @@ export * from "./presence-rules-data";
 export * from "./pricing";
 export * from "./products";
 export * from "./rule-engine";
+export * from "./specification-assignments";
 export * from "./specification-builder";
 export * from "./specification-groups";
 export * from "./specification-templates";

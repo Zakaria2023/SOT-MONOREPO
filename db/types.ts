@@ -32,6 +32,23 @@ export type SpecField = {
   allowRange?: boolean;
 };
 
+// Conditional reveal carried on an assignment: this attribute is only shown
+// (on the storefront facet and the admin product form) while another attribute
+// on the same category holds one of `values`. e.g. PoE Type and PoE Budget are
+// show-if PoE = Yes.
+//
+// The non-obvious half is the clearing: when the condition stops matching, the
+// hidden attribute's stored value must be dropped, not just hidden. A leftover
+// PoE budget on a product whose PoE is now "No" would let the engine size a
+// switch off a number that no longer applies.
+export type ShowIfCondition = {
+  // Key of the OTHER attribute this condition watches.
+  specKey: string;
+  // The condition holds when that attribute's value is one of these. For a
+  // multi-select the condition holds if ANY chosen value is in this list.
+  values: string[];
+};
+
 // Optional consumer-side filter on a compatibility rule: only selection items
 // whose chosen value for `specKey` is one of `values` participate as
 // consumers. e.g. only devices with PoE = "Yes" count toward a PoE budget.

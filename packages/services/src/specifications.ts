@@ -8,12 +8,16 @@ import {
   SelectSpecifications,
   Specifications,
 } from "../../../db/schema/specifications";
-import { SpecificationCategories } from "../../../db/schema/specification-categories";
+import {
+  SelectSpecificationCategories,
+  SpecificationCategories,
+} from "../../../db/schema/specification-categories";
 import {
   SelectSpecificationGroups,
   SpecificationGroups,
 } from "../../../db/schema/specification-groups";
 import { SpecField } from "../../../db/types";
+import { getCategoryAssignments } from "./specification-assignments";
 
 export type { SelectSpecifications };
 
@@ -348,12 +352,22 @@ export const getSpecification = async (
 // The transaction handle drizzle passes to a db.transaction callback.
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+// The assignment switches, carried across a re-link so editing an attribute in
+// the library never resets how a category uses it.
+type PreservedSwitches = Pick<
+  SelectSpecificationCategories,
+  "isFilter" | "isRule" | "scope" | "showIf" | "audience" | "enabledValues" | "order"
+>;
+
 // Insert category links for a specification (no delete — caller decides).
 // Runs on the given transaction so it's part of the caller's atomic write.
+// `preserved` carries each category's existing switches; a category being
+// linked for the first time gets the table defaults.
 const insertSpecificationCategories = async (
   tx: Tx,
   specificationUuid: string,
   categoryUuids: string[],
+  preserved: Map<string, PreservedSwitches> = new Map(),
 ): Promise<void> => {
   const unique = [...new Set(categoryUuids.filter((uuid) => uuid.length > 0))];
   if (unique.length > 0) {
@@ -362,6 +376,7 @@ const insertSpecificationCategories = async (
         uuid: randomUUID(),
         specificationUuid,
         categoryUuid,
+        ...preserved.get(categoryUuid),
       })),
     );
   }
@@ -390,10 +405,32 @@ export const updateSpecification = async (
   // write — a failure can't leave the spec updated but its links half-replaced.
   await db.transaction(async (tx) => {
     await tx.update(Specifications).set(fields).where(eq(Specifications.uuid, uuid));
+
+    // Links carry the per-category assignment switches, so read them before
+    // the delete and carry them over. Without this, editing an attribute's
+    // label in the library would silently reset every category's filter/rule/
+    // scope/show-if settings back to the defaults.
+    const existing = await tx
+      .select({
+        categoryUuid: SpecificationCategories.categoryUuid,
+        isFilter: SpecificationCategories.isFilter,
+        isRule: SpecificationCategories.isRule,
+        scope: SpecificationCategories.scope,
+        showIf: SpecificationCategories.showIf,
+        audience: SpecificationCategories.audience,
+        enabledValues: SpecificationCategories.enabledValues,
+        order: SpecificationCategories.order,
+      })
+      .from(SpecificationCategories)
+      .where(eq(SpecificationCategories.specificationUuid, uuid));
+    const preserved = new Map(
+      existing.map(({ categoryUuid, ...switches }) => [categoryUuid, switches]),
+    );
+
     await tx
       .delete(SpecificationCategories)
       .where(eq(SpecificationCategories.specificationUuid, uuid));
-    await insertSpecificationCategories(tx, uuid, categoryUuids);
+    await insertSpecificationCategories(tx, uuid, categoryUuids, preserved);
   });
 };
 
@@ -401,79 +438,31 @@ export const deleteSpecification = async (uuid: string): Promise<void> => {
   await db.delete(Specifications).where(eq(Specifications.uuid, uuid));
 };
 
-// The category itself plus every ancestor, walking up the parent chain. A
-// specification assigned to any of these applies to the given category.
-const getCategoryAndAncestors = async (
-  categoryUuid: string,
-): Promise<string[]> => {
-  const all = await db
-    .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
-    .from(Categories);
-  const parentOf = new Map(all.map((row) => [row.uuid, row.parentUuid]));
-
-  const chain: string[] = [];
-  const seen = new Set<string>();
-  let current: string | null = categoryUuid;
-  while (current && !seen.has(current)) {
-    seen.add(current);
-    chain.push(current);
-    current = parentOf.get(current) ?? null;
-  }
-  return chain;
-};
-
 /**
- * The resolved spec template for a category: every specification assigned to it
- * or any of its ancestors, as SpecField[] (the shape products fill).
+ * The resolved spec template for a category: every attribute assigned to it or
+ * any of its ancestors, as SpecField[] (the shape products fill). Options come
+ * from the assignment's enabled slice, not the raw master list, so a category
+ * only ever offers what it has enabled.
+ *
+ * Every attribute is returned regardless of its switches — the product form
+ * collects values for rule-only attributes too, which is the whole point of
+ * "living, not showing". Show-if is applied against the product's own values
+ * at render time, not here.
  */
 export const getSpecificationsForCategory = async (
   categoryUuid: string,
 ): Promise<SpecField[]> => {
   try {
-    const categoryUuids = await getCategoryAndAncestors(categoryUuid);
-    if (categoryUuids.length === 0) {
-      return [];
-    }
-
-    const rows = await db
-      .select({
-        uuid: Specifications.uuid,
-        key: Specifications.key,
-        label: Specifications.label,
-        valueType: Specifications.valueType,
-        unit: Specifications.unit,
-        allowMultiple: Specifications.allowMultiple,
-        allowRange: Specifications.allowRange,
-        options: Specifications.options,
-        order: Specifications.order,
-      })
-      .from(Specifications)
-      .innerJoin(
-        SpecificationCategories,
-        eq(SpecificationCategories.specificationUuid, Specifications.uuid),
-      )
-      .where(inArray(SpecificationCategories.categoryUuid, categoryUuids))
-      .orderBy(asc(Specifications.order));
-
-    // A spec linked to several ancestors shows up multiple times — dedupe.
-    const seen = new Set<string>();
-    const specs: SpecField[] = [];
-    for (const row of rows) {
-      if (seen.has(row.uuid)) {
-        continue;
-      }
-      seen.add(row.uuid);
-      specs.push({
-        key: row.key,
-        label: row.label,
-        options: row.options ?? [],
-        valueType: row.valueType,
-        unit: row.unit,
-        allowMultiple: row.allowMultiple,
-        allowRange: row.allowRange,
-      });
-    }
-    return specs;
+    const assignments = await getCategoryAssignments(categoryUuid);
+    return assignments.map((assignment) => ({
+      key: assignment.definition.key,
+      label: assignment.definition.label,
+      options: assignment.offeredOptions,
+      valueType: assignment.definition.valueType,
+      unit: assignment.definition.unit,
+      allowMultiple: assignment.definition.allowMultiple,
+      allowRange: assignment.definition.allowRange,
+    }));
   } catch (error) {
     console.error("getSpecificationsForCategory failed:", error);
     throw new Error("Failed to fetch specifications for category", {

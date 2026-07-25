@@ -101,6 +101,33 @@ export const specInputTypes = [
 
 export type SpecInputType = (typeof specInputTypes)[number];
 
+// How far up the category tree an assignment's FILTER reaches. Only meaningful
+// when the assignment has `isFilter` on — it never affects rule participation,
+// which always inherits down the whole subtree.
+// - branch: the facet is offered on the category it's assigned to AND every
+//   descendant, so a shopper standing at Networking filters switches, APs and
+//   routers together on one Port Speed facet.
+// - leaf: the facet is offered only on the exact category it's assigned to.
+//   Detection Range means nothing outside motion detectors, so it stays there.
+export const assignmentScopes = [
+  "branch",
+  "leaf",
+] as const satisfies readonly string[];
+
+export type AssignmentScope = (typeof assignmentScopes)[number];
+
+// Who an assignment is surfaced to, on both the storefront facet and the admin
+// product form. Widest to narrowest: "all" is public, "partner" additionally
+// requires a signed-in partner, "staff" is admin-only. Audience never affects
+// rule participation — a staff-only attribute still feeds the engine.
+export const assignmentAudiences = [
+  "all",
+  "partner",
+  "staff",
+] as const satisfies readonly string[];
+
+export type AssignmentAudience = (typeof assignmentAudiences)[number];
+
 // Compatibility rule families. Rules bind to specifications, never to
 // products: any product carrying the consumer spec participates, any product
 // carrying the provider spec supplies capacity.

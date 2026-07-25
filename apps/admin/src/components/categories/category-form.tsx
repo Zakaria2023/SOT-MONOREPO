@@ -11,7 +11,7 @@ import { Textarea } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectClassifications } from "@/db/schema/classifications";
 import { documentDownloadUrl } from "@/lib/documents";
-import { Tags } from "lucide-react";
+import { Layers, Tags } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -61,6 +61,15 @@ export const CategoryForm = (props: CategoryFormProps) => {
         <h2 className="font-heading text-xl text-ink">
           {mode === "edit" ? "Edit category" : "Create category"}
         </h2>
+        {mode === "edit" && (
+          <Link
+            href={`/categories/${props.category.uuid}/assignments`}
+            className="ml-auto flex items-center gap-1.5 rounded-control border border-hairline px-3 py-2 text-sm text-ink transition-colors hover:border-primary hover:text-primary"
+          >
+            <Layers size={15} />
+            Attributes &amp; filters
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">

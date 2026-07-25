@@ -78,3 +78,38 @@ export const normalizeSort = (value: string | undefined): ProductSort =>
   value && SORT_KEYS.includes(value as ProductSort)
     ? (value as ProductSort)
     : "featured";
+
+// Spec facet selections travel in the URL as repeated `spec=key:value` params
+// (e.g. ?spec=cable-grade:Cat6&spec=cable-grade:Cat6a&spec=color:Black). Spec
+// keys are slugified and never contain a colon, so the first colon separates
+// the two halves and the value may contain its own.
+export const SPEC_PARAM = "spec";
+
+export const encodeSpecParam = (key: string, value: string): string =>
+  `${key}:${value}`;
+
+/** Parse repeated `spec` params into the map getProducts filters by. */
+export const parseSpecParams = (
+  values: string | string[] | undefined,
+): Record<string, string[]> => {
+  const raw = values === undefined ? [] : [values].flat();
+  const parsed: Record<string, string[]> = {};
+
+  for (const entry of raw) {
+    const separator = entry.indexOf(":");
+    if (separator <= 0) {
+      continue;
+    }
+    const key = entry.slice(0, separator);
+    const value = entry.slice(separator + 1);
+    if (!value) {
+      continue;
+    }
+    const current = parsed[key] ?? [];
+    if (!current.includes(value)) {
+      current.push(value);
+    }
+    parsed[key] = current;
+  }
+  return parsed;
+};

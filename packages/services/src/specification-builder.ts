@@ -33,6 +33,9 @@ export type LibraryAttribute = {
   // "number" modifier: the product enters a from–to range instead of a single
   // value.
   allowRange: boolean;
+  // Whether `options` is an ordered scale rather than an unordered set. Drives
+  // the ≤/≥ comparators in rules and the ceiling reading of a category slice.
+  ordered: boolean;
   options: string[];
   // Per-option reveal links: option value → library attribute keys auto-added
   // to a product when that option is chosen. Empty for options with no links.
@@ -61,6 +64,9 @@ export type AttributeInput = {
   unit: string | null;
   // "number" only: the product enters a from–to range. Ignored for other types.
   allowRange: boolean;
+  // Marks the option list as a low-to-high scale. Only meaningful for the
+  // option-based types; forced off for number/text.
+  ordered: boolean;
   // Raw option strings (for select/multi_select). Ignored for other types.
   options: string[];
   // Per-option reveal links: option value → library attribute keys to auto-add
@@ -100,6 +106,8 @@ const engineFieldsFor = (input: AttributeInput) => {
         valueType: "number" as const,
         allowMultiple: false,
         allowRange: input.allowRange,
+        // Numbers already compare numerically — there is no option list to order.
+        ordered: false,
         unit: input.unit?.trim() || null,
         options: [] as SpecOption[],
       };
@@ -108,6 +116,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         valueType: "select" as const,
         allowMultiple: true,
         allowRange: false,
+        ordered: input.ordered,
         unit: null,
         options: toSpecOptions(input.options, input.reveals),
       };
@@ -116,6 +125,8 @@ const engineFieldsFor = (input: AttributeInput) => {
         valueType: "select" as const,
         allowMultiple: false,
         allowRange: false,
+        // Yes/No is a set, not a scale.
+        ordered: false,
         unit: null,
         options: toSpecOptions(["Yes", "No"], input.reveals),
       };
@@ -124,6 +135,8 @@ const engineFieldsFor = (input: AttributeInput) => {
         valueType: "select" as const,
         allowMultiple: false,
         allowRange: false,
+        // Free text has no option list to order.
+        ordered: false,
         unit: null,
         options: [] as SpecOption[],
       };
@@ -133,6 +146,7 @@ const engineFieldsFor = (input: AttributeInput) => {
         valueType: "select" as const,
         allowMultiple: false,
         allowRange: false,
+        ordered: input.ordered,
         unit: null,
         options: toSpecOptions(input.options, input.reveals),
       };
@@ -158,6 +172,7 @@ const toLibraryAttribute = (
     inputType: resolveInputType(spec),
     unit: spec.unit,
     allowRange: spec.allowRange,
+    ordered: spec.ordered,
     options: (spec.options ?? []).map((option) => option.value),
     optionReveals,
     categoryUuids,
@@ -264,6 +279,27 @@ const replaceCategoryLinks = async (
   specificationUuid: string,
   categoryUuids: string[],
 ): Promise<void> => {
+  // Each link is an assignment carrying that category's filter/rule/scope/
+  // show-if switches, so read them before the delete and carry them over.
+  // Otherwise renaming an attribute in the library would quietly reset how
+  // every category uses it.
+  const existing = await tx
+    .select({
+      categoryUuid: SpecificationCategories.categoryUuid,
+      isFilter: SpecificationCategories.isFilter,
+      isRule: SpecificationCategories.isRule,
+      scope: SpecificationCategories.scope,
+      showIf: SpecificationCategories.showIf,
+      audience: SpecificationCategories.audience,
+      enabledValues: SpecificationCategories.enabledValues,
+      order: SpecificationCategories.order,
+    })
+    .from(SpecificationCategories)
+    .where(eq(SpecificationCategories.specificationUuid, specificationUuid));
+  const preserved = new Map(
+    existing.map(({ categoryUuid, ...switches }) => [categoryUuid, switches]),
+  );
+
   await tx
     .delete(SpecificationCategories)
     .where(eq(SpecificationCategories.specificationUuid, specificationUuid));
@@ -274,6 +310,7 @@ const replaceCategoryLinks = async (
         uuid: randomUUID(),
         specificationUuid,
         categoryUuid,
+        ...preserved.get(categoryUuid),
       })),
     );
   }
@@ -303,6 +340,7 @@ export const createLibraryAttribute = async (
       valueType: engine.valueType,
       allowMultiple: engine.allowMultiple,
       allowRange: engine.allowRange,
+      ordered: engine.ordered,
       unit: engine.unit,
       options: engine.options,
       order: total,
@@ -328,6 +366,7 @@ export const updateLibraryAttribute = async (
         valueType: engine.valueType,
         allowMultiple: engine.allowMultiple,
         allowRange: engine.allowRange,
+        ordered: engine.ordered,
         unit: engine.unit,
         options: engine.options,
       })

@@ -41,6 +41,8 @@ export const checkCompatibility = async (
         key: Specifications.key,
         label: Specifications.label,
         unit: Specifications.unit,
+        ordered: Specifications.ordered,
+        options: Specifications.options,
       })
       .from(Specifications),
     // Only products with attributes can satisfy a rule or be suggested; the
@@ -65,6 +67,16 @@ export const checkCompatibility = async (
 
   const specByUuid = new Map(specRows.map((spec) => [spec.uuid, spec]));
 
+  // The master option list flattened to values in scale order — what the
+  // ordered lte/gte comparators rank against.
+  const toEngineSpec = (spec: (typeof specRows)[number]) => ({
+    key: spec.key,
+    label: spec.label,
+    unit: spec.unit,
+    ordered: spec.ordered,
+    scale: (spec.options ?? []).map((option) => option.value),
+  });
+
   const rules: EngineRule[] = ruleRows.flatMap((rule) => {
     const consumer = specByUuid.get(rule.consumerSpecUuid);
     const provider = specByUuid.get(rule.providerSpecUuid);
@@ -84,16 +96,8 @@ export const checkCompatibility = async (
         allocation: rule.allocation,
         condition: rule.condition,
         severity: rule.severity,
-        consumerSpec: {
-          key: consumer.key,
-          label: consumer.label,
-          unit: consumer.unit,
-        },
-        providerSpec: {
-          key: provider.key,
-          label: provider.label,
-          unit: provider.unit,
-        },
+        consumerSpec: toEngineSpec(consumer),
+        providerSpec: toEngineSpec(provider),
       },
     ];
   });

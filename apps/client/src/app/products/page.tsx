@@ -1,8 +1,19 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
-import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
+import {
+  buildTree,
+  normalizeSort,
+  parseSpecParams,
+  subtreeMap,
+} from "@/lib/catalog";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
-import { getBrands, getCategories, getProducts } from "services";
+import {
+  getBrands,
+  getCategories,
+  getCategoryFacets,
+  getProducts,
+  type CategoryFacet,
+} from "services";
 
 export const metadata: Metadata = {
   title: "Catalog · SOT Solutions",
@@ -15,6 +26,7 @@ type Props = {
     search?: string;
     category?: string;
     brand?: string | string[];
+    spec?: string | string[];
     sort?: string;
   }>;
 };
@@ -28,9 +40,10 @@ const toArray = (value: string | string[] | undefined): string[] => {
 
 const ProductsPage = async ({ searchParams }: Props) => {
   const params = await searchParams;
-  const [categories, brands] = await Promise.all([
+  const [categories, brands, viewerPricing] = await Promise.all([
     getCategories(),
     getBrands(),
+    getViewerPartnerPricing(),
   ]);
 
   const categoryTree = buildTree(
@@ -63,15 +76,32 @@ const ProductsPage = async ({ searchParams }: Props) => {
         ]
       : undefined;
 
-  const [products, viewerPricing] = await Promise.all([
-    getProducts({
-      search,
-      categoryUuids,
-      brandUuids,
-      sort,
-    }),
-    getViewerPartnerPricing(),
-  ]);
+  // Facets are a property of where the shopper is standing, so they only exist
+  // once a category is chosen — an attribute assigned at Networking has nothing
+  // to narrow on an all-categories view.
+  const selectedSpecs = selectedCategory ? parseSpecParams(params.spec) : {};
+  const facets: CategoryFacet[] = selectedCategory
+    ? await getCategoryFacets(
+        selectedCategory,
+        viewerPricing.isPartner ? "partner" : "all",
+      )
+    : [];
+
+  // Ignore any spec param the current category doesn't actually offer — a
+  // stale key left over from a previous category must not silently filter
+  // every product away.
+  const offeredKeys = new Set(facets.map((facet) => facet.key));
+  const specValues = Object.fromEntries(
+    Object.entries(selectedSpecs).filter(([key]) => offeredKeys.has(key)),
+  );
+
+  const products = await getProducts({
+    search,
+    categoryUuids,
+    brandUuids,
+    specValues,
+    sort,
+  });
 
   const total = categories.reduce(
     (sum, category) => sum + category.productCount,
@@ -86,6 +116,8 @@ const ProductsPage = async ({ searchParams }: Props) => {
       total={total}
       selectedCategory={selectedCategory}
       selectedBrands={selectedBrands}
+      facets={facets}
+      selectedSpecs={specValues}
       sort={sort}
       search={search ?? ""}
       discountPercent={viewerPricing.discountPercent}

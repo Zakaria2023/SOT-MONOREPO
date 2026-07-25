@@ -1,5 +1,7 @@
 import { PartnerServiceScope } from "../packages/validators/src/partner";
 import {
+  AssignmentAudience,
+  AssignmentScope,
   BusinessLine,
   BoqItemRole,
   BoqLineType,
@@ -215,4 +217,15 @@ export const SPEC_INPUT_TYPE_LABELS: Record<SpecInputType, string> = {
   multi_select: "Multi-select",
   boolean: "Yes / No",
   text: "Text",
+};
+
+export const ASSIGNMENT_SCOPE_LABELS: Record<AssignmentScope, string> = {
+  branch: "Branch-wide",
+  leaf: "Leaf only",
+};
+
+export const ASSIGNMENT_AUDIENCE_LABELS: Record<AssignmentAudience, string> = {
+  all: "Everyone",
+  partner: "Partners & staff",
+  staff: "Staff only",
 };
