@@ -23,6 +23,9 @@ type AssignmentCardProps = {
   row: DraftRow;
   relations: SpecRelation[];
   otherSpecs: { value: string; label: string }[];
+  // How many other attributes this category carries at all, so an empty
+  // controller list can explain itself rather than look broken.
+  siblingCount: number;
   // Other attributes on this category that could gate this one.
   controllers: { value: string; label: string }[];
   controllerOptions: Record<string, string[]>;
@@ -56,6 +59,7 @@ const AssignmentCard = ({
   row,
   relations,
   otherSpecs,
+  siblingCount,
   controllers,
   controllerOptions,
   onChange,
@@ -230,18 +234,29 @@ const AssignmentCard = ({
           <EyeOff size={11} />
           Show-if
         </span>
-        <Dropdown
-          value={row.showIf?.specKey ?? ""}
-          onChange={(specKey) =>
-            onChange(row.specificationUuid, {
-              showIf: specKey ? { specKey, values: [] } : null,
-            })
-          }
-          options={[
-            { value: "", label: "— always shown —" },
-            ...controllers,
-          ]}
-        />
+        {controllers.length === 0 ? (
+          // An empty dropdown reads as a bug. Say which of the two reasons it
+          // is: nothing else is assigned here, or what is assigned has no
+          // values to test against.
+          <p className="rounded-control border border-dashed border-hairline px-3 py-2 text-[11px] text-faint">
+            {siblingCount === 0
+              ? "Always shown — this is the only attribute on this category, so there is nothing to condition it on. Assign another and it can gate this one."
+              : "Always shown — the other attributes here are numbers with no option list, and a condition tests against values. Assign one with options to gate this."}
+          </p>
+        ) : (
+          <Dropdown
+            value={row.showIf?.specKey ?? ""}
+            onChange={(specKey) =>
+              onChange(row.specificationUuid, {
+                showIf: specKey ? { specKey, values: [] } : null,
+              })
+            }
+            options={[
+              { value: "", label: "— always shown —" },
+              ...controllers,
+            ]}
+          />
+        )}
         {row.showIf && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-muted">is</span>
@@ -341,6 +356,7 @@ export const AssignmentsTab = ({
               row={row}
               relations={relations[row.specificationUuid] ?? []}
               otherSpecs={otherSpecsFor(row.specificationUuid)}
+              siblingCount={rows.length - 1}
               controllers={controllersFor(row.specificationUuid)}
               controllerOptions={controllerOptions}
               onChange={onChange}
