@@ -13,6 +13,14 @@ type ShopperPanelTabProps = {
   viewingAs: AssignmentAudience;
 };
 
+type FacetRowProps = {
+  facet: DraftRow;
+  badge: "ceiling" | "inclusion";
+  caption: string;
+  chosen: string;
+  onPick: (specKey: string, value: string) => void;
+};
+
 type PreviewItemProps = {
   name: string;
   path?: string | null;
@@ -27,6 +35,53 @@ const AUDIENCE_RANK: Record<AssignmentAudience, number> = {
   partner: 1,
   staff: 2,
 };
+
+const FacetRow = ({ facet, badge, caption, chosen, onPick }: FacetRowProps) => (
+  <div>
+    <p className="flex flex-wrap items-center gap-1.5">
+      <span
+        className={
+          badge === "ceiling"
+            ? "rounded bg-primary-tint px-1 py-0.5 text-[10px] font-semibold text-primary"
+            : "rounded bg-amber-50 px-1 py-0.5 text-[10px] font-semibold text-amber-700"
+        }
+      >
+        {badge}
+      </span>
+      <span className="text-xs font-semibold text-ink">{facet.label}</span>
+      <span className="text-[11px] text-faint">— {caption}</span>
+    </p>
+    <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <button
+        type="button"
+        onClick={() => onPick(facet.key, chosen)}
+        aria-pressed={!chosen}
+        className={
+          !chosen
+            ? "rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-white"
+            : "rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-muted transition-colors hover:border-primary"
+        }
+      >
+        Any
+      </button>
+      {facet.offeredOptions.map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onPick(facet.key, option)}
+          aria-pressed={chosen === option}
+          className={
+            chosen === option
+              ? "rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-white"
+              : "rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-muted transition-colors hover:border-primary"
+          }
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  </div>
+);
 
 const PreviewItem = ({ name, path, kind, reason }: PreviewItemProps) => (
   <li
@@ -86,6 +141,11 @@ export const ShopperPanelTab = ({
     },
   );
 
+  // Ordered attributes are ceilings, unordered are inclusions — grouped so
+  // the panel says which kind of statement each chip makes.
+  const scaleFacets = facets.filter((facet) => facet.ordered);
+  const setFacets = facets.filter((facet) => !facet.ordered);
+
   const pick = (specKey: string, value: string) =>
     setChosen((current) => ({
       ...current,
@@ -102,51 +162,51 @@ export const ShopperPanelTab = ({
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row">
-      <div className="flex shrink-0 flex-col gap-4 lg:w-64">
-        <p className="text-xs font-semibold tracking-widest text-faint uppercase">
-          Filters a shopper sees
-        </p>
-
+      <div className="flex shrink-0 flex-col gap-4 lg:w-72">
         {facets.length === 0 ? (
           <p className="rounded-control border border-dashed border-hairline p-4 text-xs text-faint">
             No attribute on this category is set to show as a filter for this
             audience. Turn Filter on in Assignments.
           </p>
         ) : (
-          facets.map((facet) => (
-            <div key={facet.specificationUuid}>
-              <p className="text-xs font-semibold text-ink">
-                {facet.label}
-                {facet.unit && (
-                  <span className="ml-1 font-normal text-faint">
-                    ({facet.unit})
-                  </span>
-                )}
-                {facet.ordered && (
-                  <span className="ml-1.5 rounded bg-primary-tint px-1 py-0.5 text-[10px] font-medium text-primary">
-                    ceiling
-                  </span>
-                )}
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {facet.offeredOptions.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => pick(facet.key, option)}
-                    aria-pressed={chosen[facet.key] === option}
-                    className={
-                      chosen[facet.key] === option
-                        ? "rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-white"
-                        : "rounded-md border border-hairline bg-page px-2 py-1 text-[11px] text-muted transition-colors hover:border-primary"
-                    }
-                  >
-                    {option}
-                  </button>
+          <>
+            {/* The shopper states what they HAVE. An ordered attribute reads
+                as a ceiling ("my network gives 1G"), an unordered one as a
+                requirement ("it must do 6GHz"). Same chips, opposite meaning,
+                so they are labelled rather than left to be inferred. */}
+            {scaleFacets.length + setFacets.length > 0 && (
+              <div className="flex flex-col gap-3 rounded-control border border-hairline bg-page p-3">
+                <p className="text-[11px] font-semibold tracking-widest text-faint uppercase">
+                  Your infrastructure
+                </p>
+                {scaleFacets.map((facet) => (
+                  <FacetRow
+                    key={facet.specificationUuid}
+                    facet={facet}
+                    badge="ceiling"
+                    caption="your infrastructure max"
+                    chosen={chosen[facet.key] ?? ""}
+                    onPick={pick}
+                  />
+                ))}
+                {setFacets.map((facet) => (
+                  <FacetRow
+                    key={facet.specificationUuid}
+                    facet={facet}
+                    badge="inclusion"
+                    caption="must include"
+                    chosen={chosen[facet.key] ?? ""}
+                    onPick={pick}
+                  />
                 ))}
               </div>
-            </div>
-          ))
+            )}
+
+            <p className="text-[11px] text-muted">
+              Facets use each attribute&apos;s enabled slice, not the whole
+              master list.
+            </p>
+          </>
         )}
       </div>
 

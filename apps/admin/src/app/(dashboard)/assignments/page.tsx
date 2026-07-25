@@ -5,6 +5,7 @@ import {
   getCategories,
   getCategory,
   getCategoryAssignmentRows,
+  getRelationsBySpec,
   getShopperPreview,
   getSpecifications,
 } from "services";
@@ -31,6 +32,12 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
     getShopperPreview(categoryUuid),
   ]);
 
+  // Relations are keyed by attribute, so they load once the assignments are
+  // known — a second, bounded query rather than one per card.
+  const relations = await getRelationsBySpec(
+    assignments.map((assignment) => assignment.specificationUuid),
+  );
+
   if (!category) {
     return (
       <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">
@@ -47,6 +54,7 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
       assignments={assignments}
       library={library}
       preview={preview}
+      relations={relations}
     />
   );
 };

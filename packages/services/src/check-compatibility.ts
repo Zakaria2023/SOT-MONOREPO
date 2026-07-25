@@ -1,8 +1,15 @@
-import { eq, inArray, isNotNull, or } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "../../../db";
+import { Categories } from "../../../db/schema/categories";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
 import { Products } from "../../../db/schema/products";
+import { SpecificationCategories } from "../../../db/schema/specification-categories";
 import { Specifications } from "../../../db/schema/specifications";
+import {
+  resolveAssignments,
+  type AssignmentDefinition,
+  type AssignmentRow,
+} from "./assignment-resolver";
 import { evaluateRules } from "./rule-engine";
 import type {
   CompatibilityReport,
@@ -16,6 +23,15 @@ import type {
 /**
  * Load the enabled rules, the selected products, and the catalog (for
  * suggestions) from the database and run the pure evaluator over them.
+ *
+ * A product only brings an attribute to a rule when its category ASSIGNS that
+ * attribute with "Use in rules" on. That switch is the whole point of the
+ * assignment model: a value can live on a product for the engine, or show to a
+ * shopper as a filter, or both, or neither — and this is where "use in rules"
+ * stops being a label and starts deciding what the engine can see.
+ *
+ * Every query here is fixed-count. The connection ceiling is shared across all
+ * apps, so nothing may fan out per product or per category.
  */
 export const checkCompatibility = async (
   selection: SelectionInput[],
@@ -31,40 +47,59 @@ export const checkCompatibility = async (
     };
   }
 
-  const [ruleRows, specRows, productRows] = await Promise.all([
-    db
-      .select()
-      .from(CompatibilityRules)
-      .where(eq(CompatibilityRules.enabled, true)),
-    db
-      .select({
-        uuid: Specifications.uuid,
-        key: Specifications.key,
-        label: Specifications.label,
-        unit: Specifications.unit,
-        ordered: Specifications.ordered,
-        options: Specifications.options,
-      })
-      .from(Specifications),
-    // Only products with attributes can satisfy a rule or be suggested; the
-    // selected products are always included so the report covers all of them.
-    db
-      .select({
-        uuid: Products.uuid,
-        name: Products.name,
-        technicalAttributes: Products.technicalAttributes,
-      })
-      .from(Products)
-      .where(
-        or(
-          isNotNull(Products.technicalAttributes),
-          inArray(
-            Products.uuid,
-            items.map((item) => item.productUuid),
-          ),
-        ),
-      ),
-  ]);
+  const [ruleRows, specRows, categoryRows, assignmentRows, productRows] =
+    await Promise.all([
+      db
+        .select()
+        .from(CompatibilityRules)
+        .where(eq(CompatibilityRules.enabled, true)),
+      db
+        .select({
+          uuid: Specifications.uuid,
+          key: Specifications.key,
+          label: Specifications.label,
+          unit: Specifications.unit,
+          ordered: Specifications.ordered,
+          options: Specifications.options,
+          // The resolver needs the rest of the definition to slice options.
+          valueType: Specifications.valueType,
+          inputType: Specifications.inputType,
+          allowMultiple: Specifications.allowMultiple,
+          allowRange: Specifications.allowRange,
+          order: Specifications.order,
+        })
+        .from(Specifications)
+        .orderBy(asc(Specifications.order)),
+      db
+        .select({
+          uuid: Categories.uuid,
+          parentUuid: Categories.parentUuid,
+        })
+        .from(Categories),
+      db
+        .select({
+          specificationUuid: SpecificationCategories.specificationUuid,
+          categoryUuid: SpecificationCategories.categoryUuid,
+          isFilter: SpecificationCategories.isFilter,
+          isRule: SpecificationCategories.isRule,
+          scope: SpecificationCategories.scope,
+          showIf: SpecificationCategories.showIf,
+          audience: SpecificationCategories.audience,
+          enabledValues: SpecificationCategories.enabledValues,
+          order: SpecificationCategories.order,
+        })
+        .from(SpecificationCategories),
+      // Every product with attributes can satisfy a rule or be suggested; the
+      // selected products are always included so the report covers all of them.
+      db
+        .select({
+          uuid: Products.uuid,
+          name: Products.name,
+          categoryUuid: Products.categoryUuid,
+          technicalAttributes: Products.technicalAttributes,
+        })
+        .from(Products),
+    ]);
 
   const specByUuid = new Map(specRows.map((spec) => [spec.uuid, spec]));
 
@@ -123,6 +158,78 @@ export const checkCompatibility = async (
     ];
   });
 
+  // --- Which attributes each category lets the engine read -----------------
+
+  const parentOf = new Map(
+    categoryRows.map((category) => [category.uuid, category.parentUuid]),
+  );
+  const definitions: AssignmentDefinition[] = specRows.map((spec) => ({
+    uuid: spec.uuid,
+    key: spec.key,
+    label: spec.label,
+    valueType: spec.valueType,
+    inputType: spec.inputType,
+    unit: spec.unit,
+    allowMultiple: spec.allowMultiple,
+    allowRange: spec.allowRange,
+    ordered: spec.ordered,
+    options: spec.options,
+    order: spec.order,
+  }));
+
+  // Resolved once per category that actually has products in play, in memory.
+  const ruleKeysByCategory = new Map<string, Set<string>>();
+  const ruleKeysFor = (categoryUuid: string | null): Set<string> | null => {
+    if (!categoryUuid) {
+      return null;
+    }
+    const cached = ruleKeysByCategory.get(categoryUuid);
+    if (cached) {
+      return cached;
+    }
+    const chain: string[] = [];
+    const seen = new Set<string>();
+    let current: string | null = categoryUuid;
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      chain.push(current);
+      current = parentOf.get(current) ?? null;
+    }
+    const keys = new Set(
+      resolveAssignments({
+        chain,
+        rows: assignmentRows satisfies AssignmentRow[],
+        definitions,
+      })
+        .filter((assignment) => assignment.isRule)
+        .map((assignment) => assignment.definition.key),
+    );
+    ruleKeysByCategory.set(categoryUuid, keys);
+    return keys;
+  };
+
+  /**
+   * A product's attributes as the engine is allowed to see them. Anything its
+   * category doesn't assign with "Use in rules" is withheld, so turning that
+   * switch off genuinely removes the value from every rule.
+   *
+   * A product whose category assigns nothing at all keeps its raw attributes:
+   * that is a catalog not yet described by assignments, and silently making
+   * every rule inapplicable would look like the engine had stopped working.
+   */
+  const engineAttributes = (
+    product: (typeof productRows)[number],
+  ): Record<string, string> => {
+    const attributes = product.technicalAttributes ?? {};
+    const allowed = ruleKeysFor(product.categoryUuid);
+    if (!allowed || allowed.size === 0) {
+      return attributes;
+    }
+    return Object.fromEntries(
+      Object.entries(attributes).filter(([key]) => allowed.has(key)),
+    );
+  };
+
   const productByUuid = new Map(
     productRows.map((product) => [product.uuid, product]),
   );
@@ -137,7 +244,7 @@ export const checkCompatibility = async (
         productUuid: product.uuid,
         name: product.name,
         quantity: item.quantity,
-        attributes: product.technicalAttributes ?? {},
+        attributes: engineAttributes(product),
       },
     ];
   });
@@ -145,7 +252,7 @@ export const checkCompatibility = async (
   const catalog: EngineCatalogProduct[] = productRows.map((product) => ({
     productUuid: product.uuid,
     name: product.name,
-    attributes: product.technicalAttributes ?? {},
+    attributes: engineAttributes(product),
   }));
 
   return evaluateRules(rules, engineSelection, catalog);

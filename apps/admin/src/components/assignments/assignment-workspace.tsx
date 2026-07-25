@@ -5,10 +5,10 @@ import {
   type AssignmentInput,
   type CategoryAssignment,
   type ShopperPreview,
+  type SpecRelation,
   type SpecificationWithCategories,
 } from "@/app/(dashboard)/assignments/actions";
 import { AssignmentsTab } from "@/components/assignments/assignments-tab";
-import { ProductFormTab } from "@/components/assignments/product-form-tab";
 import { ShopperPanelTab } from "@/components/assignments/shopper-panel-tab";
 import type { AssignmentAudience } from "@/db/enum";
 import { useState, useTransition } from "react";
@@ -21,6 +21,8 @@ type AssignmentWorkspaceProps = {
   assignments: CategoryAssignment[];
   library: SpecificationWithCategories[];
   preview: ShopperPreview;
+  // Rules touching each assigned attribute, keyed by spec uuid.
+  relations: Record<string, SpecRelation[]>;
 };
 
 // A row being edited. `owned` marks it as authored ON this category: only
@@ -30,12 +32,14 @@ export type DraftRow = CategoryAssignment & {
   owned: boolean;
 };
 
-type Tab = "assignments" | "shopper" | "product";
+// The product form preview lives on the real product form now, not here —
+// this page is where assignments are authored, not where a product is filled
+// in.
+type Tab = "assignments" | "shopper";
 
 const TABS: { value: Tab; label: string }[] = [
   { value: "assignments", label: "Assignments" },
   { value: "shopper", label: "Shopper panel" },
-  { value: "product", label: "Product form" },
 ];
 
 const AUDIENCES: { value: AssignmentAudience; label: string }[] = [
@@ -62,6 +66,7 @@ export const AssignmentWorkspace = ({
   assignments,
   library,
   preview,
+  relations,
 }: AssignmentWorkspaceProps) => {
   const [tab, setTab] = useState<Tab>("assignments");
   // The preview tabs answer "what would this look like to…", so the audience
@@ -223,6 +228,7 @@ export const AssignmentWorkspace = ({
         <AssignmentsTab
           rows={rows}
           library={library}
+          relations={relations}
           onChange={patchRow}
           onReset={resetRow}
           onRemove={removeRow}
@@ -236,10 +242,6 @@ export const AssignmentWorkspace = ({
           preview={preview}
           viewingAs={viewingAs}
         />
-      )}
-
-      {tab === "product" && (
-        <ProductFormTab rows={rows} viewingAs={viewingAs} />
       )}
 
       <FormError message={error} />

@@ -2,6 +2,8 @@
 
 import type { SpecificationWithCategories } from "@/app/(dashboard)/assignments/actions";
 import type { DraftRow } from "@/components/assignments/assignment-workspace";
+import { RelationSection } from "@/components/assignments/relation-section";
+import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
 import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
 import { Dropdown } from "ui";
@@ -9,6 +11,8 @@ import { Dropdown } from "ui";
 type AssignmentsTabProps = {
   rows: DraftRow[];
   library: SpecificationWithCategories[];
+  // Rules touching each assigned attribute, keyed by spec uuid.
+  relations: Record<string, SpecRelation[]>;
   onChange: (specificationUuid: string, patch: Partial<DraftRow>) => void;
   onReset: (specificationUuid: string) => void;
   onRemove: (specificationUuid: string) => void;
@@ -17,6 +21,8 @@ type AssignmentsTabProps = {
 
 type AssignmentCardProps = {
   row: DraftRow;
+  relations: SpecRelation[];
+  otherSpecs: { value: string; label: string }[];
   // Other attributes on this category that could gate this one.
   controllers: { value: string; label: string }[];
   controllerOptions: Record<string, string[]>;
@@ -48,6 +54,8 @@ const Switch = ({ active, onClick, children }: SwitchProps) => (
 
 const AssignmentCard = ({
   row,
+  relations,
+  otherSpecs,
   controllers,
   controllerOptions,
   onChange,
@@ -260,6 +268,14 @@ const AssignmentCard = ({
           </div>
         )}
       </div>
+
+      <RelationSection
+        specUuid={row.specificationUuid}
+        specLabel={row.label}
+        specUnit={row.unit}
+        relations={relations}
+        otherSpecs={otherSpecs}
+      />
     </li>
   );
 };
@@ -267,6 +283,7 @@ const AssignmentCard = ({
 export const AssignmentsTab = ({
   rows,
   library,
+  relations,
   onChange,
   onReset,
   onRemove,
@@ -297,6 +314,19 @@ export const AssignmentsTab = ({
     rows.map((row) => [row.key, row.masterOptions]),
   );
 
+  // A relation can bind any attribute in the library, not only ones this
+  // category carries — a camera's power draw is measured against a switch's
+  // budget, and those live in different trees.
+  const otherSpecsFor = (specificationUuid: string) =>
+    library
+      .filter((specification) => specification.uuid !== specificationUuid)
+      .map((specification) => ({
+        value: specification.uuid,
+        label: specification.unit
+          ? `${specification.label} (${specification.unit})`
+          : specification.label,
+      }));
+
   return (
     <div className="flex flex-col gap-3">
       {rows.length === 0 ? (
@@ -309,6 +339,8 @@ export const AssignmentsTab = ({
             <AssignmentCard
               key={row.specificationUuid}
               row={row}
+              relations={relations[row.specificationUuid] ?? []}
+              otherSpecs={otherSpecsFor(row.specificationUuid)}
               controllers={controllersFor(row.specificationUuid)}
               controllerOptions={controllerOptions}
               onChange={onChange}
