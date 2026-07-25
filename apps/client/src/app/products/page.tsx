@@ -5,6 +5,7 @@ import {
   parseSpecParams,
   subtreeMap,
 } from "@/lib/catalog";
+import { expandFacetChoices } from "utils";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import {
@@ -93,9 +94,12 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // stale key left over from a previous category must not silently filter
   // every product away.
   const offeredKeys = new Set(facets.map((facet) => facet.key));
-  const specValues = Object.fromEntries(
+  const chosen = Object.fromEntries(
     Object.entries(selectedSpecs).filter(([key]) => offeredKeys.has(key)),
   );
+  // An ordered facet is a ceiling, not an exact match — expand the choice to
+  // everything at or below it before querying.
+  const specValues = expandFacetChoices(facets, chosen);
 
   const products = await getProducts({
     search,
@@ -119,7 +123,7 @@ const ProductsPage = async ({ searchParams }: Props) => {
       selectedCategory={selectedCategory}
       selectedBrands={selectedBrands}
       facets={facets}
-      selectedSpecs={specValues}
+      selectedSpecs={chosen}
       sort={sort}
       search={search ?? ""}
       discountPercent={viewerPricing.discountPercent}

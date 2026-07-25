@@ -23,6 +23,7 @@ import {
   type ResolvedAssignment,
   type Viewer,
   facetAssignments,
+  isVisibleTo,
   resolveAssignments,
 } from "./assignment-resolver";
 
@@ -402,5 +403,80 @@ export const getProductFormAttributes = async (): Promise<
     throw new Error("Failed to fetch product form attributes", {
       cause: error,
     });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// What a shopper is allowed to READ on a product page.
+// ---------------------------------------------------------------------------
+
+export type ProductDisplaySpec = {
+  key: SelectSpecifications["key"];
+  label: SelectSpecifications["label"];
+  unit: SelectSpecifications["unit"];
+  groupName: SelectSpecificationGroups["name"] | null;
+};
+
+/**
+ * The specs a product may show THIS viewer, in the order the product stores
+ * them.
+ *
+ * Audience gates reading, not just filtering. Hiding a partner-only attribute
+ * from the facet list while printing its value in the spec table underneath
+ * would defeat the point — trade-only detail has to be absent from the page,
+ * not merely un-clickable.
+ *
+ * A key the product carries but its category doesn't assign is shown: it is
+ * unmanaged legacy data rather than something deliberately restricted, and
+ * hiding it would silently blank spec tables on older products.
+ */
+export const getProductDisplaySpecs = async (
+  categoryUuid: string | null,
+  specKeys: string[],
+  viewer: Viewer = "user",
+): Promise<ProductDisplaySpec[]> => {
+  if (specKeys.length === 0) {
+    return [];
+  }
+  try {
+    const rows = await db
+      .select({
+        key: Specifications.key,
+        label: Specifications.label,
+        unit: Specifications.unit,
+        groupName: SpecificationGroups.name,
+      })
+      .from(Specifications)
+      .leftJoin(
+        SpecificationGroups,
+        eq(Specifications.groupUuid, SpecificationGroups.uuid),
+      )
+      .where(inArray(Specifications.key, specKeys));
+    const byKey = new Map(rows.map((row) => [row.key, row]));
+
+    // Without a category there are no assignments to judge against, so the
+    // product shows what it stores.
+    const restricted = new Map<string, boolean>();
+    if (categoryUuid) {
+      for (const assignment of await getCategoryAssignments(categoryUuid)) {
+        restricted.set(
+          assignment.definition.key,
+          !isVisibleTo(assignment.effectiveAudience, viewer),
+        );
+      }
+    }
+
+    return specKeys.flatMap((key) => {
+      if (restricted.get(key)) {
+        return [];
+      }
+      const row = byKey.get(key);
+      return [
+        row ?? { key, label: key, unit: null, groupName: null },
+      ];
+    });
+  } catch (error) {
+    console.error("getProductDisplaySpecs failed:", error);
+    throw new Error("Failed to fetch product specs", { cause: error });
   }
 };
