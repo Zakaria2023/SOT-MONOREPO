@@ -9,7 +9,7 @@ import {
   getComparableProducts,
   getProductDetailBySlug,
   getRelatedProducts,
-  getSpecificationsForKeys,
+  getProductDisplaySpecs,
 } from "services";
 import { formatSpecValue } from "utils";
 
@@ -27,11 +27,18 @@ const ProductPage = async ({ params }: Props) => {
   const specKeys =
     product.specKeys ?? Object.keys(product.technicalAttributes ?? {});
 
-  const [comparables, related, specs, viewerPricing] = await Promise.all([
+  const viewerPricing = await getViewerPartnerPricing();
+
+  const [comparables, related, specs] = await Promise.all([
     getComparableProducts(product.categoryUuid, product.uuid),
     getRelatedProducts(product.uuid),
-    getSpecificationsForKeys(specKeys),
-    getViewerPartnerPricing(),
+    // Audience gates reading too: a partner-only attribute must be absent from
+    // this table for a regular user, not merely missing from the filters.
+    getProductDisplaySpecs(
+      product.categoryUuid,
+      specKeys,
+      viewerPricing.isPartner ? "partner" : "user",
+    ),
   ]);
 
   // Values are rendered through the shared formatter, so a range reads

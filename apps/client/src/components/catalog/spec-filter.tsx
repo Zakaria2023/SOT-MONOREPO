@@ -31,6 +31,13 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
           <span className="ml-1 normal-case text-faint">({facet.unit})</span>
         )}
       </p>
+      {facet.ordered && (
+        // An ordered facet is what the shopper HAS, not what they want — say
+        // so, or picking 1G looks like it should return only 1G devices.
+        <p className="font-grotesk mt-0.5 text-xs normal-case text-faint">
+          What you have — shows anything that fits it
+        </p>
+      )}
       <ul className="mt-2 flex flex-col gap-0.5">
         {facet.options.map((option) => {
           const checked = chosen.has(option);

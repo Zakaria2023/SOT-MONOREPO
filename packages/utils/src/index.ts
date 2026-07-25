@@ -426,3 +426,52 @@ export const splitFullName = (fullName: string) => {
 /** Best-effort display name for the Clerk reviewer recorded on a request. */
 export const getReviewerName = (user: ReviewerUser | null | undefined) =>
   user?.fullName?.trim() || user?.primaryEmailAddress?.emailAddress || user?.id;
+
+// ---------------------------------------------------------------------------
+// Facet choices — the storefront half of the ordered/unordered rule.
+// ---------------------------------------------------------------------------
+
+// Just enough of a facet to judge a choice by. Structural so this stays free
+// of any database or service type.
+export type ChoosableFacet = {
+  key: string;
+  // Whether the option list is an ordered scale.
+  ordered: boolean;
+  // The options in scale order.
+  options: string[];
+};
+
+/**
+ * Expand a shopper's facet choices into the product values that satisfy them.
+ *
+ * On an UNORDERED attribute a choice is itself: pick 6GHz and only 6GHz will
+ * do. On an ORDERED one the choice is a CEILING, because the shopper is
+ * stating what they HAVE while the product's value is what it NEEDS. Picking
+ * Port Speed 1G means "my network gives 1G", so a device needing 10G is out
+ * and anything at or below 1G still fits.
+ */
+export const expandFacetChoices = (
+  facets: ChoosableFacet[],
+  selected: Record<string, string[]>,
+): Record<string, string[]> => {
+  const expanded: Record<string, string[]> = {};
+
+  for (const [key, values] of Object.entries(selected)) {
+    const facet = facets.find((entry) => entry.key === key);
+    if (!facet || values.length === 0) {
+      continue;
+    }
+    if (!facet.ordered) {
+      expanded[key] = values;
+      continue;
+    }
+    // The highest rung ticked is the ceiling; everything at or below qualifies.
+    const ceiling = Math.max(
+      ...values.map((value) => facet.options.indexOf(value)),
+    );
+    // A choice that is no longer on the scale can't be ranked — fall back to
+    // matching it literally rather than silently widening to everything.
+    expanded[key] = ceiling < 0 ? values : facet.options.slice(0, ceiling + 1);
+  }
+  return expanded;
+};
