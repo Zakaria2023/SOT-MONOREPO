@@ -5,6 +5,8 @@ import {
   removeRelation,
   type SpecRelation,
 } from "@/app/(dashboard)/assignments/actions";
+import { LookupEditor } from "@/components/assignments/lookup-editor";
+import type { LookupRow } from "@/db/types";
 import type { RuleComparator, RuleKind } from "@/db/enum";
 import { ruleKinds } from "@/db/enum";
 import { RULE_KIND_LABELS } from "@/db/label";
@@ -21,6 +23,8 @@ type RelationSectionProps = {
   relations: SpecRelation[];
   // Every other attribute, to pick the far side from.
   otherSpecs: { value: string; label: string }[];
+  // Attributes with option lists, for keying a conditional rule's table.
+  lookupSpecs: { key: string; label: string; options: string[] }[];
 };
 
 const COMPARATOR_LABELS: Record<RuleComparator, string> = {
@@ -31,9 +35,7 @@ const COMPARATOR_LABELS: Record<RuleComparator, string> = {
   intersects: "must overlap (∩)",
 };
 
-// A conditional rule's limit comes from a lookup table rather than a second
-// attribute, and that table is too large to author inline on a card.
-const CARD_KINDS = ruleKinds.filter((kind) => kind !== "conditional");
+const CARD_KINDS = ruleKinds;
 
 export const RelationSection = ({
   specUuid,
@@ -41,6 +43,7 @@ export const RelationSection = ({
   specUnit,
   relations,
   otherSpecs,
+  lookupSpecs,
 }: RelationSectionProps) => {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>(undefined);
@@ -53,6 +56,8 @@ export const RelationSection = ({
   const [comparator, setComparator] = useState<RuleComparator>("lte");
   const [headroomPercent, setHeadroomPercent] = useState(100);
   const [severity, setSeverity] = useState<"block" | "warn">("block");
+  const [lookupInputs, setLookupInputs] = useState<string[]>([]);
+  const [lookupRows, setLookupRows] = useState<LookupRow[]>([]);
 
   const reset = () => {
     setName("");
@@ -62,6 +67,8 @@ export const RelationSection = ({
     setComparator("lte");
     setHeadroomPercent(100);
     setSeverity("block");
+    setLookupInputs([]);
+    setLookupRows([]);
     setAdding(false);
   };
 
@@ -76,6 +83,8 @@ export const RelationSection = ({
         comparator,
         headroomPercent,
         severity,
+        lookupInputs,
+        lookupRows,
       });
       setError(result.error);
       if (!result.error) {
@@ -90,6 +99,9 @@ export const RelationSection = ({
     });
 
   const isMatch = kind === "spec_match";
+  // A conditional rule reads its limit from its own table, so it has no far
+  // side to pick — the table IS the capacity.
+  const isConditional = kind === "conditional";
 
   return (
     <div className="flex flex-col gap-2 border-t border-hairline pt-2.5">
@@ -156,34 +168,59 @@ export const RelationSection = ({
                 label: RULE_KIND_LABELS[value],
               }))}
             />
-            <Dropdown
-              value={side}
-              onChange={(value) => setSide(value as "demand" | "supply")}
-              options={[
-                {
-                  value: "demand",
-                  label: `${specLabel} is the demand`,
-                },
-                {
-                  value: "supply",
-                  label: `${specLabel} is the capacity`,
-                },
-              ]}
-            />
+            {isConditional ? (
+              <p className="flex items-center rounded-control border border-dashed border-hairline px-3 text-sm text-faint">
+                {specLabel} is measured against its own table
+              </p>
+            ) : (
+              <Dropdown
+                value={side}
+                onChange={(value) => setSide(value as "demand" | "supply")}
+                options={[
+                  {
+                    value: "demand",
+                    label: `${specLabel} is the demand`,
+                  },
+                  {
+                    value: "supply",
+                    label: `${specLabel} is the capacity`,
+                  },
+                ]}
+              />
+            )}
           </div>
 
-          <Dropdown
-            searchable
-            value={otherSpecUuid}
-            onChange={setOtherSpecUuid}
-            placeholder={
-              side === "demand"
-                ? "…measured against which capacity?"
-                : "…which demand draws on it?"
-            }
-            searchPlaceholder="Search attributes…"
-            options={otherSpecs}
-          />
+          {isConditional ? (
+            <LookupEditor
+              inputs={lookupInputs}
+              rows={lookupRows}
+              inputOptions={lookupSpecs.map((spec) => ({
+                value: spec.key,
+                label: spec.label,
+              }))}
+              valuesByKey={Object.fromEntries(
+                lookupSpecs.map((spec) => [spec.key, spec.options]),
+              )}
+              limitUnit={specUnit}
+              onChange={(inputs, rows) => {
+                setLookupInputs(inputs);
+                setLookupRows(rows);
+              }}
+            />
+          ) : (
+            <Dropdown
+              searchable
+              value={otherSpecUuid}
+              onChange={setOtherSpecUuid}
+              placeholder={
+                side === "demand"
+                  ? "…measured against which capacity?"
+                  : "…which demand draws on it?"
+              }
+              searchPlaceholder="Search attributes…"
+              options={otherSpecs}
+            />
+          )}
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <Dropdown
@@ -229,7 +266,11 @@ export const RelationSection = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={isPending || !name.trim() || !otherSpecUuid}
+              disabled={
+                isPending ||
+                !name.trim() ||
+                (isConditional ? lookupRows.length === 0 : !otherSpecUuid)
+              }
               onClick={submit}
               className="rounded-control bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >

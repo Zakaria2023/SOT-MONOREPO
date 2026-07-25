@@ -7,11 +7,8 @@ import {
   deleteCompatibilityRule,
   setCategoryAssignments,
 } from "services";
-import type {
-  RuleComparator,
-  RuleKind,
-  RuleSeverity,
-} from "@/db/enum";
+import type { RuleComparator, RuleKind, RuleSeverity } from "@/db/enum";
+import type { LookupRow } from "@/db/types";
 import type {
   AssignmentInput as ServiceAssignmentInput,
   CategoryAssignment as ServiceCategoryAssignment,
@@ -66,6 +63,9 @@ export type RelationInput = {
   comparator: RuleComparator;
   headroomPercent: number;
   severity: RuleSeverity;
+  // "conditional" only: the table its limit is read from.
+  lookupInputs: string[];
+  lookupRows: LookupRow[];
 };
 
 // Map a card-authored relation onto the row shape: the card's attribute takes
@@ -74,11 +74,22 @@ const toRuleFields = (input: RelationInput) => ({
   name: input.name,
   description: null,
   kind: input.kind,
+  // A conditional rule always measures the card's own attribute against its
+  // table, so it takes the demand side and leaves capacity empty.
   consumerSpecUuid:
-    input.side === "demand" ? input.specUuid : input.otherSpecUuid || null,
+    input.kind === "conditional" || input.side === "demand"
+      ? input.specUuid
+      : input.otherSpecUuid || null,
   providerSpecUuid:
-    input.side === "demand" ? input.otherSpecUuid || null : input.specUuid,
-  lookup: null,
+    input.kind === "conditional"
+      ? null
+      : input.side === "demand"
+        ? input.otherSpecUuid || null
+        : input.specUuid,
+  lookup:
+    input.kind === "conditional"
+      ? { inputs: input.lookupInputs, rows: input.lookupRows }
+      : null,
   comparator: input.comparator,
   allocation: "pooled" as const,
   headroomPercent: input.headroomPercent,
