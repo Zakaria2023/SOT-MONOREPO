@@ -1,10 +1,12 @@
-import { RuleForm } from "@/components/rules/rule-form";
+import { RelationBuilder } from "@/components/rules/relation-builder";
 import { getSpecifications } from "services";
 
 const NewRulePage = async () => {
   const specifications = await getSpecifications();
 
-  return <RuleForm mode="add" specifications={specifications} />;
+  return (
+    <RelationBuilder mode="add" specifications={specifications} />
+  );
 };
 
 export default NewRulePage;

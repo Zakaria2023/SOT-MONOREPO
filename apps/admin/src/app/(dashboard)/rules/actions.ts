@@ -12,6 +12,7 @@ import {
   deleteCompatibilityRule,
   updateCompatibilityRule,
 } from "services";
+import type { LookupRow } from "@/db/types";
 import type { CompatibilityReport, SelectionInput } from "services";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -22,6 +23,9 @@ export type RuleActionInput = {
   kind: RuleKind;
   consumerSpecUuid: string;
   providerSpecUuid: string;
+  // "conditional" only: the lookup the limit is read from.
+  lookupInputs: string[];
+  lookupRows: LookupRow[];
   comparator: RuleComparator;
   allocation: RuleAllocation;
   headroomPercent: number;
@@ -47,8 +51,14 @@ const toFields = (input: RuleActionInput) => ({
   name: input.name,
   description: input.description.trim() || null,
   kind: input.kind,
-  consumerSpecUuid: input.consumerSpecUuid,
-  providerSpecUuid: input.providerSpecUuid,
+  // An unset capacity side is null in the row, not an empty string — the
+  // column is a foreign key.
+  consumerSpecUuid: input.consumerSpecUuid || null,
+  providerSpecUuid: input.providerSpecUuid || null,
+  lookup:
+    input.kind === "conditional"
+      ? { inputs: input.lookupInputs, rows: input.lookupRows }
+      : null,
   comparator: input.comparator,
   allocation: input.allocation,
   headroomPercent: input.headroomPercent,

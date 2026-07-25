@@ -19,7 +19,7 @@ import {
   ruleKinds,
   ruleSeverities,
 } from "../enum";
-import { RuleCondition } from "../types";
+import { LookupTable, RuleCondition } from "../types";
 import { Specifications } from "./specifications";
 
 // A compatibility rule — one row per rule, created from the admin rule
@@ -39,10 +39,18 @@ export const CompatibilityRules = mysqlTable(
 
     kind: mysqlEnum("kind", ruleKinds).notNull(),
 
+    // Nullable because a conditional rule's capacity is its lookup table
+    // rather than another product's spec. The service asserts each side that
+    // a family does need.
+    //
     // The numeric spec measured on consuming items (e.g. Power Consumption).
-    consumerSpecUuid: char("consumer_spec_uuid", { length: 36 }).notNull(),
+    consumerSpecUuid: char("consumer_spec_uuid", { length: 36 }),
     // The numeric spec supplying capacity (e.g. PoE Budget).
-    providerSpecUuid: char("provider_spec_uuid", { length: 36 }).notNull(),
+    providerSpecUuid: char("provider_spec_uuid", { length: 36 }),
+
+    // "conditional" only: the table the limit is read from, keyed by the
+    // item's own other spec values. Null for every other family.
+    lookup: json("lookup").$type<LookupTable | null>(),
 
     comparator: mysqlEnum("comparator", ruleComparators)
       .default("lte")

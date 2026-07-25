@@ -458,10 +458,11 @@ export const getLibraryReadModel = async (): Promise<LibraryReadModel> => {
       name: rule.name,
       family: FAMILY_LABEL[rule.kind] ?? rule.kind,
       gate: rule.severity === "block" ? "hard" : "soft",
-      attributes: [
-        keyByUuid.get(rule.consumerSpecUuid),
-        keyByUuid.get(rule.providerSpecUuid),
-      ].filter((key): key is string => Boolean(key)),
+      // A conditional rule's capacity side is a lookup table rather than a
+      // spec, so only the spec-backed sides land in the attribute list.
+      attributes: [rule.consumerSpecUuid, rule.providerSpecUuid]
+        .map((uuid) => (uuid ? keyByUuid.get(uuid) : undefined))
+        .filter((key): key is string => Boolean(key)),
     })),
     templates: templates.map((template) => ({
       id: template.uuid,

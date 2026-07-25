@@ -9,6 +9,7 @@ import type {
   EngineCatalogProduct,
   EngineItem,
   EngineRule,
+  EngineSpec,
   SelectionInput,
 } from "./rule-engine";
 
@@ -69,7 +70,7 @@ export const checkCompatibility = async (
 
   // The master option list flattened to values in scale order — what the
   // ordered lte/gte comparators rank against.
-  const toEngineSpec = (spec: (typeof specRows)[number]) => ({
+  const toEngineSpec = (spec: (typeof specRows)[number]): EngineSpec => ({
     key: spec.key,
     label: spec.label,
     unit: spec.unit,
@@ -77,10 +78,29 @@ export const checkCompatibility = async (
     scale: (spec.options ?? []).map((option) => option.value),
   });
 
+  // A conditional rule has no provider product at all — its capacity is the
+  // lookup table — so it gets a stand-in carrying just a label for the report.
+  const operandFor = (specUuid: string | null): EngineSpec | null => {
+    if (!specUuid) {
+      return null;
+    }
+    const spec = specByUuid.get(specUuid);
+    return spec ? toEngineSpec(spec) : null;
+  };
+
+  const LOOKUP_CAPACITY: EngineSpec = {
+    key: "",
+    label: "the limit for its configuration",
+    unit: null,
+  };
+
   const rules: EngineRule[] = ruleRows.flatMap((rule) => {
-    const consumer = specByUuid.get(rule.consumerSpecUuid);
-    const provider = specByUuid.get(rule.providerSpecUuid);
-    // A rule pointing at a deleted spec can't be evaluated — skip it.
+    const consumer = operandFor(rule.consumerSpecUuid);
+    const provider =
+      rule.kind === "conditional"
+        ? LOOKUP_CAPACITY
+        : operandFor(rule.providerSpecUuid);
+    // A rule pointing at a deleted spec can't be evaluated.
     if (!consumer || !provider) {
       return [];
     }
@@ -96,8 +116,9 @@ export const checkCompatibility = async (
         allocation: rule.allocation,
         condition: rule.condition,
         severity: rule.severity,
-        consumerSpec: toEngineSpec(consumer),
-        providerSpec: toEngineSpec(provider),
+        consumerSpec: consumer,
+        providerSpec: provider,
+        lookup: rule.lookup,
       },
     ];
   });

@@ -546,3 +546,91 @@ describe("evaluateRule — spec_match (Match on select specs)", () => {
     });
   });
 });
+
+describe("evaluateRule — conditional (limit from a lookup)", () => {
+  // Max cable run: the limit isn't supplied by another product, it's read from
+  // a table keyed by the run's OWN grade and speed. Cat6 at 10G allows 55 m;
+  // Cat6a at 10G allows 100 m; the same 80 m run passes or fails on grade.
+  const cableRule: EngineRule = {
+    uuid: "cond-1",
+    name: "Max cable run",
+    description: null,
+    kind: "conditional",
+    comparator: "lte",
+    headroomPercent: 100,
+    condition: null,
+    allocation: "pooled",
+    severity: "block",
+    consumerSpec: { key: "run-length", label: "Run length", unit: "m" },
+    providerSpec: { key: "", label: "the limit for its configuration", unit: null },
+    lookup: {
+      inputs: ["cable-grade", "link-speed"],
+      rows: [
+        { when: { "cable-grade": "Cat6", "link-speed": "10G" }, limit: 55 },
+        { when: { "cable-grade": "Cat6a", "link-speed": "10G" }, limit: 100 },
+        { when: { "cable-grade": "Cat6", "link-speed": "1G" }, limit: 100 },
+      ],
+    },
+  };
+
+  const run = (
+    uuid: string,
+    grade: string,
+    speed: string,
+    length: string,
+  ): EngineItem => ({
+    productUuid: uuid,
+    name: `${grade} run`,
+    quantity: 1,
+    attributes: {
+      "cable-grade": grade,
+      "link-speed": speed,
+      "run-length": length,
+    },
+  });
+
+  it("passes a run within the limit its own configuration allows", () => {
+    const result = evaluateRule(cableRule, [run("c1", "Cat6a", "10G", "80")], []);
+    expect(result.status).toBe("pass");
+  });
+
+  it("fails the same length when the grade lowers the limit", () => {
+    const result = evaluateRule(cableRule, [run("c1", "Cat6", "10G", "80")], []);
+    expect(result.status).toBe("fail");
+    expect(result.failingItems.map((item) => item.productUuid)).toEqual(["c1"]);
+    // The message has to say which combination set the limit, or the fix
+    // isn't obvious.
+    expect(result.message).toContain("55");
+  });
+
+  it("judges each item against its own row, not a shared limit", () => {
+    const result = evaluateRule(
+      cableRule,
+      [run("ok", "Cat6", "1G", "90"), run("bad", "Cat6", "10G", "90")],
+      [],
+    );
+    expect(result.status).toBe("fail");
+    expect(result.failingItems.map((item) => item.productUuid)).toEqual(["bad"]);
+  });
+
+  it("leaves an item alone when the table has no row for it", () => {
+    // A gap in the table is the table's problem, not the item's.
+    const result = evaluateRule(cableRule, [run("c1", "Cat7", "40G", "90")], []);
+    expect(result.status).toBe("not_applicable");
+  });
+
+  it("applies headroom to the looked-up limit", () => {
+    const derated: EngineRule = { ...cableRule, headroomPercent: 90 };
+    // 52 m is within 55 but outside 90% of it (49.5).
+    expect(
+      evaluateRule(derated, [run("c1", "Cat6", "10G", "52")], []).status,
+    ).toBe("fail");
+  });
+
+  it("is not applicable when the rule has no table to read", () => {
+    const empty: EngineRule = { ...cableRule, lookup: { inputs: [], rows: [] } };
+    expect(
+      evaluateRule(empty, [run("c1", "Cat6", "10G", "10")], []).status,
+    ).toBe("not_applicable");
+  });
+});

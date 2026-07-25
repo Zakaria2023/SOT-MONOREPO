@@ -57,6 +57,24 @@ export type RuleCondition = {
   values: string[];
 };
 
+// One row of a conditional rule's lookup table: when an item's own spec values
+// all match `when`, its limit is `limit`. e.g. { when: { "cable-grade":
+// "Cat6", "link-speed": "10G" }, limit: 55 } — Cat6 at 10G runs 55 m.
+export type LookupRow = {
+  // Spec key → the value this row applies to. Every entry must match the item.
+  when: Record<string, string>;
+  // The limit the measured spec is compared against, in that spec's unit.
+  limit: number;
+};
+
+// The lookup a conditional rule resolves its limit from. `inputs` names the
+// spec keys the table is keyed by, in column order, so the admin editor can
+// render it as a grid and the evaluator can explain which row it matched.
+export type LookupTable = {
+  inputs: string[];
+  rows: LookupRow[];
+};
+
 // A rule stored on a specification. When the clauses match the product's
 // chosen spec values, this specification's value is forced to `forcedValue`
 // and locked in the admin product form. e.g. on "Uplink": if Power is 40W

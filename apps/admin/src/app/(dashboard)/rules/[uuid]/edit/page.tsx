@@ -1,4 +1,4 @@
-import { RuleForm } from "@/components/rules/rule-form";
+import { RelationBuilder } from "@/components/rules/relation-builder";
 import { notFound } from "next/navigation";
 import { getCompatibilityRule, getSpecifications } from "services";
 
@@ -18,7 +18,13 @@ const EditRulePage = async ({ params }: Props) => {
     notFound();
   }
 
-  return <RuleForm mode="edit" rule={rule} specifications={specifications} />;
+  return (
+    <RelationBuilder
+      mode="edit"
+      rule={rule}
+      specifications={specifications}
+    />
+  );
 };
 
 export default EditRulePage;

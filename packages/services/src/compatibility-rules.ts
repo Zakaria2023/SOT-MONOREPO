@@ -19,7 +19,8 @@ export type CompatibilityRuleFields = Omit<
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
 
-// A rule enriched with the labels/units of the two specs it binds.
+// A rule enriched with the bound specs' labels/units. Both are null on a side
+// a conditional rule leaves empty — its capacity is the lookup table.
 export type CompatibilityRuleListItem = SelectCompatibilityRules & {
   consumerSpecLabel: SelectSpecifications["label"] | null;
   consumerSpecUnit: SelectSpecifications["unit"] | null;
@@ -38,13 +39,15 @@ const listSelection = {
   providerSpecUnit: providerSpec.unit,
 };
 
-const toListItem = (row: {
+type ListRow = {
   rule: SelectCompatibilityRules;
   consumerSpecLabel: string | null;
   consumerSpecUnit: string | null;
   providerSpecLabel: string | null;
   providerSpecUnit: string | null;
-}): CompatibilityRuleListItem => ({
+};
+
+const toListItem = (row: ListRow): CompatibilityRuleListItem => ({
   ...row.rule,
   consumerSpecLabel: row.consumerSpecLabel,
   consumerSpecUnit: row.consumerSpecUnit,
@@ -148,9 +151,9 @@ const assertAllocationValid = (fields: CompatibilityRuleFields): void => {
   if (fields.allocation !== "per_provider") {
     return;
   }
-  if (fields.kind === "per_item_threshold") {
+  if (fields.kind === "per_item_threshold" || fields.kind === "conditional") {
     throw new Error(
-      "Per-device capacity applies to sum and count rules — per-item rules already check each unit individually.",
+      "Per-device capacity applies to sum and count rules — per-item and conditional rules already check each unit individually.",
     );
   }
   if (fields.comparator !== "lte") {
@@ -165,34 +168,79 @@ const assertUnitsMatch = async (
 ): Promise<void> => {
   // Count compares a quantity vs a count-like capacity; ratio divides two
   // (possibly different-unit) sums; spec_match compares select specs (no unit).
+  // conditional compares an item against a looked-up limit in the item's own
+  // unit — there is no second spec to agree with.
   if (
     fields.kind === "count_limit" ||
     fields.kind === "ratio" ||
-    fields.kind === "spec_match"
+    fields.kind === "spec_match" ||
+    fields.kind === "conditional"
   ) {
     return;
   }
 
-  const rows = await db
-    .select({ uuid: Specifications.uuid, unit: Specifications.unit })
-    .from(Specifications)
-    .where(
-      inArray(Specifications.uuid, [
-        fields.consumerSpecUuid,
-        fields.providerSpecUuid,
-      ]),
-    );
+  const specUuids = [fields.consumerSpecUuid, fields.providerSpecUuid].filter(
+    (uuid): uuid is string => Boolean(uuid),
+  );
 
-  const consumerUnit = rows.find(
+  const specRows =
+    specUuids.length > 0
+      ? await db
+          .select({ uuid: Specifications.uuid, unit: Specifications.unit })
+          .from(Specifications)
+          .where(inArray(Specifications.uuid, specUuids))
+      : [];
+
+  const consumerUnit = specRows.find(
     (row) => row.uuid === fields.consumerSpecUuid,
   )?.unit;
-  const providerUnit = rows.find(
+  const providerUnit = specRows.find(
     (row) => row.uuid === fields.providerSpecUuid,
   )?.unit;
 
   if (consumerUnit !== providerUnit) {
     throw new Error(
-      `Both specifications must use the same unit for this rule type — got "${consumerUnit ?? "no unit"}" vs "${providerUnit ?? "no unit"}". Comparing different units is only valid for count rules.`,
+      `Both sides must use the same unit for this rule type — got "${consumerUnit ?? "no unit"}" vs "${providerUnit ?? "no unit"}". Comparing different units is only valid for count rules.`,
+    );
+  }
+};
+
+// Each side of a rule binds a specification. The capacity side is the only
+// one a family may leave empty — a conditional rule reads its limit from its
+// lookup table instead.
+const assertOperandsValid = (fields: CompatibilityRuleFields): void => {
+  if (!fields.consumerSpecUuid) {
+    throw new Error("Pick the consumed specification.");
+  }
+  if (fields.kind !== "conditional" && !fields.providerSpecUuid) {
+    throw new Error("Pick the capacity specification.");
+  }
+  if (fields.kind === "conditional" && fields.providerSpecUuid) {
+    throw new Error(
+      "A conditional rule reads its limit from the lookup table — leave the capacity side empty.",
+    );
+  }
+
+  if (fields.kind !== "conditional") {
+    if (fields.lookup) {
+      throw new Error(
+        "A lookup table only applies to a conditional rule — clear it or change the rule type.",
+      );
+    }
+    return;
+  }
+
+  if (!fields.lookup || fields.lookup.rows.length === 0) {
+    throw new Error(
+      "A conditional rule needs at least one lookup row — that table is where its limit comes from.",
+    );
+  }
+  const missing = fields.lookup.rows.find(
+    (row) => Object.keys(row.when).length === 0,
+  );
+  if (missing) {
+    throw new Error(
+      "Every lookup row must say which attribute values it applies to.",
     );
   }
 };
@@ -200,6 +248,7 @@ const assertUnitsMatch = async (
 export const createCompatibilityRule = async (
   fields: CompatibilityRuleFields,
 ): Promise<string> => {
+  assertOperandsValid(fields);
   assertAllocationValid(fields);
   await assertUnitsMatch(fields);
   const uuid = randomUUID();
@@ -211,6 +260,7 @@ export const updateCompatibilityRule = async (
   uuid: string,
   fields: CompatibilityRuleFields,
 ): Promise<void> => {
+  assertOperandsValid(fields);
   assertAllocationValid(fields);
   await assertUnitsMatch(fields);
   await db

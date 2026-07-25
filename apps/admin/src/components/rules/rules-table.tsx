@@ -48,7 +48,16 @@ const columns: TableColumn<CompatibilityRuleListItem>[] = [
     key: "binding",
     header: "Checks",
     render: (rule) =>
-      rule.kind === "ratio" ? (
+      rule.kind === "conditional" ? (
+        <span className="text-muted">
+          {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)}{" "}
+          {COMPARATOR_SYMBOLS[rule.comparator]} limit from{" "}
+          {rule.lookup?.rows.length ?? 0} lookup row(s)
+          {rule.lookup && rule.lookup.inputs.length > 0
+            ? ` by ${rule.lookup.inputs.join(" × ")}`
+            : ""}
+        </span>
+      ) : rule.kind === "ratio" ? (
         <span className="text-muted">
           {specLabel(rule.consumerSpecLabel, rule.consumerSpecUnit)} ÷{" "}
           {specLabel(rule.providerSpecLabel, rule.providerSpecUnit)} ≤{" "}
