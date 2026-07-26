@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   addToCart,
-  checkCartPresence,
-  checkCompatibility,
+  checkDesign,
   createBoqFromCart,
   createOrderFromCart,
   getCartPreview,
@@ -15,9 +14,9 @@ import {
   removeCartItem,
   updateCartItemQuantity,
   type CartLineItem,
+  type DesignCheckResult as ServiceDesignCheckResult,
+  type DesignFinding as ServiceDesignFinding,
   type GuestCartItem,
-  type PresenceFinding,
-  type RuleEvaluation,
   type SelectionInput,
 } from "services";
 
@@ -90,76 +89,14 @@ export const removeItem = async (cartItemUuid: string) => {
   await removeCartItem({ userUuid: user.uuid, cartItemUuid });
 };
 
-// A unified, customer-facing finding — from either engine, in one shape.
-export type DesignFinding = {
-  id: string;
-  title: string;
-  message: string;
-  tone: "block" | "warn";
-  suggestions: string[];
-};
+// Re-exported so the cart's components keep importing these from here; the
+// check itself lives in packages/services because the mobile API runs it too.
+export type DesignFinding = ServiceDesignFinding;
+export type DesignCheckResult = ServiceDesignCheckResult;
 
-export type DesignCheckResult = {
-  blockers: DesignFinding[];
-  warnings: DesignFinding[];
-};
-
-const ruleToFinding = (result: RuleEvaluation): DesignFinding => ({
-  id: `rule:${result.ruleUuid}`,
-  title: result.name,
-  message: result.message,
-  tone: result.status === "fail" ? "block" : "warn",
-  suggestions: result.suggestions.map(
-    (suggestion) =>
-      `${suggestion.name}${
-        suggestion.capacity
-          ? ` (${suggestion.capacity}${result.unit ? ` ${result.unit}` : ""})`
-          : ""
-      }`,
-  ),
-});
-
-const presenceToFinding = (finding: PresenceFinding): DesignFinding => ({
-  id: `presence:${finding.ruleId}:${finding.groupDescription}`,
-  title: finding.name,
-  message: finding.message,
-  tone: finding.severity === "hard" ? "block" : "warn",
-  suggestions: [],
-});
-
-// The full design check over the cart: requires-companion (Presence — what's
-// MISSING) plus compatibility rules (Budget/Count/Match/Ratio — what conflicts).
-// Advisory by nature — a failure here must never break the cart. The UI splits
-// blockers from warnings; blockers gate checkout, warnings only caution.
 export const checkCartDesign = async (
   selection: SelectionInput[],
-): Promise<DesignCheckResult> => {
-  if (selection.length === 0) {
-    return { blockers: [], warnings: [] };
-  }
-  try {
-    const [report, presence] = await Promise.all([
-      checkCompatibility(selection),
-      checkCartPresence(selection),
-    ]);
-    const findings: DesignFinding[] = [
-      // Missing companions first — the most actionable for the buyer.
-      ...presence.findings.map(presenceToFinding),
-      ...report.results
-        .filter(
-          (result) => result.status === "fail" || result.status === "warn",
-        )
-        .map(ruleToFinding),
-    ];
-    return {
-      blockers: findings.filter((finding) => finding.tone === "block"),
-      warnings: findings.filter((finding) => finding.tone === "warn"),
-    };
-  } catch (error) {
-    console.error("checkCartDesign failed:", error);
-    return { blockers: [], warnings: [] };
-  }
-};
+): Promise<DesignCheckResult> => checkDesign(selection);
 
 // Checkout turns one solution in the cart into a draft BOQ. The category comes
 // from a hidden field on the solution's checkout form. The draft lands in the

@@ -136,6 +136,9 @@ importers:
       storage:
         specifier: workspace:*
         version: link:../../packages/storage
+      utils:
+        specifier: workspace:*
+        version: link:../../packages/utils
       validators:
         specifier: workspace:*
         version: link:../../packages/validators

@@ -4,12 +4,8 @@ import { BrandFilter } from "@/components/catalog/brand-filter";
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { CategoryFilter } from "@/components/catalog/category-filter";
 import { SpecFilter } from "@/components/catalog/spec-filter";
-import {
-  SORT_OPTIONS,
-  SPEC_PARAM,
-  encodeSpecParam,
-  type TreeNode,
-} from "@/lib/catalog";
+import { SORT_OPTIONS, type TreeNode } from "@/lib/catalog";
+import { SPEC_PARAM, encodeSpecParam } from "utils";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";

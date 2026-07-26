@@ -1,11 +1,6 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
-import {
-  buildTree,
-  normalizeSort,
-  parseSpecParams,
-  subtreeMap,
-} from "@/lib/catalog";
-import { expandFacetChoices } from "utils";
+import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
+import { expandFacetChoices, parseSpecParams } from "utils";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import {

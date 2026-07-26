@@ -1,6 +1,11 @@
 import { verifyToken } from "@clerk/backend";
 import { NextResponse } from "next/server";
-import { getUserByClerkId, type AuthUser } from "services";
+import {
+  getPartnerPricingForClerkUser,
+  getUserByClerkId,
+  type AuthUser,
+  type Viewer,
+} from "services";
 
 /**
  * Resolve the caller from the `Authorization: Bearer <Clerk session token>`
@@ -62,4 +67,23 @@ export const getStringField = (body: unknown, key: string): string | null => {
 export const getNumberField = (body: unknown, key: string): number | null => {
   const value = getField(body, key);
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+/**
+ * Which shopper audience the caller belongs to, for attribute visibility.
+ *
+ * The same distinction the web client makes: an approved partner sees
+ * partner-only attributes, everyone else — including an unauthenticated
+ * caller — is a plain user. Not a ladder; a user never sees partner detail
+ * and a partner never sees user-only detail.
+ */
+export const getViewerFromRequest = async (
+  request: Request,
+): Promise<Viewer> => {
+  const user = await getUserFromRequest(request);
+  if (!user?.clerkUserId) {
+    return "user";
+  }
+  const pricing = await getPartnerPricingForClerkUser(user.clerkUserId);
+  return pricing.isPartner ? "partner" : "user";
 };
