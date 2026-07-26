@@ -49,7 +49,15 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Checkbox, Combobox, Dropdown, Input, Textarea } from "ui";
+import {
+  Button,
+  Checkbox,
+  Combobox,
+  ConfirmDialog,
+  Dropdown,
+  Input,
+  Textarea,
+} from "ui";
 import type { DropdownOption } from "ui";
 
 type LibraryBuilderProps = {
@@ -370,6 +378,16 @@ export const LibraryBuilder = ({
 
   const realGroups = groups.filter((group) => group.uuid);
 
+  // Deleting from the library cascades: an attribute takes every assignment of
+  // it and every relation binding it. That is not something a single click on
+  // a trash icon should do.
+  const [pendingAttribute, setPendingAttribute] = useState<
+    SearchResult | LibraryBuilderGroup["attributes"][number] | null
+  >(null);
+  const [pendingGroup, setPendingGroup] = useState<
+    LibraryBuilderGroup | null
+  >(null);
+
   const [selectedUuid, setSelectedUuid] = useState<string>(
     realGroups[0]?.uuid ?? "",
   );
@@ -467,6 +485,7 @@ export const LibraryBuilder = ({
   };
 
   return (
+    <>
     <div className="flex flex-col gap-4">
       {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -589,9 +608,7 @@ export const LibraryBuilder = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
-                            run(() => deleteGroupAction(group.uuid))
-                          }
+                          onClick={() => setPendingGroup(group)}
                           aria-label="Delete group"
                           className="rounded p-1 hover:bg-white/15"
                         >
@@ -862,9 +879,7 @@ export const LibraryBuilder = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          run(() => deleteAttributeAction(attribute.uuid))
-                        }
+                        onClick={() => setPendingAttribute(attribute)}
                         aria-label="Delete"
                         title="Delete attribute"
                         className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
@@ -892,6 +907,49 @@ export const LibraryBuilder = ({
           </ul>
         </div>
       </div>
-    </div>
+      </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingAttribute)}
+        title="Delete attribute"
+        description={
+          pendingAttribute
+            ? `"${pendingAttribute.label}" is assigned to ${pendingAttribute.categoryUuids.length} categor${pendingAttribute.categoryUuids.length === 1 ? "y" : "ies"} and used by ${pendingAttribute.relationshipCount} relation${pendingAttribute.relationshipCount === 1 ? "" : "s"}. Deleting it removes every one of those too, and any value products already store under it stops being read. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete attribute"
+        isConfirming={isPending}
+        onConfirm={() => {
+          const target = pendingAttribute;
+          if (!target) {
+            return;
+          }
+          setPendingAttribute(null);
+          run(() => deleteAttributeAction(target.uuid));
+        }}
+        onCancel={() => setPendingAttribute(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingGroup)}
+        title="Delete group"
+        description={
+          pendingGroup
+            ? `"${pendingGroup.name}" holds ${pendingGroup.attributes.length} attribute${pendingGroup.attributes.length === 1 ? "" : "s"}. Deleting the group does not delete them — they become ungrouped and stay in the library.`
+            : ""
+        }
+        confirmLabel="Delete group"
+        isConfirming={isPending}
+        onConfirm={() => {
+          const target = pendingGroup;
+          if (!target) {
+            return;
+          }
+          setPendingGroup(null);
+          run(() => deleteGroupAction(target.uuid));
+        }}
+        onCancel={() => setPendingGroup(null)}
+      />
+    </>
   );
 };

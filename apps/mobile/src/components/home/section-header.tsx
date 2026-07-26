@@ -21,7 +21,11 @@ export const SectionHeader = ({
         <Text style={styles.title}>{title}</Text>
       </View>
       {onSeeAll ? (
-        <Pressable style={styles.link} onPress={onSeeAll} hitSlop={8}>
+        <Pressable style={styles.link}
+        onPress={onSeeAll}
+        hitSlop={8}
+        accessibilityRole="button"
+      >
           <Text style={styles.linkText}>All</Text>
           <ArrowRight color={colors.primary} size={15} />
         </Pressable>

@@ -55,7 +55,14 @@ export const CartRow = ({
             {formatPrice(item.unitPrice, item.currency)} each
           </Text>
         </View>
-        <Pressable onPress={onRemove} disabled={busy} style={styles.remove} hitSlop={8}>
+        <Pressable
+          onPress={onRemove}
+          disabled={busy}
+          style={styles.remove}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${item.name} from cart`}
+        >
           <Trash2 color={colors.faint} size={18} />
         </Pressable>
       </View>
@@ -67,6 +74,8 @@ export const CartRow = ({
             disabled={busy || item.quantity <= 1}
             style={styles.step}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease quantity of ${item.name}`}
           >
             <Minus
               color={item.quantity <= 1 ? colors.faint : colors.text}
@@ -83,6 +92,8 @@ export const CartRow = ({
             disabled={busy}
             style={styles.step}
             hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`Increase quantity of ${item.name}`}
           >
             <Plus color={colors.text} size={16} />
           </Pressable>
