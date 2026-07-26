@@ -1,5 +1,7 @@
-import { getProducts, type ProductSort } from "services";
+import { getViewerFromRequest } from "@/lib/helpers";
 import { NextResponse } from "next/server";
+import { getCategoryFacets, getProducts, type ProductSort } from "services";
+import { expandFacetChoices, parseSpecParams } from "utils";
 
 export const GET = async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -8,10 +10,33 @@ export const GET = async (request: Request) => {
   const brandUuids = searchParams.getAll("brand");
   const sort = searchParams.get("sort") ?? undefined;
 
+  // Spec facets arrive as repeated `spec=key:value` — the same encoding the
+  // web catalog puts in its URL, so a link shared between the two means the
+  // same thing on both.
+  const chosen = parseSpecParams(searchParams.getAll("spec"));
+
+  // A facet belongs to a place in the tree, so narrowing by one only means
+  // something once a single category is named.
+  let specValues: Record<string, string[]> = {};
+  if (Object.keys(chosen).length > 0 && categoryUuids.length === 1) {
+    const viewer = await getViewerFromRequest(request);
+    const facets = await getCategoryFacets(categoryUuids[0], viewer);
+    const offered = new Set(facets.map((facet) => facet.key));
+    // Anything this category doesn't offer THIS viewer is dropped: a stale key
+    // must not filter every product away, and a partner-only facet must not
+    // become usable just by putting it in the query string.
+    const permitted = Object.fromEntries(
+      Object.entries(chosen).filter(([key]) => offered.has(key)),
+    );
+    // An ordered facet is a ceiling, not an exact match.
+    specValues = expandFacetChoices(facets, permitted);
+  }
+
   const products = await getProducts({
     search,
     categoryUuids: categoryUuids.length > 0 ? categoryUuids : undefined,
     brandUuids: brandUuids.length > 0 ? brandUuids : undefined,
+    specValues,
     sort: sort as ProductSort | undefined,
   });
 

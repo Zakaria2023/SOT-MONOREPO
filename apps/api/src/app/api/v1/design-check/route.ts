@@ -1,0 +1,53 @@
+import { readBody } from "@/lib/helpers";
+import { NextResponse } from "next/server";
+import { checkDesign, type SelectionInput } from "services";
+
+/**
+ * Run the design check over a selection — requires-companion gaps and
+ * compatibility conflicts, split into blockers and warnings.
+ *
+ * The mobile cart had no gate at all before this: a buyer could order a design
+ * whose PoE draw exceeded the switch, while the same basket was blocked on the
+ * web. Same service function behind both, so the two can't disagree.
+ *
+ * No auth: the check reads the catalog and the rules, never the caller's data,
+ * and a guest building a basket needs the same warnings a signed-in user gets.
+ */
+export const POST = async (request: Request) => {
+  const body = await readBody(request);
+
+  if (!body || typeof body !== "object" || !("selection" in body)) {
+    return NextResponse.json(
+      { error: "Expected a `selection` array of { productUuid, quantity }" },
+      { status: 400 },
+    );
+  }
+
+  const raw = (body as { selection: unknown }).selection;
+  if (!Array.isArray(raw)) {
+    return NextResponse.json(
+      { error: "`selection` must be an array" },
+      { status: 400 },
+    );
+  }
+
+  // Drop anything malformed rather than failing the whole basket — a design
+  // check is advisory, and a bad line should not cost the buyer the warnings
+  // about the good ones.
+  const selection: SelectionInput[] = raw.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) {
+      return [];
+    }
+    const { productUuid, quantity } = entry as Record<string, unknown>;
+    if (typeof productUuid !== "string" || productUuid.length === 0) {
+      return [];
+    }
+    const count = Number(quantity);
+    if (!Number.isFinite(count) || count <= 0) {
+      return [];
+    }
+    return [{ productUuid, quantity: Math.floor(count) }];
+  });
+
+  return NextResponse.json(await checkDesign(selection));
+};
