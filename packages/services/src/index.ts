@@ -21,6 +21,7 @@ export * from "./presence-rules-data";
 export * from "./pricing";
 export * from "./products";
 export * from "./rule-engine";
+export * from "./rule-validation";
 export * from "./specification-assignments";
 export * from "./specification-builder";
 export * from "./specification-groups";
