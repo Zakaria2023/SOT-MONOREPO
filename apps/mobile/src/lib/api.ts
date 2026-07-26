@@ -37,6 +37,10 @@ type ProductsQuery = {
   // the same encoding the web catalog uses, so a shared link means the same
   // thing on both.
   specValues?: Record<string, string[]>;
+  // Which category the chosen facets belong to. Needed because categoryUuids
+  // is usually a whole subtree — the facets are the picked category's, but the
+  // products sit in its leaves.
+  facetCategoryUuid?: string;
 };
 
 const buildQuery = (query: ProductsQuery): string => {
@@ -52,6 +56,9 @@ const buildQuery = (query: ProductsQuery): string => {
   }
   for (const uuid of query.brandUuids ?? []) {
     params.append("brand", uuid);
+  }
+  if (query.facetCategoryUuid) {
+    params.set("facets", query.facetCategoryUuid);
   }
   for (const [key, values] of Object.entries(query.specValues ?? {})) {
     for (const value of values) {
