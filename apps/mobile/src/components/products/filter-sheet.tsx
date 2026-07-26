@@ -46,6 +46,11 @@ const FacetBlock = ({ facet, chosen, onToggle }: FacetBlockProps) => (
             key={option}
             onPress={() => onToggle(option)}
             style={[styles.chip, active ? styles.chipActive : null]}
+            // Colour alone does not tell a screen reader which values are
+            // chosen, and these are toggles rather than links.
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: active }}
+            accessibilityLabel={`${facet.label}: ${option}`}
           >
             <Text
               style={[styles.chipText, active ? styles.chipTextActive : null]}
@@ -97,6 +102,10 @@ export const FilterSheet = ({
     <>
       <Pressable
         onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={
+          count > 0 ? `Filters, ${count} applied` : "Filters"
+        }
         style={({ pressed }) => [
           styles.trigger,
           pressed ? styles.triggerPressed : null,
@@ -117,12 +126,22 @@ export const FilterSheet = ({
         transparent
         onRequestClose={onClose}
       >
-        <Pressable style={styles.scrim} onPress={onClose} />
+        <Pressable
+          style={styles.scrim}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close filters"
+        />
         <View style={styles.sheet}>
           <View style={styles.grabber} />
           <View style={styles.sheetHead}>
             <Text style={styles.sheetTitle}>Filters</Text>
-            <Pressable onPress={onClose} hitSlop={12}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Close filters"
+            >
               <X color={colors.muted} size={20} />
             </Pressable>
           </View>

@@ -13,7 +13,7 @@ import { RULE_KIND_LABELS } from "@/db/label";
 import { familyOperandType, validateRuleShape } from "utils";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { useState, useTransition } from "react";
-import { Dropdown, FormError, Input } from "ui";
+import { ConfirmDialog, Dropdown, FormError, Input } from "ui";
 
 type RelationSectionProps = {
   // The attribute this card is for.
@@ -77,6 +77,9 @@ export const RelationSection = ({
   const [severity, setSeverity] = useState<"block" | "warn">("block");
   const [lookupInputs, setLookupInputs] = useState<string[]>([]);
   const [lookupRows, setLookupRows] = useState<LookupRow[]>([]);
+  // A relation is global — deleting it here stops it firing for every product
+  // that binds either attribute, not just this category.
+  const [pendingDelete, setPendingDelete] = useState<SpecRelation | null>(null);
 
   const reset = () => {
     setName("");
@@ -188,7 +191,7 @@ export const RelationSection = ({
               <button
                 type="button"
                 disabled={isPending}
-                onClick={() => drop(relation.uuid)}
+                onClick={() => setPendingDelete(relation)}
                 aria-label={`Delete ${relation.name}`}
                 className="ml-auto rounded p-1 text-faint transition-colors hover:text-danger"
               >
@@ -354,6 +357,27 @@ export const RelationSection = ({
           Add relation
         </button>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete relation"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.name}" checks every product carrying ${specLabel} against ${pendingDelete.kind === "conditional" ? "its lookup table" : (pendingDelete.otherSpecLabel ?? "the other attribute")}. Deleting it stops that check everywhere, not only on this category, and any design it currently blocks will pass. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete relation"
+        isConfirming={isPending}
+        onConfirm={() => {
+          const target = pendingDelete;
+          if (!target) {
+            return;
+          }
+          setPendingDelete(null);
+          drop(target.uuid);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 };

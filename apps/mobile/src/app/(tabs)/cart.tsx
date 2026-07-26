@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { CartRow } from "@/components/cart/cart-row";
 import { DesignCheck } from "@/components/cart/design-check";
 import { Button } from "@/components/ui/button";
@@ -147,7 +147,22 @@ const CartScreen = () => {
             busy={busyUuid === item.uuid}
             onIncrement={() => mutate(item, "inc")}
             onDecrement={() => mutate(item, "dec")}
-            onRemove={() => mutate(item, "remove")}
+            onRemove={() =>
+              // A trash icon beside the quantity stepper is easy to hit by
+              // mistake on a phone, and the line is gone with no undo.
+              Alert.alert(
+                "Remove from cart?",
+                `"${item.name}" will be removed.`,
+                [
+                  { text: "Keep", style: "cancel" },
+                  {
+                    text: "Remove",
+                    style: "destructive",
+                    onPress: () => mutate(item, "remove"),
+                  },
+                ],
+              )
+            }
           />
         )}
       />
