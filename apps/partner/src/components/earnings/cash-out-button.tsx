@@ -16,7 +16,9 @@ export const CashOutButton = ({ disabled }: CashOutButtonProps) => {
     startTransition(async () => {
       setError(undefined);
       const result = await cashOut();
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
 
   return (

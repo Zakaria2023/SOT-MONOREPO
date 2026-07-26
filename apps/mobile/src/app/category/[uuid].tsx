@@ -43,11 +43,15 @@ const CategoryScreen = () => {
     let cancelled = false;
     fetchProducts({ categoryUuids: [uuid], specValues: selected })
       .then((rows) => {
-        if (!cancelled) setFiltered(rows);
+        if (!cancelled) {
+          setFiltered(rows);
+        }
       })
       // A failed filter leaves the unfiltered list rather than an error screen.
       .catch(() => {
-        if (!cancelled) setFiltered(null);
+        if (!cancelled) {
+          setFiltered(null);
+        }
       });
     return () => {
       cancelled = true;

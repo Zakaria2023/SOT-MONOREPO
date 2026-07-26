@@ -87,3 +87,10 @@ export const getViewerFromRequest = async (
   const pricing = await getPartnerPricingForClerkUser(user.clerkUserId);
   return pricing.isPartner ? "partner" : "user";
 };
+
+/** Standard 429 with the wait, for a caller over the limit. */
+export const tooManyRequests = (retryAfterSeconds: number) =>
+  NextResponse.json(
+    { error: "Too many requests. Please slow down." },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+  );

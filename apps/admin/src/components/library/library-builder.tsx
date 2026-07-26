@@ -111,11 +111,18 @@ const parseOptionLines = (raw: string): string[] =>
 
 // Total auto-add links across all of an attribute's options.
 const TypeIcon = ({ type }: { type: SpecInputType }) => {
-  if (type === "number") return <Hash size={15} className="text-faint" />;
-  if (type === "boolean") return <ToggleLeft size={15} className="text-faint" />;
-  if (type === "multi_select")
+  if (type === "number") {
+    return <Hash size={15} className="text-faint" />;
+  }
+  if (type === "boolean") {
+    return <ToggleLeft size={15} className="text-faint" />;
+  }
+  if (type === "multi_select") {
     return <ListChecks size={15} className="text-faint" />;
-  if (type === "text") return <Type size={15} className="text-faint" />;
+  }
+  if (type === "text") {
+    return <Type size={15} className="text-faint" />;
+  }
   return <List size={15} className="text-faint" />;
 };
 
@@ -395,7 +402,9 @@ export const LibraryBuilder = ({
 
   const addGroup = () => {
     const name = newGroupName.trim();
-    if (!name) return;
+    if (!name) {
+      return;
+    }
     run(async () => {
       const result = await addGroupAction(name, newGroupDomain || null);
       if (!result.error) {
@@ -449,7 +458,9 @@ export const LibraryBuilder = ({
 
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
-    if (target < 0 || target >= realGroups.length) return;
+    if (target < 0 || target >= realGroups.length) {
+      return;
+    }
     const next = [...realGroups];
     [next[index], next[target]] = [next[target], next[index]];
     run(() => reorderGroupsAction(next.map((group) => group.uuid)));
@@ -694,7 +705,9 @@ export const LibraryBuilder = ({
               onSubmit={(input) =>
                 run(async () => {
                   const result = await addAttributeAction(input);
-                  if (!result.error) setAddingAttribute(false);
+                  if (!result.error) {
+                    setAddingAttribute(false);
+                  }
                   return result;
                 })
               }
@@ -728,7 +741,9 @@ export const LibraryBuilder = ({
                           attribute.uuid,
                           input,
                         );
-                        if (!result.error) setEditingUuid(null);
+                        if (!result.error) {
+                          setEditingUuid(null);
+                        }
                         return result;
                       })
                     }
@@ -798,7 +813,9 @@ export const LibraryBuilder = ({
                                   attribute.uuid,
                                   value || null,
                                 );
-                                if (!result.error) setMovingUuid(null);
+                                if (!result.error) {
+                                  setMovingUuid(null);
+                                }
                                 return result;
                               })
                             }

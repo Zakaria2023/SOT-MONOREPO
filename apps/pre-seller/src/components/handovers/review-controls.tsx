@@ -23,7 +23,9 @@ export const ReviewControls = ({ boqUuid, status }: ReviewControlsProps) => {
     startTransition(async () => {
       setError(undefined);
       const result = await fn();
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
 
   return (

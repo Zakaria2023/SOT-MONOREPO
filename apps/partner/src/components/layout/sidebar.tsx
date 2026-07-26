@@ -34,7 +34,9 @@ export const Sidebar = () => {
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return NAV_GROUPS;
+    if (!q) {
+      return NAV_GROUPS;
+    }
     return NAV_GROUPS.map((group) => ({
       ...group,
       links: group.links.filter((link) => link.label.toLowerCase().includes(q)),

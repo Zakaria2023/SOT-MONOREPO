@@ -31,7 +31,9 @@ export const GovernmentRequestRowActions = ({
   };
 
   const closeDialog = () => {
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      return;
+    }
     resetDialog();
   };
 

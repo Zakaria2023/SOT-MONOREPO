@@ -97,7 +97,9 @@ export const Dropdown = (props: DropdownProps) => {
   // there's more room there, and always cap its height to the space available.
   const updatePosition = useCallback(() => {
     const trigger = containerRef.current;
-    if (!trigger) return;
+    if (!trigger) {
+      return;
+    }
     const rect = trigger.getBoundingClientRect();
     const margin = 8;
     const gap = 4;
@@ -117,7 +119,9 @@ export const Dropdown = (props: DropdownProps) => {
 
   // Keep it anchored while open (scroll uses capture to catch any ancestor).
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     updatePosition();
 
     const reposition = () => updatePosition();
@@ -166,7 +170,9 @@ export const Dropdown = (props: DropdownProps) => {
       const selected = options.filter((option) =>
         props.value.includes(option.value),
       );
-      if (selected.length === 0) return placeholder;
+      if (selected.length === 0) {
+        return placeholder;
+      }
       if (selected.length <= 2) {
         return selected.map((option) => option.label).join(", ");
       }

@@ -35,7 +35,9 @@ export const ConfirmDialog = ({
     }
   });
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   return (
     <div className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4">

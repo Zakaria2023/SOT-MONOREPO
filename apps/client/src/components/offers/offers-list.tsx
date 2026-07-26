@@ -21,7 +21,9 @@ export const OffersList = ({ offers }: OffersListProps) => {
     startTransition(async () => {
       setError(undefined);
       const result = await chooseOffer(boqUuid, offerUuid);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
       setPendingUuid(null);
     });
   };

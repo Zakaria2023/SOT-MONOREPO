@@ -73,7 +73,9 @@ export const addCredential = async (
   },
 ): Promise<HandoverActionState> => {
   const { user, detail } = await guard(boqUuid);
-  if (!detail) return { error: "Handover pack not found" };
+  if (!detail) {
+    return { error: "Handover pack not found" };
+  }
 
   try {
     await addHandoverCredential({
@@ -95,7 +97,9 @@ export const submitPack = async (
   trainingNotes?: string,
 ): Promise<HandoverActionState> => {
   const { user, detail } = await guard(boqUuid);
-  if (!detail) return { error: "Handover pack not found" };
+  if (!detail) {
+    return { error: "Handover pack not found" };
+  }
 
   try {
     await submitHandoverPack({

@@ -35,7 +35,9 @@ export const PartnerRequestRowActions = ({
   };
 
   const closeDialog = () => {
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      return;
+    }
     resetDialog();
   };
 

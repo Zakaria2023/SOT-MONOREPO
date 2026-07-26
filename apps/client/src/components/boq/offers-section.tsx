@@ -30,7 +30,9 @@ export const OffersSection = ({
     startTransition(async () => {
       setError(undefined);
       const result = await chooseOffer(boqUuid, offerUuid);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
       setPendingUuid(null);
     });
   };
@@ -40,12 +42,16 @@ export const OffersSection = ({
       setError(undefined);
       // On success this redirects to the order page; only errors return here.
       const result = await confirmOrder(boqUuid);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
   };
 
   if (offers.length === 0) {
-    if (!awaiting) return null;
+    if (!awaiting) {
+      return null;
+    }
     return (
       <div className="mx-auto px-6 pb-16 lg:px-12 xl:px-20">
         <div className="rounded-[18px] border border-dashed border-search-border p-8 text-center">
@@ -85,9 +91,10 @@ export const OffersSection = ({
       {selected ? (
         <div className="mt-8 flex flex-col items-start gap-3 rounded-[18px] border border-search-border bg-hover/40 p-6">
           <p className="font-grotesk text-sm text-secondary">
-            You picked <span className="font-semibold text-ink">this offer</span>
-            . Confirm to place your order — you'll pay securely through SOT, and
-            the amount is held until your system is installed and handed over.
+            You picked{" "}
+            <span className="font-semibold text-ink">this offer</span>. Confirm
+            to place your order — you&apos;ll pay securely through SOT, and the
+            amount is held until your system is installed and handed over.
           </p>
           <button
             type="button"

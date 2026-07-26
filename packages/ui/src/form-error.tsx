@@ -3,7 +3,9 @@ type FormErrorProps = {
 };
 
 export const FormError = ({ message }: FormErrorProps) => {
-  if (!message) return null;
+  if (!message) {
+    return null;
+  }
 
   return <p className="text-sm text-danger">{message}</p>;
 };

@@ -512,3 +512,76 @@ export const parseSpecParams = (
   }
   return parsed;
 };
+
+// ---------------------------------------------------------------------------
+// Rate limiting — for endpoints that do real work without authentication.
+// ---------------------------------------------------------------------------
+
+type RateBucket = { count: number; resetAt: number };
+
+// Per-process, in memory. Deliberately modest: a guard against one caller
+// hammering an expensive public endpoint, not a distributed limiter. Several
+// instances each allow the window and a restart clears it — if this ever has to
+// be exact it belongs in Redis, not a module-level Map.
+const rateBuckets = new Map<string, RateBucket>();
+
+// Bounded so a flood of spoofed addresses cannot grow the map without limit.
+const MAX_TRACKED_CALLERS = 5000;
+
+export type RateLimitVerdict = {
+  ok: boolean;
+  // Seconds until the window reopens, so a 429 can say when to retry — a
+  // refusal with no wait just invites a tighter loop.
+  retryAfterSeconds: number;
+};
+
+/**
+ * Whether `key` is within `limit` requests per `windowMs`.
+ *
+ * Takes a caller key rather than a request so it stays free of any framework;
+ * the transport decides what identifies a caller.
+ */
+export const withinRateLimit = (
+  key: string,
+  { limit, windowMs }: { limit: number; windowMs: number },
+  now: number = Date.now(),
+): RateLimitVerdict => {
+  // Opportunistic sweep — cheaper than a timer, and only when it matters.
+  if (rateBuckets.size > MAX_TRACKED_CALLERS) {
+    for (const [entry, bucket] of rateBuckets) {
+      if (bucket.resetAt <= now) {
+        rateBuckets.delete(entry);
+      }
+    }
+  }
+
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return { ok: true, retryAfterSeconds: 0 };
+  }
+
+  bucket.count += 1;
+  if (bucket.count > limit) {
+    return {
+      ok: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
+    };
+  }
+  return { ok: true, retryAfterSeconds: 0 };
+};
+
+/**
+ * The client address from a proxy chain. The first entry is the client; the
+ * rest are hops, so keying on the whole header would let one client occupy a
+ * new bucket every time it took a different route.
+ */
+export const clientAddress = (
+  forwardedFor: string | null,
+  realIp: string | null,
+): string => {
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return realIp ?? "unknown";
+};

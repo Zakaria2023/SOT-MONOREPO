@@ -20,7 +20,9 @@ type Props = {
 const ProductPage = async ({ params }: Props) => {
   const { slug } = await params;
   const product = await getProductDetailBySlug(slug);
-  if (!product) notFound();
+  if (!product) {
+    notFound();
+  }
 
   // The attributes chosen for this product (fallback to whatever it has values
   // for, for products created before per-product selection).

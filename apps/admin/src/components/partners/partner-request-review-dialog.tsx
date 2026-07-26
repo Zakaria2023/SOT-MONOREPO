@@ -32,7 +32,9 @@ export const PartnerRequestReviewDialog = ({
   onConfirm,
   onCancel,
 }: PartnerRequestReviewDialogProps) => {
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   const approve = mode === "approve";
 

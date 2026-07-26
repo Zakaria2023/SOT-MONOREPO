@@ -14,7 +14,9 @@ type CategoryMenuProps = {
 // The default leaf whose products preview when a parent first opens.
 const defaultLeaf = (parent: CategoryNode): CategoryNode | null => {
   const firstChild = parent.children[0];
-  if (!firstChild) return null;
+  if (!firstChild) {
+    return null;
+  }
   return firstChild.children[0] ?? firstChild;
 };
 
@@ -24,7 +26,9 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelClose = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+    }
   };
 
   const openMenu = (parent: CategoryNode) => {

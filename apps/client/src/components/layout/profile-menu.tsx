@@ -16,7 +16,9 @@ export const ProfileMenu = ({ fullName }: ProfileMenuProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     const handleClick = (event: MouseEvent) => {
       if (
         containerRef.current &&

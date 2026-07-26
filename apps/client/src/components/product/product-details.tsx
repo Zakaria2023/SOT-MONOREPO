@@ -23,18 +23,27 @@ type ProductDetailsProps = {
 
 export const ProductDetails = ({ product }: ProductDetailsProps) => {
   const fields: DetailField[] = [];
-  if (product.brandName) fields.push({ label: "Brand", value: product.brandName });
-  if (product.categoryName)
+  if (product.brandName) {
+    fields.push({ label: "Brand", value: product.brandName });
+  }
+  if (product.categoryName) {
     fields.push({ label: "Category", value: product.categoryName });
-  if (product.sku) fields.push({ label: "SKU", value: product.sku });
-  if (product.model) fields.push({ label: "Model", value: product.model });
+  }
+  if (product.sku) {
+    fields.push({ label: "SKU", value: product.sku });
+  }
+  if (product.model) {
+    fields.push({ label: "Model", value: product.model });
+  }
   if (product.status)
     fields.push({
       label: "Status",
       value: STATUS_LABELS[product.status] ?? capitalize(product.status),
     });
 
-  if (fields.length === 0) return null;
+  if (fields.length === 0) {
+    return null;
+  }
 
   return (
     <section className="mx-auto px-6 pt-16 lg:px-12 xl:px-20">

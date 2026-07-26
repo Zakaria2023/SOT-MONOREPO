@@ -15,7 +15,9 @@ export const SettleButton = ({ payoutUuid }: SettleButtonProps) => {
     startTransition(async () => {
       setError(undefined);
       const result = await settlePayout(payoutUuid);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
 
   return (

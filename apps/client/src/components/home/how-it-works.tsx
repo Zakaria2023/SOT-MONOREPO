@@ -42,7 +42,9 @@ export const HowItWorks = () => {
 
   useEffect(() => {
     const section = sectionRef.current;
-    if (!section) return;
+    if (!section) {
+      return;
+    }
 
     let frame = 0;
 
@@ -73,10 +75,14 @@ export const HowItWorks = () => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
+          if (!entry.isIntersecting) {
+            return;
+          }
           const index = Number(entry.target.getAttribute("data-index"));
           setVisible((prev) => {
-            if (prev[index]) return prev;
+            if (prev[index]) {
+              return prev;
+            }
             const next = [...prev];
             next[index] = true;
             return next;
@@ -88,7 +94,9 @@ export const HowItWorks = () => {
     );
 
     stepRefs.current.forEach((el) => {
-      if (el) observer.observe(el);
+      if (el) {
+        observer.observe(el);
+      }
     });
 
     return () => observer.disconnect();

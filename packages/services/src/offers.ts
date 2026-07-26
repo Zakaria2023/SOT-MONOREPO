@@ -77,7 +77,9 @@ export const getApprovedPartnerByClerkId = async (
       ),
     );
 
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
   return {
     partnerRequestUuid: row.uuid,
     name: row.companyName || row.fullName,

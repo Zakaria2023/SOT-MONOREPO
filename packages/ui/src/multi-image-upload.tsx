@@ -34,7 +34,9 @@ export const MultiImageUpload = ({
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      return;
+    }
 
     setIsUploading(true);
     onUploadingChange?.(true);
@@ -73,7 +75,9 @@ export const MultiImageUpload = ({
       onChange([...value, ...uploaded]);
     }
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
 
     setIsUploading(false);
     onUploadingChange?.(false);

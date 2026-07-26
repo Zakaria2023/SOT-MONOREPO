@@ -38,7 +38,9 @@ export const HandoverView = ({
     startTransition(async () => {
       setError(undefined);
       const result = await confirmHandover(boqUuid);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
   };
 
@@ -46,7 +48,9 @@ export const HandoverView = ({
     startTransition(async () => {
       setError(undefined);
       const result = await reportHandoverIssue(boqUuid, reason);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
       else setShowDispute(false);
     });
   };

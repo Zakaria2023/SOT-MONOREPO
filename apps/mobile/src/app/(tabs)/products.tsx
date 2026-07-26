@@ -55,10 +55,14 @@ const ProductsScreen = () => {
       .catch(() => null)
       .then((token) => fetchCategoryFacets(categoryUuid, token ?? undefined))
       .then((next) => {
-        if (!cancelled) setFacets(next);
+        if (!cancelled) {
+          setFacets(next);
+        }
       })
       .catch(() => {
-        if (!cancelled) setFacets([]);
+        if (!cancelled) {
+          setFacets([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -85,11 +89,15 @@ const ProductsScreen = () => {
       specValues: selected,
     })
       .then((next) => {
-        if (!cancelled) setRows(next);
+        if (!cancelled) {
+          setRows(next);
+        }
       })
       // Narrowing a list is not worth losing the list over.
       .catch(() => {
-        if (!cancelled) setRows(null);
+        if (!cancelled) {
+          setRows(null);
+        }
       });
     return () => {
       cancelled = true;

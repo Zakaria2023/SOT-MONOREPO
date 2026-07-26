@@ -1,6 +1,7 @@
-import { readBody } from "@/lib/helpers";
+import { readBody, tooManyRequests } from "@/lib/helpers";
 import { NextResponse } from "next/server";
 import { checkDesign, type SelectionInput } from "services";
+import { clientAddress, withinRateLimit } from "utils";
 
 /**
  * Run the design check over a selection — requires-companion gaps and
@@ -12,8 +13,22 @@ import { checkDesign, type SelectionInput } from "services";
  *
  * No auth: the check reads the catalog and the rules, never the caller's data,
  * and a guest building a basket needs the same warnings a signed-in user gets.
+ * It is rate limited instead — this is the one endpoint where an unauthenticated
+ * caller can make the server do real work, and the connection pool is shared
+ * with every other app.
  */
 export const POST = async (request: Request) => {
+  // Generous for a cart that re-checks on every quantity change, tight enough
+  // that a loop cannot monopolise the pool.
+  const caller = clientAddress(
+    request.headers.get("x-forwarded-for"),
+    request.headers.get("x-real-ip"),
+  );
+  const limit = withinRateLimit(caller, { limit: 60, windowMs: 60_000 });
+  if (!limit.ok) {
+    return tooManyRequests(limit.retryAfterSeconds);
+  }
+
   const body = await readBody(request);
 
   if (!body || typeof body !== "object" || !("selection" in body)) {

@@ -69,14 +69,20 @@ const CartScreen = () => {
       })),
     )
       .then((result) => {
-        if (!cancelled) setDesign(result);
+        if (!cancelled) {
+          setDesign(result);
+        }
       })
       // Advisory by nature — a failed check must never block the cart itself.
       .catch(() => {
-        if (!cancelled) setDesign(null);
+        if (!cancelled) {
+          setDesign(null);
+        }
       })
       .finally(() => {
-        if (!cancelled) setChecking(false);
+        if (!cancelled) {
+          setChecking(false);
+        }
       });
     return () => {
       cancelled = true;

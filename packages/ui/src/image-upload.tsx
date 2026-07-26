@@ -48,7 +48,9 @@ export const ImageUpload = ({
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setPreview(URL.createObjectURL(file));
     setIsUploading(true);

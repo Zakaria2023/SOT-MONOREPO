@@ -20,7 +20,9 @@ export const chooseOffer = async (
   offerUuid: string,
 ): Promise<SelectOfferResult> => {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not authenticated" };
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
 
   try {
     await selectOffer({ userUuid: user.uuid, boqUuid, offerUuid });
@@ -41,7 +43,9 @@ export const confirmOrder = async (
   boqUuid: string,
 ): Promise<SelectOfferResult> => {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not authenticated" };
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
 
   let orderUuid: string;
   try {
@@ -64,7 +68,9 @@ export const confirmHandover = async (
   boqUuid: string,
 ): Promise<SelectOfferResult> => {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not authenticated" };
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
 
   try {
     await confirmHandoverByCustomer({ userUuid: user.uuid, boqUuid });
@@ -84,12 +90,18 @@ export const reportHandoverIssue = async (
   reason: string,
 ): Promise<SelectOfferResult> => {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not authenticated" };
-  if (!reason.trim()) return { error: "Describe the issue first" };
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+  if (!reason.trim()) {
+    return { error: "Describe the issue first" };
+  }
 
   // Ownership guard — the service dispute call isn't customer-scoped.
   const owned = await getCustomerHandover(user.uuid, boqUuid);
-  if (!owned) return { error: "Handover not found" };
+  if (!owned) {
+    return { error: "Handover not found" };
+  }
 
   try {
     await disputeHandover({ boqUuid, reason });

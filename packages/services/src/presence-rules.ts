@@ -51,28 +51,44 @@ export const classifyPresenceAttributes = (
 
   const kind = new Set<string>();
   const powerSupplyMode = new Set<string>();
-  if (valuesInclude("poe")) powerSupplyMode.add("poe");
-  if (valuesInclude("dc")) powerSupplyMode.add("dc");
-  if (valuesInclude("ac")) powerSupplyMode.add("ac");
-  if (valuesInclude("battery")) powerSupplyMode.add("battery");
+  if (valuesInclude("poe")) {
+    powerSupplyMode.add("poe");
+  }
+  if (valuesInclude("dc")) {
+    powerSupplyMode.add("dc");
+  }
+  if (valuesInclude("ac")) {
+    powerSupplyMode.add("ac");
+  }
+  if (valuesInclude("battery")) {
+    powerSupplyMode.add("battery");
+  }
 
   const hasPoe = powerSupplyMode.has("poe") || valuesInclude("poe");
 
   if (catHas(category, "camera")) {
     kind.add("camera");
     kind.add("wired_device");
-    if (hasPoe) kind.add("poe_camera");
+    if (hasPoe) {
+      kind.add("poe_camera");
+    }
   }
   if (catHas(category, "recorder", "nvr", "dvr")) {
     kind.add("recorder");
     kind.add("wired_device");
-    if (hasPoe) kind.add("poe_source");
+    if (hasPoe) {
+      kind.add("poe_source");
+    }
   }
   if (catHas(category, "switch")) {
     kind.add("wired_device");
-    if (hasPoe) kind.add("poe_source");
+    if (hasPoe) {
+      kind.add("poe_source");
+    }
   }
-  if (catHas(category, "injector")) kind.add("poe_source");
+  if (catHas(category, "injector")) {
+    kind.add("poe_source");
+  }
   if (catHas(category, "speaker")) {
     kind.add("speaker");
     if (!category.includes("active") && !category.includes("powered")) {
@@ -83,26 +99,54 @@ export const classifyPresenceAttributes = (
     kind.add("amplifier");
     kind.add("power_amp");
   }
-  if (catHas(category, "pre-amp", "preamp", "streamer")) kind.add("preamp");
-  if (catHas(category, "pbx", "call platform")) kind.add("pbx");
+  if (catHas(category, "pre-amp", "preamp", "streamer")) {
+    kind.add("preamp");
+  }
+  if (catHas(category, "pbx", "call platform")) {
+    kind.add("pbx");
+  }
   if (catHas(category, "sip", "ip phone", "desk phone", "endpoint")) {
     kind.add("sip_phone");
     kind.add("wired_device");
   }
-  if (catHas(category, "analog phone")) kind.add("analog_phone");
-  if (catHas(category, "gateway", "ata")) {
-    if (valuesInclude("fxs")) kind.add("fxs_gateway");
-    if (valuesInclude("fxo")) kind.add("fxo_gateway");
+  if (catHas(category, "analog phone")) {
+    kind.add("analog_phone");
   }
-  if (catHas(category, "rack", "enclosure", "cabinet")) kind.add("rack");
-  if (catHas(category, "reader")) kind.add("reader");
-  if (catHas(category, "controller")) kind.add("access_controller");
-  if (catHas(category, "lock", "strike", "maglock")) kind.add("lock");
-  if (catHas(category, "exit")) kind.add("exit_device");
-  if (catHas(category, "cabl", "patch panel")) kind.add("cabling");
-  if (catHas(category, "psu", "power supply", "adapter")) kind.add("psu");
-  if (catHas(category, "fibre", "fiber")) kind.add("fibre_link");
-  if (catHas(category, "sfp", "transceiver")) kind.add("sfp_module");
+  if (catHas(category, "gateway", "ata")) {
+    if (valuesInclude("fxs")) {
+      kind.add("fxs_gateway");
+    }
+    if (valuesInclude("fxo")) {
+      kind.add("fxo_gateway");
+    }
+  }
+  if (catHas(category, "rack", "enclosure", "cabinet")) {
+    kind.add("rack");
+  }
+  if (catHas(category, "reader")) {
+    kind.add("reader");
+  }
+  if (catHas(category, "controller")) {
+    kind.add("access_controller");
+  }
+  if (catHas(category, "lock", "strike", "maglock")) {
+    kind.add("lock");
+  }
+  if (catHas(category, "exit")) {
+    kind.add("exit_device");
+  }
+  if (catHas(category, "cabl", "patch panel")) {
+    kind.add("cabling");
+  }
+  if (catHas(category, "psu", "power supply", "adapter")) {
+    kind.add("psu");
+  }
+  if (catHas(category, "fibre", "fiber")) {
+    kind.add("fibre_link");
+  }
+  if (catHas(category, "sfp", "transceiver")) {
+    kind.add("sfp_module");
+  }
 
   const attributes: Record<string, PresenceAttrValue> = { kind: [...kind] };
   if (powerSupplyMode.size > 0) {

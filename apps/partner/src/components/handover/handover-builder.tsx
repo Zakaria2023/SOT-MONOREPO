@@ -45,7 +45,9 @@ export const OpenPackButton = ({ boqUuid }: OpenPackButtonProps) => {
     startTransition(async () => {
       setError(undefined);
       const result = await openPack(boqUuid);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
 
   return (
@@ -100,12 +102,16 @@ export const HandoverBuilder = ({
     startTransition(async () => {
       setError(undefined);
       const result = await fn();
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
 
   const onSaveAsset = (uuid: string) => {
     const draft = drafts[uuid];
-    if (!draft) return;
+    if (!draft) {
+      return;
+    }
     run(() => saveAsset(boqUuid, uuid, draft));
   };
 

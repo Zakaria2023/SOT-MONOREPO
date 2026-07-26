@@ -61,7 +61,9 @@ export const dispute = async (
   reason: string,
 ): Promise<HandoverReviewState> => {
   await requirePreSeller();
-  if (!reason.trim()) return { error: "Add a reason" };
+  if (!reason.trim()) {
+    return { error: "Add a reason" };
+  }
   try {
     await disputeHandover({ boqUuid, reason });
   } catch (error) {

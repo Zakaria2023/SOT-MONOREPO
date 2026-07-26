@@ -29,7 +29,9 @@ export const InstallProgress = ({ boqUuid, status }: InstallProgressProps) => {
     startTransition(async () => {
       setError(undefined);
       const result = await advanceStage(boqUuid, to);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
     });
 
   return (

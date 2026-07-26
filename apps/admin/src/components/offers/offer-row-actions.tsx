@@ -23,7 +23,9 @@ export const OfferRowActions = ({ offer }: OfferRowActionsProps) => {
   const [isSubmitting, startTransition] = useTransition();
 
   const closeReject = () => {
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      return;
+    }
     setRejectOpen(false);
     setRejectionReason("");
     setError(undefined);

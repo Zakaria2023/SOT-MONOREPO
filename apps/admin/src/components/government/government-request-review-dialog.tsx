@@ -28,7 +28,9 @@ export const GovernmentRequestReviewDialog = ({
   onConfirm,
   onCancel,
 }: GovernmentRequestReviewDialogProps) => {
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   const approve = mode === "approve";
 

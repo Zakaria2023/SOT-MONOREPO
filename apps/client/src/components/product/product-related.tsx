@@ -10,7 +10,9 @@ type ProductRelatedProps = {
 };
 
 export const ProductRelated = ({ products }: ProductRelatedProps) => {
-  if (products.length === 0) return null;
+  if (products.length === 0) {
+    return null;
+  }
 
   return (
     <section className="mx-auto px-6 pt-16 lg:px-12 xl:px-20">

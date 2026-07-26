@@ -412,7 +412,9 @@ export const getProductDetailBySlug = async (
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(eq(Products.slug, slug));
 
-    if (!product) return null;
+    if (!product) {
+      return null;
+    }
 
     const [category] = await db
       .select()
@@ -469,7 +471,9 @@ export const getRelatedProducts = async (
       .select({ categoryUuid: Products.categoryUuid })
       .from(Products)
       .where(eq(Products.uuid, productUuid));
-    if (!product) return [];
+    if (!product) {
+      return [];
+    }
 
     const [category] = await db
       .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
