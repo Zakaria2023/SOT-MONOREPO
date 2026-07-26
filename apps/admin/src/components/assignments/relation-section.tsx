@@ -10,6 +10,7 @@ import type { LookupRow } from "@/db/types";
 import type { RuleComparator, RuleKind } from "@/db/enum";
 import { ruleKinds } from "@/db/enum";
 import { RULE_KIND_LABELS } from "@/db/label";
+import { familyOperandType, validateRuleShape } from "utils";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Dropdown, FormError, Input } from "ui";
@@ -19,10 +20,20 @@ type RelationSectionProps = {
   specUuid: string;
   specLabel: string;
   specUnit: string | null;
+  // What this attribute holds — decides which families can use it at all.
+  specValueType: "number" | "select";
+  specOrdered: boolean;
   // Rules already touching it.
   relations: SpecRelation[];
-  // Every other attribute, to pick the far side from.
-  otherSpecs: { value: string; label: string }[];
+  // Every other attribute, to pick the far side from — carrying enough shape
+  // to judge whether the pairing would actually work.
+  otherSpecs: {
+    value: string;
+    label: string;
+    valueType: "number" | "select";
+    unit: string | null;
+    ordered: boolean;
+  }[];
   // Attributes with option lists, for keying a conditional rule's table.
   lookupSpecs: { key: string; label: string; options: string[] }[];
 };
@@ -35,12 +46,18 @@ const COMPARATOR_LABELS: Record<RuleComparator, string> = {
   intersects: "must overlap (∩)",
 };
 
-const CARD_KINDS = ruleKinds;
+// Only offer families this attribute could actually take part in. A Budget
+// rule on a dropdown finds no number to add up and reports not_applicable
+// forever — silently, which is worse than refusing it.
+const kindsFor = (valueType: "number" | "select") =>
+  ruleKinds.filter((kind) => familyOperandType(kind) === valueType);
 
 export const RelationSection = ({
   specUuid,
   specLabel,
   specUnit,
+  specValueType,
+  specOrdered,
   relations,
   otherSpecs,
   lookupSpecs,
@@ -49,8 +66,10 @@ export const RelationSection = ({
   const [error, setError] = useState<string | undefined>(undefined);
   const [adding, setAdding] = useState(false);
 
+  const cardKinds = kindsFor(specValueType);
+
   const [name, setName] = useState("");
-  const [kind, setKind] = useState<RuleKind>("sum_budget");
+  const [kind, setKind] = useState<RuleKind>(cardKinds[0] ?? "spec_match");
   const [side, setSide] = useState<"demand" | "supply">("demand");
   const [otherSpecUuid, setOtherSpecUuid] = useState("");
   const [comparator, setComparator] = useState<RuleComparator>("lte");
@@ -61,7 +80,7 @@ export const RelationSection = ({
 
   const reset = () => {
     setName("");
-    setKind("sum_budget");
+    setKind(cardKinds[0] ?? "spec_match");
     setSide("demand");
     setOtherSpecUuid("");
     setComparator("lte");
@@ -97,6 +116,35 @@ export const RelationSection = ({
       const result = await removeRelation(uuid);
       setError(result.error);
     });
+
+  const chosenOther = otherSpecs.find(
+    (option) => option.value === otherSpecUuid,
+  );
+
+  // Run the same shape check the service will, so a mis-shaped relation is
+  // refused here rather than saved and silently never firing.
+  const problems = validateRuleShape({
+    kind,
+    comparator,
+    consumer: {
+      label: specLabel,
+      valueType: specValueType,
+      unit: specUnit,
+      ordered: specOrdered,
+    },
+    provider: chosenOther
+      ? {
+          label: chosenOther.label,
+          valueType: chosenOther.valueType,
+          unit: chosenOther.unit,
+          ordered: chosenOther.ordered,
+        }
+      : undefined,
+    lookup:
+      kind === "conditional"
+        ? { inputs: lookupInputs, rows: lookupRows }
+        : null,
+  });
 
   const isMatch = kind === "spec_match";
   // A conditional rule reads its limit from its own table, so it has no far
@@ -163,7 +211,7 @@ export const RelationSection = ({
             <Dropdown
               value={kind}
               onChange={(value) => setKind(value as RuleKind)}
-              options={CARD_KINDS.map((value) => ({
+              options={cardKinds.map((value) => ({
                 value,
                 label: RULE_KIND_LABELS[value],
               }))}
@@ -256,11 +304,21 @@ export const RelationSection = ({
             />
           </div>
 
-          {specUnit && (
-            <p className="text-sm text-faint">
-              {specLabel} is measured in {specUnit} — the other side must use
-              the same unit, except on a Count relation.
-            </p>
+          {problems.length > 0 ? (
+            <ul className="flex flex-col gap-1 rounded-control border border-amber-200 bg-amber-50 p-2.5">
+              {problems.map((problem) => (
+                <li key={problem} className="text-sm text-amber-700">
+                  {problem}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            specUnit && (
+              <p className="text-sm text-faint">
+                {specLabel} is measured in {specUnit} — the other side must use
+                the same unit, except on a Count relation.
+              </p>
+            )
           )}
 
           <div className="flex items-center gap-2">
@@ -269,7 +327,8 @@ export const RelationSection = ({
               disabled={
                 isPending ||
                 !name.trim() ||
-                (isConditional ? lookupRows.length === 0 : !otherSpecUuid)
+                (isConditional ? lookupRows.length === 0 : !otherSpecUuid) ||
+                problems.length > 0
               }
               onClick={submit}
               className="rounded-control bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"

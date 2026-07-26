@@ -11,6 +11,7 @@ import {
   SelectSpecifications,
   Specifications,
 } from "../../../db/schema/specifications";
+import { validateRuleShape, type OperandShape } from "utils";
 
 export type { SelectCompatibilityRules };
 
@@ -163,45 +164,54 @@ const assertAllocationValid = (fields: CompatibilityRuleFields): void => {
   }
 };
 
-const assertUnitsMatch = async (
+/**
+ * Refuse a relation the engine could not act on. A Budget rule pointed at a
+ * dropdown attribute reports not_applicable forever — no error, no gate, no
+ * clue — so the shape is checked here rather than discovered in production.
+ */
+const assertShapeValid = async (
   fields: CompatibilityRuleFields,
 ): Promise<void> => {
-  // Count compares a quantity vs a count-like capacity; ratio divides two
-  // (possibly different-unit) sums; spec_match compares select specs (no unit).
-  // conditional compares an item against a looked-up limit in the item's own
-  // unit — there is no second spec to agree with.
-  if (
-    fields.kind === "count_limit" ||
-    fields.kind === "ratio" ||
-    fields.kind === "spec_match" ||
-    fields.kind === "conditional"
-  ) {
-    return;
-  }
-
-  const specUuids = [fields.consumerSpecUuid, fields.providerSpecUuid].filter(
+  const uuids = [fields.consumerSpecUuid, fields.providerSpecUuid].filter(
     (uuid): uuid is string => Boolean(uuid),
   );
-
-  const specRows =
-    specUuids.length > 0
+  const rows =
+    uuids.length > 0
       ? await db
-          .select({ uuid: Specifications.uuid, unit: Specifications.unit })
+          .select({
+            uuid: Specifications.uuid,
+            label: Specifications.label,
+            valueType: Specifications.valueType,
+            unit: Specifications.unit,
+            ordered: Specifications.ordered,
+          })
           .from(Specifications)
-          .where(inArray(Specifications.uuid, specUuids))
+          .where(inArray(Specifications.uuid, uuids))
       : [];
 
-  const consumerUnit = specRows.find(
-    (row) => row.uuid === fields.consumerSpecUuid,
-  )?.unit;
-  const providerUnit = specRows.find(
-    (row) => row.uuid === fields.providerSpecUuid,
-  )?.unit;
+  const shapeOf = (uuid: string | null | undefined): OperandShape | undefined => {
+    const row = uuid ? rows.find((entry) => entry.uuid === uuid) : undefined;
+    return row
+      ? {
+          label: row.label,
+          valueType: row.valueType,
+          unit: row.unit,
+          ordered: row.ordered,
+        }
+      : undefined;
+  };
 
-  if (consumerUnit !== providerUnit) {
-    throw new Error(
-      `Both sides must use the same unit for this rule type — got "${consumerUnit ?? "no unit"}" vs "${providerUnit ?? "no unit"}". Comparing different units is only valid for count rules.`,
-    );
+  const problems = validateRuleShape({
+    kind: fields.kind,
+    // The column is defaulted, so an insert may legitimately omit it.
+    comparator: fields.comparator ?? "lte",
+    consumer: shapeOf(fields.consumerSpecUuid),
+    provider: shapeOf(fields.providerSpecUuid),
+    lookup: fields.lookup,
+  });
+
+  if (problems.length > 0) {
+    throw new Error(problems.join(" "));
   }
 };
 
@@ -250,7 +260,7 @@ export const createCompatibilityRule = async (
 ): Promise<string> => {
   assertOperandsValid(fields);
   assertAllocationValid(fields);
-  await assertUnitsMatch(fields);
+  await assertShapeValid(fields);
   const uuid = randomUUID();
   await db.insert(CompatibilityRules).values({ ...fields, uuid });
   return uuid;
@@ -262,7 +272,7 @@ export const updateCompatibilityRule = async (
 ): Promise<void> => {
   assertOperandsValid(fields);
   assertAllocationValid(fields);
-  await assertUnitsMatch(fields);
+  await assertShapeValid(fields);
   await db
     .update(CompatibilityRules)
     .set(fields)

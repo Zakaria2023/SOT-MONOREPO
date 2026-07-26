@@ -24,7 +24,13 @@ type AssignmentsTabProps = {
 type AssignmentCardProps = {
   row: DraftRow;
   relations: SpecRelation[];
-  otherSpecs: { value: string; label: string }[];
+  otherSpecs: {
+    value: string;
+    label: string;
+    valueType: "number" | "select";
+    unit: string | null;
+    ordered: boolean;
+  }[];
   lookupSpecs: { key: string; label: string; options: string[] }[];
   // How many other attributes this category carries at all, so an empty
   // controller list can explain itself rather than look broken.
@@ -308,6 +314,8 @@ const AssignmentCard = ({
         specUuid={row.specificationUuid}
         specLabel={row.label}
         specUnit={row.unit}
+        specValueType={row.valueType}
+        specOrdered={row.ordered}
         relations={relations}
         otherSpecs={otherSpecs}
         lookupSpecs={lookupSpecs}
@@ -371,6 +379,9 @@ export const AssignmentsTab = ({
         label: specification.unit
           ? `${specification.label} (${specification.unit})`
           : specification.label,
+        valueType: specification.valueType,
+        unit: specification.unit,
+        ordered: specification.ordered,
       }));
 
   return (

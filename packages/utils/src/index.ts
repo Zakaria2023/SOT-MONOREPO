@@ -475,3 +475,5 @@ export const expandFacetChoices = (
   }
   return expanded;
 };
+
+export * from "./rule-validation";
