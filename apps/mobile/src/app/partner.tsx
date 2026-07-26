@@ -1,4 +1,3 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Check, CircleCheckBig } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { TextField } from "@/components/ui/text-field";
 import { createPartnerRequest } from "@/lib/api";
-import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import type { PartnerCapability } from "@/lib/types";
 
 type CapabilityOption = {
@@ -74,14 +73,9 @@ const PartnerScreen = () => {
   if (done) {
     return (
       <View style={styles.doneContainer}>
-        <LinearGradient
-          colors={gradient.accent}
-          start={gradient.start}
-          end={gradient.end}
-          style={styles.doneBadge}
-        >
-          <CircleCheckBig color={colors.onGradient} size={36} />
-        </LinearGradient>
+        <View style={[styles.doneBadge, { backgroundColor: colors.primary }]}>
+          <CircleCheckBig color={colors.onAccent} size={36} />
+        </View>
         <Text style={styles.doneTitle}>Request submitted</Text>
         <Text style={styles.doneText}>
           Thanks — our team will review your application and be in touch by
@@ -198,7 +192,7 @@ const styles = StyleSheet.create({
   label: {
     color: colors.text,
     fontFamily: fonts.semibold,
-    fontSize: 14,
+    fontSize: 15,
     marginTop: spacing.lg,
     marginBottom: spacing.xs,
   },
@@ -234,7 +228,7 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
     marginTop: spacing.md,
   },
   submit: {
@@ -258,8 +252,8 @@ const styles = StyleSheet.create({
   },
   doneTitle: {
     color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 24,
+    fontFamily: fonts.bold,
+    fontSize: 26,
   },
   doneText: {
     color: colors.muted,

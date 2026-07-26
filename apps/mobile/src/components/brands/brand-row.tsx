@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   initial: {
     color: colors.primary,
-    fontFamily: fonts.heading,
+    fontFamily: fonts.bold,
     fontSize: 20,
   },
   body: {
@@ -82,8 +82,8 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 16,
+    fontFamily: fonts.bold,
+    fontSize: 17,
   },
   count: {
     color: colors.muted,

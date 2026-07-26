@@ -1,116 +1,87 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
-import { ArrowRight, LayoutGrid } from "lucide-react-native";
+import { ChevronRight, LayoutGrid } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing, type } from "@/lib/theme";
 import type { Category } from "@/lib/types";
 
 type CategoryRowProps = {
   category: Category;
 };
 
-// A full-bleed image card with a bottom scrim and the title overlaid — the
-// mobile take on the client's bento category cards.
+// A horizontal row with a small image tile, not a full-bleed photo card with
+// white text on a dark scrim. Category art here is inconsistent — logos,
+// product shots, sometimes nothing — and the old overlay was only legible
+// because the dark theme could hide it under near-black. On paper the label
+// belongs beside the image, where it always reads.
 export const CategoryRow = ({ category }: CategoryRowProps) => (
   <Link href={`/category/${category.uuid}`} asChild>
     <Pressable
-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      <View style={styles.imageWrap}>
+      <View style={styles.tile}>
         {category.image ? (
           <Image
             source={category.image}
             style={styles.image}
             contentFit="cover"
+            transition={150}
           />
         ) : (
-          <LinearGradient
-            colors={gradient.wash}
-            start={gradient.start}
-            end={gradient.end}
-            style={styles.image}
-          >
-            <LayoutGrid color={colors.primary} size={28} />
-          </LinearGradient>
+          <LayoutGrid color={colors.faint} size={22} />
         )}
-        <LinearGradient
-          colors={["transparent", "rgba(6,10,20,0.35)", "rgba(6,10,20,0.92)"]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.countPill}>
-          <Text style={styles.countText}>{category.productCount}</Text>
-        </View>
-        <View style={styles.overlay}>
-          <Text style={styles.name} numberOfLines={1}>
-            {category.name}
-          </Text>
-          <View style={styles.cta}>
-            <Text style={styles.ctaText}>Browse</Text>
-            <ArrowRight color={colors.primary} size={15} />
-          </View>
-        </View>
       </View>
+
+      <View style={styles.body}>
+        <Text style={styles.name} numberOfLines={1}>
+          {category.name}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {category.productCount}{" "}
+          {category.productCount === 1 ? "product" : "products"}
+          {category.parentName ? ` · ${category.parentName}` : ""}
+        </Text>
+      </View>
+
+      <ChevronRight color={colors.faint} size={18} />
     </Pressable>
   </Link>
 );
 
 const styles = StyleSheet.create({
-  card: {
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
-    overflow: "hidden",
-    backgroundColor: colors.surface,
     ...shadow.card,
   },
-  pressed: {
-    opacity: 0.94,
-  },
-  imageWrap: {
-    height: 132,
-    justifyContent: "flex-end",
+  pressed: { backgroundColor: colors.hover },
+  tile: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.control,
     backgroundColor: colors.surfaceAlt,
-  },
-  image: {
-    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  countPill: {
-    position: "absolute",
-    top: spacing.md,
-    right: spacing.md,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.16)",
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-  },
-  countText: {
-    color: "#ffffff",
-    fontFamily: fonts.bold,
-    fontSize: 12,
-  },
-  overlay: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: spacing.lg,
-  },
+  image: { width: "100%", height: "100%" },
+  body: { flex: 1, gap: 2 },
   name: {
-    flex: 1,
-    color: "#ffffff",
-    fontFamily: fonts.heading,
-    fontSize: 20,
-  },
-  cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  ctaText: {
-    color: colors.primary,
+    color: colors.text,
     fontFamily: fonts.semibold,
-    fontSize: 13,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
+  },
+  meta: {
+    color: colors.faint,
+    fontFamily: fonts.regular,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
 });

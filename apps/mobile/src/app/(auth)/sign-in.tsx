@@ -86,14 +86,9 @@ const SignInScreen = () => {
         style={styles.glow}
       />
       <View style={styles.inner}>
-        <LinearGradient
-          colors={gradient.accent}
-          start={gradient.start}
-          end={gradient.end}
-          style={styles.logo}
-        >
-          <Zap color={colors.onGradient} size={28} />
-        </LinearGradient>
+        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
+          <Zap color={colors.onAccent} size={28} />
+        </View>
 
         <Eyebrow label={stage === "email" ? "Welcome back" : "Verify"} />
         <Text style={styles.title}>Sign in to SOT</Text>
@@ -175,7 +170,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.display,
+    fontFamily: fonts.monoBold,
     fontSize: 32,
     letterSpacing: -0.5,
   },
@@ -193,7 +188,7 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
   },
 });
 

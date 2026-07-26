@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.md, marginTop: spacing.xl },
   heading: {
     color: colors.text,
-    fontFamily: fonts.heading,
+    fontFamily: fonts.bold,
     fontSize: 20,
   },
   group: { gap: spacing.sm },
@@ -107,14 +107,14 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 14,
+    fontSize: 15,
   },
   value: {
     flexShrink: 0,
     maxWidth: "55%",
     color: colors.text,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
     textAlign: "right",
   },
 });

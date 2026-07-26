@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
   reference: {
     flex: 1,
     color: colors.text,
-    fontFamily: fonts.heading,
+    fontFamily: fonts.bold,
     fontSize: 17,
   },
   description: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 20,
   },
   divider: {
@@ -82,11 +82,11 @@ const styles = StyleSheet.create({
   totalLabel: {
     color: colors.muted,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
   },
   total: {
     color: colors.text,
-    fontFamily: fonts.display,
-    fontSize: 18,
+    fontFamily: fonts.monoBold,
+    fontSize: 20,
   },
 });

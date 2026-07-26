@@ -15,7 +15,7 @@ type FindingRowProps = {
 const FindingRow = ({ finding }: FindingRowProps) => {
   const blocking = finding.tone === "block";
   const Icon = blocking ? ShieldAlert : AlertTriangle;
-  const accent = blocking ? colors.danger : colors.accentCyan;
+  const accent = blocking ? colors.danger : colors.primary;
 
   return (
     <View style={styles.finding}>
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   heading: {
     color: colors.text,
     fontFamily: fonts.semibold,
-    fontSize: 14,
+    fontSize: 15,
   },
   finding: {
     flexDirection: "row",
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   suggestions: {
     color: colors.faint,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: 13,
     marginTop: 2,
   },
 });

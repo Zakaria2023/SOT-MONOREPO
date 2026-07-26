@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: colors.muted,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
   },
   summaryStrong: {
     color: colors.text,
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     color: colors.text,
-    fontFamily: fonts.display,
-    fontSize: 14,
+    fontFamily: fonts.monoBold,
+    fontSize: 15,
   },
   totalValue: {
     fontSize: 20,

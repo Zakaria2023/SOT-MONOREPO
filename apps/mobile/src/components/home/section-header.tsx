@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.heading,
+    fontFamily: fonts.bold,
     fontSize: 26,
     lineHeight: 30,
   },
@@ -58,6 +58,6 @@ const styles = StyleSheet.create({
   linkText: {
     color: colors.primary,
     fontFamily: fonts.bold,
-    fontSize: 14,
+    fontSize: 15,
   },
 });
