@@ -66,14 +66,14 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 28,
+    fontFamily: fonts.bold,
+    fontSize: 32,
     lineHeight: 32,
   },
   parent: {
     color: colors.muted,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
   },
 });
 

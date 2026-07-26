@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: colors.text,
-    fontFamily: fonts.display,
+    fontFamily: fonts.monoBold,
     fontSize: 32,
     lineHeight: 36,
     letterSpacing: -0.5,

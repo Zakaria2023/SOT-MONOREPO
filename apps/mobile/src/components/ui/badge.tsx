@@ -1,46 +1,54 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, radius, spacing, type } from "@/lib/theme";
 
 type BadgeProps = {
   label: string;
-  tone?: "primary" | "neutral" | "success";
+  tone?: "primary" | "neutral" | "success" | "danger" | "warning";
 };
 
-// Tinted rounded-full pill, matching the client's count/status badges.
-export const Badge = ({ label, tone = "primary" }: BadgeProps) => (
-  <View style={[styles.badge, styles[`${tone}Bg`]]}>
-    <Text style={[styles.text, styles[`${tone}Text`]]}>{label}</Text>
+// A small tinted label. Squarer than a full pill — at this size a pill reads
+// as decoration, a soft rectangle reads as data.
+export const Badge = ({ label, tone = "neutral" }: BadgeProps) => (
+  <View style={[styles.badge, TONES[tone].box]}>
+    <Text style={[styles.text, TONES[tone].text]}>{label}</Text>
   </View>
 );
+
+const TONES = {
+  primary: {
+    box: { backgroundColor: colors.primaryTint, borderColor: colors.primaryBorder },
+    text: { color: colors.primary },
+  },
+  neutral: {
+    box: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+    text: { color: colors.muted },
+  },
+  success: {
+    box: { backgroundColor: colors.successTint, borderColor: "transparent" },
+    text: { color: colors.success },
+  },
+  danger: {
+    box: { backgroundColor: colors.dangerTint, borderColor: "transparent" },
+    text: { color: colors.danger },
+  },
+  warning: {
+    box: { backgroundColor: colors.warningTint, borderColor: "transparent" },
+    text: { color: colors.warning },
+  },
+} as const;
 
 const styles = StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 5,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
   },
   text: {
     fontFamily: fonts.semibold,
-    fontSize: 12,
+    fontSize: type.micro.size,
+    lineHeight: type.micro.line,
     letterSpacing: 0.2,
-  },
-  primaryBg: {
-    backgroundColor: colors.primaryTint,
-  },
-  primaryText: {
-    color: colors.primary,
-  },
-  neutralBg: {
-    backgroundColor: colors.surfaceGlass,
-  },
-  neutralText: {
-    color: colors.muted,
-  },
-  successBg: {
-    backgroundColor: "rgba(52,226,155,0.14)",
-  },
-  successText: {
-    color: colors.success,
   },
 });

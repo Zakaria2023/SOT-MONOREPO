@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontFamily: fonts.heading,
+    fontFamily: fonts.bold,
     fontSize: 15,
     lineHeight: 19,
   },
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    backgroundColor: colors.backgroundAlt,
+    backgroundColor: colors.surfaceAlt,
   },
   step: {
     width: 38,
@@ -171,12 +171,12 @@ const styles = StyleSheet.create({
     minWidth: 32,
     textAlign: "center",
     color: colors.text,
-    fontFamily: fonts.display,
+    fontFamily: fonts.monoBold,
     fontSize: 15,
   },
   lineTotal: {
     color: colors.text,
-    fontFamily: fonts.display,
-    fontSize: 16,
+    fontFamily: fonts.monoBold,
+    fontSize: 17,
   },
 });

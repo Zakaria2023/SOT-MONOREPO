@@ -1,6 +1,5 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Check, ImageOff, ShoppingCart } from "lucide-react-native";
 import { useCallback, useState } from "react";
@@ -8,9 +7,10 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
+import { SpecTable } from "@/components/products/spec-table";
 import { addCartItem, fetchProduct } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
-import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const ProductScreen = () => {
@@ -67,12 +67,7 @@ const ProductScreen = () => {
     >
       <Stack.Screen options={{ title: product.name }} />
       <View style={styles.well}>
-        <LinearGradient
-          colors={gradient.wash}
-          start={gradient.start}
-          end={gradient.end}
-          style={StyleSheet.absoluteFill}
-        />
+        
         {product.image ? (
           <Image
             source={product.image}
@@ -104,6 +99,15 @@ const ProductScreen = () => {
       ) : null}
       {product.description ? (
         <Text style={styles.description}>{product.description}</Text>
+      ) : null}
+
+      {/* Only the attributes this viewer may read — the API filtered them by
+          audience before they ever reached the device. */}
+      {product.specs && product.technicalAttributes ? (
+        <SpecTable
+          specs={product.specs}
+          values={product.technicalAttributes}
+        />
       ) : null}
 
       <View style={styles.action}>
@@ -154,14 +158,14 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontFamily: fonts.heading,
+    fontFamily: fonts.bold,
     fontSize: 26,
     lineHeight: 31,
   },
   price: {
     color: colors.primary,
-    fontFamily: fonts.display,
-    fontSize: 22,
+    fontFamily: fonts.monoBold,
+    fontSize: 26,
   },
   lead: {
     color: colors.text,
@@ -173,7 +177,7 @@ const styles = StyleSheet.create({
   description: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 22,
     marginTop: spacing.xs,
   },
@@ -184,7 +188,7 @@ const styles = StyleSheet.create({
   message: {
     color: colors.muted,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
     textAlign: "center",
   },
 });

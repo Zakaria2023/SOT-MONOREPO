@@ -21,6 +21,44 @@ export type Product = {
 export type ProductDetail = Product & {
   category: Category | null;
   brandBusinessLines: string[] | null;
+  // Values the API decided this viewer may read — already filtered by
+  // audience, so a partner-only attribute simply is not here.
+  technicalAttributes: Record<string, string> | null;
+  // Label/unit/group resolved per key, so the app renders a spec table
+  // without carrying its own copy of the attribute library.
+  specs: ProductSpec[] | null;
+};
+
+export type ProductSpec = {
+  key: string;
+  label: string;
+  unit: string | null;
+  groupName: string | null;
+};
+
+// A filter a category offers this viewer. `options` is already the category's
+// enabled slice; `ordered` means the choice reads as a ceiling ("what you
+// have") rather than an exact match.
+export type SpecFacet = {
+  key: string;
+  label: string;
+  unit: string | null;
+  ordered: boolean;
+  options: string[];
+};
+
+// One thing wrong with a design, from either engine.
+export type DesignFinding = {
+  id: string;
+  title: string;
+  message: string;
+  tone: "block" | "warn";
+  suggestions: string[];
+};
+
+export type DesignCheckResult = {
+  blockers: DesignFinding[];
+  warnings: DesignFinding[];
 };
 
 export type Category = {

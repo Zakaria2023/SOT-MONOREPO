@@ -1,8 +1,7 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import type { Brand } from "@/lib/types";
 
 type BrandChipProps = {
@@ -16,12 +15,7 @@ export const BrandChip = ({ brand }: BrandChipProps) => (
     <Pressable
       style={({ pressed }) => [styles.chip, pressed ? styles.pressed : null]}
     >
-      <LinearGradient
-        colors={gradient.accent}
-        start={gradient.start}
-        end={gradient.end}
-        style={styles.band}
-      />
+      <View style={[styles.band, { backgroundColor: colors.primary }]} />
       <View style={styles.logoTile}>
         {brand.image ? (
           <Image
@@ -78,8 +72,8 @@ const styles = StyleSheet.create({
   },
   initial: {
     color: colors.primary,
-    fontFamily: fonts.heading,
-    fontSize: 24,
+    fontFamily: fonts.bold,
+    fontSize: 26,
   },
   name: {
     color: colors.text,

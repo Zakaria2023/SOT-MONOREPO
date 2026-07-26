@@ -6,8 +6,6 @@ import { HankenGrotesk_400Regular } from "@expo-google-fonts/hanken-grotesk/400R
 import { HankenGrotesk_500Medium } from "@expo-google-fonts/hanken-grotesk/500Medium";
 import { HankenGrotesk_600SemiBold } from "@expo-google-fonts/hanken-grotesk/600SemiBold";
 import { HankenGrotesk_700Bold } from "@expo-google-fonts/hanken-grotesk/700Bold";
-import { Newsreader_700Bold } from "@expo-google-fonts/newsreader/700Bold";
-import { Newsreader_800ExtraBold } from "@expo-google-fonts/newsreader/800ExtraBold";
 import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
 import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk/700Bold";
 import { useFonts } from "expo-font";
@@ -16,7 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { CLERK_PUBLISHABLE_KEY } from "@/lib/env";
-import { colors, fonts, spacing } from "@/lib/theme";
+import { colors, fonts, spacing , type } from "@/lib/theme";
 import { tokenCache } from "@/lib/token-cache";
 
 // Redirect between the authenticated app and the sign-in screen based on the
@@ -48,9 +46,14 @@ const AuthGate = () => {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.background },
+        headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
-        headerTitleStyle: { fontFamily: fonts.heading, color: colors.text },
+        headerTitleStyle: {
+          fontFamily: fonts.bold,
+          fontSize: type.title.size,
+          color: colors.text,
+        },
+        headerBackButtonDisplayMode: "minimal",
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
@@ -78,8 +81,6 @@ const MissingKey = () => (
 
 const RootLayout = () => {
   const [fontsLoaded] = useFonts({
-    Newsreader_700Bold,
-    Newsreader_800ExtraBold,
     HankenGrotesk_400Regular,
     HankenGrotesk_500Medium,
     HankenGrotesk_600SemiBold,
@@ -91,7 +92,7 @@ const RootLayout = () => {
   if (!fontsLoaded) {
     return (
       <>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -102,7 +103,7 @@ const RootLayout = () => {
   if (!CLERK_PUBLISHABLE_KEY) {
     return (
       <>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <MissingKey />
       </>
     );
@@ -114,7 +115,7 @@ const RootLayout = () => {
       tokenCache={tokenCache}
     >
       <ClerkLoaded>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <AuthGate />
       </ClerkLoaded>
     </ClerkProvider>

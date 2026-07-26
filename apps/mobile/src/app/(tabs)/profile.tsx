@@ -1,5 +1,4 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { LinearGradient } from "expo-linear-gradient";
 import { Link } from "expo-router";
 import {
   ChevronRight,
@@ -13,7 +12,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
 import { fetchMe } from "@/lib/api";
-import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 type ProfileRowProps = {
@@ -86,14 +85,9 @@ const ProfileScreen = () => {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.identity}>
-        <LinearGradient
-          colors={gradient.accent}
-          start={gradient.start}
-          end={gradient.end}
-          style={styles.avatar}
-        >
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <Text style={styles.avatarText}>{initial}</Text>
-        </LinearGradient>
+        </View>
         <Text style={styles.name}>{name}</Text>
         {data.company ? (
           <Text style={styles.company}>{data.company}</Text>
@@ -146,19 +140,19 @@ const styles = StyleSheet.create({
     ...shadow.glow,
   },
   avatarText: {
-    color: colors.onGradient,
-    fontFamily: fonts.display,
+    color: colors.onAccent,
+    fontFamily: fonts.monoBold,
     fontSize: 34,
   },
   name: {
     color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 24,
+    fontFamily: fonts.bold,
+    fontSize: 26,
   },
   company: {
     color: colors.muted,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 15,
   },
   card: {
     backgroundColor: colors.surface,
@@ -204,14 +198,14 @@ const styles = StyleSheet.create({
   label: {
     color: colors.faint,
     fontFamily: fonts.semibold,
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
   value: {
     color: colors.text,
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: 17,
   },
   divider: {
     height: 1,

@@ -4,10 +4,12 @@ import type {
   Brand,
   CartLineItem,
   Category,
+  DesignCheckResult,
   Offer,
   PartnerRequestInput,
   Product,
   ProductDetail,
+  SpecFacet,
 } from "./types";
 
 export class ApiError extends Error {
@@ -31,6 +33,10 @@ type ProductsQuery = {
   categoryUuids?: string[];
   brandUuids?: string[];
   sort?: "featured" | "price-asc" | "price-desc" | "name";
+  // Chosen facet values per attribute key. Sent as repeated `spec=key:value`,
+  // the same encoding the web catalog uses, so a shared link means the same
+  // thing on both.
+  specValues?: Record<string, string[]>;
 };
 
 const buildQuery = (query: ProductsQuery): string => {
@@ -46,6 +52,11 @@ const buildQuery = (query: ProductsQuery): string => {
   }
   for (const uuid of query.brandUuids ?? []) {
     params.append("brand", uuid);
+  }
+  for (const [key, values] of Object.entries(query.specValues ?? {})) {
+    for (const value of values) {
+      params.append("spec", `${key}:${value}`);
+    }
   }
   const qs = params.toString();
   return qs.length > 0 ? `?${qs}` : "";
@@ -107,6 +118,32 @@ export const fetchProduct = (uuid: string): Promise<ProductDetail> =>
 
 export const fetchCategories = (): Promise<Category[]> =>
   request<Category[]>("/categories");
+
+/**
+ * The filters this category offers — resolved server-side from the
+ * assignments, so the app never needs to know the attribute library, the
+ * category tree, or who is allowed to see what. Pass the token when signed in:
+ * a partner is offered facets a plain user is not.
+ */
+export const fetchCategoryFacets = (
+  uuid: string,
+  token?: string,
+): Promise<SpecFacet[]> =>
+  request<SpecFacet[]>(`/categories/${uuid}/facets`, { token });
+
+/**
+ * Check a basket before the buyer commits to it: missing companions and
+ * compatibility conflicts, split into blockers and warnings. Same service
+ * behind this as the web cart, so the two cannot disagree about whether a
+ * design is valid.
+ */
+export const fetchDesignCheck = (
+  selection: { productUuid: string; quantity: number }[],
+): Promise<DesignCheckResult> =>
+  request<DesignCheckResult>("/design-check", {
+    method: "POST",
+    body: { selection },
+  });
 
 export const fetchCategory = (uuid: string): Promise<Category> =>
   request<Category>(`/categories/${uuid}`);
