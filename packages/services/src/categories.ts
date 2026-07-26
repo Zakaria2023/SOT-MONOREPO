@@ -258,14 +258,38 @@ export const getCategoryBoard = async (): Promise<CategoryBoardColumn[]> => {
     }
   }
 
-  return Promise.all(
-    columnKeys.map(async (parentUuid) => ({
-      parentUuid,
-      parentName: parentUuid ? (nameOf.get(parentUuid) ?? null) : null,
-      total: totals.get(parentUuid) ?? 0,
-      items: await getCategoryChildren(parentUuid),
-    })),
-  );
+  // One query for every category on the board, then split into columns in
+  // memory. Fanning out to getCategoryChildren per column meant a query per
+  // parent — fine at nine, but it grows with the tree, and the connection
+  // ceiling is shared with every other app.
+  const rows = await db
+    .select(categoryBoardSelection)
+    .from(Categories)
+    .leftJoin(
+      ParentCategories,
+      eq(Categories.parentUuid, ParentCategories.uuid),
+    )
+    .leftJoin(Products, eq(Products.categoryUuid, Categories.uuid))
+    .leftJoin(ChildCategories, eq(ChildCategories.parentUuid, Categories.uuid))
+    .leftJoin(
+      Classifications,
+      eq(Categories.classificationUuid, Classifications.uuid),
+    )
+    .groupBy(Categories.id)
+    .orderBy(asc(Categories.order));
+
+  const byParent = new Map<string | null, CategoryBoardItem[]>();
+  for (const row of rows) {
+    const key = row.parentUuid ?? null;
+    byParent.set(key, [...(byParent.get(key) ?? []), row]);
+  }
+
+  return columnKeys.map((parentUuid) => ({
+    parentUuid,
+    parentName: parentUuid ? (nameOf.get(parentUuid) ?? null) : null,
+    total: totals.get(parentUuid) ?? 0,
+    items: byParent.get(parentUuid) ?? [],
+  }));
 };
 
 /**

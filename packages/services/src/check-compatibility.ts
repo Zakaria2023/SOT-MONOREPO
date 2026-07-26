@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import { CompatibilityRules } from "../../../db/schema/compatibility-rules";
@@ -90,8 +90,10 @@ export const checkCompatibility = async (
           order: SpecificationCategories.order,
         })
         .from(SpecificationCategories),
-      // Every product with attributes can satisfy a rule or be suggested; the
-      // selected products are always included so the report covers all of them.
+      // Only products with attributes can satisfy a rule or be offered as a
+      // suggestion; the selected ones are always included so the report covers
+      // every line even if one carries nothing. Without this the whole catalog
+      // is read on every cart change.
       db
         .select({
           uuid: Products.uuid,
@@ -99,7 +101,16 @@ export const checkCompatibility = async (
           categoryUuid: Products.categoryUuid,
           technicalAttributes: Products.technicalAttributes,
         })
-        .from(Products),
+        .from(Products)
+        .where(
+          or(
+            isNotNull(Products.technicalAttributes),
+            inArray(
+              Products.uuid,
+              items.map((item) => item.productUuid),
+            ),
+          ),
+        ),
     ]);
 
   const specByUuid = new Map(specRows.map((spec) => [spec.uuid, spec]));

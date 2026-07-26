@@ -221,14 +221,30 @@ export const getBrandBoard = async (): Promise<BrandBoardColumn[]> => {
     }
   }
 
-  return Promise.all(
-    columnKeys.map(async (parentUuid) => ({
-      parentUuid,
-      parentName: parentUuid ? (nameOf.get(parentUuid) ?? null) : null,
-      total: totals.get(parentUuid) ?? 0,
-      items: await getBrandChildren(parentUuid),
-    })),
-  );
+  // One query for the whole board, split into columns in memory — the same
+  // reason as the category board: a query per parent scales with the tree
+  // against a connection ceiling shared by every app.
+  const rows = await db
+    .select(brandBoardSelection)
+    .from(Brands)
+    .leftJoin(ParentBrands, eq(Brands.parentUuid, ParentBrands.uuid))
+    .leftJoin(Products, eq(Products.brandUuid, Brands.uuid))
+    .leftJoin(ChildBrands, eq(ChildBrands.parentUuid, Brands.uuid))
+    .groupBy(Brands.id)
+    .orderBy(asc(Brands.order));
+
+  const byParent = new Map<string | null, BrandBoardItem[]>();
+  for (const row of rows) {
+    const key = row.parentUuid ?? null;
+    byParent.set(key, [...(byParent.get(key) ?? []), row]);
+  }
+
+  return columnKeys.map((parentUuid) => ({
+    parentUuid,
+    parentName: parentUuid ? (nameOf.get(parentUuid) ?? null) : null,
+    total: totals.get(parentUuid) ?? 0,
+    items: byParent.get(parentUuid) ?? [],
+  }));
 };
 
 /**
