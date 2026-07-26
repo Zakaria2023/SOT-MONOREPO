@@ -1,14 +1,20 @@
 import { useAuth } from "@clerk/clerk-expo";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { CartRow } from "@/components/cart/cart-row";
+import { DesignCheck } from "@/components/cart/design-check";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
-import { fetchCart, removeCartItem, updateCartItem } from "@/lib/api";
+import {
+  fetchCart,
+  fetchDesignCheck,
+  removeCartItem,
+  updateCartItem,
+} from "@/lib/api";
 import { formatMoney, summarizeCart } from "@/lib/format";
 import { colors, fonts, radius, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
-import type { CartLineItem } from "@/lib/types";
+import type { CartLineItem, DesignCheckResult } from "@/lib/types";
 
 type SummaryRowProps = {
   label: string;
@@ -40,6 +46,44 @@ const CartScreen = () => {
   }, [getToken]);
 
   const { data, error, loading, reload } = useAsync(load);
+
+  // The same check the web cart runs. Re-run whenever the lines change, so a
+  // buyer sees the problem while they can still fix it rather than at checkout.
+  const [design, setDesign] = useState<DesignCheckResult | null>(null);
+  const [checking, setChecking] = useState(false);
+  const signature = (data ?? [])
+    .map((item) => `${item.productUuid}:${item.quantity}`)
+    .join(",");
+
+  useEffect(() => {
+    if (!data || data.length === 0) {
+      setDesign(null);
+      return;
+    }
+    let cancelled = false;
+    setChecking(true);
+    fetchDesignCheck(
+      data.map((item) => ({
+        productUuid: item.productUuid,
+        quantity: item.quantity,
+      })),
+    )
+      .then((result) => {
+        if (!cancelled) setDesign(result);
+      })
+      // Advisory by nature — a failed check must never block the cart itself.
+      .catch(() => {
+        if (!cancelled) setDesign(null);
+      })
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Keyed on the lines, not the array identity, so a reload with identical
+    // contents doesn't re-check.
+  }, [signature]);
 
   const mutate = useCallback(
     async (item: CartLineItem, action: "inc" | "dec" | "remove") => {
@@ -83,6 +127,8 @@ const CartScreen = () => {
   );
   const currency = data[0]?.currency ?? "SAR";
   const { vat, total } = summarizeCart(subtotal);
+  // A blocking finding gates checkout, exactly as it does on the web.
+  const blocked = (design?.blockers.length ?? 0) > 0;
 
   return (
     <View style={styles.container}>
@@ -102,13 +148,20 @@ const CartScreen = () => {
         )}
       />
       <View style={styles.footer}>
+        <DesignCheck result={design} checking={checking} />
         <View style={styles.summary}>
           <SummaryRow label="Subtotal" value={formatMoney(subtotal, currency)} />
           <SummaryRow label="VAT (15%)" value={formatMoney(vat, currency)} />
           <View style={styles.divider} />
           <SummaryRow label="Total" value={formatMoney(total, currency)} emphasis />
         </View>
-        <Button label="Proceed to checkout" onPress={reload} />
+        <Button
+          label={
+            blocked ? "Fix the problems above to continue" : "Proceed to checkout"
+          }
+          onPress={reload}
+          disabled={blocked}
+        />
       </View>
     </View>
   );

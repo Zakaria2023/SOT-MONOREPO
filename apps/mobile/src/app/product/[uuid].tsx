@@ -8,6 +8,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
+import { SpecTable } from "@/components/products/spec-table";
 import { addCartItem, fetchProduct } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
@@ -104,6 +105,15 @@ const ProductScreen = () => {
       ) : null}
       {product.description ? (
         <Text style={styles.description}>{product.description}</Text>
+      ) : null}
+
+      {/* Only the attributes this viewer may read — the API filtered them by
+          audience before they ever reached the device. */}
+      {product.specs && product.technicalAttributes ? (
+        <SpecTable
+          specs={product.specs}
+          values={product.technicalAttributes}
+        />
       ) : null}
 
       <View style={styles.action}>
