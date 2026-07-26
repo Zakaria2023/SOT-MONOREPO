@@ -18,9 +18,38 @@ export const formatMoney = (amount: number, currency = "SAR"): string =>
 
 export const VAT_PERCENT = 15;
 
-export const summarizeCart = (subtotal: number) => {
-  const vat = (subtotal * VAT_PERCENT) / 100;
-  return { subtotal, vat, total: subtotal + vat };
+/** Parse a decimal money value into integer minor units. */
+export const toMinorUnits = (value: string | number | null): number =>
+  Math.round(Number(value ?? 0) * 100);
+
+/** Integer minor units back to major units (420055 -> 4200.55). */
+export const fromMinorUnits = (minor: number): number => minor / 100;
+
+/**
+ * Subtotal, VAT and total for a set of cart lines.
+ *
+ * Mirrors summarizeCart in packages/utils, which the web cart uses: integer
+ * minor units throughout, and VAT rounded to the cent before it is added.
+ * This previously took an already-floated subtotal and applied VAT without
+ * rounding, so the same basket could total differently here than on the web —
+ * and the drift grew with the number of lines.
+ *
+ * Duplicated rather than imported because mobile talks to this system over
+ * HTTP only and never pulls in a workspace package.
+ */
+export const summarizeCart = (
+  lines: { unitPrice: string | number | null; quantity: number }[],
+) => {
+  const subtotalMinor = lines.reduce(
+    (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
+    0,
+  );
+  const vatMinor = Math.round((subtotalMinor * VAT_PERCENT) / 100);
+  return {
+    subtotal: fromMinorUnits(subtotalMinor),
+    vat: fromMinorUnits(vatMinor),
+    total: fromMinorUnits(subtotalMinor + vatMinor),
+  };
 };
 
 // A range spec is stored as "from - to"; a plain number never contains " - ",

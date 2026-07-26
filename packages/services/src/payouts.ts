@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import { fromMinorUnits, toMinorUnits } from "utils";
 import { db } from "../../../db";
 import {
   PartnerEarnings,
@@ -67,7 +68,14 @@ export const settleIntegratedPartner = async (
     return;
   }
 
-  const total = accrued.reduce((sum, row) => sum + Number(row.amount), 0);
+  // Integer minor units. This is money owed to a partner, accumulated over an
+  // arbitrary number of earnings rows — adding decimal strings as floats drifts
+  // as the row count grows, and toFixed at the end cannot recover a cent that
+  // was lost mid-sum.
+  const totalMinor = accrued.reduce(
+    (sum, row) => sum + toMinorUnits(row.amount),
+    0,
+  );
   const payoutUuid = randomUUID();
   const now = new Date();
 
@@ -75,7 +83,7 @@ export const settleIntegratedPartner = async (
     uuid: payoutUuid,
     reference: `PAY-${payoutUuid.slice(0, 8).toUpperCase()}`,
     partnerClerkUserId,
-    amount: total.toFixed(2),
+    amount: fromMinorUnits(totalMinor).toFixed(2),
     currency: accrued[0]?.currency ?? "SAR",
     status: "paid",
     auto: true,
@@ -170,12 +178,19 @@ export const requestPayout = async ({
       throw new ValidationError("You have no earnings to cash out");
     }
 
-    const total = accrued.reduce((sum, row) => sum + Number(row.amount), 0);
+    // Integer minor units. This is money owed to a partner, accumulated over an
+  // arbitrary number of earnings rows — adding decimal strings as floats drifts
+  // as the row count grows, and toFixed at the end cannot recover a cent that
+  // was lost mid-sum.
+  const totalMinor = accrued.reduce(
+    (sum, row) => sum + toMinorUnits(row.amount),
+    0,
+  );
     await tx.insert(PartnerPayouts).values({
       uuid: payoutUuid,
       reference: `PAY-${payoutUuid.slice(0, 8).toUpperCase()}`,
       partnerClerkUserId,
-      amount: total.toFixed(2),
+      amount: fromMinorUnits(totalMinor).toFixed(2),
       currency: accrued[0]?.currency ?? "SAR",
       status: "requested",
       invoiceDocument: invoiceDocument ?? null,

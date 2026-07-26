@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -73,6 +74,7 @@ export const createBrand = async (
   _prevState: BrandActionResult,
   fields: BrandFields,
 ): Promise<BrandActionResult> => {
+  await requireAdmin();
   try {
     await createBrandRecord(fields);
   } catch (error) {
@@ -90,6 +92,7 @@ export const updateBrand = async (
   _prevState: BrandActionResult,
   fields: BrandFields,
 ): Promise<BrandActionResult> => {
+  await requireAdmin();
   try {
     await updateBrandRecord(uuid, fields);
   } catch (error) {
@@ -105,6 +108,7 @@ export const updateBrand = async (
 export const deleteBrand = async (
   uuid: string,
 ): Promise<BrandActionResult> => {
+  await requireAdmin();
   try {
     await deleteBrandRecord(uuid);
     revalidatePath("/brands");
@@ -119,6 +123,7 @@ export const deleteBrand = async (
 export const reorderBrands = async (
   orderedUuids: string[],
 ): Promise<{ error?: string }> => {
+  await requireAdmin();
   try {
     await reorderBrandsRecord(orderedUuids);
     revalidatePath("/brands");
@@ -138,6 +143,7 @@ export const moveBrandToParent = async (
   newParentUuid: string | null,
   targetIndex: number,
 ): Promise<{ error?: string }> => {
+  await requireAdmin();
   try {
     await moveBrandToParentRecord(uuid, newParentUuid, targetIndex);
     revalidatePath("/brands");
@@ -156,6 +162,7 @@ export const reorderBrandChildren = async (
   pageStart: number,
   orderedPageUuids: string[],
 ): Promise<{ error?: string }> => {
+  await requireAdmin();
   try {
     await reorderBrandChildrenRecord(parentUuid, pageStart, orderedPageUuids);
     // No revalidatePath here: the column already reflects the new order

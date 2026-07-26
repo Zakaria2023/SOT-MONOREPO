@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -54,6 +55,7 @@ export const createProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
+  await requireAdmin();
   try {
     await createProductRecord(fields);
   } catch (error) {
@@ -72,6 +74,7 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
+  await requireAdmin();
   try {
     await updateProductRecord(uuid, fields);
   } catch (error) {
@@ -88,6 +91,7 @@ export const updateProduct = async (
 export const deleteProduct = async (
   uuid: string,
 ): Promise<ProductActionResult> => {
+  await requireAdmin();
   try {
     await deleteProductRecord(uuid);
     revalidatePath("/products");

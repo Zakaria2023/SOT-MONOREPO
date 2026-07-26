@@ -40,12 +40,16 @@ const totalsFromOffer = (offer: {
   installPrice: string;
   programmingPrice: string | null;
 }) => {
-  const product = Number(offer.productPrice);
-  const service = Number(offer.installPrice) + Number(offer.programmingPrice ?? 0);
+  // Integer minor units, like every other total in this file. Adding decimal
+  // strings as floats happens to survive toFixed for two or three addends, but
+  // it is the wrong tool for money and the codebase already has the right one.
+  const productMinor = toMinorUnits(offer.productPrice);
+  const serviceMinor =
+    toMinorUnits(offer.installPrice) + toMinorUnits(offer.programmingPrice);
   return {
-    productTotal: product.toFixed(2),
-    serviceTotal: service.toFixed(2),
-    grandTotal: (product + service).toFixed(2),
+    productTotal: fromMinorUnits(productMinor).toFixed(2),
+    serviceTotal: fromMinorUnits(serviceMinor).toFixed(2),
+    grandTotal: fromMinorUnits(productMinor + serviceMinor).toFixed(2),
   };
 };
 

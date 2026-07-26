@@ -127,12 +127,10 @@ const CartScreen = () => {
     );
   }
 
-  const subtotal = data.reduce(
-    (sum, item) => sum + Number(item.unitPrice ?? 0) * item.quantity,
-    0,
-  );
   const currency = data[0]?.currency ?? "SAR";
-  const { vat, total } = summarizeCart(subtotal);
+  // One helper does the whole sum in minor units — accumulating the subtotal
+  // as a float here and handing it over would reintroduce the drift.
+  const { subtotal, vat, total } = summarizeCart(data);
   // A blocking finding gates checkout, exactly as it does on the web.
   const blocked = (design?.blockers.length ?? 0) > 0;
 

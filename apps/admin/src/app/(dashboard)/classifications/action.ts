@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -38,6 +39,7 @@ export const createClassification = async (
   _prevState: ClassificationActionResult,
   fields: ClassificationFields,
 ): Promise<ClassificationActionResult> => {
+  await requireAdmin();
   try {
     await createClassificationRecord(fields);
   } catch (error) {
@@ -58,6 +60,7 @@ export const updateClassification = async (
   _prevState: ClassificationActionResult,
   fields: ClassificationFields,
 ): Promise<ClassificationActionResult> => {
+  await requireAdmin();
   try {
     await updateClassificationRecord(uuid, fields);
   } catch (error) {
@@ -76,6 +79,7 @@ export const updateClassification = async (
 export const deleteClassification = async (
   uuid: string,
 ): Promise<ClassificationActionResult> => {
+  await requireAdmin();
   try {
     await deleteClassificationRecord(uuid);
     revalidatePath("/classifications");

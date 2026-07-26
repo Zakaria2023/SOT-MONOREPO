@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -75,6 +76,7 @@ export const createCategory = async (
   _prevState: CategoryActionResult,
   fields: CategoryFields,
 ): Promise<CategoryActionResult> => {
+  await requireAdmin();
   try {
     await createCategoryRecord(fields);
   } catch (error) {
@@ -93,6 +95,7 @@ export const updateCategory = async (
   _prevState: CategoryActionResult,
   fields: CategoryFields,
 ): Promise<CategoryActionResult> => {
+  await requireAdmin();
   try {
     await updateCategoryRecord(uuid, fields);
   } catch (error) {
@@ -109,6 +112,7 @@ export const updateCategory = async (
 export const deleteCategory = async (
   uuid: string,
 ): Promise<CategoryActionResult> => {
+  await requireAdmin();
   try {
     await deleteCategoryRecord(uuid);
     revalidatePath("/categories");
@@ -124,6 +128,7 @@ export const deleteCategory = async (
 export const reorderCategories = async (
   orderedUuids: string[],
 ): Promise<{ error?: string }> => {
+  await requireAdmin();
   try {
     await reorderCategoriesRecord(orderedUuids);
     revalidatePath("/categories");
@@ -144,6 +149,7 @@ export const moveCategoryToParent = async (
   newParentUuid: string | null,
   targetIndex: number,
 ): Promise<{ error?: string }> => {
+  await requireAdmin();
   try {
     await moveCategoryToParentRecord(uuid, newParentUuid, targetIndex);
     revalidatePath("/categories");
@@ -163,6 +169,7 @@ export const reorderCategoryChildren = async (
   pageStart: number,
   orderedPageUuids: string[],
 ): Promise<{ error?: string }> => {
+  await requireAdmin();
   try {
     await reorderCategoryChildrenRecord(parentUuid, pageStart, orderedPageUuids);
     // No revalidatePath here: the column already reflects the new order
