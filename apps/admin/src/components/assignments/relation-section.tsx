@@ -10,7 +10,7 @@ import type { LookupRow } from "@/db/types";
 import type { RuleComparator, RuleKind } from "@/db/enum";
 import { ruleKinds } from "@/db/enum";
 import { RULE_KIND_LABELS } from "@/db/label";
-import { familyOperandType, validateRuleShape } from "services";
+import { familyOperandType, validateRuleShape } from "utils";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Dropdown, FormError, Input } from "ui";

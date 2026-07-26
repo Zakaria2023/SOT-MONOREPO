@@ -11,10 +11,7 @@ import {
   SelectSpecifications,
   Specifications,
 } from "../../../db/schema/specifications";
-import {
-  validateRuleShape,
-  type OperandShape,
-} from "./rule-validation";
+import { validateRuleShape, type OperandShape } from "utils";
 
 export type { SelectCompatibilityRules };
 
