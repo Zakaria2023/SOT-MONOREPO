@@ -21,9 +21,25 @@ import { Dropdown, Input, type DropdownOption } from "ui";
 
 export type SubjectMode = "group" | "condition";
 
+// What each side of the toggle emits before anything is picked.
+//
+// Both are real predicates, and neither is null. Null used to mean "condition
+// mode, nothing chosen", which every caller then had to coerce back into
+// something storable — and the coercion turned it straight back into a group,
+// so the toggle could not be switched at all. A placeholder that says which
+// mode it is removes the guess.
+//
+// `exists` on no attribute matches nothing, which is the honest reading of a
+// condition nobody has finished writing.
+const BLANK_GROUP: Predicate = { op: "in_category", categoryUuid: "" };
+const BLANK_CONDITION: Predicate = { op: "exists", attr: "" };
+
 type SubjectPickerProps = {
   value: Predicate | null;
-  onChange: (next: Predicate | null) => void;
+  // Never null. The picker always hands back something storable — a blank group
+  // or a blank condition — so no caller has to invent a default, and no caller
+  // can invent one that flips the mode back.
+  onChange: (next: Predicate) => void;
   attributes: PredicateAttribute[];
   // Depth-ordered, so the tree reads as a tree in the menu.
   categoryOptions: DropdownOption[];
@@ -107,11 +123,7 @@ export const SubjectPicker = ({
             key={option}
             type="button"
             onClick={() =>
-              onChange(
-                option === "group"
-                  ? { op: "in_category", categoryUuid: "" }
-                  : null,
-              )
+              onChange(option === "group" ? BLANK_GROUP : BLANK_CONDITION)
             }
             className={`rounded px-3 py-1 text-xs ${
               mode === option

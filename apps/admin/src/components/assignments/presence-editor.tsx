@@ -43,15 +43,7 @@ export const PresenceEditor = ({
       <Field label="Trigger — when the basket contains">
         <SubjectPicker
           value={value.trigger}
-          onChange={(trigger) =>
-            onChange({
-              ...value,
-              // A presence rule with no trigger would fire on everything, so the
-              // shape keeps a placeholder rather than accepting null. The
-              // validator refuses to publish it while the group is still blank.
-              trigger: trigger ?? { op: "in_category", categoryUuid: "" },
-            })
-          }
+          onChange={(trigger) => onChange({ ...value, trigger })}
           attributes={attributes}
           categoryOptions={categoryOptions}
         />
@@ -70,15 +62,7 @@ export const PresenceEditor = ({
                   // The buyer's sentence comes from the rule's own name and the
                   // finding, so there is nothing to type here.
                   description: requirement?.description ?? "",
-                  satisfiedBy: [
-                    {
-                      type: "item_exists",
-                      predicate: predicate ?? {
-                        op: "in_category",
-                        categoryUuid: "",
-                      },
-                    },
-                  ],
+                  satisfiedBy: [{ type: "item_exists", predicate }],
                   // 0 = presence alone is enough. Per-trigger pairing (20 doors
                   // need 20 readers) is still in the shape and still evaluated;
                   // it is simply not asked for here.
