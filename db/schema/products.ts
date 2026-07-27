@@ -95,9 +95,18 @@ export const Products = mysqlTable(
     // immediately applies to every product in it.
     specValues: json("spec_values").$type<ProductValues>(),
 
-    // LEGACY — the pre-uuid, string-keyed value map. Read only by the migration
-    // that backfills `specValues`, and dropped once it has run. Nothing else may
-    // reference it: two value maps would be two sources of truth.
+    // A frozen snapshot of the pre-migration values: the old string-keyed,
+    // string-valued map, kept only as a safety net now that `specValues` has been
+    // backfilled from it.
+    //
+    // NOTHING reads it. It is not a fallback and must never become one — two
+    // value maps would be two sources of truth, which is the problem the uuid
+    // keying was introduced to end. Drop it once the storefront has been
+    // verified:
+    //
+    //   ALTER TABLE Products DROP COLUMN technical_attributes;
+    //
+    // then delete this column from the schema.
     technicalAttributes: json("technical_attributes").$type<
       Record<string, string>
     >(),

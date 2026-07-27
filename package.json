@@ -17,11 +17,7 @@
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
     "test": "vitest run",
-    "db:push": "dotenv -e .env.local -- drizzle-kit push",
-    "spec:prepare": "dotenv -e .env.local -- tsx db/prepare-spec-model.ts",
-    "spec:prepare:write": "dotenv -e .env.local -- tsx db/prepare-spec-model.ts --write",
-    "spec:migrate": "dotenv -e .env.local -- tsx db/migrate-spec-model.ts",
-    "spec:migrate:write": "dotenv -e .env.local -- tsx db/migrate-spec-model.ts --write"
+    "db:push": "dotenv -e .env.local -- drizzle-kit push"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
