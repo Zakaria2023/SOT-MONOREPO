@@ -173,23 +173,6 @@ const AssignmentFields = ({
     attribute.type === "single_select" || attribute.type === "multi_select";
   const liveOptions = attribute.options.filter((option) => !option.retired);
 
-  // The "up to" helper: on an ordered scale, pick everything at or below one
-  // option. The slice stored is still the literal list of values — the helper
-  // just fills it in, so nothing is reinterpreted later.
-  const fillUpTo = (value: string): void => {
-    const ceiling = liveOptions.find((option) => option.value === value);
-    const rank = ceiling?.rank;
-    if (rank === undefined || rank === null) {
-      onChange({ enabledValues: [value] });
-      return;
-    }
-    onChange({
-      enabledValues: liveOptions
-        .filter((option) => option.rank !== null && option.rank <= rank)
-        .map((option) => option.value),
-    });
-  };
-
   return (
     <>
       <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -270,31 +253,10 @@ const AssignmentFields = ({
             placeholder={`All ${liveOptions.length} options`}
             searchable={liveOptions.length > 8}
           />
-
-          {attribute.ordered && (
-            <div className="pt-1">
-              <Dropdown
-                value=""
-                onChange={fillUpTo}
-                options={liveOptions.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                triggerLabel="Everything up to…"
-              />
-            </div>
-          )}
         </Field>
       )}
 
-      <Field
-        label="Shown only when"
-        hint={
-          draft.showIf
-            ? "When this stops matching, the field is hidden and its value cleared — a leftover number on a hidden field would still be feeding the engine."
-            : "Pick the answers on other attributes that bring this one out. Several answers to the same question mean any of them; answers to different questions all have to hold."
-        }
-      >
+      <Field label="Shown only when">
         <ConditionPicker
           value={draft.showIf}
           onChange={(showIf) => onChange({ showIf })}
