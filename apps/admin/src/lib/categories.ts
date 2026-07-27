@@ -7,10 +7,18 @@ import type { DropdownOption } from "ui";
  *
  * A category whose parent is missing (deleted, dangling parent_uuid) is
  * treated as a root, otherwise it and its subtree would never render.
+ *
+ * Tolerates a missing list rather than throwing. The types say it cannot happen,
+ * and across a server/client boundary that is not quite true: a stale bundle for
+ * one component and fresh source for another is enough to hand this `undefined`,
+ * and an empty picker is a far better outcome than a blank page.
  */
 export const buildCategoryTreeOptions = (
-  categories: SelectCategories[],
+  categories: SelectCategories[] | null | undefined,
 ): DropdownOption[] => {
+  if (!Array.isArray(categories) || categories.length === 0) {
+    return [];
+  }
   const presentUuids = new Set(categories.map((category) => category.uuid));
   const childrenByParent = new Map<string | null, SelectCategories[]>();
   for (const category of categories) {
