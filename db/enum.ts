@@ -57,6 +57,70 @@ export const measurementUnits = [
 
 export type MeasurementUnit = (typeof measurementUnits)[number];
 
+// The physical dimension each unit measures, and how many BASE units one of it
+// is worth. A rule may only compare two operands whose units share a dimension;
+// when they do, both sides are converted to the base before any arithmetic.
+//
+// Without this, an attribute in kW and an attribute in W sum together with no
+// error and the design check confidently approves a 1000× overload. Units the
+// engine never does arithmetic on are simply absent — an unlisted unit is
+// treated as dimensionless and may only be compared against the same unit
+// string, which is the safe fallback rather than a silent conversion.
+export type UnitDimension = {
+  dimension: string;
+  // Multiply a value in this unit by `toBase` to get the dimension's base unit.
+  toBase: number;
+};
+
+export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
+  {
+    // Power — base W
+    W: { dimension: "power", toBase: 1 },
+    kW: { dimension: "power", toBase: 1000 },
+    // Apparent power is deliberately its OWN dimension: 1500 VA is not 1500 W,
+    // and letting them convert would be the classic UPS sizing mistake.
+    VA: { dimension: "apparent_power", toBase: 1 },
+    // Electrical
+    V: { dimension: "voltage", toBase: 1 },
+    A: { dimension: "current", toBase: 1 },
+    mA: { dimension: "current", toBase: 0.001 },
+    Ah: { dimension: "charge", toBase: 1 },
+    mAh: { dimension: "charge", toBase: 0.001 },
+    // Distance — base m
+    m: { dimension: "distance", toBase: 1 },
+    cm: { dimension: "distance", toBase: 0.01 },
+    mm: { dimension: "distance", toBase: 0.001 },
+    km: { dimension: "distance", toBase: 1000 },
+    // Mass — base g
+    kg: { dimension: "mass", toBase: 1000 },
+    g: { dimension: "mass", toBase: 1 },
+    // Storage — base MB
+    MB: { dimension: "storage", toBase: 1 },
+    GB: { dimension: "storage", toBase: 1000 },
+    TB: { dimension: "storage", toBase: 1000000 },
+    // Throughput — base Mbps
+    Mbps: { dimension: "throughput", toBase: 1 },
+    Gbps: { dimension: "throughput", toBase: 1000 },
+    // Frequency — base MHz
+    MHz: { dimension: "frequency", toBase: 1 },
+    GHz: { dimension: "frequency", toBase: 1000 },
+    Hz: { dimension: "frequency", toBase: 0.000001 },
+    // Time — base min
+    min: { dimension: "duration", toBase: 1 },
+    h: { dimension: "duration", toBase: 60 },
+    months: { dimension: "period", toBase: 1 },
+    years: { dimension: "period", toBase: 12 },
+    // Countable things. Each is its own dimension so "ports" never sums with
+    // "channels" just because both happen to be integers.
+    count: { dimension: "count", toBase: 1 },
+    ports: { dimension: "ports", toBase: 1 },
+    channels: { dimension: "channels", toBase: 1 },
+    devices: { dimension: "devices", toBase: 1 },
+    users: { dimension: "users", toBase: 1 },
+    licenses: { dimension: "licenses", toBase: 1 },
+    calls: { dimension: "calls", toBase: 1 },
+  };
+
 // Navigation domains for the specification library — a functional grouping
 // above SpecificationGroups (never brand-based). A stable universe, so it lives
 // in code. Labels in db/label.ts (SPECIFICATION_DOMAIN_LABELS).
@@ -74,32 +138,38 @@ export const specificationDomains = [
 
 export type SpecificationDomain = (typeof specificationDomains)[number];
 
-// How a specification's value is entered on a product: picked from dropdown
-// options, or typed as a number (with a unit). Numeric specs are what the
-// compatibility rule engine aggregates and compares.
-export const specValueTypes = [
-  "select",
-  "number",
-] as const satisfies readonly string[];
-
-export type SpecValueType = (typeof specValueTypes)[number];
-
-// The attribute type shown in the library builder — a richer, UX-facing set
-// that maps down to valueType/allowMultiple for the engine:
-//   number        → valueType number (has a unit)
-//   single_select → valueType select, one option
-//   multi_select  → valueType select, several options (allowMultiple)
-//   boolean       → valueType select with Yes/No options
-//   text          → valueType select, free text (no options)
-export const specInputTypes = [
+// What kind of value an attribute holds. ONE stored type — not a UX type plus
+// an engine type derived from it, because two stored fields for one fact can
+// disagree in the database and then nothing knows which is true.
+//
+//   number        — a magnitude with a unit. The only type arithmetic runs on.
+//   single_select — exactly one option from the master list.
+//   multi_select  — any number of options from the master list.
+//   boolean       — a REAL true/false. Deliberately not a two-option select of
+//                   the strings "Yes"/"No": a rule that compares the string
+//                   "Yes" breaks the moment someone relabels the option, and
+//                   every such bug looks like a passing check.
+//
+// There is no `text` type. Free text can never feed a rule, and an attribute
+// that cannot feed a rule or a filter is marketing copy — it belongs on the
+// product, not in a registry whose whole purpose is machine comparison.
+export const specificationTypes = [
   "number",
   "single_select",
   "multi_select",
   "boolean",
-  "text",
 ] as const satisfies readonly string[];
 
-export type SpecInputType = (typeof specInputTypes)[number];
+export type SpecificationType = (typeof specificationTypes)[number];
+
+/** The types whose values come from the master option list. */
+export const optionBackedTypes = [
+  "single_select",
+  "multi_select",
+] as const satisfies readonly string[];
+
+export const isOptionBacked = (type: SpecificationType): boolean =>
+  type === "single_select" || type === "multi_select";
 
 // How far up the category tree an assignment's FILTER reaches. Only meaningful
 // when the assignment has `isFilter` on — it never affects rule participation,
@@ -132,39 +202,79 @@ export const assignmentAudiences = [
 
 export type AssignmentAudience = (typeof assignmentAudiences)[number];
 
-// Compatibility rule families. Rules bind to specifications, never to
-// products: any product carrying the consumer spec participates, any product
-// carrying the provider spec supplies capacity.
-// - sum_budget: SUM(consumer value x qty) vs pooled provider capacity
-//   (e.g. total PoE draw vs switch PoE budget).
-// - count_limit: SUM(qty) of consumer items vs pooled provider capacity
-//   (e.g. device count vs switch port count).
-// - per_item_threshold: each consumer item's own value vs the best provider
-//   value (e.g. one camera's draw vs the switch per-port maximum).
-// - ratio: SUM(demand) / SUM(supply) <= a tunable ratio (e.g. uplink
-//   oversubscription ~20:1). A designed contention ratio, not a hard sum.
-// - spec_match: per-item compatibility on SELECT specs — the consumer's chosen
-//   value(s) must fit the provider's (equal / member-of / overlap), e.g.
-//   speaker impedance ∈ amp supported impedances, codec sets intersect.
-// - conditional: the limit is looked up from a table keyed by the item's OWN
-//   other spec values, then its measured value is compared against that limit
-//   — e.g. max cable run length depends on cable grade × link speed, so Cat6
-//   at 10G allows 55 m while Cat6a at 10G allows 100 m. There is no provider
-//   product on the other side; the table IS the capacity.
-export const ruleKinds = [
-  "sum_budget",
-  "count_limit",
-  "per_item_threshold",
+// What "matches" means when the attribute being tested holds SEVERAL values at
+// once (a multi-select). Both readings are legitimate and they disagree on the
+// same product, so the author picks:
+//   any → the item's values overlap the listed values (the common case)
+//   all → the item's values are a SUBSET of the listed values — "only PoE,
+//         nothing else", which `any` cannot express.
+export const matchModes = ["any", "all"] as const satisfies readonly string[];
+
+export type MatchMode = (typeof matchModes)[number];
+
+// The operators of the ONE predicate language, shared by the conditional reveal
+// on an assignment, both side-filters on a relationship, and presence triggers.
+export const predicateOperators = [
+  "equals",
+  "not_equals",
+  "in",
+  "not_in",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+  "between",
+  "exists",
+  "in_category",
+  "all",
+  "any",
+  "not",
+] as const satisfies readonly string[];
+
+export type PredicateOperator = (typeof predicateOperators)[number];
+
+// The six relationship families. A relationship references ATTRIBUTES, never
+// products: anything carrying the consumer operand participates, anything
+// carrying the provider operand supplies capacity, so a new SKU joins every
+// existing rule with zero configuration.
+//
+// - budget:      Σ(demand × qty) fits the provider capacity. Set `perItem` to
+//                judge each unit against the single best provider value
+//                instead (one camera's draw vs the per-port maximum) — a mode,
+//                not a seventh family, because it is the same comparison with
+//                a different aggregation.
+// - count:       the same evaluator with an `item_count` consumer operand —
+//                Σ(qty of matching items) vs capacity (cameras vs channels).
+// - match:       per-item value compatibility (a PoE af device fits an at
+//                switch; two codec sets must overlap). No arithmetic.
+// - ratio:       demand ÷ supply must stay within a designed contention ratio
+//                (uplink oversubscription). A derating, not a hard sum.
+// - presence:    a companion that SHOULD be in the selection and ISN'T. The
+//                only family that scans for absence, so it is also the only
+//                one that can report "you forgot the recorder".
+// - conditional: the limit comes from the rule's own lookup table keyed by the
+//                item's other values (Cat6 at 10G runs 55 m, Cat6a runs 100 m).
+//                There is no provider product; the table IS the capacity.
+export const relationshipFamilies = [
+  "budget",
+  "count",
+  "match",
   "ratio",
-  "spec_match",
+  "presence",
   "conditional",
 ] as const satisfies readonly string[];
 
-export type RuleKind = (typeof ruleKinds)[number];
+export type RelationshipFamily = (typeof relationshipFamilies)[number];
 
-// lte/gte/eq are numeric; in/intersects are the spec_match set operators
-// (in = consumer values ⊆ provider set; intersects = the two sets overlap).
-export const ruleComparators = [
+// lte/gte/eq are the numeric comparisons. `in` and `intersects` are the set
+// operators the match family uses: `in` = the consumer's values are a subset of
+// the provider's; `intersects` = the two sets overlap.
+//
+// On an ORDERED attribute, lte/gte compare the option's `rank`, which is what
+// makes "at most 802.3at" meaningful on a dropdown. On an unordered attribute
+// there is no "at most", so they degrade to plain membership rather than
+// silently comparing alphabetical position.
+export const relationshipComparators = [
   "lte",
   "gte",
   "eq",
@@ -172,26 +282,73 @@ export const ruleComparators = [
   "intersects",
 ] as const satisfies readonly string[];
 
-export type RuleComparator = (typeof ruleComparators)[number];
+export type RelationshipComparator = (typeof relationshipComparators)[number];
 
-// How provider capacity is applied in sum/count rules:
-// - pooled: all provider units act as one big pool (SUM of capacities).
-// - per_provider: each provider unit is its own bin — consumers are
-//   distributed across units and every unit must fit its share (e.g. each
-//   switch's own PoE budget, not the fleet total).
-export const ruleAllocations = [
+// How provider capacity is applied.
+// - per_unit: each provider unit is its own bin; consumers are distributed and
+//   every unit must fit its share. THE DEFAULT, because two switches with 130 W
+//   each are not one switch with 260 W — pooling would approve a design where a
+//   single 200 W load cannot physically attach to either.
+// - pooled: all provider units act as one capacity. Correct only where the
+//   resource genuinely is shared (licences, a site-wide budget).
+export const relationshipAllocations = [
+  "per_unit",
   "pooled",
-  "per_provider",
 ] as const satisfies readonly string[];
 
-export type RuleAllocation = (typeof ruleAllocations)[number];
+export type RelationshipAllocation = (typeof relationshipAllocations)[number];
 
-export const ruleSeverities = [
+// One severity vocabulary for the whole system. `hard`/`soft` are deliberately
+// NOT also in use anywhere — two words for one concept is how an API ends up
+// translating between them and getting a gate backwards.
+export const relationshipGates = [
   "block",
   "warn",
 ] as const satisfies readonly string[];
 
-export type RuleSeverity = (typeof ruleSeverities)[number];
+export type RelationshipGate = (typeof relationshipGates)[number];
+
+// A wrong rule blocks real sales across the whole catalog the instant it is
+// saved, so rules are authored as drafts, previewed against a real selection,
+// and only then published. Only `published` rules ever gate a buyer.
+export const relationshipStatuses = [
+  "draft",
+  "published",
+  "archived",
+] as const satisfies readonly string[];
+
+export type RelationshipStatus = (typeof relationshipStatuses)[number];
+
+// A project input is a number (or a yes/no) the BUYER supplies — expected
+// concurrent calls, retention days, uplink capacity. It is a rule operand
+// exactly like an attribute, which is what lets the Ratio family exist at all.
+export const projectVariableTypes = [
+  "number",
+  "boolean",
+] as const satisfies readonly string[];
+
+export type ProjectVariableType = (typeof projectVariableTypes)[number];
+
+// What a catalog change was, for the audit trail. Rules and assignments are the
+// things that get blamed when a sale is blocked, so who changed what and when
+// has to be answerable.
+export const catalogAuditTargets = [
+  "specification",
+  "assignment",
+  "relationship",
+  "project_variable",
+] as const satisfies readonly string[];
+
+export type CatalogAuditTarget = (typeof catalogAuditTargets)[number];
+
+export const catalogAuditActions = [
+  "create",
+  "update",
+  "delete",
+  "publish",
+] as const satisfies readonly string[];
+
+export type CatalogAuditAction = (typeof catalogAuditActions)[number];
 
 export const productStatuses = [
   "in_stock",

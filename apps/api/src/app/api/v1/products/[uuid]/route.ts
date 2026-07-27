@@ -1,6 +1,6 @@
 import { getViewerFromRequest } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { getProduct, getProductDisplaySpecs } from "services";
+import { getProduct, getProductSpecsForDisplay } from "services";
 
 type Params = {
   params: Promise<{ uuid: string }>;
@@ -19,27 +19,25 @@ export const GET = async (request: Request, { params }: Params) => {
   // has no way of knowing which ones it was never meant to see — so the
   // filtering happens here, not in the client.
   const viewer = await getViewerFromRequest(request);
-  const storedKeys =
-    product.specKeys ?? Object.keys(product.technicalAttributes ?? {});
-  const specs = await getProductDisplaySpecs(
+  // Already resolved, revealed, audience-filtered and FORMATTED — the app gets a
+  // spec table it can render without carrying its own copy of the library, and
+  // without ever seeing a value it was not meant to.
+  const specs = await getProductSpecsForDisplay(
     product.categoryUuid,
-    storedKeys,
+    product.specValues ?? {},
     viewer,
   );
 
-  const visible = new Set(specs.map((spec) => spec.key));
-  const technicalAttributes = Object.fromEntries(
-    Object.entries(product.technicalAttributes ?? {}).filter(([key]) =>
-      visible.has(key),
+  const visible = new Set(specs.map((spec) => spec.uuid));
+  const specValues = Object.fromEntries(
+    Object.entries(product.specValues ?? {}).filter(([uuid]) =>
+      visible.has(uuid),
     ),
   );
 
   return NextResponse.json({
     ...product,
-    technicalAttributes,
-    specKeys: storedKeys.filter((key) => visible.has(key)),
-    // Resolved label/unit/group per key, so the app can render a spec table
-    // without carrying its own copy of the library.
+    specValues,
     specs,
   });
 };

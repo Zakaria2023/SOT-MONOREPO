@@ -152,7 +152,9 @@ export const approveGovernmentRequest = async ({
   }
 
   if (request.status !== "pending") {
-    throw new ConflictError("This government request has already been reviewed");
+    throw new ConflictError(
+      "This government request has already been reviewed",
+    );
   }
 
   await db
@@ -183,7 +185,9 @@ export const rejectGovernmentRequest = async ({
   }
 
   if (request.status !== "pending") {
-    throw new ConflictError("This government request has already been reviewed");
+    throw new ConflictError(
+      "This government request has already been reviewed",
+    );
   }
 
   await db

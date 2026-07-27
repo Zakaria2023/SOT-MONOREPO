@@ -1,12 +1,15 @@
 import { AssignmentWorkspace } from "@/components/assignments/assignment-workspace";
 import { CategoryTree } from "@/components/assignments/category-tree";
 import { AsyncSection } from "@/components/shared/async-section";
+import { buildCategoryTreeOptions } from "@/lib/categories";
+import type { DropdownOption } from "ui";
 import {
+  getAllSpecifications,
   getCategories,
   getCategory,
-  getCategoryAssignmentRows,
-  getRelationsBySpec,
-  getSpecifications,
+  getCategoryAssignments,
+  getProjectVariables,
+  listRelationships,
 } from "services";
 
 type Props = {
@@ -15,27 +18,21 @@ type Props = {
 
 type WorkspaceProps = {
   categoryUuid: string;
+  // The whole tree, depth-ordered. Passed down rather than re-fetched: the page
+  // already loaded it for the sidebar, and a rule's product-group picker needs
+  // the same list.
+  categoryOptions: DropdownOption[];
 };
 
-// The right-hand panel. Everything it needs for all three tabs is loaded here
-// so switching tabs and flipping switches stays instant — only changing the
-// selected category costs a round trip.
-const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
-  // The tree already loaded every category for the sidebar; this panel only
-  // needs the one it is showing, so it reads a single row rather than the
-  // whole table a second time.
-  const [category, assignments, library] = await Promise.all([
-    getCategory(categoryUuid),
-    getCategoryAssignmentRows(categoryUuid),
-    getSpecifications(),
-  ]);
-
-  // Relations are keyed by attribute, so they load once the assignments are
-  // known — a second, bounded query rather than one per card.
-  const relations = await getRelationsBySpec(
-    assignments.map((assignment) => assignment.specificationUuid),
-  );
-
+// The right-hand panel. Everything both tabs need is loaded here so switching
+// tabs and flipping switches stays instant — only changing the selected category
+// costs a round trip.
+//
+// Four bounded queries, none of them per-row: the assignment resolution reads the
+// in-process catalog model, so this page costs the same whether a category
+// carries three attributes or thirty.
+const Workspace = async ({ categoryUuid, categoryOptions }: WorkspaceProps) => {
+  const category = await getCategory(categoryUuid);
   if (!category) {
     return (
       <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">
@@ -44,14 +41,37 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
     );
   }
 
+  const [assignments, library, relationships, variables] = await Promise.all([
+    getCategoryAssignments(categoryUuid),
+    getAllSpecifications(),
+    listRelationships(),
+    getProjectVariables(),
+  ]);
+
   return (
     <AssignmentWorkspace
       categoryUuid={categoryUuid}
       categoryName={category.name}
       categoryPath={category.path}
-      assignments={assignments}
-      library={library}
-      relations={relations}
+      resolved={assignments.resolved}
+      problems={assignments.problems}
+      library={library.map((spec) => ({
+        uuid: spec.uuid,
+        label: spec.label,
+        type: spec.type,
+        ordered: spec.ordered,
+        unit: spec.unit,
+        options: spec.options,
+        groupName: spec.groupName,
+      }))}
+      relationships={relationships}
+      categoryOptions={categoryOptions}
+      variables={variables.map((variable) => ({
+        uuid: variable.uuid,
+        label: variable.label,
+        unit: variable.unit,
+        type: variable.type,
+      }))}
     />
   );
 };
@@ -59,6 +79,7 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
 const AssignmentsPage = async ({ searchParams }: Props) => {
   const { category } = await searchParams;
   const categories = await getCategories();
+  const categoryOptions = buildCategoryTreeOptions(categories);
 
   return (
     <div className="flex flex-col gap-5">
@@ -66,11 +87,6 @@ const AssignmentsPage = async ({ searchParams }: Props) => {
         <h1 className="font-heading text-2xl text-ink">
           Define once, assign down
         </h1>
-        <p className="text-sm text-muted">
-          An attribute is defined once in the library. A category borrows it
-          here and sets only how it is used — everything below inherits, and
-          may override.
-        </p>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row">
@@ -81,7 +97,10 @@ const AssignmentsPage = async ({ searchParams }: Props) => {
         <div className="min-w-0 flex-1">
           {category ? (
             <AsyncSection reloadKey={category}>
-              <Workspace categoryUuid={category} />
+              <Workspace
+                categoryUuid={category}
+                categoryOptions={categoryOptions}
+              />
             </AsyncSection>
           ) : (
             <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">

@@ -9,78 +9,94 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { assignmentAudiences, specValueTypes } from "../enum";
-import { SpecOption, SpecRule } from "../types";
+import { assignmentAudiences, specificationTypes } from "../enum";
+import { SpecOption } from "../types";
 import { SpecificationGroups } from "./specification-groups";
 
-// A single specification field (e.g. "PoE") with its dropdown options. Each
-// option can reveal nested child fields (the conditional tree) stored as JSON.
-// Specifications are assigned to categories via SpecificationCategories and
-// apply to those categories and all of their descendants.
+// THE LIBRARY — where an attribute is born, exactly once.
+//
+// "Port Speed" is authored one time; every category that uses it points at THIS
+// row, which is what makes 1G on a switch and 1G on a NAS provably the same
+// value and lets a rule compare across categories that know nothing about each
+// other.
+//
+// A row here describes ONLY itself. It carries no condition, no category, no
+// reference to another attribute — the boundary rule. The moment a definition
+// can say "show me when PoE = Yes" it has become an assignment, and we are back
+// to the same conditional logic living in two places with no single truth.
 export const Specifications = mysqlTable("Specifications", {
   id: int("id").primaryKey().autoincrement(),
+  // The ONLY identity. Products store values under it, assignments point at it,
+  // relationships reference it, predicates name it. Never derived from the
+  // label, so renaming an attribute cannot orphan a single stored value.
   uuid: char("uuid", { length: 36 }).notNull().unique(),
 
-  // Master-library group (Power, Connectivity, ...) — organizational only.
+  // Master-library group (Power, Connectivity, ...) — filing only. A group that
+  // changed behaviour would be a second, weaker category tree.
   groupUuid: char("group_uuid", { length: 36 }).references(
     () => SpecificationGroups.uuid,
     { onDelete: "set null" },
   ),
 
+  // Display text. Deliberately NOT unique: "Type" is rack height on a rack,
+  // cable grade on a cable and switch role on a switch. The shopper should see
+  // "Type" in all three places while the engine keeps them apart by uuid.
   label: varchar("label", { length: 255 }).notNull(),
-  // Stable key derived from the label — products store chosen values under it.
+  // How authors tell two same-labelled attributes apart in the admin. Never
+  // shown to a shopper, never used for identity.
+  internalName: varchar("internal_name", { length: 255 }),
+  // A human-readable slug for exports and the AI read model ONLY. Nothing
+  // points at it, so it is free to change when the label does.
   key: varchar("key", { length: 255 }).notNull(),
 
-  // "select" = dropdown options below; "number" = a typed numeric value in
-  // `unit` — the values the compatibility rule engine aggregates.
-  valueType: mysqlEnum("value_type", specValueTypes)
-    .default("select")
-    .notNull(),
-  // The richer library-builder type (number/single_select/multi_select/
-  // boolean/text). valueType + allowMultiple stay the engine-facing truth;
-  // this drives the builder UI. Nullable — derived from valueType on old rows.
-  inputType: varchar("input_type", { length: 20 }),
+  description: varchar("description", { length: 500 }),
+
+  // One stored type — number / single_select / multi_select / boolean. Not a
+  // UX type plus an engine type derived from it: two stored fields for one fact
+  // can disagree in the database, and then nothing knows which is true.
+  type: mysqlEnum("type", specificationTypes).notNull(),
+
+  // Only meaningful for `number`. A rule may only compare two operands whose
+  // units share a dimension (see UNIT_DIMENSIONS) — otherwise W and kW sum
+  // together with no error and the check approves a 1000x overload.
   unit: varchar("unit", { length: 32 }),
 
-  // "select" modifier: products may tick several options instead of one. The
-  // chosen values are stored comma-joined in the product's attribute map.
-  allowMultiple: boolean("allow_multiple").default(false).notNull(),
-  // "number" modifier: products enter a from–to range instead of a single
-  // value. Stored as "from - to"; the rule engine budgets a range consumer at
-  // its max and a range provider at its min.
+  // Whether `options` is a SCALE (802.3af < at < bt; 1G < 10G) rather than an
+  // unordered set (Black | White). Two behaviours read it: the lte/gte
+  // comparators, which compare an option's `rank`; and the "up to" quick-pick
+  // when an author is choosing a category's enabled slice.
+  //
+  // Definition-level, never per-category — whether a list is a scale is a
+  // property of the attribute itself, not of where it is used.
+  ordered: boolean("ordered").default(false).notNull(),
+
+  // Only meaningful for `number`. Whether a product answers this with a SPAN
+  // (−20 to 60 °C) rather than a single figure.
+  //
+  // Definition-level for the same reason `ordered` is: whether a quantity is
+  // naturally a range is a property of the quantity, not of the category asking
+  // for it. Operating temperature is a range on a switch and on a camera.
+  //
+  // A plain number is the degenerate range where min equals max, so turning this
+  // on never invalidates the values already stored.
   allowRange: boolean("allow_range").default(false).notNull(),
 
-  // Who this attribute is for. Set once, where the attribute is born: an
-  // installer certification is a partner concern wherever it is used, not
-  // something each category should have to remember. A category may narrow
-  // this further on its assignment, but never widen it — so marking an
-  // attribute partner-only here cannot be undone by a category exposing it
-  // publicly by mistake.
+  // The MASTER option list. Categories narrow which of these they offer (see
+  // SpecificationCategories.enabledValues) but never edit this list — a
+  // per-category edit would fork the attribute and break every rule comparing
+  // across categories. Options are append-only; removal is the `retired` flag,
+  // so a product holding a value never ends up holding one that no longer
+  // exists.
+  options: json("options").$type<SpecOption[]>(),
+
+  // Who this attribute is FOR. Set once, where it is born: an installer
+  // certification is a partner concern wherever it is used, not something every
+  // category has to remember. A category may NARROW this on its assignment but
+  // never widen it, so marking an attribute staff-only here cannot be undone by
+  // one category exposing it publicly by mistake.
   audience: mysqlEnum("audience", assignmentAudiences)
     .default("everyone")
     .notNull(),
-
-  // Whether `options` is an ORDERED scale (802.3af < at < bt; 1G < 10G;
-  // Cat5e < Cat6 < Cat6a) rather than an unordered set (Black | White). Two
-  // behaviours read it:
-  //   - rules: the lte/gte comparators compare an option's INDEX in this list,
-  //     so "consumer's PoE type must be at most what the switch supplies" works
-  //     on a select spec.
-  //   - assignments: an enabled slice reads as a CEILING (everything up to the
-  //     highest enabled option) instead of plain set membership.
-  // Definition-level, never per-category — the ordering is a property of the
-  // attribute itself.
-  ordered: boolean("ordered").default(false).notNull(),
-
-  // The master option list. Categories narrow which of these they OFFER (see
-  // SpecificationCategories.enabledValues) but never edit this list — a
-  // per-category edit would fork the attribute and break every rule that
-  // compares across categories.
-  options: json("options").$type<SpecOption[]>(),
-
-  // Rules that force this specification's value when other specs' chosen
-  // values match — evaluated live in the admin product form.
-  rules: json("rules").$type<SpecRule[]>(),
 
   order: int("order").default(0).notNull(),
 

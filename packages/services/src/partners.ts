@@ -1,4 +1,13 @@
-import { and, count, desc, eq, inArray, isNotNull, like, or } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  like,
+  or,
+} from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
@@ -14,8 +23,7 @@ import { ConflictError, ValidationError } from "./errors";
  * so a helper can run standalone or as part of a caller's transaction.
  */
 export type DbExecutor =
-  | typeof db
-  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PartnerRequestInput = {
   capabilities?: SelectPartnerRequests["capabilities"];
@@ -43,7 +51,9 @@ export type PartnerRequestInput = {
 
 export type ApprovePartnerRequestInput = {
   partnerRequestUuid: SelectPartnerRequests["uuid"];
-  approvedClerkUserId: NonNullable<SelectPartnerRequests["approvedClerkUserId"]>;
+  approvedClerkUserId: NonNullable<
+    SelectPartnerRequests["approvedClerkUserId"]
+  >;
   reviewedByClerkUserId?: SelectPartnerRequests["reviewedByClerkUserId"];
   reviewedByName?: SelectPartnerRequests["reviewedByName"];
 };

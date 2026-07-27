@@ -27,7 +27,9 @@ const classificationListSelection = {
 };
 
 /** Every classification with its category count, ordered by name. */
-export const getClassifications = async (): Promise<ClassificationListItem[]> => {
+export const getClassifications = async (): Promise<
+  ClassificationListItem[]
+> => {
   try {
     return await db
       .select(classificationListSelection)

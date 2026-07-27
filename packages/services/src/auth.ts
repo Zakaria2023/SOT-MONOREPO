@@ -43,9 +43,7 @@ export type ClerkUserSync = {
 };
 
 /** Looks up a user by our internal uuid. */
-export const getUserByUuid = async (
-  uuid: string,
-): Promise<AuthUser | null> => {
+export const getUserByUuid = async (uuid: string): Promise<AuthUser | null> => {
   const [user] = await db.select().from(Users).where(eq(Users.uuid, uuid));
   return user ?? null;
 };
@@ -196,10 +194,10 @@ export const isProfileComplete = (user: AuthUser): boolean => {
   if (user.type === "facility") {
     return Boolean(
       user.unifiedNumber &&
-        user.crNumber &&
-        user.vatNumber &&
-        user.nationalAddress &&
-        user.representativeName,
+      user.crNumber &&
+      user.vatNumber &&
+      user.nationalAddress &&
+      user.representativeName,
     );
   }
   if (user.type === "individual") {

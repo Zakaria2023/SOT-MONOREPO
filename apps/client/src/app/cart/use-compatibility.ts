@@ -11,15 +11,20 @@ type SelectionLine = {
 type DesignState = {
   blockers: DesignFinding[];
   warnings: DesignFinding[];
+  // Checks that could not run. The service has always returned these and the
+  // state was already carrying them at runtime — the type just did not say so,
+  // so no caller could reach them and the buyer never saw one.
+  unknowns: DesignFinding[];
 };
 
-const EMPTY: DesignState = { blockers: [], warnings: [] };
+const EMPTY: DesignState = { blockers: [], warnings: [], unknowns: [] };
 
 /**
  * Debounced design check over the current cart lines — requires-companion
  * (Presence) plus compatibility rules. Quantities change in quick bursts
  * (+/- steppers), so it waits for the cart to settle before calling the engine.
- * Returns blockers (must fix) and warnings (advisory).
+ * Returns blockers (must fix), warnings (advisory), and the checks that could
+ * not be run at all — the last of which must never be mistaken for a pass.
  */
 export const useCompatibility = (lines: SelectionLine[]): DesignState => {
   const [state, setState] = useState<DesignState>(EMPTY);

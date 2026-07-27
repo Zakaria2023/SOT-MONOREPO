@@ -1,14 +1,21 @@
-import { getCategories } from "@/app/(dashboard)/categories/action";
 import { LibraryWorkspace } from "@/components/library/library-workspace";
-import { getBuilder } from "./action";
+import { getCategories } from "services";
+import { getLibraryData, getVariables } from "./action";
 
 const LibraryPage = async () => {
-  const [groups, categories] = await Promise.all([
-    getBuilder(),
+  const [groups, variables, categories] = await Promise.all([
+    getLibraryData(),
+    getVariables(),
     getCategories(),
   ]);
 
-  return <LibraryWorkspace groups={groups} categories={categories} />;
+  return (
+    <LibraryWorkspace
+      groups={groups}
+      variables={variables}
+      categories={categories}
+    />
+  );
 };
 
 export default LibraryPage;

@@ -1,425 +1,729 @@
 "use client";
 
-import type { SpecificationWithCategories } from "@/app/(dashboard)/assignments/actions";
-import type { DraftRow } from "@/components/assignments/assignment-workspace";
-import { RelationSection } from "@/components/assignments/relation-section";
-import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
+import {
+  removeAssignmentAction,
+  saveAssignmentAction,
+  suppressAssignmentAction,
+  type AssignmentInput,
+} from "@/app/(dashboard)/assignments/actions";
+import {
+  ConditionPicker,
+  describePredicate,
+  type PredicateAttribute,
+} from "@/components/assignments/condition-picker";
+import { Field } from "@/components/shared/field";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
-import { ASSIGNMENT_AUDIENCE_LABELS } from "@/db/label";
-import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
-import type { ReactNode } from "react";
-import { Dropdown } from "ui";
+import { assignmentAudiences, assignmentScopes } from "@/db/enum";
+import {
+  ASSIGNMENT_AUDIENCE_LABELS,
+  ASSIGNMENT_SCOPE_LABELS,
+} from "@/db/label";
+import type { Predicate } from "@/db/types";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Hash,
+  ListChecks,
+  Plus,
+  ToggleLeft,
+  TriangleAlert,
+  X,
+  Zap,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import type { ResolvedAssignment, RevealProblem } from "services";
+import { Button, Checkbox, Dropdown, type DropdownOption } from "ui";
 
 type AssignmentsTabProps = {
-  rows: DraftRow[];
-  library: SpecificationWithCategories[];
-  // Rules touching each assigned attribute, keyed by spec uuid.
-  relations: Record<string, SpecRelation[]>;
-  onChange: (specificationUuid: string, patch: Partial<DraftRow>) => void;
-  onReset: (specificationUuid: string) => void;
-  onRemove: (specificationUuid: string) => void;
-  onAdd: (specificationUuid: string) => void;
+  categoryUuid: string;
+  resolved: ResolvedAssignment[];
+  problems: RevealProblem[];
+  // Every attribute in the library, for the "add attribute" picker.
+  library: PredicateAttribute[];
+};
+
+// The seven switches, as the form holds them. Shared by the add form and the
+// edit expansion so the two cannot drift into offering different things.
+type Draft = {
+  isFilter: boolean;
+  isRule: boolean;
+  scope: AssignmentScope;
+  audience: AssignmentAudience;
+  showIf: Predicate | null;
+  enabledValues: string[];
+};
+
+type AssignmentFieldsProps = {
+  draft: Draft;
+  onChange: (next: Partial<Draft>) => void;
+  // The attribute being configured — its type decides which switches apply.
+  attribute: PredicateAttribute;
+  // The library's own audience floor, when it set one — a category may narrow
+  // it, never widen it. Absent while ADDING, because the picker only carries
+  // what a condition needs; the server enforces the narrowing either way, so the
+  // note is omitted rather than guessed at.
+  libraryAudience?: AssignmentAudience;
+  // Attributes usable as a condition: everything this category carries, minus
+  // the attribute itself. Inherited ones are allowed — otherwise every
+  // branch-level attribute would have to be re-assigned on each leaf just to be
+  // usable, which defeats inheritance.
+  triggers: PredicateAttribute[];
+};
+
+type AddAssignmentFormProps = {
+  categoryUuid: string;
+  // Everything in the library this category does not already carry.
+  available: PredicateAttribute[];
+  triggers: PredicateAttribute[];
+  order: number;
+  onDone: () => void;
+  onCancel: () => void;
 };
 
 type AssignmentCardProps = {
-  row: DraftRow;
-  relations: SpecRelation[];
-  otherSpecs: {
-    value: string;
-    label: string;
-    valueType: "number" | "select";
-    unit: string | null;
-    ordered: boolean;
-  }[];
-  lookupSpecs: { key: string; label: string; options: string[] }[];
-  // How many other attributes this category carries at all, so an empty
-  // controller list can explain itself rather than look broken.
-  siblingCount: number;
-  // Other attributes on this category that could gate this one.
-  controllers: { value: string; label: string }[];
-  controllerOptions: Record<string, string[]>;
-  onChange: (specificationUuid: string, patch: Partial<DraftRow>) => void;
-  onReset: (specificationUuid: string) => void;
-  onRemove: (specificationUuid: string) => void;
+  categoryUuid: string;
+  assignment: ResolvedAssignment;
+  triggers: PredicateAttribute[];
+  expanded: boolean;
+  onToggle: () => void;
+  onSaved: () => void;
 };
 
-type SwitchProps = {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-  children: ReactNode;
-};
+// Attributes filed under no group still need a bucket to be filtered by, and a
+// dropdown value has to be a string.
+const UNGROUPED = "Ungrouped";
 
-const Switch = ({ active, onClick, disabled, title, children }: SwitchProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-pressed={active}
-    className={
-      active
-        ? "flex items-center gap-1.5 rounded-control bg-primary px-3.5 py-2 text-sm font-semibold text-white"
-        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-hairline disabled:hover:text-faint"
-    }
-  >
-    {children}
-  </button>
+const SCOPE_OPTIONS: DropdownOption[] = assignmentScopes.map((scope) => ({
+  value: scope,
+  label: ASSIGNMENT_SCOPE_LABELS[scope],
+}));
+
+const AUDIENCE_OPTIONS: DropdownOption[] = assignmentAudiences.map(
+  (audience) => ({
+    value: audience,
+    label: ASSIGNMENT_AUDIENCE_LABELS[audience],
+  }),
 );
 
-const AssignmentCard = ({
-  row,
-  relations,
-  otherSpecs,
-  lookupSpecs,
-  siblingCount,
-  controllers,
-  controllerOptions,
+const toPredicateAttribute = (
+  assignment: ResolvedAssignment,
+): PredicateAttribute => ({
+  uuid: assignment.definition.uuid,
+  label: assignment.definition.label,
+  type: assignment.definition.type,
+  ordered: assignment.definition.ordered,
+  unit: assignment.definition.unit,
+  // The slice this category OFFERS, not the master list — a condition must not
+  // be able to name a value the category does not put on the form.
+  options: assignment.offeredOptions,
+});
+
+// Sensible defaults for a brand-new assignment: the engine reads it, the shopper
+// does not filter on it yet. Turning the filter on is a deliberate
+// merchandising decision, so it is never on by accident.
+const emptyDraft = (): Draft => ({
+  isFilter: false,
+  isRule: true,
+  scope: "branch",
+  audience: "everyone",
+  showIf: null,
+  enabledValues: [],
+});
+
+const toDraft = (assignment: ResolvedAssignment): Draft => ({
+  isFilter: assignment.isFilter,
+  isRule: assignment.isRule,
+  scope: assignment.scope,
+  audience: assignment.audience,
+  showIf: assignment.showIf,
+  enabledValues: assignment.enabledValues ?? [],
+});
+
+const TypeIcon = ({ assignment }: { assignment: ResolvedAssignment }) => {
+  const { type, ordered } = assignment.definition;
+  if (type === "number") {
+    return <Hash size={14} className="text-faint" />;
+  }
+  if (type === "boolean") {
+    return <ToggleLeft size={14} className="text-faint" />;
+  }
+  if (type === "multi_select") {
+    return <ListChecks size={14} className="text-faint" />;
+  }
+  return ordered ? (
+    <ArrowUpDown size={14} className="text-faint" />
+  ) : (
+    <ListChecks size={14} className="text-faint" />
+  );
+};
+
+/**
+ * The switches themselves. No save button, no fetching — it holds nothing and
+ * decides nothing, so adding an attribute and editing one are the same screen
+ * and cannot offer different options.
+ */
+const AssignmentFields = ({
+  draft,
   onChange,
-  onReset,
-  onRemove,
-}: AssignmentCardProps) => {
-  const enabled = new Set(row.enabledValues ?? row.masterOptions);
-  const hasOptions = row.masterOptions.length > 0;
-  const isBoolean = row.inputType === "boolean";
-  const showIfValues = row.showIf?.values ?? [];
+  attribute,
+  libraryAudience,
+  triggers,
+}: AssignmentFieldsProps) => {
+  const optionBacked =
+    attribute.type === "single_select" || attribute.type === "multi_select";
+  const liveOptions = attribute.options.filter((option) => !option.retired);
 
-  const toggleEnabled = (option: string) => {
-    const current = new Set(row.enabledValues ?? row.masterOptions);
-    if (current.has(option)) {
-      current.delete(option);
-    } else {
-      current.add(option);
+  return (
+    <>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        <Checkbox
+          label="Shopper sees it (filter)"
+          checked={draft.isFilter}
+          onChange={(event) => onChange({ isFilter: event.target.checked })}
+        />
+        <Checkbox
+          label="Engine reads it (rule)"
+          checked={draft.isRule}
+          onChange={(event) => onChange({ isRule: event.target.checked })}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {draft.isFilter && (
+          <Field
+            label="Filter reaches"
+            hint="Affects the shopper's facet only. Rule participation always inherits down the whole subtree."
+          >
+            <Dropdown
+              value={draft.scope}
+              onChange={(next) => onChange({ scope: next as AssignmentScope })}
+              options={SCOPE_OPTIONS}
+            />
+          </Field>
+        )}
+
+        <Field label="Surfaced to">
+          <Dropdown
+            value={draft.audience}
+            onChange={(next) =>
+              onChange({ audience: next as AssignmentAudience })
+            }
+            options={AUDIENCE_OPTIONS}
+          />
+          {libraryAudience && libraryAudience !== "everyone" && (
+            <span className="text-[11px] text-amber-500">
+              The library marks this{" "}
+              {ASSIGNMENT_AUDIENCE_LABELS[libraryAudience]} — a category can
+              narrow that, never widen it.
+            </span>
+          )}
+        </Field>
+      </div>
+
+      {optionBacked && (
+        <Field
+          label="Options this category offers"
+          hint={
+            draft.enabledValues.length === 0
+              ? "Every option, including any added to the library later."
+              : "Exactly these are offered — gaps included. Nothing is re-expanded later, so what you pick is what the shopper and the product form get."
+          }
+          accessory={
+            draft.enabledValues.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange({ enabledValues: [] })}
+                className="rounded-control px-2 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
+              >
+                Offer all
+              </button>
+            )
+          }
+        >
+          <Dropdown
+            multiple
+            value={draft.enabledValues}
+            onChange={(enabledValues) => onChange({ enabledValues })}
+            options={liveOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            // Empty is not "nothing offered" — it is the unrestricted case,
+            // which is why it stays distinct from ticking every box.
+            placeholder={`All ${liveOptions.length} options`}
+            searchable={liveOptions.length > 8}
+          />
+        </Field>
+      )}
+
+      <Field label="Shown only when">
+        <ConditionPicker
+          value={draft.showIf}
+          onChange={(showIf) => onChange({ showIf })}
+          attributes={triggers}
+          emptyLabel="Always shown"
+        />
+      </Field>
+    </>
+  );
+};
+
+/**
+ * Adding an attribute.
+ *
+ * Deliberately a form that saves ONCE. The old flow wrote a row with defaults
+ * the moment an attribute was picked and then opened it for editing — so a
+ * cancelled thought left a live assignment behind, and for the seconds in
+ * between, every product in the category was quietly incomplete.
+ */
+const AddAssignmentForm = ({
+  categoryUuid,
+  available,
+  triggers,
+  order,
+  onDone,
+  onCancel,
+}: AddAssignmentFormProps) => {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+  const [groups, setGroups] = useState<string[]>([]);
+  const [picked, setPicked] = useState("");
+  const [draft, setDraft] = useState<Draft>(emptyDraft());
+
+  // Only groups that still have something to offer. A group whose attributes are
+  // all assigned already would filter the picker down to nothing.
+  const groupOptions = useMemo<DropdownOption[]>(() => {
+    const names = new Set<string>();
+    for (const entry of available) {
+      names.add(entry.groupName ?? UNGROUPED);
     }
-    // Everything ticked means "no narrowing" — store null rather than a slice
-    // equal to the master list, so the category keeps tracking options added
-    // to the library later.
-    const next = row.masterOptions.filter((value) => current.has(value));
-    onChange(row.specificationUuid, {
-      enabledValues: next.length === row.masterOptions.length ? null : next,
-    });
-  };
+    return [...names].sort().map((name) => ({ value: name, label: name }));
+  }, [available]);
 
-  const toggleShowIfValue = (value: string) => {
-    if (!row.showIf) {
+  const listed = useMemo(
+    () =>
+      groups.length === 0
+        ? available
+        : available.filter((entry) =>
+            groups.includes(entry.groupName ?? UNGROUPED),
+          ),
+    [available, groups],
+  );
+
+  const attribute = available.find((entry) => entry.uuid === picked);
+
+  const save = (): void => {
+    if (!attribute) {
       return;
     }
-    const current = new Set(showIfValues);
-    if (current.has(value)) {
-      current.delete(value);
-    } else {
-      current.add(value);
-    }
-    onChange(row.specificationUuid, {
-      showIf: { specKey: row.showIf.specKey, values: [...current] },
+    setError(undefined);
+    const input: AssignmentInput = {
+      categoryUuid,
+      specificationUuid: attribute.uuid,
+      isFilter: draft.isFilter,
+      isRule: draft.isRule,
+      scope: draft.scope,
+      showIf: draft.showIf,
+      audience: draft.audience,
+      enabledValues:
+        draft.enabledValues.length > 0 ? draft.enabledValues : null,
+      suppressed: false,
+      order,
+    };
+    startTransition(async () => {
+      const result = await saveAssignmentAction(input);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onDone();
+      router.refresh();
     });
   };
 
   return (
-    <li className="flex flex-col gap-2.5 rounded-control border border-hairline bg-page p-3.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-base font-semibold text-ink">{row.label}</span>
-        <span className="rounded bg-primary-tint px-1.5 py-0.5 text-xs font-semibold text-primary">
-          {isBoolean ? "yes / no" : row.valueType === "number" ? "number" : "select"}
-        </span>
-        {hasOptions && (
-          <span className="rounded bg-surface px-1.5 py-0.5 text-sm font-medium text-muted">
-            {row.ordered ? "ordered · ceiling" : "unordered · inclusion"}
-          </span>
-        )}
-        {row.inherited && !row.owned ? (
-          <span className="flex items-center gap-1 text-sm font-medium text-faint">
-            <ArrowUpFromLine size={15} />
-            from {row.sourceCategoryName ?? "an ancestor"}
-          </span>
-        ) : (
-          <span className="text-sm font-medium text-faint">own</span>
-        )}
-
-        <span className="ml-auto flex items-center gap-1">
-          {row.owned && row.inherited && (
-            <button
-              type="button"
-              onClick={() => onReset(row.specificationUuid)}
-              className="rounded px-2 py-1 text-sm text-muted transition-colors hover:bg-surface hover:text-ink"
-            >
-              Reset to inherited
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => onRemove(row.specificationUuid)}
-            aria-label={`Remove ${row.label}`}
-            className="rounded-control border border-hairline p-1.5 text-faint transition-colors hover:border-danger hover:text-danger"
-          >
-            <X size={14} />
-          </button>
-        </span>
-      </div>
-
-      {/* Switches 1 and 2, then scope. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Switch
-          active={row.isFilter}
-          onClick={() =>
-            onChange(row.specificationUuid, { isFilter: !row.isFilter })
-          }
+    <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-ink">Add an attribute</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Cancel"
+          className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
         >
-          {row.isFilter ? <Eye size={15} /> : <EyeOff size={15} />}
-          Filter
-        </Switch>
-        <Switch
-          active={row.isRule}
-          onClick={() =>
-            onChange(row.specificationUuid, { isRule: !row.isRule })
-          }
-        >
-          {row.isRule ? <Zap size={15} /> : <ZapOff size={15} />}
-          Rule
-        </Switch>
-        {(["branch", "leaf"] as AssignmentScope[]).map((scope) => (
-          <Switch
-            key={scope}
-            active={row.scope === scope}
-            onClick={() => onChange(row.specificationUuid, { scope })}
-          >
-            {scope === "branch" ? "Branch" : "Leaf"}
-          </Switch>
-        ))}
+          <X size={14} />
+        </button>
       </div>
 
-      {/* Audience. The library already fixed who the attribute is FOR; this
-          can only narrow it, so anything wider is shown as unavailable. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(["everyone", "user", "partner"] as AssignmentAudience[]).map(
-          (audience) => {
-            // Once the library has picked a side, a category cannot move it.
-            const lockedByDefinition =
-              row.definitionAudience !== "everyone" &&
-              audience !== row.definitionAudience;
-            return (
-              <Switch
-                key={audience}
-                active={row.effectiveAudience === audience}
-                disabled={lockedByDefinition}
-                title={
-                  lockedByDefinition
-                    ? `The library marks this attribute ${ASSIGNMENT_AUDIENCE_LABELS[row.definitionAudience]} — a category cannot change that`
-                    : undefined
-                }
-                onClick={() => onChange(row.specificationUuid, { audience })}
-              >
-                {ASSIGNMENT_AUDIENCE_LABELS[audience]}
-              </Switch>
-            );
-          },
-        )}
-        {row.definitionAudience !== "everyone" && (
-          <span className="text-sm text-faint">set in the library</span>
-        )}
-      </div>
-
-      {!row.isFilter && row.isRule && (
-        <p className="text-sm text-faint">
-          Living, not showing — the engine reads this value, no shopper sees it.
-        </p>
-      )}
-
-      {hasOptions && (
-        <div>
-          <p className="text-sm text-muted">
-            {isBoolean
-              ? "Enabled values: any yes / no"
-              : "Enabled values (slice of the master list):"}
-          </p>
-          {!isBoolean && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {row.masterOptions.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => toggleEnabled(option)}
-                  aria-pressed={enabled.has(option)}
-                  className={
-                    enabled.has(option)
-                      ? "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-white"
-                      : "rounded-md border border-hairline bg-surface px-2.5 py-1 text-sm text-faint"
-                  }
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1 text-sm text-muted">
-          <EyeOff size={14} />
-          Show-if
-        </span>
-        {controllers.length === 0 ? (
-          // An empty dropdown reads as a bug. Say which of the two reasons it
-          // is: nothing else is assigned here, or what is assigned has no
-          // values to test against.
-          <p className="rounded-control border border-dashed border-hairline px-3 py-2 text-sm text-faint">
-            {siblingCount === 0
-              ? "Always shown — this is the only attribute on this category, so there is nothing to condition it on. Assign another and it can gate this one."
-              : "Always shown — the other attributes here are numbers with no option list, and a condition tests against values. Assign one with options to gate this."}
-          </p>
-        ) : (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* A filter, not a field. It narrows what the picker beside it LISTS and
+            is never saved — which group an attribute was found in has no bearing
+            on how this category uses it. */}
+        <Field label="Groups">
           <Dropdown
-            value={row.showIf?.specKey ?? ""}
-            onChange={(specKey) =>
-              onChange(row.specificationUuid, {
-                showIf: specKey ? { specKey, values: [] } : null,
-              })
-            }
-            options={[
-              { value: "", label: "— always shown —" },
-              ...controllers,
-            ]}
+            multiple
+            value={groups}
+            onChange={(next) => {
+              setGroups(next);
+              // Narrowing past the current pick would leave the picker showing
+              // its placeholder with the switches still open underneath it.
+              const stillListed =
+                next.length === 0 ||
+                available.some(
+                  (entry) =>
+                    entry.uuid === picked &&
+                    next.includes(entry.groupName ?? UNGROUPED),
+                );
+              if (!stillListed) {
+                setPicked("");
+                setDraft(emptyDraft());
+              }
+            }}
+            options={groupOptions}
+            placeholder={`All ${groupOptions.length} groups`}
+            searchable={groupOptions.length > 8}
           />
-        )}
-        {row.showIf && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-sm text-muted">is</span>
-            {(controllerOptions[row.showIf.specKey] ?? []).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => toggleShowIfValue(value)}
-                aria-pressed={showIfValues.includes(value)}
-                className={
-                  showIfValues.includes(value)
-                    ? "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-white"
-                    : "rounded-md border border-hairline bg-surface px-2.5 py-1 text-sm text-faint"
-                }
-              >
-                {value}
-              </button>
-            ))}
-            {showIfValues.length === 0 && (
-              <span className="text-sm text-amber-700">
-                pick a value, or it is always hidden
+        </Field>
+
+        <Field label="Attribute">
+          <Dropdown
+            value={picked}
+            onChange={(next) => {
+              setPicked(next);
+              // A fresh attribute means a fresh set of switches — carrying an
+              // option slice or a condition across from the last pick would name
+              // values the new attribute does not have.
+              setDraft(emptyDraft());
+            }}
+            options={listed.map((entry) => ({
+              value: entry.uuid,
+              label: entry.unit
+                ? `${entry.label} (${entry.unit})`
+                : entry.label,
+            }))}
+            searchable
+            placeholder="Choose an attribute"
+            emptyMessage={
+              groups.length > 0
+                ? "Nothing left in those groups"
+                : "Every library attribute is already here"
+            }
+          />
+        </Field>
+      </div>
+
+      {/* The switches wait for an attribute, because its TYPE decides which of
+          them apply at all — there is no option slice on a number. */}
+      {attribute && (
+        <AssignmentFields
+          draft={draft}
+          onChange={(next) => setDraft((current) => ({ ...current, ...next }))}
+          attribute={attribute}
+          triggers={triggers}
+        />
+      )}
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+        <Button onClick={save} disabled={pending || !attribute}>
+          {pending ? "Adding…" : "Add to this category"}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const AssignmentCard = ({
+  categoryUuid,
+  assignment,
+  triggers,
+  expanded,
+  onToggle,
+  onSaved,
+}: AssignmentCardProps) => {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+  const [draft, setDraft] = useState<Draft>(toDraft(assignment));
+
+  const { definition } = assignment;
+  const optionBacked =
+    definition.type === "single_select" || definition.type === "multi_select";
+  const liveOptions = definition.options.filter((option) => !option.retired);
+
+  const save = (): void => {
+    setError(undefined);
+    const input: AssignmentInput = {
+      categoryUuid,
+      specificationUuid: definition.uuid,
+      isFilter: draft.isFilter,
+      isRule: draft.isRule,
+      scope: draft.scope,
+      showIf: draft.showIf,
+      audience: draft.audience,
+      enabledValues:
+        draft.enabledValues.length > 0 ? draft.enabledValues : null,
+      suppressed: false,
+      order: assignment.order,
+    };
+    startTransition(async () => {
+      const result = await saveAssignmentAction(input);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onSaved();
+      router.refresh();
+    });
+  };
+
+  const remove = (): void => {
+    setError(undefined);
+    startTransition(async () => {
+      const result = assignment.inherited
+        ? await suppressAssignmentAction(categoryUuid, definition.uuid)
+        : await removeAssignmentAction(categoryUuid, definition.uuid);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  return (
+    <div
+      className={`rounded-card border bg-surface ${
+        assignment.inherited ? "border-hairline" : "border-primary/25"
+      }`}
+    >
+      <div className="flex items-start gap-3 px-3 py-2.5">
+        <div className="mt-0.5">
+          <TypeIcon assignment={assignment} />
+        </div>
+
+        <button
+          type="button"
+          onClick={onToggle}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-ink">
+              {definition.label}
+            </span>
+            {assignment.inherited && (
+              <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                inherited
+              </span>
+            )}
+            {assignment.isFilter && (
+              <span className="flex items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-400">
+                <Eye size={9} />
+                filter
+              </span>
+            )}
+            {assignment.isRule && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                <Zap size={9} />
+                rule
+              </span>
+            )}
+            {assignment.effectiveAudience !== "everyone" && (
+              <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                {ASSIGNMENT_AUDIENCE_LABELS[assignment.effectiveAudience]}
               </span>
             )}
           </div>
-        )}
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+            {assignment.showIf ? (
+              <span className="flex items-center gap-1 text-amber-500">
+                <EyeOff size={10} />
+                shown when {describePredicate(assignment.showIf, triggers)}
+              </span>
+            ) : (
+              <span className="text-faint">always shown</span>
+            )}
+            {optionBacked && (
+              <span>
+                {assignment.enabledValues
+                  ? `${assignment.offeredOptions.length} of ${liveOptions.length} options`
+                  : `all ${liveOptions.length} options`}
+              </span>
+            )}
+            {assignment.isFilter && (
+              <span>{ASSIGNMENT_SCOPE_LABELS[assignment.scope]}</span>
+            )}
+          </div>
+        </button>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? "Collapse" : "Edit"}
+            className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
+          >
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          <button
+            type="button"
+            onClick={remove}
+            disabled={pending}
+            aria-label={
+              assignment.inherited
+                ? `Drop ${definition.label} from this category`
+                : `Remove ${definition.label}`
+            }
+            className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
-      <RelationSection
-        specUuid={row.specificationUuid}
-        specLabel={row.label}
-        specUnit={row.unit}
-        specValueType={row.valueType}
-        specOrdered={row.ordered}
-        relations={relations}
-        otherSpecs={otherSpecs}
-        lookupSpecs={lookupSpecs}
-      />
-    </li>
+      {expanded && (
+        <div className="flex flex-col gap-4 border-t border-hairline px-3 py-3">
+          <AssignmentFields
+            draft={draft}
+            onChange={(next) =>
+              setDraft((current) => ({ ...current, ...next }))
+            }
+            attribute={{
+              uuid: definition.uuid,
+              label: definition.label,
+              type: definition.type,
+              ordered: definition.ordered,
+              unit: definition.unit,
+              options: definition.options,
+            }}
+            libraryAudience={definition.audience}
+            triggers={triggers}
+          />
+
+          {error && <p className="text-xs text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onToggle} disabled={pending}>
+              Close
+            </Button>
+            <Button onClick={save} disabled={pending}>
+              {assignment.inherited ? "Override here" : "Save"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
 export const AssignmentsTab = ({
-  rows,
+  categoryUuid,
+  resolved,
+  problems,
   library,
-  relations,
-  onChange,
-  onReset,
-  onRemove,
-  onAdd,
 }: AssignmentsTabProps) => {
-  const assigned = new Set(rows.map((row) => row.specificationUuid));
-  const addable = library
-    .filter((specification) => !assigned.has(specification.uuid))
-    .map((specification) => ({
-      value: specification.uuid,
-      label: specification.unit
-        ? `${specification.label} (${specification.unit})`
-        : specification.label,
-    }));
+  const [expanded, setExpanded] = useState<string | null>(null);
+  // Whether the add form is open. Nothing is written until it is submitted.
+  const [adding, setAdding] = useState(false);
 
-  // Show-if can only point at another attribute on this same category, and
-  // only one that has values to test.
-  const controllersFor = (specificationUuid: string) =>
-    rows
-      .filter(
-        (row) =>
-          row.specificationUuid !== specificationUuid &&
-          row.masterOptions.length > 0,
-      )
-      .map((row) => ({ value: row.key, label: `only if ${row.label}` }));
-
-  const controllerOptions = Object.fromEntries(
-    rows.map((row) => [row.key, row.masterOptions]),
+  const assigned = useMemo(
+    () => new Set(resolved.map((entry) => entry.definition.uuid)),
+    [resolved],
   );
 
-  // A conditional table is keyed by chosen values, so only attributes with an
-  // option list can key one.
-  const lookupSpecs = library
-    .filter((specification) => (specification.options ?? []).length > 0)
-    .map((specification) => ({
-      key: specification.key,
-      label: specification.label,
-      options: (specification.options ?? []).map((option) => option.value),
-    }));
+  const triggers = useMemo(
+    () => resolved.map(toPredicateAttribute),
+    [resolved],
+  );
 
-  // A relation can bind any attribute in the library, not only ones this
-  // category carries — a camera's power draw is measured against a switch's
-  // budget, and those live in different trees.
-  const otherSpecsFor = (specificationUuid: string) =>
-    library
-      .filter((specification) => specification.uuid !== specificationUuid)
-      .map((specification) => ({
-        value: specification.uuid,
-        label: specification.unit
-          ? `${specification.label} (${specification.unit})`
-          : specification.label,
-        valueType: specification.valueType,
-        unit: specification.unit,
-        ordered: specification.ordered,
-      }));
+  const unassigned = useMemo(
+    () => library.filter((attribute) => !assigned.has(attribute.uuid)),
+    [library, assigned],
+  );
 
   return (
     <div className="flex flex-col gap-3">
-      {rows.length === 0 ? (
-        <p className="rounded-control border border-dashed border-hairline p-8 text-center text-sm text-faint">
-          This category carries no attributes yet. Assign one from the library.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2.5">
-          {rows.map((row) => (
-            <AssignmentCard
-              key={row.specificationUuid}
-              row={row}
-              relations={relations[row.specificationUuid] ?? []}
-              otherSpecs={otherSpecsFor(row.specificationUuid)}
-              lookupSpecs={lookupSpecs}
-              siblingCount={rows.length - 1}
-              controllers={controllersFor(row.specificationUuid)}
-              controllerOptions={controllerOptions}
-              onChange={onChange}
-              onReset={onReset}
-              onRemove={onRemove}
-            />
+      {problems.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+          {problems.map((problem) => (
+            <p
+              key={`${problem.specificationUuid}-${problem.code}`}
+              className="flex items-start gap-1.5 text-xs text-amber-500"
+            >
+              <TriangleAlert size={12} className="mt-0.5 shrink-0" />
+              {problem.message}
+            </p>
           ))}
-        </ul>
+        </div>
       )}
 
-      <div className="w-72">
-        <Dropdown
-          searchable
-          value=""
-          onChange={onAdd}
-          placeholder="Assign attribute from library…"
-          searchPlaceholder="Search the library…"
-          options={addable}
-        />
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted">
+          {resolved.length} attribute{resolved.length === 1 ? "" : "s"} —{" "}
+          {resolved.filter((entry) => !entry.inherited).length} authored here
+        </p>
+        {!adding && (
+          <Button
+            variant="outline"
+            onClick={() => setAdding(true)}
+            disabled={unassigned.length === 0}
+          >
+            <Plus size={14} />
+            Add attribute
+          </Button>
+        )}
       </div>
+
+      {adding && (
+        <AddAssignmentForm
+          categoryUuid={categoryUuid}
+          available={unassigned}
+          triggers={triggers}
+          order={resolved.length}
+          onDone={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
+      {resolved.length === 0 && !adding && (
+        <p className="rounded-card border border-dashed border-hairline px-3 py-8 text-center text-xs text-faint">
+          Nothing assigned yet. Add an attribute from the library, or assign it
+          higher up the tree so a whole branch inherits it.
+        </p>
+      )}
+
+      {resolved.map((assignment) => (
+        <AssignmentCard
+          // Keyed by what the row currently HOLDS, not just its uuid — a card
+          // that stays mounted across a refresh keeps the draft it was opened
+          // with, so a save would show stale switches until the page reloaded.
+          key={`${assignment.definition.uuid}-${assignment.sourceCategoryUuid}`}
+          categoryUuid={categoryUuid}
+          assignment={assignment}
+          triggers={triggers.filter(
+            (entry) => entry.uuid !== assignment.definition.uuid,
+          )}
+          expanded={expanded === assignment.definition.uuid}
+          onToggle={() =>
+            setExpanded((current) =>
+              current === assignment.definition.uuid
+                ? null
+                : assignment.definition.uuid,
+            )
+          }
+          onSaved={() => setExpanded(null)}
+        />
+      ))}
     </div>
   );
 };

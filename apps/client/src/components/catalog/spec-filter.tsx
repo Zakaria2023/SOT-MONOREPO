@@ -40,12 +40,12 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
       )}
       <ul className="mt-2 flex flex-col gap-0.5">
         {facet.options.map((option) => {
-          const checked = chosen.has(option);
+          const checked = chosen.has(option.value);
           return (
-            <li key={option}>
+            <li key={option.value}>
               <button
                 type="button"
-                onClick={() => onToggle(facet.key, option)}
+                onClick={() => onToggle(facet.key, option.value)}
                 aria-pressed={checked}
                 className="font-grotesk flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-surface-2"
               >
@@ -59,7 +59,7 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
                 >
                   {checked && <Check size={13} />}
                 </span>
-                <span className="flex-1 text-left text-ink">{option}</span>
+                <span className="flex-1 text-left text-ink">{option.label}</span>
               </button>
             </li>
           );

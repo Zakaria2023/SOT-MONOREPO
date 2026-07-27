@@ -4,205 +4,317 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
   createLibraryAttribute,
+  createProjectVariable,
   createSpecificationGroup,
-  createTemplateFromGroup,
   deleteLibraryAttribute,
+  deleteProjectVariable,
   deleteSpecificationGroup,
-  deleteSpecificationTemplate,
-  getLibraryBuilder,
-  getLibraryReadModel,
-  getSpecificationTemplates,
+  getAttributeCategories,
+  getLibrary,
+  getProjectVariables,
+  removeAssignment,
+  saveAssignment,
   moveLibraryAttribute,
+  reorderLibraryAttributes,
   reorderSpecificationGroups,
   updateLibraryAttribute,
+  updateProjectVariable,
   updateSpecificationGroup,
-} from "services";
-import type {
-  AttributeInput as ServiceAttributeInput,
-  LibraryBuilderGroup as ServiceLibraryBuilderGroup,
-  LibraryReadModel as ServiceLibraryReadModel,
-  SelectSpecificationTemplates as ServiceSelectSpecificationTemplates,
+  type LibraryAttributeInput as ServiceLibraryAttributeInput,
+  type LibraryGroup as ServiceLibraryGroup,
+  type ProjectVariableInput as ServiceProjectVariableInput,
+  type SpecificationGroupFields as ServiceSpecificationGroupFields,
 } from "services";
 
-// Types re-declared as local aliases (a "use server" file may only export
-// async functions).
-export type AttributeInput = ServiceAttributeInput;
-export type LibraryBuilderGroup = ServiceLibraryBuilderGroup;
-export type LibraryReadModel = ServiceLibraryReadModel;
-export type SpecificationTemplate = ServiceSelectSpecificationTemplates;
+// Types re-declared as local aliases — a "use server" file may only export
+// async functions.
+// The service input plus the categories the form lets an author tick. Kept as an
+// ADMIN type on purpose: `createLibraryAttribute` still refuses to write category
+// links, so the two writes stay separate and the assignment service remains the
+// only thing that touches those rows.
+export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
+  categoryUuids: string[];
+};
+export type LibraryGroup = ServiceLibraryGroup;
+export type ProjectVariableInput = ServiceProjectVariableInput;
+export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 
-export type LibraryActionResult = { error?: string };
+export type ActionResult = {
+  error?: string;
+  success?: boolean;
+};
 
-const revalidate = () => revalidatePath("/library");
-
-const fail = (error: unknown, fallback: string): LibraryActionResult => ({
+const fail = (error: unknown, fallback: string): ActionResult => ({
   error: error instanceof Error ? error.message : fallback,
 });
 
-// --- Reads ---
-export const getBuilder = async (): Promise<LibraryBuilderGroup[]> => {
+export const getLibraryData = async (): Promise<LibraryGroup[]> => {
   await requireAdmin();
-  return getLibraryBuilder();
+  return getLibrary();
 };
 
-export const getReadModel = async (): Promise<LibraryReadModel> => {
+export const getVariables = async () => {
   await requireAdmin();
-  return getLibraryReadModel();
+  return getProjectVariables();
 };
 
-export const getTemplates = async (): Promise<SpecificationTemplate[]> => {
-  await requireAdmin();
-  return getSpecificationTemplates();
-};
-
-// --- Groups ---
-export const addGroupAction = async (
-  name: string,
-  domain: string | null,
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  if (!name.trim()) {
-    return { error: "Name is required" };
-  }
-  try {
-    await createSpecificationGroup({ name: name.trim(), domain });
-  } catch (error) {
-    return fail(error, "Failed to add group");
-  }
-  revalidate();
-  return {};
-};
-
-// Saves the group's name and domain together — both come from the same inline
-// editor, so neither is ever written blind over the other.
-export const updateGroupAction = async (
-  uuid: string,
-  name: string,
-  domain: string | null,
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  if (!name.trim()) {
-    return { error: "Name is required" };
-  }
-  try {
-    await updateSpecificationGroup(uuid, { name: name.trim(), domain });
-  } catch (error) {
-    return fail(error, "Failed to update group");
-  }
-  revalidate();
-  return {};
-};
-
-export const deleteGroupAction = async (
-  uuid: string,
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  try {
-    await deleteSpecificationGroup(uuid);
-  } catch (error) {
-    return fail(error, "Failed to delete group");
-  }
-  revalidate();
-  return {};
-};
-
-export const reorderGroupsAction = async (
-  orderedUuids: string[],
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  try {
-    await reorderSpecificationGroups(orderedUuids);
-  } catch (error) {
-    return fail(error, "Failed to reorder groups");
-  }
-  revalidate();
-  return {};
-};
-
-// --- Attributes ---
 export const addAttributeAction = async (
-  input: AttributeInput,
-): Promise<LibraryActionResult> => {
+  input: LibraryAttributeInput,
+): Promise<ActionResult> => {
   await requireAdmin();
-  if (!input.label.trim()) {
-    return { error: "Name is required" };
-  }
+  const { categoryUuids, ...definition } = input;
   try {
-    await createLibraryAttribute({ ...input, label: input.label.trim() });
+    const uuid = await createLibraryAttribute(definition);
+    if (categoryUuids.length > 0) {
+      await applyAttributeCategories(uuid, categoryUuids);
+    }
   } catch (error) {
-    return fail(error, "Failed to add attribute");
+    return fail(error, "Failed to create the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
 };
 
 export const updateAttributeAction = async (
   uuid: string,
-  input: AttributeInput,
-): Promise<LibraryActionResult> => {
+  input: LibraryAttributeInput,
+): Promise<ActionResult> => {
   await requireAdmin();
-  if (!input.label.trim()) {
-    return { error: "Name is required" };
-  }
+  const { categoryUuids, ...definition } = input;
   try {
-    await updateLibraryAttribute(uuid, { ...input, label: input.label.trim() });
+    await updateLibraryAttribute(uuid, definition);
+    await applyAttributeCategories(uuid, categoryUuids);
   } catch (error) {
-    return fail(error, "Failed to update attribute");
+    return fail(error, "Failed to update the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
 };
 
+/**
+ * Delete an attribute. The service REFUSES while any rule or assignment
+ * references it, and its message names what is in the way — so this surfaces
+ * that message rather than a generic failure.
+ */
 export const deleteAttributeAction = async (
   uuid: string,
-): Promise<LibraryActionResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
     await deleteLibraryAttribute(uuid);
   } catch (error) {
-    return fail(error, "Failed to delete attribute");
+    return fail(error, "Failed to delete the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
 };
 
 export const moveAttributeAction = async (
   uuid: string,
   groupUuid: string | null,
-): Promise<LibraryActionResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
     await moveLibraryAttribute(uuid, groupUuid);
   } catch (error) {
-    return fail(error, "Failed to move attribute");
+    return fail(error, "Failed to move the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  return { success: true };
 };
 
-// --- Templates ---
-export const createTemplateFromGroupAction = async (
-  groupUuid: string,
-): Promise<LibraryActionResult> => {
+export const reorderAttributesAction = async (
+  order: { uuid: string; order: number }[],
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
-    await createTemplateFromGroup(groupUuid);
+    await reorderLibraryAttributes(order);
   } catch (error) {
-    return fail(error, "Failed to create template");
+    return fail(error, "Failed to reorder");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  return { success: true };
 };
 
-export const deleteTemplateAction = async (
+/**
+ * Apply a category selection by touching ONLY the difference.
+ *
+ * Not exported — a "use server" file may only export async functions, and this is
+ * shared internal machinery rather than a server action.
+ */
+const applyAttributeCategories = async (
+  specificationUuid: string,
+  categoryUuids: string[],
+): Promise<void> => {
+  const existing = await getAttributeCategories(specificationUuid);
+  const wanted = new Set(categoryUuids.filter((uuid) => uuid.length > 0));
+  const current = new Set(existing);
+
+  for (const categoryUuid of wanted) {
+    if (current.has(categoryUuid)) {
+      continue;
+    }
+    await saveAssignment({
+      categoryUuid,
+      specificationUuid,
+      // The engine reads it; the shopper does not filter on it until somebody
+      // decides that deliberately on the assignments screen.
+      isFilter: false,
+      isRule: true,
+      scope: "branch",
+      showIf: null,
+      audience: "everyone",
+      enabledValues: null,
+      suppressed: false,
+      order: 0,
+    });
+  }
+
+  for (const categoryUuid of current) {
+    if (!wanted.has(categoryUuid)) {
+      await removeAssignment(categoryUuid, specificationUuid);
+    }
+  }
+};
+
+/**
+ * Set which categories use an attribute, from the library screen.
+ *
+ * ADDITIVE AND GUARDED, deliberately. The old version of this rewrote every
+ * category link for the attribute — delete, then re-insert — which silently reset
+ * whatever switches an author had set on the assignments screen. Renaming an
+ * attribute could quietly change how a dozen categories used it.
+ *
+ * So this only ever touches the difference:
+ *   - a newly ticked category gets a fresh assignment with sensible defaults
+ *   - an unticked one is removed through the SAME guard the assignments screen
+ *     uses, which refuses when another attribute's reveal depends on it
+ *   - a category that was already ticked is left completely alone
+ *
+ * Everything else about an assignment — the filter switch, the slice, the reveal,
+ * the audience — still has exactly one owner: the assignments screen.
+ */
+export const setAttributeCategoriesAction = async (
+  specificationUuid: string,
+  categoryUuids: string[],
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await applyAttributeCategories(specificationUuid, categoryUuids);
+  } catch (error) {
+    return fail(error, "Failed to update the categories");
+  }
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
+};
+
+// ---------------------------------------------------------------------------
+// Groups — the folders an attribute is filed in.
+//
+// Filing only: a group is invisible to the shopper and to the engine. If one ever
+// started affecting behaviour it would have become a second, weaker category
+// tree, with two places to look for the same answer.
+// ---------------------------------------------------------------------------
+
+export const addGroupAction = async (
+  fields: SpecificationGroupFields,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await createSpecificationGroup(fields);
+  } catch (error) {
+    return fail(error, "Failed to create the group");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const updateGroupAction = async (
   uuid: string,
-): Promise<LibraryActionResult> => {
+  fields: SpecificationGroupFields,
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
-    await deleteSpecificationTemplate(uuid);
+    await updateSpecificationGroup(uuid, fields);
   } catch (error) {
-    return fail(error, "Failed to delete template");
+    return fail(error, "Failed to update the group");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  return { success: true };
+};
+
+/**
+ * Delete a group. The attributes inside it are NOT deleted — they become
+ * ungrouped, because a group is a folder and emptying a folder must never
+ * destroy what was filed in it.
+ */
+export const deleteGroupAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteSpecificationGroup(uuid);
+  } catch (error) {
+    return fail(error, "Failed to delete the group");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+/** Persist a new group order — each uuid's position becomes its `order`. */
+export const reorderGroupsAction = async (
+  orderedUuids: string[],
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await reorderSpecificationGroups(orderedUuids);
+  } catch (error) {
+    return fail(error, "Failed to reorder the groups");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const addVariableAction = async (
+  input: ProjectVariableInput,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await createProjectVariable(input);
+  } catch (error) {
+    return fail(error, "Failed to create the project input");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const updateVariableAction = async (
+  uuid: string,
+  input: ProjectVariableInput,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await updateProjectVariable(uuid, input);
+  } catch (error) {
+    return fail(error, "Failed to update the project input");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const deleteVariableAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteProjectVariable(uuid);
+  } catch (error) {
+    return fail(error, "Failed to delete the project input");
+  }
+  revalidatePath("/library");
+  return { success: true };
 };

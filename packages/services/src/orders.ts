@@ -1,24 +1,18 @@
 import { and, asc, desc, eq, getTableColumns } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import {
-  applyPercentDiscount,
-  fromMinorUnits,
-  toMinorUnits,
-} from "utils";
+import { applyPercentDiscount, fromMinorUnits, toMinorUnits } from "utils";
 import { db } from "../../../db";
 import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Offers } from "../../../db/schema/offers";
-import {
-  OrderItems,
-  SelectOrderItems,
-} from "../../../db/schema/order-items";
+import { OrderItems, SelectOrderItems } from "../../../db/schema/order-items";
 import {
   Invoices,
   Orders,
   SelectInvoices,
   SelectOrders,
 } from "../../../db/schema/orders";
+import { gateSelection } from "./design-check";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
 
@@ -132,15 +126,45 @@ export const createOrderFromSelectedOffer = async ({
 export const createOrderFromCart = async ({
   userUuid,
   discountPercent = 0,
+  override,
+  region,
+  variables,
 }: {
   userUuid: string;
   discountPercent?: number;
+  // A partner may know better than the catalog; an ordinary user has no way to
+  // judge whether the engine is wrong, so only a caller that says the actor may
+  // override gets one — and the recorded reason is what makes it auditable.
+  override?: { allowed: boolean; reason: string };
+  region?: string;
+  variables?: Record<string, number | boolean>;
 }): Promise<SelectOrders> => {
   const items = (await getCart(userUuid)).filter(
     (item) => item.kind === "product",
   );
   if (items.length === 0) {
     throw new ValidationError("Your cart has no products to order");
+  }
+
+  // THE GATE. The cart UI shows the design check live, but a check that only
+  // lives in the UI is bypassed by any direct API call — and web and mobile
+  // would drift. So it runs again HERE, on the server, at the moment the order
+  // is created, through the same service both transports use.
+  const gate = await gateSelection({
+    selection: items.map((item) => ({
+      productUuid: item.productUuid,
+      quantity: item.quantity,
+    })),
+    variables,
+    region,
+    override,
+  });
+  if (!gate.allowed) {
+    throw new ValidationError(
+      `This design cannot be ordered yet: ${gate.blockers
+        .map((finding) => finding.message)
+        .join(" ")}`,
+    );
   }
 
   const currency = items[0].currency ?? "SAR";
@@ -175,6 +199,14 @@ export const createOrderFromCart = async ({
       serviceTotal: "0.00",
       grandTotal,
       currency,
+      // Snapshotted, not re-derived later: a rule edited next month must not
+      // silently change what this order was judged against. It is also how we
+      // find out which rules are wrong.
+      // Unknowns included deliberately: an order judged against a check that
+      // could not run is a different fact from one judged clean, and this
+      // snapshot is the only place that distinction survives.
+      designFindings: [...gate.blockers, ...gate.warnings, ...gate.unknowns],
+      designOverrideReason: gate.overridden ? (override?.reason ?? null) : null,
     });
 
     for (const line of lines) {
@@ -315,9 +347,7 @@ export const getUserOrder = async (
 };
 
 /** Every order a user owns, newest first, tagged with its BOQ reference. */
-export const getUserOrders = async (
-  userUuid: string,
-): Promise<UserOrder[]> =>
+export const getUserOrders = async (userUuid: string): Promise<UserOrder[]> =>
   db
     .select({
       ...getTableColumns(Orders),

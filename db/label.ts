@@ -18,58 +18,121 @@ import {
   PartnerRequestStatus,
   PartnerType,
   ProductStatus,
-  RuleAllocation,
-  RuleComparator,
-  RuleKind,
-  RuleSeverity,
+  ProjectVariableType,
+  MatchMode,
+  PredicateOperator,
+  RelationshipAllocation,
+  RelationshipComparator,
+  RelationshipFamily,
+  RelationshipGate,
+  RelationshipStatus,
   SpecificationDomain,
-  SpecInputType,
-  SpecValueType,
+  SpecificationType,
   UserType,
 } from "./enum";
 
-export const SPEC_VALUE_TYPE_LABELS: Record<SpecValueType, string> = {
-  select: "Dropdown",
-  number: "Number",
-};
+export const SPECIFICATION_DOMAIN_LABELS: Record<SpecificationDomain, string> =
+  {
+    core: "Core",
+    networking: "Networking & Connectivity",
+    control_panel: "Control-Panel Systems",
+    video: "Video Surveillance",
+    access: "Access Control & Intercom",
+    unified_comms: "Unified Communications",
+    audio: "Audio & Multiroom",
+    power_racks: "Power Protection & Racks",
+    passive: "Passive / Cabling",
+  };
 
-export const SPECIFICATION_DOMAIN_LABELS: Record<SpecificationDomain, string> = {
-  core: "Core",
-  networking: "Networking & Connectivity",
-  control_panel: "Control-Panel Systems",
-  video: "Video Surveillance",
-  access: "Access Control & Intercom",
-  unified_comms: "Unified Communications",
-  audio: "Audio & Multiroom",
-  power_racks: "Power Protection & Racks",
-  passive: "Passive / Cabling",
-};
-
-export const RULE_KIND_LABELS: Record<RuleKind, string> = {
-  sum_budget: "Budget — sum vs capacity",
-  count_limit: "Count — items vs slots",
-  per_item_threshold: "Match — per-item threshold",
-  ratio: "Ratio — demand ÷ supply",
-  spec_match: "Match — spec compatibility",
+export const RELATIONSHIP_FAMILY_LABELS: Record<RelationshipFamily, string> = {
+  budget: "Budget — capacity ≥ Σ demand",
+  count: "Count — items ≤ a limit",
+  match: "Match — two values compatible",
+  ratio: "Ratio — demand ÷ supply ≤ target",
+  presence: "Presence — requires a companion",
   conditional: "Conditional — limit from a lookup",
 };
 
-export const RULE_COMPARATOR_LABELS: Record<RuleComparator, string> = {
-  lte: "must be ≤",
-  gte: "must be ≥",
+// One line each, written for the author choosing a family in the builder.
+export const RELATIONSHIP_FAMILY_HINTS: Record<RelationshipFamily, string> = {
+  budget:
+    "Adds up what the selection draws and checks it fits what the selection supplies.",
+  count: "Counts matching items and checks they fit the available slots.",
+  match:
+    "Checks one item's value is compatible with another's — no arithmetic.",
+  ratio:
+    "Allows deliberate oversubscription: demand may exceed supply up to a target ratio.",
+  presence: "Detects something that should be in the selection but is missing.",
+  conditional:
+    "Reads the limit from a table keyed by the item's own other values.",
+};
+
+export const RELATIONSHIP_COMPARATOR_LABELS: Record<
+  RelationshipComparator,
+  string
+> = {
+  lte: "must be at most",
+  gte: "must be at least",
   eq: "must equal",
   in: "must be one of",
   intersects: "must overlap",
 };
 
-export const RULE_SEVERITY_LABELS: Record<RuleSeverity, string> = {
-  block: "Block",
-  warn: "Warn",
+export const RELATIONSHIP_GATE_LABELS: Record<RelationshipGate, string> = {
+  block: "Blocks checkout",
+  warn: "Warns only",
 };
 
-export const RULE_ALLOCATION_LABELS: Record<RuleAllocation, string> = {
+export const RELATIONSHIP_STATUS_LABELS: Record<RelationshipStatus, string> = {
+  draft: "Draft",
+  published: "Published",
+  archived: "Archived",
+};
+
+export const RELATIONSHIP_ALLOCATION_LABELS: Record<
+  RelationshipAllocation,
+  string
+> = {
+  per_unit: "Each device on its own",
   pooled: "Shared pool",
-  per_provider: "Per device",
+};
+
+export const RELATIONSHIP_ALLOCATION_HINTS: Record<
+  RelationshipAllocation,
+  string
+> = {
+  per_unit:
+    "Two switches with 130 W each are not one switch with 260 W — every device must fit its own share.",
+  pooled:
+    "All providers act as one capacity. Correct only where the resource really is shared.",
+};
+
+export const MATCH_MODE_LABELS: Record<MatchMode, string> = {
+  any: "any of the values match",
+  all: "only these values, nothing else",
+};
+
+export const PROJECT_VARIABLE_TYPE_LABELS: Record<ProjectVariableType, string> =
+  {
+    number: "Number",
+    boolean: "Yes / No",
+  };
+
+export const PREDICATE_OPERATOR_LABELS: Record<PredicateOperator, string> = {
+  equals: "is",
+  not_equals: "is not",
+  in: "is one of",
+  not_in: "is none of",
+  gt: "is more than",
+  gte: "is at least",
+  lt: "is less than",
+  lte: "is at most",
+  between: "is between",
+  exists: "has any value",
+  in_category: "is in product group",
+  all: "all of",
+  any: "any of",
+  not: "not",
 };
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
@@ -212,12 +275,11 @@ export const BUSINESS_LINE_LABELS: Record<BusinessLine, string> = {
   enterprise: "Enterprise",
 };
 
-export const SPEC_INPUT_TYPE_LABELS: Record<SpecInputType, string> = {
+export const SPECIFICATION_TYPE_LABELS: Record<SpecificationType, string> = {
   number: "Number",
   single_select: "Single-select",
   multi_select: "Multi-select",
   boolean: "Yes / No",
-  text: "Text",
 };
 
 export const ASSIGNMENT_SCOPE_LABELS: Record<AssignmentScope, string> = {

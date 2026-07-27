@@ -50,8 +50,7 @@ export const HandoverView = ({
       const result = await reportHandoverIssue(boqUuid, reason);
       if (result.error) {
         setError(result.error);
-      }
-      else setShowDispute(false);
+      } else setShowDispute(false);
     });
   };
 
@@ -147,7 +146,7 @@ export const HandoverView = ({
               onClick={() => setShowDispute((prev) => !prev)}
               className="inline-flex items-center rounded-xl border border-search-border px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-hover"
             >
-              Something's wrong
+              Something&apos;s wrong
             </button>
           </div>
 

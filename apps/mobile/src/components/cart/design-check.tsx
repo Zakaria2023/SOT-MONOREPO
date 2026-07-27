@@ -25,11 +25,16 @@ const FindingRow = ({ finding }: FindingRowProps) => {
           {finding.title}
         </Text>
         <Text style={styles.findingMessage}>{finding.message}</Text>
-        {finding.suggestions.length > 0 ? (
-          <Text style={styles.suggestions}>
-            Try: {finding.suggestions.slice(0, 3).join(" · ")}
+        {/* Every correction is add supply, reduce demand, or swap — the buyer is
+            never told only that something is wrong. */}
+        {finding.corrections.map((correction, index) => (
+          <Text key={index} style={styles.suggestions}>
+            {correction.message}
+            {correction.products.length > 0
+              ? ` e.g. ${correction.products.map((entry) => entry.name).join(", ")}`
+              : ""}
           </Text>
-        ) : null}
+        ))}
       </View>
     </View>
   );
@@ -54,9 +59,13 @@ export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
     return null;
   }
 
-  const { blockers, warnings } = result;
+  const { blockers, warnings, unknowns } = result;
 
-  if (blockers.length === 0 && warnings.length === 0) {
+  if (
+    blockers.length === 0 &&
+    warnings.length === 0 &&
+    unknowns.length === 0
+  ) {
     return (
       <View style={[styles.card, styles.clean]}>
         <CheckCircle2 color={colors.success} size={16} />
@@ -74,9 +83,13 @@ export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
       <Text style={styles.heading}>
         {blockers.length > 0
           ? `${blockers.length} problem${blockers.length === 1 ? "" : "s"} to fix`
-          : `${warnings.length} thing${warnings.length === 1 ? "" : "s"} to check`}
+          : warnings.length > 0
+            ? `${warnings.length} thing${warnings.length === 1 ? "" : "s"} to check`
+            : `${unknowns.length} check${unknowns.length === 1 ? "" : "s"} we could not run`}
       </Text>
-      {[...blockers, ...warnings].map((finding) => (
+      {/* Unknowns last, and never counted as problems — but never dropped
+          either. A check we could not make must not read as one that passed. */}
+      {[...blockers, ...warnings, ...unknowns].map((finding) => (
         <FindingRow key={finding.id} finding={finding} />
       ))}
     </View>

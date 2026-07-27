@@ -1,11 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { ProductSpec } from "@/lib/types";
 import { colors, fonts, radius, spacing } from "@/lib/theme";
-import { formatSpecValue } from "@/lib/format";
 
 type SpecTableProps = {
   specs: ProductSpec[];
-  values: Record<string, string>;
 };
 
 type Group = {
@@ -13,18 +11,19 @@ type Group = {
   rows: { label: string; value: string }[];
 };
 
-// Sectioned by library group, groups in first-seen order so the table reads
-// the way the library is organised. Ungrouped attributes trail behind.
-const groupSpecs = (
-  specs: ProductSpec[],
-  values: Record<string, string>,
-): Group[] =>
+// Values arrive already formatted, by the same renderer the engine uses to
+// explain a finding — so a spec row and a design message can never describe the
+// same value two different ways, and the app carries no copy of the option
+// labels or units.
+//
+// Sectioned by library group, groups in first-seen order so the table reads the
+// way the library is organised. Ungrouped attributes trail behind.
+const groupSpecs = (specs: ProductSpec[]): Group[] =>
   specs.reduce<Group[]>((groups, spec) => {
-    const value = formatSpecValue(values[spec.key], spec.unit);
-    if (!value) {
+    if (!spec.value) {
       return groups;
     }
-    const row = { label: spec.label, value };
+    const row = { label: spec.label, value: spec.value };
     const existing = groups.find((group) => group.name === spec.groupName);
     if (existing) {
       existing.rows.push(row);
@@ -34,8 +33,8 @@ const groupSpecs = (
     return groups;
   }, []);
 
-export const SpecTable = ({ specs, values }: SpecTableProps) => {
-  const groups = groupSpecs(specs, values);
+export const SpecTable = ({ specs }: SpecTableProps) => {
+  const groups = groupSpecs(specs);
   if (groups.length === 0) {
     return null;
   }

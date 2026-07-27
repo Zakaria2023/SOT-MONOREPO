@@ -1,11 +1,13 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
 import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
-import { expandFacetChoices, parseSpecParams } from "utils";
+import { parseSpecParams } from "utils";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import type { Metadata } from "next";
 import {
   getBrands,
   getCategories,
+  expandFacetChoices,
+  facetSelectionValues,
   getCategoryFacets,
   getProducts,
   type CategoryFacet,
@@ -76,12 +78,21 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // once a category is chosen — an attribute assigned at Networking has nothing
   // to narrow on an all-categories view.
   const selectedSpecs = selectedCategory ? parseSpecParams(params.spec) : {};
+  // A signed-in partner is a different shopper from a regular user, not a wider
+  // one — each sees "everyone" plus their own side.
+  const viewer = viewerPricing.isPartner ? "partner" : "user";
+
+  // Resolved twice on purpose. The first pass gives the facets that are always
+  // offered; the second re-resolves with what the shopper has actually ticked, so
+  // a conditional facet (PoE Budget) appears once its trigger (PoE = Yes) is set.
+  const baseFacets: CategoryFacet[] = selectedCategory
+    ? await getCategoryFacets(selectedCategory, viewer)
+    : [];
   const facets: CategoryFacet[] = selectedCategory
     ? await getCategoryFacets(
         selectedCategory,
-        // A signed-in partner is a different shopper from a regular user, not
-        // a wider one — each sees "everyone" plus their own side.
-        viewerPricing.isPartner ? "partner" : "user",
+        viewer,
+        facetSelectionValues(selectedSpecs, baseFacets),
       )
     : [];
 

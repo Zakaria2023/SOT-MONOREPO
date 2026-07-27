@@ -146,7 +146,12 @@ export const getCategoriesPage = async (
       db.select({ total: count() }).from(Categories).where(where),
     ]);
 
-    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+    return buildPaginatedResult(
+      rows,
+      Number(totals?.total ?? 0),
+      page,
+      pageSize,
+    );
   } catch (error) {
     console.error("getCategoriesPage failed:", error);
     throw new Error("Failed to fetch categories", { cause: error });

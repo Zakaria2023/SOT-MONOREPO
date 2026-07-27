@@ -40,22 +40,22 @@ const FacetBlock = ({ facet, chosen, onToggle }: FacetBlockProps) => (
     ) : null}
     <View style={styles.options}>
       {facet.options.map((option) => {
-        const active = chosen.includes(option);
+        const active = chosen.includes(option.value);
         return (
           <Pressable
-            key={option}
-            onPress={() => onToggle(option)}
+            key={option.value}
+            onPress={() => onToggle(option.value)}
             style={[styles.chip, active ? styles.chipActive : null]}
             // Colour alone does not tell a screen reader which values are
             // chosen, and these are toggles rather than links.
             accessibilityRole="checkbox"
             accessibilityState={{ checked: active }}
-            accessibilityLabel={`${facet.label}: ${option}`}
+            accessibilityLabel={`${facet.label}: ${option.label}`}
           >
             <Text
               style={[styles.chipText, active ? styles.chipTextActive : null]}
             >
-              {option}
+              {option.label}
             </Text>
           </Pressable>
         );

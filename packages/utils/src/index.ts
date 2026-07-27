@@ -204,150 +204,70 @@ export const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-// A multi-select spec's chosen options are stored comma-joined in the product's
-// flat attribute map (e.g. "802.3af, 802.3at"). These two helpers move between
-// that stored string and the individual option values the UI works with.
-export const parseSpecValues = (raw: string | null | undefined): string[] =>
-  raw
-    ? raw
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean)
-    : [];
+// ---------------------------------------------------------------------------
+// Attribute values
+//
+// A product's value for an attribute is stored TYPED — a number as a number, a
+// multi-select as an array of option values, a boolean as true/false. The old
+// comma-joined-string encoding is gone: it produced NaN on any value carrying a
+// unit and corrupted outright on an option label containing a comma.
+//
+// Kept structural (no db import) so the server and browser share one formatter.
+// ---------------------------------------------------------------------------
 
-export const serializeSpecValues = (values: string[]): string =>
-  values.join(", ");
-
-// A range spec's value is stored as "from - to" (e.g. "10 - 20", "-20 - 60") —
-// a plain number never contains " - ", so that separator distinguishes the two.
-export const RANGE_SEPARATOR = " - ";
-
-export const serializeSpecRange = (from: string, to: string): string =>
-  `${from.trim()}${RANGE_SEPARATOR}${to.trim()}`;
-
-/** Splits a stored range value into its raw "from"/"to" parts for editing. */
-export const splitSpecRange = (
-  raw: string | null | undefined,
-): [string, string] => {
-  if (!raw) {
-    return ["", ""];
-  }
-  const at = raw.indexOf(RANGE_SEPARATOR);
-  if (at === -1) {
-    return [raw, ""];
-  }
-  return [raw.slice(0, at), raw.slice(at + RANGE_SEPARATOR.length)];
-};
+export type TypedSpecValue = number | boolean | string | string[];
 
 /**
- * Renders a stored spec value for display, appending the unit.
+ * Renders a stored value for display: option values swapped for their labels,
+ * a unit appended to a number, a boolean read as Yes/No.
  *
- * Handles the three storage shapes a spec value can take:
- *   range  "220 - 240" + "V" → "220 – 240 V"   (unit once, en dash)
- *   multi  "802.3af, 802.3at" → "802.3af, 802.3at"  (option labels, no unit)
- *   plain  "45" + "W" → "45 W"
- *
- * Returns "" for an empty value so callers can filter unset attributes.
+ * Returns "" for an empty value so callers can filter unset attributes out of a
+ * spec table rather than rendering a row of dashes.
  */
 export const formatSpecValue = (
-  raw: string | null | undefined,
+  value: TypedSpecValue | null | undefined,
   unit?: string | null,
+  optionLabels?: Record<string, string>,
 ): string => {
-  // The separator is checked before trimming: "10 - " trims to "10 -", which
-  // would no longer look like a range.
-  const stored = raw ?? "";
-  const value = stored.trim();
-  if (value === "") {
+  if (value === null || value === undefined) {
     return "";
   }
-  const trimmedUnit = unit?.trim() ?? "";
-  const suffix = trimmedUnit === "" ? "" : ` ${trimmedUnit}`;
+  const suffix = unit?.trim() ? ` ${unit.trim()}` : "";
 
-  // A half-filled range ("10 - ") must not render its dangling separator.
-  if (stored.includes(RANGE_SEPARATOR)) {
-    const [rawFrom, rawTo] = splitSpecRange(stored);
-    const from = rawFrom.trim();
-    const to = rawTo.trim();
-    if (from !== "" && to !== "") {
-      return `${from} – ${to}${suffix}`;
-    }
-    const only = from === "" ? to : from;
-    return only === "" ? "" : `${only}${suffix}`;
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
   }
-
-  const parts = parseSpecValues(value);
-  if (parts.length > 1) {
-    return parts.join(", ");
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? `${value}${suffix}` : "";
   }
-  return `${value}${suffix}`;
+  if (Array.isArray(value)) {
+    const labelled = value
+      .map((entry) => optionLabels?.[entry] ?? entry)
+      .filter((entry) => entry.trim() !== "");
+    return labelled.join(", ");
+  }
+  const text = value.trim();
+  if (text === "") {
+    return "";
+  }
+  // A single option value still deserves its label; a free string passes through.
+  return optionLabels?.[text] ?? `${text}${suffix}`;
 };
 
-// The UX-facing input type of a library attribute. Kept structural (no db
-// import) so both the server library builder and client components can share
-// one resolver.
-export type ResolvedSpecInputType =
-  | "number"
-  | "single_select"
-  | "multi_select"
-  | "boolean"
-  | "text";
-
-type SpecInputTypeSource = {
-  inputType?: string | null;
-  valueType?: string | null;
-  allowMultiple?: boolean | null;
-  options?: { value: string }[] | null;
-};
-
-/**
- * The attribute's input type, derived for legacy rows that predate the
- * `inputType` column: a numeric spec is a number, an exactly-Yes/No option set
- * is a boolean, a multi-value select is multi_select, and an option-less
- * select is free text.
- */
-export const resolveSpecInputType = (
-  spec: SpecInputTypeSource,
-): ResolvedSpecInputType => {
-  if (spec.inputType) {
-    return spec.inputType as ResolvedSpecInputType;
+/** Whether a stored value counts as filled in. 0 and false are real answers. */
+export const hasSpecValue = (
+  value: TypedSpecValue | null | undefined,
+): boolean => {
+  if (value === null || value === undefined) {
+    return false;
   }
-  if (spec.valueType === "number") {
-    return "number";
+  if (Array.isArray(value)) {
+    return value.length > 0;
   }
-  const values = (spec.options ?? []).map((option) => option.value);
-  const isYesNo =
-    values.length === 2 && values.includes("Yes") && values.includes("No");
-  if (isYesNo) {
-    return "boolean";
+  if (typeof value === "string") {
+    return value.trim() !== "";
   }
-  if (spec.allowMultiple) {
-    return "multi_select";
-  }
-  return values.length === 0 ? "text" : "single_select";
-};
-
-/**
- * Parses a stored range spec value back into numeric bounds, or null when it
- * isn't a valid "from - to" pair. The rule engine reads these bounds: a range
- * consumer is budgeted at its max (worst case), a range provider at its min
- * (guaranteed capacity).
- */
-export const parseSpecRange = (
-  raw: string | null | undefined,
-): { min: number; max: number } | null => {
-  if (!raw) {
-    return null;
-  }
-  const at = raw.indexOf(RANGE_SEPARATOR);
-  if (at === -1) {
-    return null;
-  }
-  const min = Number(raw.slice(0, at).trim());
-  const max = Number(raw.slice(at + RANGE_SEPARATOR.length).trim());
-  if (!Number.isFinite(min) || !Number.isFinite(max)) {
-    return null;
-  }
-  return { min, max };
+  return true;
 };
 
 /** Turns a slug/key back into a readable Title Case label, e.g. "poe-standard" -> "Poe Standard". */
@@ -476,7 +396,6 @@ export const expandFacetChoices = (
   return expanded;
 };
 
-export * from "./rule-validation";
 
 // Spec facet selections travel in the URL as repeated `spec=key:value` params
 // (e.g. ?spec=cable-grade:Cat6&spec=cable-grade:Cat6a&spec=color:Black). Spec

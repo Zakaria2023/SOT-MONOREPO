@@ -30,11 +30,8 @@ import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
-import { checkCompatibility } from "./check-compatibility";
+import { checkDesign, type DesignCheckResult } from "./design-check";
 import { ConflictError, ValidationError } from "./errors";
-import { checkBoqPresence } from "./presence-rules";
-import type { PresenceFinding } from "./presence-engine";
-import type { CompatibilityReport } from "./rule-engine";
 import {
   getApprovedPartnerOptions,
   type BoqPartnerOptions,
@@ -52,10 +49,10 @@ export type BoqDetail = {
 
 export type ValidateBoqResult = {
   boq: SelectBoqs;
-  report: CompatibilityReport;
-  // Requires-companion findings (what's MISSING from the design). Hard findings
-  // block validation just like a compatibility failure; soft ones only warn.
-  presenceFindings: PresenceFinding[];
+  // The whole design check — presence gaps (what is MISSING) and compatibility
+  // conflicts (what does not fit), split into blockers, warnings, and checks that
+  // could not be run.
+  design: DesignCheckResult;
   validated: boolean;
 };
 
@@ -136,7 +133,9 @@ export const createBoqFromCart = async (
       ),
     );
   if (lines.length === 0) {
-    throw new ValidationError("Add a solution to your cart before sending a BOQ");
+    throw new ValidationError(
+      "Add a solution to your cart before sending a BOQ",
+    );
   }
 
   const productUuids = lines.map((line) => line.productUuid);
@@ -265,13 +264,12 @@ export const validateBoq = async (
       ? [{ productUuid: item.productUuid, quantity: item.quantity }]
       : [],
   );
-  const [report, presence] = await Promise.all([
-    checkCompatibility(selection),
-    checkBoqPresence(boqUuid),
-  ]);
-  // The purchase gate: a clean pass needs both no compatibility failures and no
-  // HARD requires-companion gaps (a camera with no recorder, etc.).
-  const validated = report.failures === 0 && !presence.gate.blocked;
+  const design = await checkDesign({ selection });
+  // The purchase gate: a clean pass needs no blocking findings from any family.
+  // A degraded run (the engine itself failed) does NOT promote the BOQ — "we
+  // could not look" is not the same as "nothing is wrong", and a BOQ marked
+  // validated is a claim we made.
+  const validated = design.blockers.length === 0 && !design.degraded;
 
   if (validated) {
     await db
@@ -284,7 +282,7 @@ export const validateBoq = async (
   if (!boq) {
     throw new Error("Failed to load BOQ after validation");
   }
-  return { boq, report, presenceFindings: presence.findings, validated };
+  return { boq, design, validated };
 };
 
 // The fulfilment stages, in order — the Service & Handover progression. Each
@@ -312,9 +310,7 @@ export const advanceBoqFulfilment = async (
   const currentIndex = FULFILMENT_ORDER.indexOf(boq.status ?? "draft");
   const nextIndex = FULFILMENT_ORDER.indexOf(next);
   if (nextIndex <= 0 || nextIndex !== currentIndex + 1) {
-    throw new ConflictError(
-      `A BOQ at "${boq.status}" can't move to "${next}"`,
-    );
+    throw new ConflictError(`A BOQ at "${boq.status}" can't move to "${next}"`);
   }
 
   await db.update(Boqs).set({ status: next }).where(eq(Boqs.uuid, boqUuid));
@@ -339,9 +335,10 @@ const attachBoqTotals = async <T extends { uuid: string }>(
       boqUuid: BoqItems.boqUuid,
       // MySQL returns SUM() as a decimal string — map it to a real number.
       itemCount: sql<number>`sum(${BoqItems.quantity})`.mapWith(Number),
-      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`.mapWith(
-        Number,
-      ),
+      subtotal:
+        sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`.mapWith(
+          Number,
+        ),
     })
     .from(BoqItems)
     .where(
@@ -567,7 +564,9 @@ export const submitReviewedBoq = async ({
     });
     const partners = [...selectedClose, ...selectedOthers];
     if (partners.length === 0) {
-      throw new ValidationError("Select at least one partner to send this BOQ to");
+      throw new ValidationError(
+        "Select at least one partner to send this BOQ to",
+      );
     }
 
     await tx

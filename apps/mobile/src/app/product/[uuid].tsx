@@ -103,12 +103,7 @@ const ProductScreen = () => {
 
       {/* Only the attributes this viewer may read — the API filtered them by
           audience before they ever reached the device. */}
-      {product.specs && product.technicalAttributes ? (
-        <SpecTable
-          specs={product.specs}
-          values={product.technicalAttributes}
-        />
-      ) : null}
+      {product.specs ? <SpecTable specs={product.specs} /> : null}
 
       <View style={styles.action}>
         <Button

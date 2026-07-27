@@ -13,6 +13,7 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { boqItemRoles, lifecycleStatuses, productStatuses } from "../enum";
+import { ProductValues } from "../types";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
 
@@ -76,14 +77,36 @@ export const Products = mysqlTable(
     // Phase-1 signal until the real-time Odoo stock link arrives.
     isAvailable: boolean("is_available").default(true).notNull(),
 
-    // The library attributes chosen for THIS product (ordered spec keys),
-    // picked from the specification library on the product form. Values live in
-    // technicalAttributes keyed by the same key. Empty/absent falls back to the
-    // keys present in technicalAttributes (older products).
-    specKeys: json("spec_keys").$type<string[]>(),
+    // The product's attribute values, keyed by Specifications.uuid and stored
+    // TYPED — a number as a number, a multi-select as an array, a boolean as
+    // true/false.
+    //
+    // Keyed by uuid, not by a label-derived slug: a slug changes when the label
+    // changes, and every value stored under the old slug would silently orphan
+    // while rules that read it quietly stopped firing. An orphaned value does
+    // not look like an error — it looks like a passing check.
+    //
+    // Typed, not stringly: `Number("12 W")` is NaN, and a comma-joined
+    // multi-select corrupts the moment an option label contains a comma. The
+    // engine sums these directly, so the parse has to have happened already.
+    //
+    // WHICH attributes a product carries is not stored here — it is resolved
+    // from the category's assignment chain, so adding an attribute to a category
+    // immediately applies to every product in it.
+    specValues: json("spec_values").$type<ProductValues>(),
 
-    // Values for the product's chosen attributes, keyed by SpecField.key.
-    // Machine-reasonable specs for filtering, rules, and the AI builder.
+    // A frozen snapshot of the pre-migration values: the old string-keyed,
+    // string-valued map, kept only as a safety net now that `specValues` has been
+    // backfilled from it.
+    //
+    // NOTHING reads it. It is not a fallback and must never become one — two
+    // value maps would be two sources of truth, which is the problem the uuid
+    // keying was introduced to end. Drop it once the storefront has been
+    // verified:
+    //
+    //   ALTER TABLE Products DROP COLUMN technical_attributes;
+    //
+    // then delete this column from the schema.
     technicalAttributes: json("technical_attributes").$type<
       Record<string, string>
     >(),

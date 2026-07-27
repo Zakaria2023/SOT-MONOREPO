@@ -3,6 +3,7 @@ import {
   char,
   decimal,
   index,
+  json,
   int,
   mysqlEnum,
   mysqlTable,
@@ -56,6 +57,19 @@ export const Orders = mysqlTable(
     }).notNull(),
     grandTotal: decimal("grand_total", { precision: 12, scale: 2 }).notNull(),
     currency: char("currency", { length: 3 }).default("SAR"),
+
+    // The design check as it stood WHEN THE ORDER WAS PLACED.
+    //
+    // Snapshotted rather than re-derived: an order is a commercial document, and
+    // a rule edited next month must not silently change what this order was
+    // judged against — nor silently make an order look valid that was not. It is
+    // also the fastest way to find out which rules are wrong.
+    designFindings: json("design_findings").$type<
+      { id: string; title: string; message: string; tone: string }[]
+    >(),
+    // Set only when a buyer was let through despite blockers. The reason is what
+    // makes the override auditable; without one, the gate refuses.
+    designOverrideReason: varchar("design_override_reason", { length: 500 }),
 
     confirmedAt: timestamp("confirmed_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),
