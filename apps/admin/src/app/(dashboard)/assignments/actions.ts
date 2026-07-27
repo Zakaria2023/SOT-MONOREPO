@@ -10,10 +10,12 @@ import {
   publishRelationship,
   removeAssignment,
   saveAssignment,
+  searchProductsForPicker,
   suppressInherited,
   updateRelationship,
   validateRelationship,
   type AssignmentInput as ServiceAssignmentInput,
+  type ProductPickerItem as ServiceProductPickerItem,
   type RelationshipInput as ServiceRelationshipInput,
   type RelationshipPreview as ServiceRelationshipPreview,
   type RelationshipProblem as ServiceRelationshipProblem,
@@ -22,6 +24,7 @@ import {
 // Types re-declared as local aliases — a "use server" file may only export
 // async functions.
 export type AssignmentInput = ServiceAssignmentInput;
+export type ProductPickerItem = ServiceProductPickerItem;
 export type RelationshipInput = ServiceRelationshipInput;
 export type RelationshipPreview = ServiceRelationshipPreview;
 export type RelationshipProblem = ServiceRelationshipProblem;
@@ -166,6 +169,26 @@ export const deleteRelationAction = async (
   }
   refreshCatalog();
   return { success: true };
+};
+
+/**
+ * Products matching a search term, for the preview's picker.
+ *
+ * A query rather than a mutation, but still an action: the alternative is a
+ * route handler duplicating what the service already does.
+ */
+export const searchProductsAction = async (
+  search: string,
+): Promise<ProductPickerItem[]> => {
+  await requireAdmin();
+  if (search.trim().length < 2) {
+    return [];
+  }
+  try {
+    return await searchProductsForPicker(search);
+  } catch {
+    return [];
+  }
 };
 
 /**

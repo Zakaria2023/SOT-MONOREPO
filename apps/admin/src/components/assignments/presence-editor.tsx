@@ -5,6 +5,7 @@ import {
   PredicateEditor,
   type PredicateAttribute,
 } from "@/components/assignments/predicate-editor";
+import { Field, FieldSet } from "@/components/shared/field";
 import type { PresenceAlternative, PresenceSpec } from "@/db/types";
 import { Plus, X } from "lucide-react";
 import { Dropdown, Input, Textarea, type DropdownOption } from "ui";
@@ -67,30 +68,28 @@ export const PresenceEditor = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5 rounded-control border border-hairline p-3">
-        <span className="text-xs font-semibold text-ink">
-          This applies to items where…
-        </span>
+      <FieldSet
+        title="This applies to items where…"
+        hint="Usually a Device Role — “role is Camera”. Using an attribute rather than a category keeps the rule working after a category is renamed."
+      >
         <PredicateEditor
           value={value.trigger}
           onChange={(trigger) =>
             onChange({
               ...value,
-              trigger:
-                trigger ?? { op: "exists", attr: attributes[0]?.uuid ?? "" },
+              trigger: trigger ?? {
+                op: "exists",
+                attr: attributes[0]?.uuid ?? "",
+              },
             })
           }
           attributes={attributes}
           emptyLabel="Pick what triggers this rule"
         />
-        <p className="text-[11px] text-muted">
-          Usually a Device Role — “role is Camera”. Using an attribute rather than
-          a category keeps the rule working after a category is renamed.
-        </p>
-      </div>
+      </FieldSet>
 
       <div className="flex flex-col gap-3">
-        <span className="text-xs font-semibold text-ink">
+        <span className="text-sm font-semibold text-ink">
           …and the selection must also contain
         </span>
 
@@ -135,11 +134,7 @@ export const PresenceEditor = ({
               </button>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-medium text-secondary">
-                Satisfied by any one of these
-              </span>
-
+            <Field label="Satisfied by any one of these">
               {requirement.satisfiedBy.map((alternative, alternativeIndex) => (
                 <div
                   key={alternativeIndex}
@@ -168,7 +163,10 @@ export const PresenceEditor = ({
                           )
                         }
                         options={[
-                          { value: "item_exists", label: "An item in the cart" },
+                          {
+                            value: "item_exists",
+                            label: "An item in the cart",
+                          },
                           ...(variables.length > 0
                             ? [
                                 {
@@ -198,11 +196,10 @@ export const PresenceEditor = ({
                       onChange={(predicate) =>
                         setAlternative(requirementIndex, alternativeIndex, {
                           type: "item_exists",
-                          predicate:
-                            predicate ?? {
-                              op: "exists",
-                              attr: attributes[0]?.uuid ?? "",
-                            },
+                          predicate: predicate ?? {
+                            op: "exists",
+                            attr: attributes[0]?.uuid ?? "",
+                          },
                         })
                       }
                       attributes={attributes}
@@ -244,7 +241,7 @@ export const PresenceEditor = ({
                 <Plus size={12} />
                 Add an alternative
               </button>
-            </div>
+            </Field>
 
             <div className="flex flex-col gap-1">
               <Input
@@ -260,8 +257,8 @@ export const PresenceEditor = ({
                 }
               />
               <span className="text-[11px] text-muted">
-                0 = only presence matters. 1 = every trigger needs its own —
-                20 doors demand 20 readers, checked as a total. This is how
+                0 = only presence matters. 1 = every trigger needs its own — 20
+                doors demand 20 readers, checked as a total. This is how
                 per-door pairing works without modelling each door.
               </span>
             </div>

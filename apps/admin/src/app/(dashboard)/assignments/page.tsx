@@ -62,6 +62,7 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
         uuid: variable.uuid,
         label: variable.label,
         unit: variable.unit,
+        type: variable.type,
       }))}
     />
   );
@@ -77,11 +78,6 @@ const AssignmentsPage = async ({ searchParams }: Props) => {
         <h1 className="font-heading text-2xl text-ink">
           Define once, assign down
         </h1>
-        <p className="text-sm text-muted">
-          An attribute is defined once in the library. A category borrows it here
-          and sets only how it is used — everything below inherits, and may
-          override or drop it.
-        </p>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row">

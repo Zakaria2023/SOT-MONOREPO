@@ -11,6 +11,7 @@ import {
   describePredicate,
   type PredicateAttribute,
 } from "@/components/assignments/predicate-editor";
+import { Field } from "@/components/shared/field";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
 import { assignmentAudiences, assignmentScopes } from "@/db/enum";
 import {
@@ -26,7 +27,6 @@ import {
   EyeOff,
   Hash,
   ListChecks,
-  Plus,
   ToggleLeft,
   TriangleAlert,
   X,
@@ -298,8 +298,8 @@ const AssignmentCard = ({
             <p className="-mt-2 text-[11px] text-muted">
               A <strong className="text-secondary">living</strong> attribute:
               invisible to the shopper, still read by the engine. An access
-              point&apos;s uplink speed is never shopped by, but the engine needs
-              it to size the switch.
+              point&apos;s uplink speed is never shopped by, but the engine
+              needs it to size the switch.
             </p>
           )}
           {isRule && (
@@ -310,28 +310,21 @@ const AssignmentCard = ({
             </p>
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {isFilter && (
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-secondary">
-                  Filter reaches
-                </span>
+              <Field
+                label="Filter reaches"
+                hint="Affects the shopper's facet only. Rule participation always inherits down the whole subtree."
+              >
                 <Dropdown
                   value={scope}
                   onChange={(next) => setScope(next as AssignmentScope)}
                   options={SCOPE_OPTIONS}
                 />
-                <span className="text-[11px] text-muted">
-                  Affects the shopper&apos;s facet only. Rule participation
-                  always inherits down the whole subtree.
-                </span>
-              </div>
+              </Field>
             )}
 
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-secondary">
-                Surfaced to
-              </span>
+            <Field label="Surfaced to">
               <Dropdown
                 value={audience}
                 onChange={(next) => setAudience(next as AssignmentAudience)}
@@ -344,98 +337,81 @@ const AssignmentCard = ({
                   can narrow that, never widen it.
                 </span>
               )}
-            </div>
+            </Field>
           </div>
 
           {optionBacked && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-secondary">
-                  Options this category offers
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEnabled([])}
-                  className="rounded-control px-2 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
-                >
-                  offer all
-                </button>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {liveOptions.map((option) => {
-                  const picked =
-                    enabled.length === 0 || enabled.includes(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() =>
-                        setEnabled((current) => {
-                          const base =
-                            current.length === 0
-                              ? liveOptions.map((entry) => entry.value)
-                              : current;
-                          return base.includes(option.value)
-                            ? base.filter((entry) => entry !== option.value)
-                            : [...base, option.value];
-                        })
-                      }
-                      className={`rounded-full px-2 py-0.5 text-[11px] ${
-                        picked
-                          ? "bg-primary/20 text-primary"
-                          : "bg-hover text-faint hover:text-secondary"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <Field
+              label="Options this category offers"
+              hint={
+                enabled.length === 0
+                  ? "Every option, including any added to the library later."
+                  : "Exactly these are offered — gaps included. Nothing is re-expanded later, so what you pick is what the shopper and the product form get."
+              }
+              accessory={
+                enabled.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEnabled([])}
+                    className="rounded-control px-2 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
+                  >
+                    Offer all
+                  </button>
+                )
+              }
+            >
+              <Dropdown
+                multiple
+                value={enabled}
+                onChange={setEnabled}
+                options={liveOptions.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                // Empty is not "nothing offered" — it is the unrestricted case,
+                // which is why it stays distinct from ticking every box.
+                placeholder={`All ${liveOptions.length} options`}
+                searchable={liveOptions.length > 8}
+              />
 
               {definition.ordered && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] text-faint">up to:</span>
-                  {liveOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => fillUpTo(option.value)}
-                      className="rounded-control bg-hover px-1.5 py-0.5 text-[11px] text-secondary hover:text-ink"
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                <div className="pt-1">
+                  <Dropdown
+                    value=""
+                    onChange={fillUpTo}
+                    options={liveOptions.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    triggerLabel="Everything up to…"
+                  />
                 </div>
               )}
-
-              <p className="text-[11px] text-muted">
-                Exactly the options ticked here are offered — gaps included.
-                Nothing is re-expanded later, so what you pick is what the
-                shopper and the product form get.
-              </p>
-            </div>
+            </Field>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-secondary">
-              Shown only when
-            </span>
+          <Field
+            label="Shown only when"
+            hint={
+              showIf ? (
+                <>
+                  When this stops matching, the field is hidden{" "}
+                  <strong className="text-secondary">
+                    and its value cleared
+                  </strong>{" "}
+                  — a leftover number on a hidden field would still be feeding
+                  the engine.
+                </>
+              ) : undefined
+            }
+          >
             <PredicateEditor
               value={showIf}
               onChange={setShowIf}
               attributes={triggers}
               emptyLabel="Always shown"
             />
-            {showIf && (
-              <p className="text-[11px] text-muted">
-                When this stops matching, the field is hidden{" "}
-                <strong className="text-secondary">and its value cleared</strong>{" "}
-                — a leftover number on a hidden field would still be feeding the
-                engine.
-              </p>
-            )}
-          </div>
+          </Field>
 
           {error && <p className="text-xs text-red-400">{error}</p>}
 

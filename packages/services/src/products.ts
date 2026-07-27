@@ -259,7 +259,12 @@ export const getProductsPage = async (
       db.select({ total: count() }).from(Products).where(where),
     ]);
 
-    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+    return buildPaginatedResult(
+      rows,
+      Number(totals?.total ?? 0),
+      page,
+      pageSize,
+    );
   } catch (error) {
     console.error("getProductsPage failed:", error);
     throw new Error("Failed to fetch products", { cause: error });
@@ -346,6 +351,48 @@ export const getProductsByCategory = async (
   } catch (error) {
     console.error("getProductsByCategory failed:", error);
     throw new Error("Failed to fetch products for category", { cause: error });
+  }
+};
+
+// Just enough of a product to name it in a picker. Deliberately NOT
+// `ProductListItem` — a picker that dragged every column across the wire for
+// every candidate is how a search box becomes the slowest thing on a page.
+export type ProductPickerItem = {
+  uuid: SelectProducts["uuid"];
+  name: SelectProducts["name"];
+  sku: SelectProducts["sku"];
+  categoryName: SelectCategories["name"] | null;
+};
+
+// One query, hard-capped. The picker is a search box, not a catalog dump.
+const PICKER_LIMIT = 30;
+
+/**
+ * Products matching a search term, for a picker.
+ *
+ * Used by the rule preview, where an author names the two or three products
+ * whose combination they want to try a draft rule against.
+ */
+export const searchProductsForPicker = async (
+  search: string,
+): Promise<ProductPickerItem[]> => {
+  const where = adminProductSearchFilter(search);
+  try {
+    return await db
+      .select({
+        uuid: Products.uuid,
+        name: Products.name,
+        sku: Products.sku,
+        categoryName: Categories.name,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .where(where)
+      .orderBy(asc(Products.name))
+      .limit(PICKER_LIMIT);
+  } catch (error) {
+    console.error("searchProductsForPicker failed:", error);
+    throw new Error("Failed to search products", { cause: error });
   }
 };
 

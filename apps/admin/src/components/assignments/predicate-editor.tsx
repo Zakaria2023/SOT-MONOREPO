@@ -8,7 +8,7 @@ import type {
 import { MATCH_MODE_LABELS, PREDICATE_OPERATOR_LABELS } from "@/db/label";
 import type { Predicate, SpecOption } from "@/db/types";
 import { Plus, X } from "lucide-react";
-import { Checkbox, Dropdown, Input, type DropdownOption } from "ui";
+import { Dropdown, Input, type DropdownOption } from "ui";
 
 // ---------------------------------------------------------------------------
 // THE condition editor. One component, used everywhere a condition is authored:
@@ -66,7 +66,13 @@ const operatorsFor = (
   if (attribute.type === "boolean") {
     return ["equals", "exists"];
   }
-  const base: PredicateOperator[] = ["in", "not_in", "equals", "not_equals", "exists"];
+  const base: PredicateOperator[] = [
+    "in",
+    "not_in",
+    "equals",
+    "not_equals",
+    "exists",
+  ];
   return attribute.ordered ? [...base, "lte", "gte"] : base;
 };
 
@@ -163,13 +169,10 @@ const LeafEditor = ({
     (option) => !option.retired,
   );
 
-  const toggleValue = (option: string): void => {
+  const setValues = (next: string[]): void => {
     if (!("values" in value)) {
       return;
     }
-    const next = value.values.map(String).includes(option)
-      ? value.values.filter((entry) => String(entry) !== option)
-      : [...value.values, option];
     onChange({ ...value, values: next });
   };
 
@@ -252,30 +255,23 @@ const LeafEditor = ({
 
       {(value.op === "in" || value.op === "not_in") && (
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-1.5">
-            {liveOptions.length === 0 && (
-              <span className="text-[11px] text-faint">
-                This attribute has no options to pick.
-              </span>
-            )}
-            {liveOptions.map((option) => {
-              const picked = value.values.map(String).includes(option.value);
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => toggleValue(option.value)}
-                  className={`rounded-full px-2 py-0.5 text-[11px] ${
-                    picked
-                      ? "bg-primary/20 text-primary"
-                      : "bg-hover text-secondary hover:text-ink"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+          {liveOptions.length === 0 ? (
+            <span className="text-[11px] text-faint">
+              This attribute has no options to pick.
+            </span>
+          ) : (
+            <Dropdown
+              multiple
+              value={value.values.map(String)}
+              onChange={setValues}
+              options={liveOptions.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+              placeholder="Pick one or more values"
+              searchable={liveOptions.length > 8}
+            />
+          )}
 
           {value.op === "in" && (
             <div className="w-full">
@@ -298,9 +294,16 @@ const LeafEditor = ({
         </div>
       )}
 
+      {/* The two empty cases are opposites, so they cannot share a message: an
+          empty "is" matches nothing, an empty "is not" excludes nothing. */}
       {value.op === "in" && value.values.length === 0 && (
         <p className="text-[11px] text-amber-500">
           Nothing selected — this condition can never match.
+        </p>
+      )}
+      {value.op === "not_in" && value.values.length === 0 && (
+        <p className="text-[11px] text-amber-500">
+          Nothing excluded — this condition matches everything.
         </p>
       )}
     </div>
@@ -465,7 +468,10 @@ export const PredicateEditor = ({
         disabled={!first}
         onClick={() => {
           if (first) {
-            onChange({ ...value, children: [...value.children, defaultFor(first)] });
+            onChange({
+              ...value,
+              children: [...value.children, defaultFor(first)],
+            });
           }
         }}
         className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover disabled:text-faint"
@@ -486,8 +492,12 @@ export const describePredicate = (
     return "always";
   }
   const label = (uuid: string): string =>
-    attributes.find((entry) => entry.uuid === uuid)?.label ?? "a deleted attribute";
-  const optionLabel = (uuid: string, value: string | number | boolean): string => {
+    attributes.find((entry) => entry.uuid === uuid)?.label ??
+    "a deleted attribute";
+  const optionLabel = (
+    uuid: string,
+    value: string | number | boolean,
+  ): string => {
     const attribute = attributes.find((entry) => entry.uuid === uuid);
     const option = attribute?.options.find(
       (entry) => entry.value === String(value),

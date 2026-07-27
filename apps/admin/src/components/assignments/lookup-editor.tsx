@@ -5,6 +5,7 @@ import {
   describePredicate,
   type PredicateAttribute,
 } from "@/components/assignments/predicate-editor";
+import { FieldSet } from "@/components/shared/field";
 import type { LookupTable, Predicate } from "@/db/types";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { Input } from "ui";
@@ -28,12 +29,19 @@ export const LookupEditor = ({
   onChange,
   attributes,
 }: LookupEditorProps) => {
-  const setRow = (index: number, when: Predicate | null, limit: number): void => {
+  const setRow = (
+    index: number,
+    when: Predicate | null,
+    limit: number,
+  ): void => {
     onChange({
       ...value,
       rows: value.rows.map((row, at) =>
         at === index
-          ? { when: when ?? { op: "exists", attr: attributes[0]?.uuid ?? "" }, limit }
+          ? {
+              when: when ?? { op: "exists", attr: attributes[0]?.uuid ?? "" },
+              limit,
+            }
           : row,
       ),
     });
@@ -56,16 +64,10 @@ export const LookupEditor = ({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
-      <div>
-        <span className="text-xs font-semibold text-ink">Limit table</span>
-        <p className="mt-0.5 text-[11px] text-muted">
-          Rows are tried top to bottom and the first match wins, so put the
-          specific combinations above the catch-all. An item matching no row is
-          outside what the table describes and is left alone.
-        </p>
-      </div>
-
+    <FieldSet
+      title="Limit table"
+      hint="Rows are tried top to bottom and the first match wins, so put the specific combinations above the catch-all. An item matching no row is outside what the table describes and is left alone."
+    >
       {value.rows.length === 0 && (
         <p className="rounded-control border border-dashed border-hairline px-3 py-4 text-center text-[11px] text-faint">
           No rows yet — a conditional rule with an empty table cannot run.
@@ -164,6 +166,6 @@ export const LookupEditor = ({
         <Plus size={13} />
         Add row
       </button>
-    </div>
+    </FieldSet>
   );
 };

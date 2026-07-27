@@ -6,9 +6,13 @@ import {
   deleteRelationAction,
   publishRelationAction,
   updateRelationAction,
+  validateRelationAction,
   type RelationshipInput,
+  type RelationshipProblem,
 } from "@/app/(dashboard)/assignments/actions";
 import { OperandPicker } from "@/components/assignments/operand-picker";
+import { RelationPreview } from "@/components/assignments/relation-preview";
+import { Field, FieldSet } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
   PredicateEditor,
@@ -18,6 +22,7 @@ import {
 import { LookupEditor } from "@/components/assignments/lookup-editor";
 import type {
   MatchMode,
+  ProjectVariableType,
   RelationshipAllocation,
   RelationshipComparator,
   RelationshipFamily,
@@ -26,7 +31,6 @@ import type {
 import {
   matchModes,
   relationshipAllocations,
-  relationshipComparators,
   relationshipFamilies,
   relationshipGates,
 } from "@/db/enum";
@@ -41,16 +45,35 @@ import {
   RELATIONSHIP_STATUS_LABELS,
 } from "@/db/label";
 import type { LookupTable, Operand, Predicate, PresenceSpec } from "@/db/types";
-import { Archive, Pencil, Plus, Send, Trash2, TriangleAlert } from "lucide-react";
+import {
+  Archive,
+  Check,
+  FlaskConical,
+  Pencil,
+  Plus,
+  Send,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { SelectRelationships } from "@/db/schema/relationships";
-import { Button, ConfirmDialog, Dropdown, Input, Textarea, type DropdownOption } from "ui";
+import {
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  Dropdown,
+  Input,
+  type DropdownOption,
+} from "ui";
 
 export type RelationVariable = {
   uuid: string;
   label: string;
   unit: string | null;
+  // The preview asks the author to answer these, and a yes/no question needs a
+  // yes/no control rather than a number box.
+  type: ProjectVariableType;
 };
 
 type RelationBuilderProps = {
@@ -88,7 +111,9 @@ const ALLOCATION_OPTIONS: DropdownOption[] = relationshipAllocations.map(
 
 // Which comparators a family can actually use. Offering "must overlap" on a
 // budget would produce a rule that cannot be evaluated.
-const comparatorsFor = (family: RelationshipFamily): RelationshipComparator[] => {
+const comparatorsFor = (
+  family: RelationshipFamily,
+): RelationshipComparator[] => {
   if (family === "match") {
     return ["in", "intersects", "eq", "lte", "gte"];
   }
@@ -150,9 +175,46 @@ const RelationForm = ({
   const [form, setForm] = useState<RelationshipInput>(
     initial ? toInput(initial) : emptyInput(),
   );
+  const [problems, setProblems] = useState<RelationshipProblem[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState(false);
 
-  const patch = (next: Partial<RelationshipInput>): void =>
+  // Any edit invalidates the last verdict — a stale "nothing wrong" beside a
+  // rule that has since changed is worse than no verdict at all.
+  const patch = (next: Partial<RelationshipInput>): void => {
+    setProblems([]);
+    setChecked(false);
     setForm((current) => ({ ...current, ...next }));
+  };
+
+  const validate = async (
+    candidate: RelationshipInput,
+  ): Promise<RelationshipProblem[]> => {
+    setChecking(true);
+    try {
+      const found = await validateRelationAction(candidate);
+      setProblems(found);
+      setChecked(true);
+      return found;
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const check = (): void => {
+    void validate(form);
+  };
+
+  // Saving validates FIRST so the author sees every problem at once. The service
+  // validates again and throws — but only ever the first problem, which is the
+  // whack-a-mole this list exists to avoid.
+  const submit = (): void => {
+    void validate(form).then((found) => {
+      if (found.length === 0) {
+        onSubmit(form);
+      }
+    });
+  };
 
   const changeFamily = (family: RelationshipFamily): void => {
     const comparators = comparatorsFor(family);
@@ -163,7 +225,10 @@ const RelationForm = ({
         : (comparators[0] ?? "lte"),
       // Presence and conditional have no provider side; ratio warns by default
       // because a contention ratio is a design judgement, not a hard limit.
-      provider: family === "presence" || family === "conditional" ? null : form.provider,
+      provider:
+        family === "presence" || family === "conditional"
+          ? null
+          : form.provider,
       gate: family === "ratio" ? "warn" : form.gate,
       presence:
         family === "presence"
@@ -177,8 +242,7 @@ const RelationForm = ({
         family === "conditional"
           ? (form.lookup ?? { inputs: [], rows: [] })
           : null,
-      consumer:
-        family === "count" ? { source: "item_count" } : form.consumer,
+      consumer: family === "count" ? { source: "item_count" } : form.consumer,
     });
   };
 
@@ -190,7 +254,9 @@ const RelationForm = ({
   );
 
   const capacityFamily =
-    form.family === "budget" || form.family === "count" || form.family === "ratio";
+    form.family === "budget" ||
+    form.family === "count" ||
+    form.family === "ratio";
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
@@ -201,26 +267,13 @@ const RelationForm = ({
         onChange={(event) => patch({ name: event.target.value })}
       />
 
-      <Textarea
-        label="Note for staff (optional)"
-        rows={2}
-        value={form.description ?? ""}
-        onChange={(event) =>
-          patch({ description: event.target.value || null })
-        }
-      />
-
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-secondary">Family</span>
+      <Field label="Family" hint={RELATIONSHIP_FAMILY_HINTS[form.family]}>
         <Dropdown
           value={form.family}
           onChange={(next) => changeFamily(next as RelationshipFamily)}
           options={FAMILY_OPTIONS}
         />
-        <span className="text-[11px] text-muted">
-          {RELATIONSHIP_FAMILY_HINTS[form.family]}
-        </span>
-      </div>
+      </Field>
 
       {form.family === "presence" ? (
         <PresenceEditor
@@ -238,10 +291,9 @@ const RelationForm = ({
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
-              <span className="text-xs font-semibold text-ink">
-                {form.family === "ratio" ? "Demand" : "What is measured"}
-              </span>
+            <FieldSet
+              title={form.family === "ratio" ? "Demand" : "What is measured"}
+            >
               <OperandPicker
                 value={form.consumer}
                 onChange={(consumer: Operand | null) => patch({ consumer })}
@@ -249,42 +301,41 @@ const RelationForm = ({
                 variables={variables}
                 allowItemCount={form.family === "count"}
               />
-              <span className="text-xs font-medium text-secondary">
-                Which items count
-              </span>
-              <PredicateEditor
-                value={form.consumerWhen}
-                onChange={(consumerWhen: Predicate | null) =>
-                  patch({ consumerWhen })
-                }
-                attributes={attributes}
-                emptyLabel="Anything carrying that attribute"
-              />
-            </div>
+              <Field label="Which items count">
+                <PredicateEditor
+                  value={form.consumerWhen}
+                  onChange={(consumerWhen: Predicate | null) =>
+                    patch({ consumerWhen })
+                  }
+                  attributes={attributes}
+                  emptyLabel="Anything carrying that attribute"
+                />
+              </Field>
+            </FieldSet>
 
             {form.family !== "conditional" && (
-              <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
-                <span className="text-xs font-semibold text-ink">
-                  {form.family === "ratio" ? "Supply" : "What supplies the limit"}
-                </span>
+              <FieldSet
+                title={
+                  form.family === "ratio" ? "Supply" : "What supplies the limit"
+                }
+              >
                 <OperandPicker
                   value={form.provider}
                   onChange={(provider: Operand | null) => patch({ provider })}
                   attributes={attributes}
                   variables={variables}
                 />
-                <span className="text-xs font-medium text-secondary">
-                  Which items supply it
-                </span>
-                <PredicateEditor
-                  value={form.providerWhen}
-                  onChange={(providerWhen: Predicate | null) =>
-                    patch({ providerWhen })
-                  }
-                  attributes={attributes}
-                  emptyLabel="Anything carrying that attribute"
-                />
-              </div>
+                <Field label="Which items supply it">
+                  <PredicateEditor
+                    value={form.providerWhen}
+                    onChange={(providerWhen: Predicate | null) =>
+                      patch({ providerWhen })
+                    }
+                    attributes={attributes}
+                    emptyLabel="Anything carrying that attribute"
+                  />
+                </Field>
+              </FieldSet>
             )}
           </div>
 
@@ -298,10 +349,9 @@ const RelationForm = ({
         </>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {form.family !== "presence" && (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-secondary">Comparison</span>
+          <Field label="Comparison">
             <Dropdown
               value={form.comparator}
               onChange={(next) =>
@@ -309,14 +359,11 @@ const RelationForm = ({
               }
               options={comparatorOptions}
             />
-          </div>
+          </Field>
         )}
 
         {form.family === "match" && (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-secondary">
-              On several values
-            </span>
+          <Field label="On several values">
             <Dropdown
               value={form.matchMode}
               onChange={(next) => patch({ matchMode: next as MatchMode })}
@@ -325,7 +372,7 @@ const RelationForm = ({
                 label: MATCH_MODE_LABELS[mode],
               }))}
             />
-          </div>
+          </Field>
         )}
 
         {capacityFamily && (
@@ -355,21 +402,20 @@ const RelationForm = ({
           />
         )}
 
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">When it fails</span>
+        <Field label="When it fails">
           <Dropdown
             value={form.gate}
             onChange={(next) => patch({ gate: next as RelationshipGate })}
             options={GATE_OPTIONS}
           />
-        </div>
+        </Field>
       </div>
 
       {(form.family === "budget" || form.family === "count") && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">
-            How capacity is applied
-          </span>
+        <Field
+          label="How capacity is applied"
+          hint={RELATIONSHIP_ALLOCATION_HINTS[form.allocation]}
+        >
           <Dropdown
             value={form.allocation}
             onChange={(next) =>
@@ -377,39 +423,61 @@ const RelationForm = ({
             }
             options={ALLOCATION_OPTIONS}
           />
-          <span className="text-[11px] text-muted">
-            {RELATIONSHIP_ALLOCATION_HINTS[form.allocation]}
+        </Field>
+      )}
+
+      {form.family === "budget" && (
+        <div className="flex flex-col gap-1">
+          <Checkbox
+            label="Judge each item on its own, against the single best supplier value"
+            checked={form.perItem}
+            onChange={(event) => patch({ perItem: event.target.checked })}
+          />
+          <span className="pl-6 text-[11px] text-muted">
+            One camera&apos;s draw against the per-port maximum, rather than the
+            total against the whole budget.
           </span>
         </div>
       )}
 
-      {form.family === "budget" && (
-        <label className="flex items-start gap-2 text-xs text-secondary">
-          <input
-            type="checkbox"
-            checked={form.perItem}
-            onChange={(event) => patch({ perItem: event.target.checked })}
-            className="mt-0.5"
-          />
-          <span>
-            Judge each item on its own, against the single best supplier value
-            <span className="mt-0.5 block text-[11px] text-muted">
-              One camera&apos;s draw against the per-port maximum, rather than the
-              total against the whole budget.
-            </span>
-          </span>
-        </label>
+      {/* Everything wrong with the rule, at once — the author fixes the set
+          rather than resubmitting to discover the next one. */}
+      {problems.length > 0 && (
+        <ul className="flex flex-col gap-1 rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+          {problems.map((problem) => (
+            <li
+              key={`${problem.field}-${problem.message}`}
+              className="flex items-start gap-1.5 text-xs text-amber-500"
+            >
+              <TriangleAlert size={12} className="mt-0.5 shrink-0" />
+              {problem.message}
+            </li>
+          ))}
+        </ul>
       )}
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {checked && problems.length === 0 && (
+          <span className="mr-auto flex items-center gap-1.5 text-xs text-emerald-400">
+            <Check size={13} />
+            Nothing wrong with this rule.
+          </span>
+        )}
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
         <Button
-          onClick={() => onSubmit(form)}
-          disabled={pending || form.name.trim() === ""}
+          variant="outline"
+          onClick={check}
+          disabled={pending || checking}
+        >
+          {checking ? "Checking…" : "Check"}
+        </Button>
+        <Button
+          onClick={submit}
+          disabled={pending || checking || form.name.trim() === ""}
         >
           {initial ? "Save draft" : "Create draft"}
         </Button>
@@ -433,8 +501,11 @@ export const RelationBuilder = ({
   const [pending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [confirming, setConfirming] = useState<SelectRelationships | null>(null);
+  const [confirming, setConfirming] = useState<SelectRelationships | null>(
+    null,
+  );
 
   const run = (action: () => Promise<{ error?: string }>): void => {
     setError(undefined);
@@ -464,8 +535,8 @@ export const RelationBuilder = ({
       }
       if (operand.source === "variable") {
         return (
-          variables.find((entry) => entry.uuid === operand.variableUuid)?.label ??
-          "a deleted input"
+          variables.find((entry) => entry.uuid === operand.variableUuid)
+            ?.label ?? "a deleted input"
         );
       }
       if (operand.source === "item_count") {
@@ -484,20 +555,6 @@ export const RelationBuilder = ({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-card border border-hairline bg-surface p-4">
-        <p className="text-sm font-semibold text-ink">
-          Rules reference attributes, never products
-        </p>
-        <p className="mt-1 text-xs text-muted">
-          Anything carrying the measured attribute participates; anything carrying
-          the supplying attribute provides capacity. A new SKU joins every rule as
-          soon as its values are filled in — no rule edits.
-        </p>
-        <p className="mt-1.5 text-xs text-amber-500">
-          A new rule starts as a draft. Only published rules gate a real cart.
-        </p>
-      </div>
-
       {error && !adding && !editing && (
         <p className="rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {error}
@@ -546,90 +603,120 @@ export const RelationBuilder = ({
               setEditing(null);
               setError(undefined);
             }}
-            onSubmit={(input) => run(() => updateRelationAction(row.uuid, input))}
+            onSubmit={(input) =>
+              run(() => updateRelationAction(row.uuid, input))
+            }
           />
         ) : (
-          <div
-            key={row.uuid}
-            className="flex items-start gap-3 rounded-card border border-hairline bg-surface px-3 py-2.5"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-ink">{row.name}</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${STATUS_STYLE[row.status]}`}
-                >
-                  {RELATIONSHIP_STATUS_LABELS[row.status]}
-                </span>
-                <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
-                  {RELATIONSHIP_FAMILY_LABELS[row.family].split(" — ")[0]}
-                </span>
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                    row.gate === "block"
-                      ? "bg-red-500/15 text-red-400"
-                      : "bg-amber-500/15 text-amber-500"
-                  }`}
-                >
-                  {RELATIONSHIP_GATE_LABELS[row.gate]}
-                </span>
-                {row.headroomPercent !== 100 && (
-                  <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
-                    {row.headroomPercent}% headroom
+          <div key={row.uuid} className="flex flex-col gap-2">
+            <div className="flex items-start gap-3 rounded-card border border-hairline bg-surface px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-ink">
+                    {row.name}
                   </span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${STATUS_STYLE[row.status]}`}
+                  >
+                    {RELATIONSHIP_STATUS_LABELS[row.status]}
+                  </span>
+                  <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                    {RELATIONSHIP_FAMILY_LABELS[row.family].split(" — ")[0]}
+                  </span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                      row.gate === "block"
+                        ? "bg-red-500/15 text-red-400"
+                        : "bg-amber-500/15 text-amber-500"
+                    }`}
+                  >
+                    {RELATIONSHIP_GATE_LABELS[row.gate]}
+                  </span>
+                  {row.headroomPercent !== 100 && (
+                    <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                      {row.headroomPercent}% headroom
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-1 font-mono text-[11px] text-muted">
+                  {describeSides(row)}
+                </p>
+                {row.description && (
+                  <p className="mt-0.5 text-xs text-faint">{row.description}</p>
                 )}
               </div>
 
-              <p className="mt-1 font-mono text-[11px] text-muted">
-                {describeSides(row)}
-              </p>
-              {row.description && (
-                <p className="mt-0.5 text-xs text-faint">{row.description}</p>
-              )}
+              <div className="flex shrink-0 items-center gap-1">
+                {/* Before Publish, deliberately — the point of a draft is that it
+                  can be tried on a real basket while it still gates nothing. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPreviewing((current) =>
+                      current === row.uuid ? null : row.uuid,
+                    )
+                  }
+                  aria-label={`Try ${row.name} on a basket`}
+                  className={`flex items-center gap-1 rounded-control px-2 py-1.5 text-[11px] hover:bg-hover ${
+                    previewing === row.uuid
+                      ? "text-primary"
+                      : "text-faint hover:text-ink"
+                  }`}
+                >
+                  <FlaskConical size={12} />
+                  Try it
+                </button>
+                {row.status === "draft" && (
+                  <button
+                    type="button"
+                    onClick={() => run(() => publishRelationAction(row.uuid))}
+                    disabled={pending}
+                    aria-label={`Publish ${row.name}`}
+                    className="flex items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-emerald-400 hover:bg-hover"
+                  >
+                    <Send size={12} />
+                    Publish
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setEditing(row.uuid)}
+                  aria-label={`Edit ${row.name}`}
+                  className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
+                >
+                  <Pencil size={14} />
+                </button>
+                {row.status === "published" ? (
+                  <button
+                    type="button"
+                    onClick={() => run(() => archiveRelationAction(row.uuid))}
+                    disabled={pending}
+                    aria-label={`Archive ${row.name}`}
+                    className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-amber-500"
+                  >
+                    <Archive size={14} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(row)}
+                    aria-label={`Delete ${row.name}`}
+                    className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1">
-              {row.status === "draft" && (
-                <button
-                  type="button"
-                  onClick={() => run(() => publishRelationAction(row.uuid))}
-                  disabled={pending}
-                  aria-label={`Publish ${row.name}`}
-                  className="flex items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-emerald-400 hover:bg-hover"
-                >
-                  <Send size={12} />
-                  Publish
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setEditing(row.uuid)}
-                aria-label={`Edit ${row.name}`}
-                className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
-              >
-                <Pencil size={14} />
-              </button>
-              {row.status === "published" ? (
-                <button
-                  type="button"
-                  onClick={() => run(() => archiveRelationAction(row.uuid))}
-                  disabled={pending}
-                  aria-label={`Archive ${row.name}`}
-                  className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-amber-500"
-                >
-                  <Archive size={14} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirming(row)}
-                  aria-label={`Delete ${row.name}`}
-                  className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
+            {previewing === row.uuid && (
+              <RelationPreview
+                relation={row}
+                variables={variables}
+                onClose={() => setPreviewing(null)}
+              />
+            )}
           </div>
         ),
       )}
