@@ -1,6 +1,5 @@
 "use client";
 
-import type { OperandVariable } from "@/components/assignments/operand-picker";
 import {
   ConditionPicker,
   type PredicateAttribute,
@@ -19,11 +18,19 @@ import { Dropdown, Input, Textarea, type DropdownOption } from "ui";
 // through an attribute, normally a Device Role. Matching on category NAMES would
 // break the first time a category is renamed or translated.
 
+// The buyer-supplied inputs a requirement may be satisfied by. Structural, so
+// this file does not have to reach into the relation builder for a type.
+type PresenceVariable = {
+  uuid: string;
+  label: string;
+  unit: string | null;
+};
+
 type PresenceEditorProps = {
   value: PresenceSpec;
   onChange: (next: PresenceSpec) => void;
   attributes: PredicateAttribute[];
-  variables: OperandVariable[];
+  variables: PresenceVariable[];
 };
 
 export const PresenceEditor = ({

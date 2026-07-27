@@ -10,9 +10,8 @@ import {
   type RelationshipInput,
   type RelationshipProblem,
 } from "@/app/(dashboard)/assignments/actions";
-import { OperandPicker } from "@/components/assignments/operand-picker";
 import { RelationPreview } from "@/components/assignments/relation-preview";
-import { Field, FieldSet } from "@/components/shared/field";
+import { Field } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
   ConditionPicker,
@@ -26,7 +25,6 @@ import type {
   RelationshipAllocation,
   RelationshipComparator,
   RelationshipFamily,
-  RelationshipGate,
 } from "@/db/enum";
 import {
   matchModes,
@@ -48,6 +46,8 @@ import type { LookupTable, Operand, Predicate, PresenceSpec } from "@/db/types";
 import {
   Archive,
   Check,
+  ChevronDown,
+  ChevronUp,
   FlaskConical,
   Pencil,
   Plus,
@@ -56,7 +56,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { SelectRelationships } from "@/db/schema/relationships";
 import {
   Button,
@@ -97,17 +97,48 @@ const FAMILY_OPTIONS: DropdownOption[] = relationshipFamilies.map((family) => ({
   label: RELATIONSHIP_FAMILY_LABELS[family],
 }));
 
-const GATE_OPTIONS: DropdownOption[] = relationshipGates.map((gate) => ({
-  value: gate,
-  label: RELATIONSHIP_GATE_LABELS[gate],
-}));
-
 const ALLOCATION_OPTIONS: DropdownOption[] = relationshipAllocations.map(
   (allocation) => ({
     value: allocation,
     label: RELATIONSHIP_ALLOCATION_LABELS[allocation],
   }),
 );
+
+// What each side is CALLED, per family. The two sides are always consumer and
+// provider underneath — only the word for them changes, because "Demand ÷
+// Supply" and "Attribute A / Attribute B" describe the same two operands.
+const SIDE_A_LABEL: Record<RelationshipFamily, string> = {
+  budget: "What is drawn",
+  count: "What is counted",
+  match: "Attribute A",
+  ratio: "Demand",
+  presence: "Trigger",
+  conditional: "What is measured",
+};
+
+const SIDE_B_LABEL: Record<RelationshipFamily, string> = {
+  budget: "What supplies it",
+  count: "The limit",
+  match: "Attribute B",
+  ratio: "Supply",
+  presence: "—",
+  conditional: "—",
+};
+
+// Attributes filed under no group still need a bucket to be filtered by.
+const UNGROUPED = "Ungrouped";
+
+/** What a side points at, or "" when it points at neither an attribute nor an
+ * input — item_count and a constant have no uuid to show in a picker. */
+const operandUuid = (operand: Operand | null): string => {
+  if (operand?.source === "spec") {
+    return operand.specUuid;
+  }
+  if (operand?.source === "variable") {
+    return operand.variableUuid;
+  }
+  return "";
+};
 
 // Which comparators a family can actually use. Offering "must overlap" on a
 // budget would produce a rule that cannot be evaluated.
@@ -178,6 +209,54 @@ const RelationForm = ({
   const [problems, setProblems] = useState<RelationshipProblem[]>([]);
   const [checking, setChecking] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [groups, setGroups] = useState<string[]>([]);
+  const [showMore, setShowMore] = useState(false);
+
+  // Every group in the LIBRARY. Not the selected category's — a rule is global,
+  // and the whole point of one is comparing a camera's attribute against a
+  // switch's, which no single category carries both of.
+  const groupOptions = useMemo<DropdownOption[]>(() => {
+    const names = new Set<string>();
+    for (const attribute of attributes) {
+      names.add(attribute.groupName ?? UNGROUPED);
+    }
+    return [...names].sort().map((name) => ({ value: name, label: name }));
+  }, [attributes]);
+
+  // One list per side, not a source picker and then a list. Project inputs sit
+  // in the same dropdown as attributes because from the rule's point of view
+  // they are the same thing — a number to compare. There are none today, so this
+  // reads as a plain attribute list; it stays correct the day somebody adds one.
+  const sideOptions = useMemo<DropdownOption[]>(
+    () => [
+      ...attributes
+        .filter(
+          (attribute) =>
+            groups.length === 0 ||
+            groups.includes(attribute.groupName ?? UNGROUPED),
+        )
+        .map((attribute) => ({
+          value: attribute.uuid,
+          label: attribute.unit
+            ? `${attribute.label} (${attribute.unit})`
+            : attribute.label,
+        })),
+      ...variables.map((variable) => ({
+        value: variable.uuid,
+        label: variable.unit
+          ? `${variable.label} (${variable.unit}) — the buyer tells us`
+          : `${variable.label} — the buyer tells us`,
+      })),
+    ],
+    [attributes, groups, variables],
+  );
+
+  // Which kind of operand a picked uuid is. Variables are few and attributes
+  // many, so asking the short list is the cheap question.
+  const toOperand = (uuid: string): Operand =>
+    variables.some((variable) => variable.uuid === uuid)
+      ? { source: "variable", variableUuid: uuid }
+      : { source: "spec", specUuid: uuid };
 
   // Any edit invalidates the last verdict — a stale "nothing wrong" beside a
   // rule that has since changed is worse than no verdict at all.
@@ -258,10 +337,24 @@ const RelationForm = ({
     form.family === "count" ||
     form.family === "ratio";
 
+  // How many of the collapsed settings differ from the family's defaults. A
+  // rule that relies on one of them must not look identical to one that does
+  // not, or "More" becomes a place things go to be forgotten.
+  const tuned = [
+    form.consumerWhen !== null,
+    form.providerWhen !== null,
+    form.family !== "match" &&
+      form.comparator !== comparatorsFor(form.family)[0],
+    form.family === "match" && form.matchMode !== "any",
+    form.headroomPercent !== 100,
+    form.allocation !== "per_unit",
+    form.perItem,
+  ].filter(Boolean).length;
+
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
       <Input
-        label="Name the buyer will see"
+        label="Name"
         placeholder="Switch PoE budget covers device draw"
         value={form.name}
         onChange={(event) => patch({ name: event.target.value })}
@@ -274,6 +367,46 @@ const RelationForm = ({
           options={FAMILY_OPTIONS}
         />
       </Field>
+
+      {/* Two states, so two buttons. A dropdown to choose between "blocks" and
+          "warns" hides the more consequential of the two behind a click. */}
+      <Field label="Gate">
+        <div className="flex w-fit rounded-control border border-hairline p-0.5">
+          {relationshipGates.map((gate) => (
+            <button
+              key={gate}
+              type="button"
+              onClick={() => patch({ gate })}
+              className={`rounded px-4 py-1.5 text-sm ${
+                form.gate === gate
+                  ? gate === "block"
+                    ? "bg-red-500/15 font-medium text-red-400"
+                    : "bg-amber-500/15 font-medium text-amber-500"
+                  : "text-muted hover:text-ink"
+              }`}
+            >
+              {RELATIONSHIP_GATE_LABELS[gate]}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {/* A filter on the two pickers below, never saved. Deliberately drawn from
+          the WHOLE library and not from the category selected in the tree: a
+          rule is global, and the whole point of it is to compare a camera's
+          attribute against a switch's. */}
+      {groupOptions.length > 1 && form.family !== "presence" && (
+        <Field label="Groups">
+          <Dropdown
+            multiple
+            value={groups}
+            onChange={setGroups}
+            options={groupOptions}
+            placeholder={`All ${groupOptions.length} groups`}
+            searchable={groupOptions.length > 8}
+          />
+        </Field>
+      )}
 
       {form.family === "presence" ? (
         <PresenceEditor
@@ -290,54 +423,59 @@ const RelationForm = ({
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <FieldSet
-              title={form.family === "ratio" ? "Demand" : "What is measured"}
-            >
-              <OperandPicker
-                value={form.consumer}
-                onChange={(consumer: Operand | null) => patch({ consumer })}
-                attributes={attributes}
-                variables={variables}
-                allowItemCount={form.family === "count"}
+          {/* Count measures how many items there are, not a value on them, so
+              it has no A side to pick. */}
+          {form.family !== "count" && (
+            <Field label={SIDE_A_LABEL[form.family]}>
+              <Dropdown
+                value={operandUuid(form.consumer)}
+                onChange={(uuid) => patch({ consumer: toOperand(uuid) })}
+                options={sideOptions}
+                searchable
+                placeholder="— attribute —"
               />
-              <Field label="Which items count">
-                <ConditionPicker
-                  value={form.consumerWhen}
-                  onChange={(consumerWhen: Predicate | null) =>
-                    patch({ consumerWhen })
-                  }
-                  attributes={attributes}
-                  emptyLabel="Anything carrying that attribute"
-                />
-              </Field>
-            </FieldSet>
+            </Field>
+          )}
 
-            {form.family !== "conditional" && (
-              <FieldSet
-                title={
-                  form.family === "ratio" ? "Supply" : "What supplies the limit"
+          {form.family === "match" && (
+            <Field label="Compatible via">
+              <Dropdown
+                value={form.comparator}
+                onChange={(next) =>
+                  patch({ comparator: next as RelationshipComparator })
                 }
-              >
-                <OperandPicker
-                  value={form.provider}
-                  onChange={(provider: Operand | null) => patch({ provider })}
-                  attributes={attributes}
-                  variables={variables}
-                />
-                <Field label="Which items supply it">
-                  <ConditionPicker
-                    value={form.providerWhen}
-                    onChange={(providerWhen: Predicate | null) =>
-                      patch({ providerWhen })
-                    }
-                    attributes={attributes}
-                    emptyLabel="Anything carrying that attribute"
-                  />
-                </Field>
-              </FieldSet>
-            )}
-          </div>
+                options={comparatorOptions}
+              />
+            </Field>
+          )}
+
+          {form.family !== "conditional" && (
+            <Field label={SIDE_B_LABEL[form.family]}>
+              <Dropdown
+                value={operandUuid(form.provider)}
+                onChange={(uuid) => patch({ provider: toOperand(uuid) })}
+                options={sideOptions}
+                searchable
+                placeholder="— attribute —"
+              />
+            </Field>
+          )}
+
+          {form.family === "ratio" && (
+            <Input
+              label="Target ratio (N:1)"
+              type="number"
+              value={form.ratioLimit === null ? "" : String(form.ratioLimit)}
+              onChange={(event) =>
+                patch({
+                  ratioLimit:
+                    event.target.value === ""
+                      ? null
+                      : Number(event.target.value),
+                })
+              }
+            />
+          )}
 
           {form.family === "conditional" && (
             <LookupEditor
@@ -346,98 +484,129 @@ const RelationForm = ({
               attributes={attributes}
             />
           )}
+
+          {/* Everything the six defaults already get right, for the rule that
+              needs one of them changed. Collapsed, because a rule that needs
+              none of it is the normal case — and it carries a count so a rule
+              that DOES use one is never silently hidden. */}
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMore((open) => !open)}
+              className="flex w-fit items-center gap-1.5 text-xs text-muted hover:text-ink"
+            >
+              {showMore ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              More
+              {tuned > 0 && (
+                <span className="rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">
+                  {tuned}
+                </span>
+              )}
+            </button>
+
+            {showMore && (
+              <div className="flex flex-col gap-4 rounded-control border border-hairline bg-base/40 p-3">
+                <Field
+                  label="Which items count"
+                  hint="Left empty, anything carrying the attribute above takes part."
+                >
+                  <ConditionPicker
+                    value={form.consumerWhen}
+                    onChange={(consumerWhen: Predicate | null) =>
+                      patch({ consumerWhen })
+                    }
+                    attributes={attributes}
+                    emptyLabel="Anything carrying that attribute"
+                  />
+                </Field>
+
+                {form.family !== "conditional" && (
+                  <Field label="Which items supply it">
+                    <ConditionPicker
+                      value={form.providerWhen}
+                      onChange={(providerWhen: Predicate | null) =>
+                        patch({ providerWhen })
+                      }
+                      attributes={attributes}
+                      emptyLabel="Anything carrying that attribute"
+                    />
+                  </Field>
+                )}
+
+                {form.family !== "match" && (
+                  <Field label="Comparison">
+                    <Dropdown
+                      value={form.comparator}
+                      onChange={(next) =>
+                        patch({ comparator: next as RelationshipComparator })
+                      }
+                      options={comparatorOptions}
+                    />
+                  </Field>
+                )}
+
+                {form.family === "match" && (
+                  <Field label="On several values">
+                    <Dropdown
+                      value={form.matchMode}
+                      onChange={(next) =>
+                        patch({ matchMode: next as MatchMode })
+                      }
+                      options={matchModes.map((mode) => ({
+                        value: mode,
+                        label: MATCH_MODE_LABELS[mode],
+                      }))}
+                    />
+                  </Field>
+                )}
+
+                {capacityFamily && (
+                  <Input
+                    label="Headroom %"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={String(form.headroomPercent)}
+                    onChange={(event) =>
+                      patch({ headroomPercent: Number(event.target.value) })
+                    }
+                  />
+                )}
+
+                {(form.family === "budget" || form.family === "count") && (
+                  <Field
+                    label="How capacity is applied"
+                    hint={RELATIONSHIP_ALLOCATION_HINTS[form.allocation]}
+                  >
+                    <Dropdown
+                      value={form.allocation}
+                      onChange={(next) =>
+                        patch({ allocation: next as RelationshipAllocation })
+                      }
+                      options={ALLOCATION_OPTIONS}
+                    />
+                  </Field>
+                )}
+
+                {form.family === "budget" && (
+                  <div className="flex flex-col gap-1">
+                    <Checkbox
+                      label="Judge each item on its own, against the single best supplier value"
+                      checked={form.perItem}
+                      onChange={(event) =>
+                        patch({ perItem: event.target.checked })
+                      }
+                    />
+                    <span className="pl-6 text-[11px] text-muted">
+                      One camera&apos;s draw against the per-port maximum,
+                      rather than the total against the whole budget.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {form.family !== "presence" && (
-          <Field label="Comparison">
-            <Dropdown
-              value={form.comparator}
-              onChange={(next) =>
-                patch({ comparator: next as RelationshipComparator })
-              }
-              options={comparatorOptions}
-            />
-          </Field>
-        )}
-
-        {form.family === "match" && (
-          <Field label="On several values">
-            <Dropdown
-              value={form.matchMode}
-              onChange={(next) => patch({ matchMode: next as MatchMode })}
-              options={matchModes.map((mode) => ({
-                value: mode,
-                label: MATCH_MODE_LABELS[mode],
-              }))}
-            />
-          </Field>
-        )}
-
-        {capacityFamily && (
-          <Input
-            label="Headroom %"
-            type="number"
-            min={1}
-            max={100}
-            value={String(form.headroomPercent)}
-            onChange={(event) =>
-              patch({ headroomPercent: Number(event.target.value) })
-            }
-          />
-        )}
-
-        {form.family === "ratio" && (
-          <Input
-            label="Target ratio (N:1)"
-            type="number"
-            value={form.ratioLimit === null ? "" : String(form.ratioLimit)}
-            onChange={(event) =>
-              patch({
-                ratioLimit:
-                  event.target.value === "" ? null : Number(event.target.value),
-              })
-            }
-          />
-        )}
-
-        <Field label="When it fails">
-          <Dropdown
-            value={form.gate}
-            onChange={(next) => patch({ gate: next as RelationshipGate })}
-            options={GATE_OPTIONS}
-          />
-        </Field>
-      </div>
-
-      {(form.family === "budget" || form.family === "count") && (
-        <Field
-          label="How capacity is applied"
-          hint={RELATIONSHIP_ALLOCATION_HINTS[form.allocation]}
-        >
-          <Dropdown
-            value={form.allocation}
-            onChange={(next) =>
-              patch({ allocation: next as RelationshipAllocation })
-            }
-            options={ALLOCATION_OPTIONS}
-          />
-        </Field>
-      )}
-
-      {form.family === "budget" && (
-        <div className="flex flex-col gap-1">
-          <Checkbox
-            label="Judge each item on its own, against the single best supplier value"
-            checked={form.perItem}
-            onChange={(event) => patch({ perItem: event.target.checked })}
-          />
-          <span className="pl-6 text-[11px] text-muted">
-            One camera&apos;s draw against the per-port maximum, rather than the
-            total against the whole budget.
-          </span>
-        </div>
       )}
 
       {/* Everything wrong with the rule, at once — the author fixes the set
