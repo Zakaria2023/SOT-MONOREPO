@@ -1,28 +1,27 @@
 "use client";
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
+import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
 import type { ProductValue, SpecOption } from "@/db/types";
-import { AlertCircle, EyeOff, Hash, ListChecks, ToggleLeft } from "lucide-react";
+import { EyeOff, Hash, ListChecks, ToggleLeft, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { Field } from "@/components/shared/field";
-import { Dropdown, Input } from "ui";
+import { Dropdown, Input, type DropdownOption } from "ui";
 
 // ---------------------------------------------------------------------------
-// The product's attribute values.
+// The product's specifications.
 //
-// WHICH fields appear is not a choice made here — it is resolved from the
-// category's assignment chain, so adding an attribute to a category immediately
-// applies to every product in it. This component only fills the values in.
+// Pick the specifications this product has from a dropdown, then fill in the
+// values. Fields grouped the way the library is, and a field whose reveal
+// condition is met appears on its own — set PoE to Yes and PoE Budget shows up
+// without being picked.
 //
-// It mirrors the server's reveal logic so the form is responsive, but the server
-// re-runs it on save: the visible set and the clearing of hidden values are the
-// authority there, not here.
+// No rules are defined here and none are explained here. Which specifications a
+// category offers comes from Assignments; what the values then mean to the
+// compatibility engine is worked out in the cart. This form only records values.
 // ---------------------------------------------------------------------------
 
-// The resolved assignment, flattened for the client. Shaped by the page, which
-// reads it from the same resolver the engine uses.
 export type FormField = {
   specificationUuid: string;
   label: string;
@@ -35,25 +34,20 @@ export type FormField = {
   isRule: boolean;
   isFilter: boolean;
   inherited: boolean;
-  // Serialised reveal condition, evaluated client-side for responsiveness.
+  // Serialised reveal condition, evaluated here so the form responds instantly.
   showIf: RevealCondition | null;
-  // Filing only — which section this field appears under. It never affects which
-  // fields appear or what the engine reads.
   groupName: string | null;
   groupOrder: number;
 };
 
-// A deliberately narrow mirror of the server predicate: enough to drive the
-// form, and nothing that could drift into a second rule language. Anything more
-// complex simply shows the field, and the server decides on save.
+// A deliberately narrow mirror of the server condition: enough to drive the
+// form, and nothing that could grow into a second rule language. Anything more
+// complex simply shows the field and the server decides on save.
 export type RevealCondition = {
   attr: string;
   op: "equals" | "in" | "exists" | "gte" | "lte" | "gt" | "lt";
   values: (string | number | boolean)[];
 };
-
-// Sentinel for the ungrouped section, since a dropdown option value is a string.
-const UNGROUPED = "__ungrouped__";
 
 type SpecificationComposerProps = {
   fieldsByCategory: Record<string, FormField[]>;
@@ -62,8 +56,10 @@ type SpecificationComposerProps = {
 type FieldRowProps = {
   field: FormField;
   value: ProductValue | undefined;
+  // Absent for a field the reveal brought in — it disappears on its own when the
+  // condition stops holding, so removing it by hand would be a dead end.
+  onRemove?: () => void;
   onChange: (next: ProductValue | undefined) => void;
-  missing: boolean;
 };
 
 const TypeIcon = ({ type }: { type: SpecificationType }) => {
@@ -81,6 +77,13 @@ const asList = (value: ProductValue | undefined): string[] => {
     return [];
   }
   return Array.isArray(value) ? value.map(String) : [String(value)];
+};
+
+const hasValue = (value: ProductValue | undefined): boolean => {
+  if (value === undefined || value === null || value === "") {
+    return false;
+  }
+  return !(Array.isArray(value) && value.length === 0);
 };
 
 const satisfied = (
@@ -122,36 +125,47 @@ const satisfied = (
   return numeric < target;
 };
 
-const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
+const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
   const live = field.options.filter((option) => !option.retired);
   const selected = asList(value);
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <TypeIcon type={field.type} />
-        <span className="text-xs font-medium text-secondary">{field.label}</span>
-        {field.isRule && (
-          <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
-            required — the engine reads this
-          </span>
-        )}
-        {!field.isFilter && field.isRule && (
-          <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
-            living
-          </span>
-        )}
-        {field.showIf && (
-          <span className="flex items-center gap-1 text-[10px] text-faint">
-            <EyeOff size={9} />
-            conditional
-          </span>
+      <div className="flex items-start gap-2">
+        <div className="mt-0.5">
+          <TypeIcon type={field.type} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-ink">{field.label}</span>
+            {field.unit && (
+              <span className="text-xs text-faint">({field.unit})</span>
+            )}
+            {field.showIf && (
+              <span
+                title="Shown because another specification's value brought it in"
+                className="flex items-center gap-1 text-[10px] text-faint"
+              >
+                <EyeOff size={9} />
+                conditional
+              </span>
+            )}
+          </div>
+          {field.description && (
+            <p className="mt-0.5 text-[11px] text-muted">{field.description}</p>
+          )}
+        </div>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${field.label}`}
+            className="shrink-0 rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+          >
+            <X size={13} />
+          </button>
         )}
       </div>
-
-      {field.description && (
-        <p className="text-[11px] text-muted">{field.description}</p>
-      )}
 
       {field.type === "number" && (
         <Input
@@ -173,7 +187,9 @@ const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
       {field.type === "boolean" && (
         <Dropdown
           value={value === undefined ? "" : value === true ? "true" : "false"}
-          onChange={(next) => onChange(next === "" ? undefined : next === "true")}
+          onChange={(next) =>
+            onChange(next === "" ? undefined : next === "true")
+          }
           options={[
             { value: "true", label: "Yes" },
             { value: "false", label: "No" },
@@ -199,7 +215,7 @@ const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
         <div className="flex flex-wrap gap-1.5">
           {live.length === 0 && (
             <span className="text-[11px] text-faint">
-              This category offers no options for this attribute.
+              This category offers no options for this specification.
             </span>
           )}
           {live.map((option) => {
@@ -226,14 +242,6 @@ const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
           })}
         </div>
       )}
-
-      {missing && (
-        <p className="flex items-center gap-1 text-[11px] text-amber-500">
-          <AlertCircle size={11} />
-          Needed before this product can be sold — a blank here would make it
-          silently pass every rule that reads this.
-        </p>
-      )}
     </div>
   );
 };
@@ -241,21 +249,39 @@ const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
 export const SpecificationComposer = ({
   fieldsByCategory,
 }: SpecificationComposerProps) => {
-  const [groupFilter, setGroupFilter] = useState<string[]>([]);
   const { control, setValue } = useFormContext<ProductFormValues>();
   const categoryUuid = useWatch({ control, name: "categoryUuid" });
   const specValues = useWatch({ control, name: "specValues" }) ?? {};
+
+  // Specifications picked in this session that have no value yet. A field with a
+  // value needs no separate record of being picked — the value IS the record,
+  // which is why nothing extra is stored on the product.
+  const [added, setAdded] = useState<string[]>([]);
 
   const fields = useMemo(
     () => fieldsByCategory[categoryUuid] ?? [],
     [fieldsByCategory, categoryUuid],
   );
 
-  // The reveal, run to a fixed point: hiding a trigger has to hide whatever it
-  // revealed, or a field lingers because its own condition still matches a value
-  // nobody can see any more.
-  const visible = useMemo(() => {
-    let current = fields;
+  const picked = useMemo(() => {
+    const set = new Set(added);
+    for (const field of fields) {
+      if (hasValue(specValues[field.specificationUuid])) {
+        set.add(field.specificationUuid);
+      }
+    }
+    return set;
+  }, [added, fields, specValues]);
+
+  // What is on the form: everything picked, plus anything a reveal condition has
+  // brought in. Run to a fixed point, so hiding a trigger also hides whatever it
+  // revealed rather than leaving an orphan behind.
+  const shown = useMemo(() => {
+    let current = fields.filter(
+      (field) =>
+        picked.has(field.specificationUuid) ||
+        (field.showIf !== null && satisfied(field.showIf, specValues)),
+    );
     for (let pass = 0; pass <= fields.length; pass += 1) {
       const present = new Set(current.map((field) => field.specificationUuid));
       const next = current.filter(
@@ -270,32 +296,32 @@ export const SpecificationComposer = ({
       current = next;
     }
     return current;
-  }, [fields, specValues]);
+  }, [fields, picked, specValues]);
 
-  const missing = useMemo(
-    () =>
-      new Set(
-        visible
-          .filter((field) => {
-            if (!field.isRule) {
-              return false;
-            }
-            const value = specValues[field.specificationUuid];
-            if (value === undefined || value === null || value === "") {
-              return true;
-            }
-            return Array.isArray(value) && value.length === 0;
-          })
-          .map((field) => field.specificationUuid),
-      ),
-    [visible, specValues],
+  const shownUuids = useMemo(
+    () => new Set(shown.map((field) => field.specificationUuid)),
+    [shown],
   );
 
-  // Sections follow the library's own group order, so the form reads the way the
-  // library is arranged. Ungrouped fields trail behind under "Other".
+  // The picker lists everything the category carries that is not already on the
+  // form, labelled with its group so the list stays navigable.
+  const options = useMemo<DropdownOption[]>(
+    () =>
+      fields
+        .filter((field) => !shownUuids.has(field.specificationUuid))
+        .map((field) => ({
+          value: field.specificationUuid,
+          label: field.groupName
+            ? `${field.groupName} · ${field.label}`
+            : field.label,
+        })),
+    [fields, shownUuids],
+  );
+
+  // Sections in the library's own group order; ungrouped fields trail behind.
   const sections = useMemo(() => {
     const byGroup = new Map<string | null, FormField[]>();
-    for (const field of visible) {
+    for (const field of shown) {
       const list = byGroup.get(field.groupName) ?? [];
       list.push(field);
       byGroup.set(field.groupName, list);
@@ -305,41 +331,13 @@ export const SpecificationComposer = ({
         name,
         fields: groupFields,
         order: Math.min(...groupFields.map((field) => field.groupOrder)),
-        missing: groupFields.filter((field) =>
-          missing.has(field.specificationUuid),
-        ).length,
       }))
       .sort((a, b) => a.order - b.order);
-  }, [visible, missing]);
+  }, [shown]);
 
-  // Group options for the picker. The key has to be a string, so an ungrouped
-  // section gets a sentinel rather than being dropped.
-  const groupOptions = useMemo(
-    () =>
-      sections.map((section) => ({
-        value: section.name ?? UNGROUPED,
-        label:
-          (section.name ?? "Other") +
-          (section.missing > 0 ? ` · ${section.missing} needed` : ""),
-      })),
-    [sections],
-  );
-
-  // Nothing selected shows everything, which is the useful default — an author
-  // opening a product wants to see the whole form, not an empty one.
-  const shownSections =
-    groupFilter.length === 0
-      ? sections
-      : sections.filter((section) =>
-          groupFilter.includes(section.name ?? UNGROUPED),
-        );
-
-  // Values still needed that the filter is currently hiding. Without this, an
-  // author could filter to one group, see no warnings, and save an incomplete
-  // product — and an incomplete product silently passes every rule that reads it.
-  const hiddenMissing = sections
-    .filter((section) => !shownSections.includes(section))
-    .reduce((sum, section) => sum + section.missing, 0);
+  const writeValues = (next: Record<string, ProductValue>): void => {
+    setValue("specValues", next, { shouldDirty: true });
+  };
 
   const update = (uuid: string, next: ProductValue | undefined): void => {
     const values = { ...specValues };
@@ -348,11 +346,16 @@ export const SpecificationComposer = ({
     } else {
       values[uuid] = next;
     }
-    // Drop the values of anything the change has just hidden. The server does
-    // this again on save — a leftover value on a hidden field would still be
-    // feeding the engine, and nobody would be able to see the number doing it.
-    const stillVisible = new Set<string>();
-    let current = fields;
+
+    // Drop the value of anything this change has just hidden. The server does it
+    // again on save — a value left on a hidden field would still be read later,
+    // and nobody could see the number doing it.
+    const stillShown = new Set<string>();
+    let current = fields.filter(
+      (field) =>
+        picked.has(field.specificationUuid) ||
+        (field.showIf !== null && satisfied(field.showIf, values)),
+    );
     for (let pass = 0; pass <= fields.length; pass += 1) {
       const present = new Set(current.map((field) => field.specificationUuid));
       const filtered = current.filter(
@@ -366,23 +369,32 @@ export const SpecificationComposer = ({
       }
       current = filtered;
     }
-    current.forEach((field) => stillVisible.add(field.specificationUuid));
+    current.forEach((field) => stillShown.add(field.specificationUuid));
 
-    const assigned = new Set(fields.map((field) => field.specificationUuid));
+    const carried = new Set(fields.map((field) => field.specificationUuid));
     for (const key of Object.keys(values)) {
-      if (assigned.has(key) && !stillVisible.has(key)) {
+      if (carried.has(key) && !stillShown.has(key)) {
         delete values[key];
       }
     }
+    writeValues(values);
+  };
 
-    setValue("specValues", values, { shouldDirty: true });
+  const add = (uuids: string[]): void => {
+    setAdded((current) => [...new Set([...current, ...uuids])]);
+  };
+
+  const remove = (uuid: string): void => {
+    setAdded((current) => current.filter((entry) => entry !== uuid));
+    const values = { ...specValues };
+    delete values[uuid];
+    writeValues(values);
   };
 
   if (!categoryUuid) {
     return (
       <p className="rounded-card border border-dashed border-hairline px-3 py-6 text-center text-xs text-faint">
-        Pick a category first — it decides which specifications this product
-        carries.
+        Pick a category first — it decides which specifications are available.
       </p>
     );
   }
@@ -390,73 +402,65 @@ export const SpecificationComposer = ({
   if (fields.length === 0) {
     return (
       <p className="rounded-card border border-dashed border-hairline px-3 py-6 text-center text-xs text-faint">
-        This category has no attributes assigned yet. Add them in Assignments and
-        they will appear here for every product in the category.
+        This category has no specifications yet. Add them in Assignments and they
+        become available here.
       </p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {missing.size > 0 && (
-        <p className="rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
-          {missing.size} value{missing.size === 1 ? "" : "s"} still needed before
-          this product can be sold
-          {hiddenMissing > 0 && (
-            <span>
-              {" "}
-              — {hiddenMissing} of them in a group this filter is hiding
-            </span>
-          )}
-          .
-        </p>
-      )}
-
-      {/* Pick one or more groups to work through. A FILTER, not a picker: it
-          narrows what is on screen, and the category still decides which fields
-          exist — so nothing here changes what the product carries. */}
+    <div className="flex flex-col gap-5">
       <div className="max-w-md">
-        <Field
-          label="Groups"
-          hint="Leave empty to see every group. Pick one or more to work through them a section at a time."
-        >
+        <Field label="Add specifications">
           <Dropdown
             multiple
-            value={groupFilter}
-            onChange={setGroupFilter}
-            options={groupOptions}
-            searchable={groupOptions.length > 8}
-            placeholder="All groups"
+            value={[]}
+            onChange={add}
+            options={options}
+            searchable
+            placeholder={
+              options.length === 0
+                ? "All of them are on the form"
+                : "Pick specifications to fill in"
+            }
+            emptyMessage="Nothing left to add"
           />
         </Field>
       </div>
 
-      {shownSections.map((section) => (
-        <section
-          key={section.name ?? "ungrouped"}
-          className="flex flex-col gap-3"
-        >
-          <h3 className="border-b border-hairline pb-1 text-xs font-semibold tracking-wide text-secondary uppercase">
-            {section.name ?? "Other"}
-            {section.missing > 0 && (
-              <span className="ml-2 font-normal text-amber-500">
-                {section.missing} needed
-              </span>
-            )}
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {section.fields.map((field) => (
-              <FieldRow
-                key={field.specificationUuid}
-                field={field}
-                value={specValues[field.specificationUuid]}
-                onChange={(next) => update(field.specificationUuid, next)}
-                missing={missing.has(field.specificationUuid)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      {shown.length === 0 ? (
+        <p className="rounded-card border border-dashed border-hairline px-3 py-6 text-center text-xs text-faint">
+          Nothing added yet. Pick a specification above to start.
+        </p>
+      ) : (
+        sections.map((section) => (
+          <section
+            key={section.name ?? "ungrouped"}
+            className="flex flex-col gap-3"
+          >
+            <h3 className="border-b border-hairline pb-1 text-xs font-semibold tracking-wide text-secondary uppercase">
+              {section.name ?? "Other"}
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {section.fields.map((field) => (
+                <FieldRow
+                  key={field.specificationUuid}
+                  field={field}
+                  value={specValues[field.specificationUuid]}
+                  onChange={(next) => update(field.specificationUuid, next)}
+                  // A conditional field leaves on its own when its trigger
+                  // changes, so it carries no remove button.
+                  onRemove={
+                    field.showIf
+                      ? undefined
+                      : () => remove(field.specificationUuid)
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
     </div>
   );
 };
