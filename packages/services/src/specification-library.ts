@@ -19,6 +19,9 @@ import {
 import { recordAudit } from "./catalog-audit";
 import { invalidateCatalogModel } from "./catalog-model";
 import { ValidationError } from "./errors";
+// Option identity lives in its own module because this one opens a database
+// connection on import, and that logic has to be testable on its own.
+import { mergeOptions, type LibraryOptionInput } from "./library-options";
 
 // ---------------------------------------------------------------------------
 // THE LIBRARY SERVICE — authoring attribute definitions.
@@ -36,12 +39,6 @@ import { ValidationError } from "./errors";
 // (the assignment service) — two screens writing the same table is how their
 // switches end up overwriting each other.
 // ---------------------------------------------------------------------------
-
-export type LibraryOptionInput = {
-  value?: string;
-  label: string;
-  rank: number | null;
-};
 
 export type LibraryAttributeInput = {
   groupUuid: string | null;
@@ -99,58 +96,6 @@ const uniqueKey = (label: string, taken: Set<string>): string => {
     suffix += 1;
   }
   return `${base}-${suffix}`;
-};
-
-/**
- * Normalise an author's option list against what is already stored.
- *
- * Options are APPEND-ONLY. An option that disappears from the input is marked
- * `retired` rather than removed, because deleting it would leave every product
- * holding that value pointing at something that no longer exists — and those
- * products would then silently drop out of any rule reading the attribute.
- *
- * A retired option that comes back is simply un-retired, keeping its identity so
- * historical values line up again.
- */
-export const mergeOptions = (
-  existing: SpecOption[],
-  input: LibraryOptionInput[],
-  ordered: boolean,
-): SpecOption[] => {
-  const byValue = new Map(existing.map((option) => [option.value, option]));
-  const seen = new Set<string>();
-  const merged: SpecOption[] = [];
-
-  input.forEach((entry, index) => {
-    const label = entry.label.trim();
-    if (label === "") {
-      return;
-    }
-    // A stable value is derived once, at creation, and then carried forward by
-    // the author's editor. Editing a label never re-derives it.
-    const value =
-      entry.value?.trim() || slugify(label) || `option-${index + 1}`;
-    if (seen.has(value)) {
-      return;
-    }
-    seen.add(value);
-    merged.push({
-      value,
-      label,
-      // On an ordered scale every option needs a rank, or the comparators have
-      // nothing to compare. Falling back to position is better than null, but
-      // the admin asks for it explicitly.
-      rank: ordered ? (entry.rank ?? index + 1) : null,
-      retired: false,
-    });
-  });
-
-  for (const option of existing) {
-    if (!seen.has(option.value)) {
-      merged.push({ ...option, retired: true });
-    }
-  }
-  return merged;
 };
 
 const assertValidInput = (input: LibraryAttributeInput): void => {
