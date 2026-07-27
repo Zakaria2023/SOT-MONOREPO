@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { Predicate, ProductValues, SpecOption } from "../../../db/types";
+import {
+  predicateCategories,
+  type Predicate,
+  type ProductValues,
+  type SpecOption,
+} from "../../../db/types";
 import {
   clearHiddenValues,
   completenessProblems,
   facetAssignments,
   resolveAssignments,
+  revealProblems,
   visibleAssignments,
   type AssignmentDefinition,
   type AssignmentRow,
@@ -894,5 +900,102 @@ describe("J6 — one cart, every family at once", () => {
     );
     // And it is NOT counted among the checks that passed.
     expect(report.passed).toBeLessThan(3);
+  });
+});
+
+// ===========================================================================
+describe("J7 — the gaps an author could otherwise fall into", () => {
+  it("refuses a product group as a reveal trigger", () => {
+    // A reveal is evaluated by the product FORM, against values only. It has no
+    // cart and no tree, so a group condition reads false forever and the field
+    // never appears — with nothing on screen to say why.
+    const rows: AssignmentRow[] = [
+      ...ASSIGNMENTS,
+      assignment({
+        categoryUuid: SWITCHES,
+        specificationUuid: POE_CLASS.uuid,
+        showIf: { op: "in_category", categoryUuid: CAMERAS },
+      }),
+    ];
+    const resolved = resolveAssignments({
+      chain: CHAINS.get(SWITCHES) ?? [SWITCHES],
+      rows,
+      definitions: DEFINITIONS,
+    });
+    const problems = revealProblems(resolved);
+    expect(problems.map((problem) => problem.code)).toContain(
+      "group_in_reveal",
+    );
+  });
+
+  it("finds a group buried inside an and/or reveal too", () => {
+    const rows: AssignmentRow[] = [
+      ...ASSIGNMENTS,
+      assignment({
+        categoryUuid: SWITCHES,
+        specificationUuid: POE_CLASS.uuid,
+        showIf: {
+          op: "all",
+          children: [
+            { op: "equals", attr: POE.uuid, value: true },
+            { op: "in_category", categoryUuid: CAMERAS },
+          ],
+        },
+      }),
+    ];
+    const resolved = resolveAssignments({
+      chain: CHAINS.get(SWITCHES) ?? [SWITCHES],
+      rows,
+      definitions: DEFINITIONS,
+    });
+    expect(revealProblems(resolved).map((problem) => problem.code)).toContain(
+      "group_in_reveal",
+    );
+  });
+
+  it("leaves an ordinary value reveal alone", () => {
+    // The PoE → PoE Budget reveal every switch category uses.
+    expect(revealProblems(resolve(SWITCHES))).toEqual([]);
+  });
+
+  it("collects every group a rule names, however deeply nested", () => {
+    const buried: Predicate = {
+      op: "any",
+      children: [
+        { op: "in_category", categoryUuid: CAMERAS },
+        {
+          op: "not",
+          child: { op: "in_category", categoryUuid: RECORDERS },
+        },
+        { op: "equals", attr: POE.uuid, value: true },
+      ],
+    };
+    expect(predicateCategories(buried).sort()).toEqual(
+      [CAMERAS, RECORDERS].sort(),
+    );
+    // And an attribute-only condition names none, so the deleted-category check
+    // never fires on a rule that has no groups in it.
+    expect(
+      predicateCategories({ op: "equals", attr: POE.uuid, value: true }),
+    ).toEqual([]);
+  });
+
+  it("a rule pointing at a deleted group matches nothing", () => {
+    // The behaviour the validator exists to warn about, proven at the engine
+    // level: it does not throw, it does not half-apply — it simply never fires.
+    const orphaned = rule({
+      uuid: "r-orphan",
+      name: "Counts a group that was deleted",
+      family: "count",
+      consumer: { source: "item_count" },
+      consumerWhen: { op: "in_category", categoryUuid: "cat-deleted" },
+      provider: { source: "spec", specUuid: PORTS.uuid },
+    });
+    const finding = evaluateRelationship(
+      orphaned,
+      [poeSwitch, varifocalCamera],
+      context(),
+    );
+    expect(finding.status).toBe("not_applicable");
   });
 });

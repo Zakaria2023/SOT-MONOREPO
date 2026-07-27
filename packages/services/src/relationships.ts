@@ -12,12 +12,13 @@ import {
   Relationships,
   type SelectRelationships,
 } from "../../../db/schema/relationships";
-import type {
-  LookupTable,
-  Operand,
-  Predicate,
-  PresenceSpec,
-  RelationshipScope,
+import {
+  predicateCategories,
+  type LookupTable,
+  type Operand,
+  type Predicate,
+  type PresenceSpec,
+  type RelationshipScope,
 } from "../../../db/types";
 import { recordAudit } from "./catalog-audit";
 import {
@@ -136,12 +137,55 @@ export const validateRelationship = async (
     });
   }
 
+  // Every condition on the rule, wherever it lives. Collected first so the
+  // category check below can run over all of them in one pass rather than being
+  // repeated at each site that happens to hold a predicate.
+  const conditions: [string, Predicate | null][] = [
+    ["consumerWhen", input.consumerWhen],
+    ["providerWhen", input.providerWhen],
+    ...(input.family === "presence" && input.presence
+      ? ([["presence.trigger", input.presence.trigger]] as [
+          string,
+          Predicate | null,
+        ][])
+      : []),
+    ...(input.presence?.requires ?? []).flatMap((requirement, index) =>
+      requirement.satisfiedBy.flatMap((alternative) =>
+        alternative.type === "item_exists"
+          ? ([[`presence.${index}`, alternative.predicate]] as [
+              string,
+              Predicate | null,
+            ][])
+          : [],
+      ),
+    ),
+    ...(input.lookup?.rows ?? []).map(
+      (row, index) =>
+        [`lookup.${index}`, row.when] as [string, Predicate | null],
+    ),
+  ];
+
   for (const [field, predicate] of [
     ["consumerWhen", input.consumerWhen],
     ["providerWhen", input.providerWhen],
   ] as const) {
     for (const problem of validatePredicate(predicate, model.attributes)) {
       problems.push({ field, message: problem.message });
+    }
+  }
+
+  // A product group pointing at a deleted category matches nothing, so the rule
+  // silently stops applying. `validatePredicate` cannot catch this — it is given
+  // the attribute index, not the tree — but this function has the whole model.
+  for (const [field, predicate] of conditions) {
+    for (const categoryUuid of predicateCategories(predicate)) {
+      if (categoryUuid !== "" && !model.chains.has(categoryUuid)) {
+        problems.push({
+          field,
+          message:
+            "This rule names a product group that no longer exists, so it would never apply.",
+        });
+      }
     }
   }
 
@@ -620,7 +664,13 @@ export const summarizeRelationship = (
       : `Total ${name(rule.consumer)} must fit ${name(rule.provider)}${headroom}, ${rule.allocation === "per_unit" ? "device by device" : "pooled across devices"}.`;
   }
   if (rule.family === "count") {
-    return `The number of matching items must fit ${name(rule.provider)}${headroom}.`;
+    // "Matching" is vague when the rule names a group, and a group is what the
+    // Count form writes — so say which one, by the count of categories rather
+    // than by a uuid nobody can read.
+    const groups = predicateCategories(rule.consumerWhen);
+    const counted =
+      groups.length > 0 ? "items in the chosen group" : "matching items";
+    return `The number of ${counted} must fit ${name(rule.provider)}${headroom}.`;
   }
   if (rule.family === "match") {
     return `${name(rule.consumer)} must be compatible with ${name(rule.provider)}.`;

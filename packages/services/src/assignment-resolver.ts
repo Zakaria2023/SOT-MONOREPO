@@ -508,7 +508,7 @@ export const outOfSliceValues = (
 export type RevealProblem = {
   specificationUuid: string;
   label: string;
-  code: "cycle" | "unassigned_trigger";
+  code: "cycle" | "unassigned_trigger" | "group_in_reveal";
   message: string;
 };
 
@@ -524,6 +524,23 @@ export type RevealProblem = {
  *   not carry, usually because someone removed it later. The field is then
  *   permanently hidden, and nothing says so.
  */
+/** Whether a condition tree contains a product-group test anywhere inside it. */
+const usesProductGroup = (predicate: Predicate | null): boolean => {
+  if (!predicate) {
+    return false;
+  }
+  if (predicate.op === "in_category") {
+    return true;
+  }
+  if (predicate.op === "not") {
+    return usesProductGroup(predicate.child);
+  }
+  if (predicate.op === "all" || predicate.op === "any") {
+    return predicate.children.some(usesProductGroup);
+  }
+  return false;
+};
+
 export const revealProblems = (
   resolved: ResolvedAssignment[],
 ): RevealProblem[] => {
@@ -534,6 +551,21 @@ export const revealProblems = (
 
   const dependencies = new Map<string, string[]>();
   for (const assignment of resolved) {
+    // A product group can never drive a reveal. The product form evaluates a
+    // reveal against the product's VALUES — it has no cart and no tree to ask
+    // "is this in category X", so the condition would read as false forever and
+    // the field would simply never appear, with nothing to say why.
+    //
+    // It is also meaningless: the form is already showing a product of one
+    // category, so the answer is fixed before the question is asked.
+    if (usesProductGroup(assignment.showIf)) {
+      problems.push({
+        specificationUuid: assignment.definition.uuid,
+        label: assignment.definition.label,
+        code: "group_in_reveal",
+        message: `"${assignment.definition.label}" is revealed by a product group. A reveal can only read the product's own values, so this field would never appear — use a condition on an attribute instead.`,
+      });
+    }
     const deps = predicateAttributes(assignment.showIf);
     dependencies.set(assignment.definition.uuid, deps);
     for (const dep of deps) {

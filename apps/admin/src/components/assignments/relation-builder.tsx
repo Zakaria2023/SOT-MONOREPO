@@ -754,7 +754,7 @@ export const RelationBuilder = ({
       return String(operand.value);
     };
     if (row.family === "presence") {
-      return `when ${describePredicate(row.presence?.trigger ?? null, attributes)}`;
+      return `when ${describePredicate(row.presence?.trigger ?? null, attributes, categoryOptions)}`;
     }
     if (row.family === "conditional") {
       return `${name(row.consumer ?? null)} vs a lookup table`;

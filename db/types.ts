@@ -129,6 +129,36 @@ export const predicateAttributes = (predicate: Predicate | null): string[] => {
   return [...found];
 };
 
+/**
+ * Every category uuid a predicate tree names, deduplicated.
+ *
+ * The mirror of `predicateAttributes`. A rule pointing at a deleted category
+ * matches nothing and silently stops applying, which looks exactly like a rule
+ * that was never violated — so whoever holds the tree has to be able to ask.
+ */
+export const predicateCategories = (predicate: Predicate | null): string[] => {
+  if (!predicate) {
+    return [];
+  }
+  const found = new Set<string>();
+  const walk = (node: Predicate): void => {
+    if (node.op === "in_category") {
+      found.add(node.categoryUuid);
+      return;
+    }
+    if (isAttributePredicate(node)) {
+      return;
+    }
+    if (node.op === "not") {
+      walk(node.child);
+      return;
+    }
+    node.children.forEach(walk);
+  };
+  walk(predicate);
+  return [...found];
+};
+
 /** The operator set, for the admin editor and validation. */
 export type PredicateOp = PredicateOperator;
 

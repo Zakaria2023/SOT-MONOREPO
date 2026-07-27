@@ -44,7 +44,9 @@ const HandoverReviewPage = async ({ params }: Props) => {
       </div>
 
       <section className="rounded-card border border-hairline bg-surface p-6">
-        <h2 className="font-heading text-lg text-ink">Devices ({assets.length})</h2>
+        <h2 className="font-heading text-lg text-ink">
+          Devices ({assets.length})
+        </h2>
         <div className="mt-3 flex flex-col gap-2 text-sm">
           {assets.map((asset) => (
             <div key={asset.uuid} className="flex justify-between text-muted">
@@ -86,7 +88,8 @@ const HandoverReviewPage = async ({ params }: Props) => {
         <h2 className="font-heading text-lg text-ink">Actions</h2>
         <p className="mt-1 mb-4 text-sm text-muted">
           Confirm credentials are present, cloud admin is transferred, and the
-          customer has confirmed. Completing releases the partner's payment.
+          customer has confirmed. Completing releases the partner&apos;s
+          payment.
         </p>
         <ReviewControls boqUuid={uuid} status={pack.status} />
       </section>

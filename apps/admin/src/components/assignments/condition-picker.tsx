@@ -298,6 +298,9 @@ export const ConditionPicker = ({
 export const describePredicate = (
   predicate: Predicate | null,
   attributes: PredicateAttribute[],
+  // The tree, when the caller has it. Without it a group can only be described
+  // as "a product group" — which is true but useless in a list of rules.
+  categoryOptions: { value: string; label: string }[] = [],
 ): string => {
   if (!predicate) {
     return "always";
@@ -319,19 +322,20 @@ export const describePredicate = (
   if (predicate.op === "all" || predicate.op === "any") {
     const joiner = predicate.op === "all" ? " and " : " or ";
     return predicate.children
-      .map((child) => describePredicate(child, attributes))
+      .map((child) => describePredicate(child, attributes, categoryOptions))
       .join(joiner);
   }
   if (predicate.op === "not") {
-    return `not (${describePredicate(predicate.child, attributes)})`;
+    return `not (${describePredicate(predicate.child, attributes, categoryOptions)})`;
   }
   if (predicate.op === "exists") {
     return `${label(predicate.attr)} is filled in`;
   }
   if (predicate.op === "in_category") {
-    // The tree is not in scope here, so the uuid is all there is to say. Every
-    // surface that HAS the tree renders the group name instead.
-    return "in a product group";
+    const group = categoryOptions.find(
+      (option) => option.value === predicate.categoryUuid,
+    );
+    return group ? `in ${group.label.trim()}` : "in a product group";
   }
   if (predicate.op === "between") {
     return `${label(predicate.attr)} is between ${predicate.min} and ${predicate.max}`;
