@@ -78,14 +78,38 @@ const toClauses = (predicate: Predicate | null): Clause[] => {
   return clause ? [clause] : [];
 };
 
-const toPredicate = (clauses: Clause[]): Predicate | null => {
+const toPredicate = (
+  clauses: Clause[],
+  attributes: PredicateAttribute[],
+): Predicate | null => {
   const children: Predicate[] = clauses
     .filter((clause) => clause.attr !== "")
-    .map((clause) =>
-      clause.value === ""
-        ? { op: "exists", attr: clause.attr }
-        : { op: "in", attr: clause.attr, values: [clause.value], mode: "any" },
-    );
+    .map((clause) => {
+      if (clause.value === "") {
+        return { op: "exists", attr: clause.attr };
+      }
+      // A typed number is stored as a NUMBER, not as the string that was typed.
+      // `in` on a numeric attribute would compare "55" against 55 by way of
+      // String(), which happens to work and happens to stop working the moment
+      // anyone writes 55.0.
+      const attribute = attributes.find((entry) => entry.uuid === clause.attr);
+      if (attribute?.type === "number") {
+        return { op: "equals", attr: clause.attr, value: Number(clause.value) };
+      }
+      if (attribute?.type === "boolean") {
+        return {
+          op: "equals",
+          attr: clause.attr,
+          value: clause.value === "true",
+        };
+      }
+      return {
+        op: "in",
+        attr: clause.attr,
+        values: [clause.value],
+        mode: "any",
+      };
+    });
   const only = children[0];
   if (!only) {
     return null;
@@ -116,10 +140,14 @@ const RowEditor = ({
         slots.map((slot, position) =>
           position === at ? { ...slot, ...patch } : slot,
         ),
+        attributes,
       ),
       limit,
     );
   };
+
+  const typeOf = (attr: string) =>
+    attributes.find((entry) => entry.uuid === attr)?.type;
 
   const optionsFor = (attr: string) =>
     (attributes.find((entry) => entry.uuid === attr)?.options ?? [])
@@ -164,13 +192,34 @@ const RowEditor = ({
           <div className="flex items-center gap-2">
             <span className="w-3 shrink-0 text-sm text-faint">=</span>
             <div className="min-w-0 flex-1">
-              <Dropdown
-                value={slot.value}
-                onChange={(value) => setSlot(at, { value })}
-                options={optionsFor(slot.attr)}
-                placeholder="value"
-                emptyMessage="Pick an attribute first"
-              />
+              {typeOf(slot.attr) === "number" ? (
+                <Input
+                  type="number"
+                  placeholder="value"
+                  value={slot.value}
+                  onChange={(event) =>
+                    setSlot(at, { value: event.target.value })
+                  }
+                />
+              ) : typeOf(slot.attr) === "boolean" ? (
+                <Dropdown
+                  value={slot.value}
+                  onChange={(value) => setSlot(at, { value })}
+                  options={[
+                    { value: "true", label: "Yes" },
+                    { value: "false", label: "No" },
+                  ]}
+                  placeholder="value"
+                />
+              ) : (
+                <Dropdown
+                  value={slot.value}
+                  onChange={(value) => setSlot(at, { value })}
+                  options={optionsFor(slot.attr)}
+                  placeholder="value"
+                  emptyMessage="Pick an attribute first"
+                />
+              )}
             </div>
           </div>
         </div>

@@ -16,12 +16,13 @@ import { Button, Dropdown, Input, useDebouncedCallback } from "ui";
 import type { FindingStatus } from "services";
 
 // ---------------------------------------------------------------------------
-// THE DRAFT'S REASON FOR EXISTING.
+// HOW A RULE GETS REVIEWED.
 //
 // A rule that has only ever been read cannot be trusted — the author knows what
-// they meant, not what the evaluator will do with it. So the draft state is only
-// worth having if the author can point the draft at a real basket and read the
-// sentence the buyer would read, while nobody is being blocked by it yet.
+// they meant, not what the evaluator will do with it. So the author points it at
+// a real basket and reads the sentence the buyer would read. This replaced a
+// draft state that reviewed nothing: a rule sitting unpublished is a gate
+// somebody believes is protecting them while it protects nothing.
 //
 // This runs the SAME evaluator the checkout gate runs. Not an approximation of
 // it, not a second implementation: `previewRelationship` loads the real products
@@ -193,8 +194,8 @@ export const RelationPreview = ({
             Try “{relation.name}” against a real basket
           </p>
           <p className="mt-0.5 text-xs text-muted">
-            Runs the same evaluator checkout runs — on a draft, nobody is
-            blocked by the result.
+            Runs the same evaluator checkout runs, on a basket you choose.
+            Nothing here changes the rule or anyone&apos;s cart.
           </p>
         </div>
         <button

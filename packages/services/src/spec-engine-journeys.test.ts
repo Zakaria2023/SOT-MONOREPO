@@ -999,3 +999,89 @@ describe("J7 — the gaps an author could otherwise fall into", () => {
     expect(finding.status).toBe("not_applicable");
   });
 });
+
+// ===========================================================================
+describe("J8 — a typed number in a condition", () => {
+  // A number attribute has no option list, so its value is TYPED. What the form
+  // stores has to be a number, not the string that was typed: `in` compares by
+  // way of String(), which works on "55" and stops working on "55.0".
+  it("matches a number stored as a number", () => {
+    const exactly55: Predicate = { op: "equals", attr: LENGTH.uuid, value: 55 };
+    expect(
+      evaluatePredicate(exactly55, { [LENGTH.uuid]: 55 }, ATTRIBUTES).matched,
+    ).toBe(true);
+    expect(
+      evaluatePredicate(exactly55, { [LENGTH.uuid]: 56 }, ATTRIBUTES).matched,
+    ).toBe(false);
+  });
+
+  it("matches the same number however it was written", () => {
+    // 55.0 typed into the box becomes 55, so it still finds a 55 m run. Stored
+    // as the string "55.0" this comparison would silently fail.
+    const written: Predicate = {
+      op: "equals",
+      attr: LENGTH.uuid,
+      value: Number("55.0"),
+    };
+    expect(
+      evaluatePredicate(written, { [LENGTH.uuid]: 55 }, ATTRIBUTES).matched,
+    ).toBe(true);
+  });
+
+  it("drives a lookup row keyed on a number", () => {
+    const byLength = rule({
+      uuid: "r-num-lookup",
+      name: "Short runs may go faster",
+      family: "conditional",
+      consumer: { source: "spec", specUuid: LENGTH.uuid },
+      lookup: {
+        inputs: [],
+        rows: [
+          {
+            // if Cable Grade = Cat6 and Link Speed = 10G, then at most 55 m.
+            when: {
+              op: "all",
+              children: [
+                { op: "in", attr: GRADE.uuid, values: ["cat6"], mode: "any" },
+                { op: "in", attr: SPEED.uuid, values: ["10g"], mode: "any" },
+              ],
+            },
+            limit: 55,
+          },
+        ],
+      },
+    });
+
+    const run = (length: number) =>
+      evaluateRelationship(
+        byLength,
+        [
+          item({
+            productUuid: `p-run-${length}`,
+            name: `${length} m run`,
+            categoryUuid: CABLES,
+            values: {
+              [GRADE.uuid]: "cat6",
+              [SPEED.uuid]: "10g",
+              [LENGTH.uuid]: length,
+            },
+          }),
+        ],
+        context(),
+      );
+
+    expect(run(50).status).toBe("pass");
+    expect(run(55).status).toBe("pass");
+    expect(run(60).status).toBe("block");
+  });
+
+  it("treats a boolean condition as a real boolean", () => {
+    const isPoe: Predicate = { op: "equals", attr: POE.uuid, value: true };
+    expect(
+      evaluatePredicate(isPoe, { [POE.uuid]: true }, ATTRIBUTES).matched,
+    ).toBe(true);
+    expect(
+      evaluatePredicate(isPoe, { [POE.uuid]: false }, ATTRIBUTES).matched,
+    ).toBe(false);
+  });
+});
