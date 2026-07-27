@@ -613,6 +613,18 @@ const evaluateCapacity = (
   const consumerName = operandLabel(rule.consumer, context);
   const providerName = operandLabel(rule.provider, context);
 
+  // A count has no unit of its own — it is a number of things. Rendering it with
+  // the provider's unit produced "Total item count is 20 ports", which reads as
+  // though the cameras were measured in ports.
+  const counting = rule.consumer?.source === "item_count";
+  const describeDemand = (value: number): string =>
+    counting
+      ? `${round2(value)} item${round2(value) === 1 ? "" : "s"}`
+      : formatValue(value, providerUnit);
+  const reduceDemand = counting
+    ? "Remove items, or add another device to take them."
+    : `Reduce "${consumerName}" by removing items or choosing lower-draw alternatives.`;
+
   // Budget in per-item mode: each unit against the single best provider value.
   if (rule.perItem) {
     const limit = Math.max(...providers.map((provider) => provider.unitValue));
@@ -673,7 +685,7 @@ const evaluateCapacity = (
         effectiveCapacity: pooledEffective,
         bins,
         status: "pass",
-        message: `Everything fits: ${formatValue(demand, providerUnit)} of "${consumerName}" spread across ${bins.length} device(s), each within its own "${providerName}".`,
+        message: `Everything fits: ${describeDemand(demand)} of "${consumerName}" spread across ${bins.length} device(s), each within its own "${providerName}".`,
       };
     }
     const leftover = unplaced.reduce((sum, item) => sum + item.quantity, 0);
@@ -688,19 +700,20 @@ const evaluateCapacity = (
       bins,
       failingItems: unplaced,
       status: violation(rule),
-      message: `${leftover} item(s) do not fit on any single device even after spreading the load across ${bins.length}: ${unplaced.map((item) => `${item.quantity} × ${item.name}`).join(", ")}. Total "${consumerName}" is ${formatValue(demand, providerUnit)} against a usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote}.`,
+      message: `${leftover} item(s) do not fit on any single device even after spreading the load across ${bins.length}: ${unplaced.map((item) => `${item.quantity} × ${item.name}`).join(", ")}. Total "${consumerName}" is ${describeDemand(demand)} against a usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote}.`,
       corrections: [
         correction(
           "add_supply",
           shortfall > 0
             ? `Add at least ${formatValue(shortfall, providerUnit)} more "${providerName}" — another device, or a bigger one.`
             : `Add another device: the total is within budget but no single unit can take the largest item (${formatValue(largest, providerUnit)}).`,
-          suggestProviders(rule, largest, context),
+          // Suggest against the SHORTFALL, not the largest leftover item.
+          // Searching on the largest item offered a 130 W switch as the example
+          // fix for a 110 W shortfall — technically able to hold one camera, and
+          // useless as an answer to the sentence above it.
+          suggestProviders(rule, Math.max(shortfall, largest), context),
         ),
-        correction(
-          "reduce_demand",
-          `Reduce "${consumerName}" by removing items or choosing lower-draw alternatives.`,
-        ),
+        correction("reduce_demand", reduceDemand),
       ],
     };
   }
@@ -712,7 +725,7 @@ const evaluateCapacity = (
       capacity: pooledCapacity,
       effectiveCapacity: pooledEffective,
       status: "pass",
-      message: `Total "${consumerName}" of ${formatValue(demand, providerUnit)} fits the usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote}.`,
+      message: `Total "${consumerName}" of ${describeDemand(demand)} fits the usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote}.`,
     };
   }
 
@@ -724,7 +737,7 @@ const evaluateCapacity = (
     capacity: pooledCapacity,
     effectiveCapacity: pooledEffective,
     status: violation(rule),
-    message: `Total "${consumerName}" of ${formatValue(demand, providerUnit)} ${over ? "exceeds" : "falls short of"} the usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote} — ${over ? "over" : "short"} by ${formatValue(gap, providerUnit)}.`,
+    message: `Total "${consumerName}" of ${describeDemand(demand)} ${over ? "exceeds" : "falls short of"} the usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote} — ${over ? "over" : "short"} by ${formatValue(gap, providerUnit)}.`,
     corrections: [
       correction(
         "add_supply",
@@ -733,7 +746,7 @@ const evaluateCapacity = (
       ),
       correction(
         "reduce_demand",
-        `Reduce "${consumerName}" by ${formatValue(gap, providerUnit)}.`,
+        counting ? reduceDemand : `Reduce "${consumerName}" by ${formatValue(gap, providerUnit)}.`,
       ),
     ],
   };

@@ -2,26 +2,39 @@
 
 import {
   addAttributeAction,
+  addGroupAction,
   deleteAttributeAction,
+  deleteGroupAction,
   moveAttributeAction,
+  reorderGroupsAction,
   updateAttributeAction,
+  updateGroupAction,
   type LibraryAttributeInput,
   type LibraryGroup,
 } from "@/app/(dashboard)/library/action";
-import type { AssignmentAudience, SpecificationType } from "@/db/enum";
+import type {
+  AssignmentAudience,
+  SpecificationDomain,
+  SpecificationType,
+} from "@/db/enum";
 import {
   assignmentAudiences,
   measurementUnits,
+  specificationDomains,
   specificationTypes,
   UNIT_DIMENSIONS,
 } from "@/db/enum";
 import {
   ASSIGNMENT_AUDIENCE_LABELS,
+  SPECIFICATION_DOMAIN_LABELS,
   SPECIFICATION_TYPE_LABELS,
 } from "@/db/label";
 import type { SpecOption } from "@/db/types";
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpDown,
+  FolderPlus,
   Hash,
   Link2,
   ListChecks,
@@ -51,6 +64,68 @@ type LibraryAttribute = LibraryGroup["attributes"][number];
 
 type LibraryBuilderProps = {
   groups: LibraryGroup[];
+};
+
+type GroupFormProps = {
+  initial?: { name: string; domain: string | null };
+  onSubmit: (fields: { name: string; domain: string | null }) => void;
+  onCancel: () => void;
+  pending: boolean;
+};
+
+// The domain a group is bucketed under on the product picker. "" = no domain,
+// which drops the group into the trailing "Other" bucket.
+const DOMAIN_OPTIONS: DropdownOption[] = [
+  { value: "", label: "No domain" },
+  ...specificationDomains.map((domain) => ({
+    value: domain,
+    label: SPECIFICATION_DOMAIN_LABELS[domain],
+  })),
+];
+
+const domainLabel = (domain: string | null): string => {
+  if (!domain) {
+    return "No domain";
+  }
+  return (
+    SPECIFICATION_DOMAIN_LABELS[domain as SpecificationDomain] ?? domain
+  );
+};
+
+const GroupForm = ({
+  initial,
+  onSubmit,
+  onCancel,
+  pending,
+}: GroupFormProps) => {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [domain, setDomain] = useState(initial?.domain ?? "");
+
+  return (
+    <div className="flex flex-col gap-2 rounded-card border border-primary/40 bg-surface p-3">
+      <Input
+        label="Group name"
+        placeholder="Power"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-secondary">Domain</span>
+        <Dropdown value={domain} onChange={setDomain} options={DOMAIN_OPTIONS} />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={pending}>
+          Cancel
+        </Button>
+        <Button
+          disabled={pending || name.trim() === ""}
+          onClick={() => onSubmit({ name, domain: domain === "" ? null : domain })}
+        >
+          {initial ? "Save" : "Add group"}
+        </Button>
+      </div>
+    </div>
+  );
 };
 
 type AttributeFormProps = {
@@ -488,14 +563,23 @@ const AttributeRow = ({
   );
 };
 
+
 export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
-  const [addingIn, setAddingIn] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<string>(
+    groups[0]?.uuid ?? "",
+  );
+  const [addingAttribute, setAddingAttribute] = useState(false);
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [confirming, setConfirming] = useState<LibraryAttribute | null>(null);
+  const [confirmingGroup, setConfirmingGroup] = useState<LibraryGroup | null>(
+    null,
+  );
 
   const groupOptions = useMemo<DropdownOption[]>(
     () => [
@@ -507,6 +591,8 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
     [groups],
   );
 
+  // Search spans every group, because an author looking for "PoE Budget" does
+  // not know or care which folder it was filed in.
   const hits = useMemo<SearchHit[]>(() => {
     const term = search.trim().toLowerCase();
     if (term === "") {
@@ -526,6 +612,10 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
     );
   }, [groups, search]);
 
+  const searching = search.trim() !== "";
+  const active =
+    groups.find((group) => group.uuid === selectedGroup) ?? groups[0];
+
   const run = (action: () => Promise<{ error?: string }>): void => {
     setError(undefined);
     startTransition(async () => {
@@ -534,11 +624,35 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
         setError(result.error);
         return;
       }
-      setAddingIn(null);
+      setAddingAttribute(false);
+      setAddingGroup(false);
+      setEditingGroup(null);
       setEditing(null);
       setConfirming(null);
+      setConfirmingGroup(null);
       router.refresh();
     });
+  };
+
+  // Reorder by swapping with the neighbour, then sending the WHOLE order — the
+  // service assigns positions by index, so a partial update would leave two
+  // groups claiming the same slot.
+  const moveGroup = (uuid: string, direction: -1 | 1): void => {
+    const real = groups.filter((group) => group.uuid !== "");
+    const at = real.findIndex((group) => group.uuid === uuid);
+    const target = at + direction;
+    if (at === -1 || target < 0 || target >= real.length) {
+      return;
+    }
+    const ordered = real.map((group) => group.uuid);
+    const current = ordered[at];
+    const swap = ordered[target];
+    if (!current || !swap) {
+      return;
+    }
+    ordered[at] = swap;
+    ordered[target] = current;
+    run(() => reorderGroupsAction(ordered));
   };
 
   const editForm = (attribute: LibraryAttribute) => (
@@ -569,21 +683,25 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search attributes and options…"
+          placeholder="Search every group for an attribute or an option…"
           className="w-full rounded-control border border-hairline bg-surface py-2 pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-primary focus:outline-none"
         />
       </div>
 
-      {error && !addingIn && !editing && (
-        <p className="rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-          {error}
-        </p>
-      )}
+      {error &&
+        !addingAttribute &&
+        !editing &&
+        !addingGroup &&
+        !editingGroup && (
+          <p className="rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            {error}
+          </p>
+        )}
 
-      {search.trim() !== "" ? (
+      {searching ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted">
-            {hits.length} match{hits.length === 1 ? "" : "es"}
+            {hits.length} match{hits.length === 1 ? "" : "es"} across all groups
           </p>
           {hits.map((hit) =>
             editing === hit.uuid ? (
@@ -601,19 +719,148 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
           )}
         </div>
       ) : (
-        groups.map((group) => (
-          <section key={group.uuid || "ungrouped"} className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,320px)_1fr]">
+          {/* LEFT — the groups. Filing only: a group is invisible to the shopper
+              and to the engine, so nothing here changes how anything behaves. */}
+          <aside className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">Groups</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingGroup(true);
+                  setError(undefined);
+                }}
+                className="flex items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+              >
+                <FolderPlus size={13} />
+                Group
+              </button>
+            </div>
+
+            {addingGroup && (
+              <GroupForm
+                pending={pending}
+                onCancel={() => {
+                  setAddingGroup(false);
+                  setError(undefined);
+                }}
+                onSubmit={(fields) => run(() => addGroupAction(fields))}
+              />
+            )}
+
+            <div className="flex flex-col gap-1">
+              {groups.map((group, index) => {
+                const isActive = group.uuid === active?.uuid;
+                // The trailing "Ungrouped" bucket is not a row in the table, so
+                // it cannot be renamed, reordered or deleted.
+                const real = group.uuid !== "";
+
+                if (editingGroup === group.uuid) {
+                  return (
+                    <GroupForm
+                      key={group.uuid}
+                      initial={{ name: group.name, domain: group.domain }}
+                      pending={pending}
+                      onCancel={() => {
+                        setEditingGroup(null);
+                        setError(undefined);
+                      }}
+                      onSubmit={(fields) =>
+                        run(() => updateGroupAction(group.uuid, fields))
+                      }
+                    />
+                  );
+                }
+
+                return (
+                  <div
+                    key={group.uuid || "ungrouped"}
+                    className={`flex items-center gap-1 rounded-card border px-2 py-1.5 ${
+                      isActive
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-hairline bg-surface"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGroup(group.uuid)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span
+                        className={`block text-sm ${
+                          isActive ? "font-medium text-primary" : "text-ink"
+                        }`}
+                      >
+                        {group.name}
+                      </span>
+                      <span className="block text-[11px] text-faint">
+                        {group.attributes.length} attribute
+                        {group.attributes.length === 1 ? "" : "s"}
+                        {real ? ` · ${domainLabel(group.domain)}` : ""}
+                      </span>
+                    </button>
+
+                    {real && (
+                      <div className="flex shrink-0 items-center">
+                        <button
+                          type="button"
+                          onClick={() => moveGroup(group.uuid, -1)}
+                          disabled={index === 0 || pending}
+                          aria-label={`Move ${group.name} up`}
+                          className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                        >
+                          <ArrowUp size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveGroup(group.uuid, 1)}
+                          disabled={pending}
+                          aria-label={`Move ${group.name} down`}
+                          className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                        >
+                          <ArrowDown size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingGroup(group.uuid);
+                            setError(undefined);
+                          }}
+                          aria-label={`Rename ${group.name}`}
+                          className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingGroup(group)}
+                          aria-label={`Delete ${group.name}`}
+                          className="rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+
+          {/* RIGHT — the attributes filed in the selected group. */}
+          <section className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-ink">
-                {group.name}
+                {active?.name ?? "Attributes"}
                 <span className="ml-2 text-xs font-normal text-faint">
-                  {group.attributes.length}
+                  {active?.attributes.length ?? 0}
                 </span>
               </h2>
               <button
                 type="button"
                 onClick={() => {
-                  setAddingIn(group.uuid);
+                  setAddingAttribute(true);
                   setError(undefined);
                 }}
                 className="flex items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
@@ -623,27 +870,27 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
               </button>
             </div>
 
-            {addingIn === group.uuid && (
+            {addingAttribute && (
               <AttributeForm
-                groupUuid={group.uuid === "" ? null : group.uuid}
+                groupUuid={active && active.uuid !== "" ? active.uuid : null}
                 groupOptions={groupOptions}
                 pending={pending}
                 error={error}
                 onCancel={() => {
-                  setAddingIn(null);
+                  setAddingAttribute(false);
                   setError(undefined);
                 }}
                 onSubmit={(input) => run(() => addAttributeAction(input))}
               />
             )}
 
-            {group.attributes.length === 0 && addingIn !== group.uuid && (
-              <p className="rounded-card border border-dashed border-hairline px-3 py-4 text-center text-xs text-faint">
-                No attributes here yet.
+            {(active?.attributes.length ?? 0) === 0 && !addingAttribute && (
+              <p className="rounded-card border border-dashed border-hairline px-3 py-8 text-center text-xs text-faint">
+                Nothing filed here yet.
               </p>
             )}
 
-            {group.attributes.map((attribute) =>
+            {active?.attributes.map((attribute) =>
               editing === attribute.uuid ? (
                 editForm(attribute)
               ) : (
@@ -659,7 +906,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
               ),
             )}
           </section>
-        ))
+        </div>
       )}
 
       <ConfirmDialog
@@ -680,6 +927,24 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
         }}
         onCancel={() => {
           setConfirming(null);
+          setError(undefined);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmingGroup !== null}
+        title={`Delete the “${confirmingGroup?.name ?? ""}” group?`}
+        description={`Its ${confirmingGroup?.attributes.length ?? 0} attribute(s) are NOT deleted — they become ungrouped. A group is a folder, and emptying a folder must never destroy what was filed in it.`}
+        confirmLabel="Delete group"
+        isConfirming={pending}
+        error={error}
+        onConfirm={() => {
+          if (confirmingGroup) {
+            run(() => deleteGroupAction(confirmingGroup.uuid));
+          }
+        }}
+        onCancel={() => {
+          setConfirmingGroup(null);
           setError(undefined);
         }}
       />

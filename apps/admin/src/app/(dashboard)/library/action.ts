@@ -5,17 +5,22 @@ import { revalidatePath } from "next/cache";
 import {
   createLibraryAttribute,
   createProjectVariable,
+  createSpecificationGroup,
   deleteLibraryAttribute,
   deleteProjectVariable,
+  deleteSpecificationGroup,
   getLibrary,
   getProjectVariables,
   moveLibraryAttribute,
   reorderLibraryAttributes,
+  reorderSpecificationGroups,
   updateLibraryAttribute,
   updateProjectVariable,
+  updateSpecificationGroup,
   type LibraryAttributeInput as ServiceLibraryAttributeInput,
   type LibraryGroup as ServiceLibraryGroup,
   type ProjectVariableInput as ServiceProjectVariableInput,
+  type SpecificationGroupFields as ServiceSpecificationGroupFields,
 } from "services";
 
 // Types re-declared as local aliases — a "use server" file may only export
@@ -23,6 +28,7 @@ import {
 export type LibraryAttributeInput = ServiceLibraryAttributeInput;
 export type LibraryGroup = ServiceLibraryGroup;
 export type ProjectVariableInput = ServiceProjectVariableInput;
+export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 
 export type ActionResult = {
   error?: string;
@@ -113,6 +119,73 @@ export const reorderAttributesAction = async (
     await reorderLibraryAttributes(order);
   } catch (error) {
     return fail(error, "Failed to reorder");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+// ---------------------------------------------------------------------------
+// Groups — the folders an attribute is filed in.
+//
+// Filing only: a group is invisible to the shopper and to the engine. If one ever
+// started affecting behaviour it would have become a second, weaker category
+// tree, with two places to look for the same answer.
+// ---------------------------------------------------------------------------
+
+export const addGroupAction = async (
+  fields: SpecificationGroupFields,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await createSpecificationGroup(fields);
+  } catch (error) {
+    return fail(error, "Failed to create the group");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const updateGroupAction = async (
+  uuid: string,
+  fields: SpecificationGroupFields,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await updateSpecificationGroup(uuid, fields);
+  } catch (error) {
+    return fail(error, "Failed to update the group");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+/**
+ * Delete a group. The attributes inside it are NOT deleted — they become
+ * ungrouped, because a group is a folder and emptying a folder must never
+ * destroy what was filed in it.
+ */
+export const deleteGroupAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteSpecificationGroup(uuid);
+  } catch (error) {
+    return fail(error, "Failed to delete the group");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+/** Persist a new group order — each uuid's position becomes its `order`. */
+export const reorderGroupsAction = async (
+  orderedUuids: string[],
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await reorderSpecificationGroups(orderedUuids);
+  } catch (error) {
+    return fail(error, "Failed to reorder the groups");
   }
   revalidatePath("/library");
   return { success: true };
