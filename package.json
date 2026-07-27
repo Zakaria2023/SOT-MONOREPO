@@ -17,11 +17,16 @@
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
     "test": "vitest run",
-    "db:push": "dotenv -e .env.local -- drizzle-kit push"
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "spec:prepare": "dotenv -e .env.local -- tsx db/prepare-spec-model.ts",
+    "spec:prepare:write": "dotenv -e .env.local -- tsx db/prepare-spec-model.ts --write",
+    "spec:migrate": "dotenv -e .env.local -- tsx db/migrate-spec-model.ts",
+    "spec:migrate:write": "dotenv -e .env.local -- tsx db/migrate-spec-model.ts --write"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.1",
     "turbo": "^2.5.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.10"

@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { convertLegacyValue } from "../packages/services/src/legacy-spec-migration";
 import { db } from ".";
 import { Products } from "./schema/products";
 import { Specifications } from "./schema/specifications";
@@ -58,90 +59,29 @@ type Report = {
   unparsed: { product: string; label: string; raw: string }[];
 };
 
-/** "802.3af, 802.3at" → ["802.3af", "802.3at"] — the old multi-select encoding. */
-const splitLegacyValues = (raw: string): string[] =>
-  raw
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => value !== "");
-
 /**
- * Map a legacy stored value onto an option's stable `value`.
- *
- * The old rows stored the LABEL ("802.3af"), while the new model stores a slug.
- * So the match is tried against the option's value first, then its label, then a
- * case-insensitive label — because a hand-typed catalog will not be consistent.
+ * Convert one stored value, reporting anything it cannot place rather than
+ * guessing. The decisions live in packages/services/src/legacy-spec-migration.ts
+ * so they are unit-tested — a wrong conversion here would look like valid data.
  */
-const matchOption = (
-  options: SpecOption[],
-  raw: string,
-): SpecOption | undefined => {
-  const needle = raw.trim();
-  const lower = needle.toLowerCase();
-  return (
-    options.find((option) => option.value === needle) ??
-    options.find((option) => option.label === needle) ??
-    options.find((option) => option.label.toLowerCase() === lower) ??
-    options.find((option) => option.value.toLowerCase() === lower)
-  );
-};
-
 const convertValue = (
   spec: LegacySpec,
   raw: string,
   productName: string,
   report: Report,
 ): ProductValues[string] | undefined => {
-  const value = raw.trim();
-  if (value === "") {
-    return undefined;
+  const result = convertLegacyValue(raw, spec.type, spec.options ?? []);
+  if (result.ok) {
+    return result.value;
   }
-
-  if (spec.type === "number") {
-    // The old encoding allowed ranges ("220 - 240"). Ranges are gone; the
-    // migration keeps the WORST case, because that is what a budget check needs
-    // and quietly halving a demand figure is the dangerous direction.
-    const rangeAt = value.indexOf(" - ");
-    const candidate =
-      rangeAt === -1 ? value : value.slice(rangeAt + 3).trim() || value;
-    const parsed = Number(candidate);
-    if (!Number.isFinite(parsed)) {
-      report.unparsed.push({ product: productName, label: spec.label, raw });
-      return undefined;
-    }
-    return parsed;
+  if (result.reason !== "empty") {
+    report.unparsed.push({
+      product: productName,
+      label: spec.label,
+      raw: `${raw} (${result.reason})`,
+    });
   }
-
-  if (spec.type === "boolean") {
-    const lower = value.toLowerCase();
-    if (lower === "yes" || lower === "true") {
-      return true;
-    }
-    if (lower === "no" || lower === "false") {
-      return false;
-    }
-    report.unparsed.push({ product: productName, label: spec.label, raw });
-    return undefined;
-  }
-
-  const options = spec.options ?? [];
-  const parts = splitLegacyValues(value);
-  const matched = parts.flatMap((part) => {
-    const option = matchOption(options, part);
-    if (!option) {
-      report.unparsed.push({ product: productName, label: spec.label, raw: part });
-      return [];
-    }
-    return [option.value];
-  });
-
-  if (matched.length === 0) {
-    return undefined;
-  }
-  if (spec.type === "multi_select") {
-    return matched;
-  }
-  return matched[0];
+  return undefined;
 };
 
 const migrate = async (): Promise<void> => {
