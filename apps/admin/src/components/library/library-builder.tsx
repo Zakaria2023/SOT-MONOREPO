@@ -105,7 +105,11 @@ const GroupForm = ({
         onChange={(event) => setName(event.target.value)}
       />
       <Field label="Domain">
-        <Dropdown value={domain} onChange={setDomain} options={DOMAIN_OPTIONS} />
+        <Dropdown
+          value={domain}
+          onChange={setDomain}
+          options={DOMAIN_OPTIONS}
+        />
       </Field>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
@@ -221,11 +225,10 @@ const AttributeForm = ({
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
+  const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [group, setGroup] = useState(initial?.groupUuid ?? groupUuid ?? "");
   const [options, setOptions] = useState<OptionDraft[]>(
-    initial
-      ? toDrafts(initial.options)
-      : [{ label: "", retired: false }],
+    initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
   );
 
   const locked = (initial?.relationshipCount ?? 0) > 0;
@@ -268,6 +271,7 @@ const AttributeForm = ({
       categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
       ordered: isOptionType(type) ? ordered : false,
+      allowRange: type === "number" ? allowRange : false,
       // Who sees an attribute is a per-category decision, so it is set on
       // the assignment. The library only says what the attribute IS.
       audience: initial?.audience ?? "everyone",
@@ -343,17 +347,37 @@ const AttributeForm = ({
       </div>
 
       {type === "number" && (
-        <Field
-          label="Unit"
-          hint="A rule can only compare two numbers that measure the same thing. W converts to kW; W and VA never convert, because 1500 VA is not 1500 W."
-        >
-          <Combobox
-            value={unit}
-            onChange={setUnit}
-            options={UNIT_OPTIONS}
-            placeholder="Search units…"
-          />
-        </Field>
+        <div className="flex flex-col gap-4">
+          <Field
+            label="Unit"
+            hint="A rule can only compare two numbers that measure the same thing. W converts to kW; W and VA never convert, because 1500 VA is not 1500 W."
+          >
+            <Combobox
+              value={unit}
+              onChange={setUnit}
+              options={UNIT_OPTIONS}
+              placeholder="Search units…"
+            />
+          </Field>
+
+          {/* Same plain-question treatment as the ordered checkbox above: the
+              author is asked what the number IS, not told how the engine will
+              read it. What it does behind the scenes — worst case when it is
+              being consumed, guaranteed case when it is being supplied — is not
+              a choice they should have to make per attribute. */}
+          <div className="flex flex-col gap-2">
+            <Checkbox
+              label="This is a range, not a single figure"
+              checked={allowRange}
+              onChange={(event) => setAllowRange(event.target.checked)}
+            />
+            <p className="-mt-1 text-[11px] text-muted">
+              {allowRange
+                ? `Products give a lowest and a highest${unit ? ` ${unit}` : ""} — an operating temperature of −20 to 60, a draw that varies 4 to 12. Checks use the end that matters: the most it can need, and the least it can give.`
+                : "Leave this off when one figure is the answer, like 8 ports or 130 W."}
+            </p>
+          </div>
+        </div>
       )}
 
       {isOptionType(type) && (
@@ -521,6 +545,11 @@ const AttributeRow = ({
             <span className="flex items-center gap-1 rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
               <ArrowUpDown size={9} />
               scale
+            </span>
+          )}
+          {attribute.allowRange && (
+            <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+              range
             </span>
           )}
           {attribute.audience !== "everyone" && (

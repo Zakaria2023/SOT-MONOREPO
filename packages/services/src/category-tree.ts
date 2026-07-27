@@ -19,9 +19,7 @@ export type CategoryNode = {
  * Bounded by the number of categories, so a parent cycle introduced by bad data
  * cannot hang a request. A tree is data, and data can be wrong.
  */
-export const buildChains = (
-  rows: CategoryNode[],
-): Map<string, string[]> => {
+export const buildChains = (rows: CategoryNode[]): Map<string, string[]> => {
   const parentOf = new Map(rows.map((row) => [row.uuid, row.parentUuid]));
   const chains = new Map<string, string[]>();
 

@@ -133,7 +133,9 @@ export const createBoqFromCart = async (
       ),
     );
   if (lines.length === 0) {
-    throw new ValidationError("Add a solution to your cart before sending a BOQ");
+    throw new ValidationError(
+      "Add a solution to your cart before sending a BOQ",
+    );
   }
 
   const productUuids = lines.map((line) => line.productUuid);
@@ -308,9 +310,7 @@ export const advanceBoqFulfilment = async (
   const currentIndex = FULFILMENT_ORDER.indexOf(boq.status ?? "draft");
   const nextIndex = FULFILMENT_ORDER.indexOf(next);
   if (nextIndex <= 0 || nextIndex !== currentIndex + 1) {
-    throw new ConflictError(
-      `A BOQ at "${boq.status}" can't move to "${next}"`,
-    );
+    throw new ConflictError(`A BOQ at "${boq.status}" can't move to "${next}"`);
   }
 
   await db.update(Boqs).set({ status: next }).where(eq(Boqs.uuid, boqUuid));
@@ -335,9 +335,10 @@ const attachBoqTotals = async <T extends { uuid: string }>(
       boqUuid: BoqItems.boqUuid,
       // MySQL returns SUM() as a decimal string — map it to a real number.
       itemCount: sql<number>`sum(${BoqItems.quantity})`.mapWith(Number),
-      subtotal: sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`.mapWith(
-        Number,
-      ),
+      subtotal:
+        sql<number>`sum(${BoqItems.unitPrice} * ${BoqItems.quantity})`.mapWith(
+          Number,
+        ),
     })
     .from(BoqItems)
     .where(
@@ -563,7 +564,9 @@ export const submitReviewedBoq = async ({
     });
     const partners = [...selectedClose, ...selectedOthers];
     if (partners.length === 0) {
-      throw new ValidationError("Select at least one partner to send this BOQ to");
+      throw new ValidationError(
+        "Select at least one partner to send this BOQ to",
+      );
     }
 
     await tx

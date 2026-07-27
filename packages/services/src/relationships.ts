@@ -204,10 +204,14 @@ export const validateRelationship = async (
   }
 
   if (input.family === "match") {
-    if (input.consumer?.source !== "spec" || input.provider?.source !== "spec") {
+    if (
+      input.consumer?.source !== "spec" ||
+      input.provider?.source !== "spec"
+    ) {
       problems.push({
         field: "consumer",
-        message: "A match rule compares two attributes, so both sides must be attributes.",
+        message:
+          "A match rule compares two attributes, so both sides must be attributes.",
       });
     } else {
       const consumerMeta = model.attributes.get(input.consumer.specUuid);
@@ -241,7 +245,8 @@ export const validateRelationship = async (
     if (!input.lookup || input.lookup.rows.length === 0) {
       problems.push({
         field: "lookup",
-        message: "A conditional rule needs at least one row in its lookup table.",
+        message:
+          "A conditional rule needs at least one row in its lookup table.",
       });
     } else {
       input.lookup.rows.forEach((row, index) => {
@@ -259,7 +264,8 @@ export const validateRelationship = async (
     if (!input.presence) {
       problems.push({
         field: "presence",
-        message: "A presence rule needs a trigger and at least one requirement.",
+        message:
+          "A presence rule needs a trigger and at least one requirement.",
       });
     } else {
       for (const problem of validatePredicate(
@@ -587,7 +593,9 @@ export const summarizeRelationship = (
       return "—";
     }
     if (operand.source === "spec") {
-      return model.attributes.get(operand.specUuid)?.label ?? "a deleted attribute";
+      return (
+        model.attributes.get(operand.specUuid)?.label ?? "a deleted attribute"
+      );
     }
     if (operand.source === "variable") {
       return (
@@ -602,7 +610,9 @@ export const summarizeRelationship = (
   };
 
   const headroom =
-    rule.headroomPercent === 100 ? "" : ` (using ${rule.headroomPercent}% of it)`;
+    rule.headroomPercent === 100
+      ? ""
+      : ` (using ${rule.headroomPercent}% of it)`;
 
   if (rule.family === "budget") {
     return rule.perItem

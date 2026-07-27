@@ -31,7 +31,15 @@ export const productFormSchema = z.object({
   // again before writing, so the form is convenience, never the authority.
   specValues: z.record(
     z.string(),
-    z.union([z.number(), z.boolean(), z.string(), z.array(z.string())]),
+    z.union([
+      z.number(),
+      z.boolean(),
+      z.string(),
+      z.array(z.string()),
+      // A span. Both ends required — a half-filled one is not a value, and the
+      // server drops it rather than storing something it cannot read back.
+      z.object({ min: z.number(), max: z.number() }),
+    ]),
   ),
   status: z.enum(productStatuses),
   order: z.number().int().min(0).optional(),

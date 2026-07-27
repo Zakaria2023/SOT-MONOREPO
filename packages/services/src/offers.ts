@@ -220,10 +220,7 @@ export const listOffers = async (
 ): Promise<{ items: OfferListItem[]; total: number }> => {
   const term = params.search?.trim();
   const where = term
-    ? or(
-        like(Boqs.reference, `%${term}%`),
-        like(Users.fullName, `%${term}%`),
-      )
+    ? or(like(Boqs.reference, `%${term}%`), like(Users.fullName, `%${term}%`))
     : undefined;
 
   const [items, [totals]] = await Promise.all([

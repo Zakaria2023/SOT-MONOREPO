@@ -91,9 +91,7 @@ export const isAttributePredicate = (
 ): predicate is AttributePredicate => "attr" in predicate;
 
 /** Every attribute uuid a predicate tree references, deduplicated. */
-export const predicateAttributes = (
-  predicate: Predicate | null,
-): string[] => {
+export const predicateAttributes = (predicate: Predicate | null): string[] => {
   if (!predicate) {
     return [];
   }
@@ -120,12 +118,31 @@ export type PredicateOp = PredicateOperator;
 // Product values
 // ---------------------------------------------------------------------------
 
+// A number attribute answered as a SPAN rather than a point: an operating
+// temperature of −20 to 60 °C, a PoE draw that varies 4–12 W with the heater on.
+//
+// Stored as two numbers, not as the string "4 - 12", because the engine has to
+// do arithmetic on both ends. Which end it reads is the whole point of the
+// shape: a range CONSUMES at its max (the worst case has to fit) and SUPPLIES at
+// its min (only the guaranteed capacity may be promised). Flattening a range to
+// one number anywhere would quietly pick a side.
+export type SpecRange = { min: number; max: number };
+
+export const isSpecRange = (value: unknown): value is SpecRange =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  typeof (value as SpecRange).min === "number" &&
+  typeof (value as SpecRange).max === "number" &&
+  Number.isFinite((value as SpecRange).min) &&
+  Number.isFinite((value as SpecRange).max);
+
 // What a product stores for one attribute, keyed by Specifications.uuid.
 //
 // TYPED, not stringly. A number is a number so the engine can sum it without a
 // parse that can silently produce NaN; a multi-select is an array so an option
 // containing a comma cannot corrupt the row the way a comma-joined string does.
-export type ProductValue = number | boolean | string | string[];
+export type ProductValue = number | boolean | string | string[] | SpecRange;
 
 export type ProductValues = Record<string, ProductValue>;
 

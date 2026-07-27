@@ -29,6 +29,7 @@ import {
   unitFactor,
   type AttributeIndex,
   type AttributeMeta,
+  type RangeBound,
 } from "./spec-values";
 
 // ---------------------------------------------------------------------------
@@ -113,11 +114,7 @@ export type EngineContext = {
 // not_applicable — nothing in the selection participates
 // unknown     — could not be checked. Never treated as a pass.
 export type FindingStatus =
-  | "pass"
-  | "warn"
-  | "block"
-  | "not_applicable"
-  | "unknown";
+  "pass" | "warn" | "block" | "not_applicable" | "unknown";
 
 export type Participant = {
   productUuid: string;
@@ -218,7 +215,9 @@ const operandLabel = (
     return operandMeta(operand, context)?.label ?? "a deleted attribute";
   }
   if (operand.source === "variable") {
-    return context.variables.get(operand.variableUuid)?.label ?? "a deleted input";
+    return (
+      context.variables.get(operand.variableUuid)?.label ?? "a deleted input"
+    );
   }
   if (operand.source === "item_count") {
     return "item count";
@@ -232,6 +231,7 @@ const itemOperandValue = (
   operand: Operand,
   item: EngineItem,
   context: EngineContext,
+  bound: RangeBound,
 ): number | null => {
   if (operand.source === "constant") {
     return operand.value;
@@ -247,7 +247,7 @@ const itemOperandValue = (
   if (!meta) {
     return null;
   }
-  return asNumber(readValue(item.values, operand.specUuid), meta);
+  return asNumber(readValue(item.values, operand.specUuid), meta, bound);
 };
 
 // ---------------------------------------------------------------------------
@@ -267,6 +267,10 @@ const collectSide = (
   when: Predicate | null,
   selection: EngineItem[],
   context: EngineContext,
+  // Which end of a span this side reads. The consumer side takes "max" and the
+  // provider side "min", so a span always costs its worst case and only ever
+  // promises its guaranteed one.
+  bound: RangeBound,
 ): Side => {
   const participants: Participant[] = [];
   const skipped: SkippedItem[] = [];
@@ -319,7 +323,7 @@ const collectSide = (
     }
 
     matched += 1;
-    const unitValue = itemOperandValue(operand, item, context);
+    const unitValue = itemOperandValue(operand, item, context, bound);
     if (unitValue === null) {
       skipped.push({
         productUuid: item.productUuid,
@@ -405,7 +409,14 @@ const suggestProviders = (
       if (!filter.matched) {
         return [];
       }
-      const capacity = asNumber(readValue(product.values, operand.specUuid), meta);
+      // A suggested replacement is a PROVIDER, so it may only be credited with
+      // the capacity it always has — suggesting a 20–30 W part to cover 25 W
+      // would be recommending something that might not fit.
+      const capacity = asNumber(
+        readValue(product.values, operand.specUuid),
+        meta,
+        "min",
+      );
       if (capacity === null) {
         return [];
       }
@@ -483,7 +494,9 @@ const packPerUnit = (
       continue;
     }
     bin.used = round2(bin.used + unit.size);
-    const entry = bin.items.find((item) => item.productUuid === unit.productUuid);
+    const entry = bin.items.find(
+      (item) => item.productUuid === unit.productUuid,
+    );
     if (entry) {
       entry.count += 1;
     } else {
@@ -531,12 +544,14 @@ const evaluateCapacity = (
     rule.consumerWhen,
     selection,
     context,
+    "max",
   );
   const providerSide = collectSide(
     rule.provider,
     rule.providerWhen,
     selection,
     context,
+    "min",
   );
   const skipped = [...consumerSide.skipped, ...providerSide.skipped];
 
@@ -579,7 +594,9 @@ const evaluateCapacity = (
   const consumers = consumerSide.participants.map((participant) => ({
     ...participant,
     unitValue: round2(participant.unitValue * toProvider),
-    totalValue: round2(participant.unitValue * toProvider * participant.quantity),
+    totalValue: round2(
+      participant.unitValue * toProvider * participant.quantity,
+    ),
   }));
   const providers = providerSide.participants;
 
@@ -746,7 +763,9 @@ const evaluateCapacity = (
       ),
       correction(
         "reduce_demand",
-        counting ? reduceDemand : `Reduce "${consumerName}" by ${formatValue(gap, providerUnit)}.`,
+        counting
+          ? reduceDemand
+          : `Reduce "${consumerName}" by ${formatValue(gap, providerUnit)}.`,
       ),
     ],
   };
@@ -993,12 +1012,14 @@ const evaluateRatio = (
     rule.consumerWhen,
     selection,
     context,
+    "max",
   );
   const providerSide = collectSide(
     rule.provider,
     rule.providerWhen,
     selection,
     context,
+    "min",
   );
   const skipped = [...consumerSide.skipped, ...providerSide.skipped];
 
@@ -1008,7 +1029,10 @@ const evaluateRatio = (
     rule.consumer?.source === "variable"
       ? context.variables.get(rule.consumer.variableUuid)
       : null;
-  if (rule.consumer?.source === "variable" && demandFromVariable?.value === null) {
+  if (
+    rule.consumer?.source === "variable" &&
+    demandFromVariable?.value === null
+  ) {
     return {
       ...base,
       skipped,
@@ -1120,7 +1144,13 @@ const evaluateConditional = (
     ) {
       return [];
     }
-    const value = asNumber(readValue(item.values, operand.specUuid), meta);
+    // The item's own measured value against a limit read from the table — a
+    // consumer, so a span is judged at the end that could exceed the limit.
+    const value = asNumber(
+      readValue(item.values, operand.specUuid),
+      meta,
+      "max",
+    );
     if (value === null) {
       return [];
     }
@@ -1217,7 +1247,8 @@ const evaluatePresence = (
   }
 
   const triggered = selection.filter(
-    (item) => evaluatePredicate(spec.trigger, item.values, context.attributes).matched,
+    (item) =>
+      evaluatePredicate(spec.trigger, item.values, context.attributes).matched,
   );
   if (triggered.length === 0) {
     return {
@@ -1256,8 +1287,11 @@ const evaluatePresence = (
       }
       const companions = selection.filter(
         (item) =>
-          evaluatePredicate(alternative.predicate, item.values, context.attributes)
-            .matched,
+          evaluatePredicate(
+            alternative.predicate,
+            item.values,
+            context.attributes,
+          ).matched,
       );
       if (companions.length === 0) {
         continue;
@@ -1278,7 +1312,8 @@ const evaluatePresence = (
         corrections: [
           correction(
             "add_supply",
-            spec.suggestedFix ?? `Add what "${requirement.description}" asks for.`,
+            spec.suggestedFix ??
+              `Add what "${requirement.description}" asks for.`,
           ),
         ],
       };
@@ -1288,7 +1323,9 @@ const evaluatePresence = (
     // "every door needs a reader" be checked in total, without modelling
     // per-door grouping.
     if (requirement.perTriggerQuantity > 0) {
-      const needed = Math.ceil(triggerQuantity * requirement.perTriggerQuantity);
+      const needed = Math.ceil(
+        triggerQuantity * requirement.perTriggerQuantity,
+      );
       if (companionQuantity < needed) {
         return {
           ...withSides,

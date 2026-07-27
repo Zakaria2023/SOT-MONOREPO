@@ -148,9 +148,7 @@ const attributes = indexAttributes([
   channels,
 ]);
 
-const context = (
-  overrides: Partial<EngineContext> = {},
-): EngineContext => ({
+const context = (overrides: Partial<EngineContext> = {}): EngineContext => ({
   attributes,
   variables: new Map<string, EngineVariable>(),
   catalog: [],
@@ -266,9 +264,21 @@ describe("Budget — the acceptance scenario", () => {
       [switch24, camera],
       context({
         catalog: [
-          { productUuid: "c-1", name: "370W switch", values: { "a-budget": 370 } },
-          { productUuid: "c-2", name: "250W switch", values: { "a-budget": 250 } },
-          { productUuid: "c-3", name: "90W switch", values: { "a-budget": 90 } },
+          {
+            productUuid: "c-1",
+            name: "370W switch",
+            values: { "a-budget": 370 },
+          },
+          {
+            productUuid: "c-2",
+            name: "250W switch",
+            values: { "a-budget": 250 },
+          },
+          {
+            productUuid: "c-3",
+            name: "90W switch",
+            values: { "a-budget": 90 },
+          },
         ],
       }),
     );
@@ -323,7 +333,10 @@ describe("Budget — per-unit allocation", () => {
   it("spreads a load that does fit across the units", () => {
     const finding = evaluateRelationship(
       perUnit,
-      [{ ...switch24, quantity: 2 }, { ...camera, quantity: 20 }],
+      [
+        { ...switch24, quantity: 2 },
+        { ...camera, quantity: 20 },
+      ],
       context(),
     );
     expect(finding.status).toBe("pass");
@@ -411,7 +424,12 @@ describe("Count", () => {
       name: "Cameras fit the recorder channels",
       family: "count",
       consumer: { source: "item_count" },
-      consumerWhen: { op: "in", attr: "a-role", values: ["camera"], mode: "any" },
+      consumerWhen: {
+        op: "in",
+        attr: "a-role",
+        values: ["camera"],
+        mode: "any",
+      },
       provider: { source: "spec", specUuid: "a-channels" },
     });
     const nvr: EngineItem = {
@@ -484,7 +502,12 @@ describe("Match", () => {
       comparator: "intersects",
       gate: "warn",
       consumer: { source: "spec", specUuid: "a-onvif" },
-      consumerWhen: { op: "in", attr: "a-role", values: ["camera"], mode: "any" },
+      consumerWhen: {
+        op: "in",
+        attr: "a-role",
+        values: ["camera"],
+        mode: "any",
+      },
       provider: { source: "spec", specUuid: "a-onvif" },
       providerWhen: {
         op: "in",
@@ -551,7 +574,11 @@ describe("Match", () => {
         { value: "osdp", label: "OSDP", rank: null, retired: false },
       ],
     };
-    const ifaces: AttributeMeta = { ...unordered, uuid: "a-ifaces", type: "multi_select" };
+    const ifaces: AttributeMeta = {
+      ...unordered,
+      uuid: "a-ifaces",
+      type: "multi_select",
+    };
     const readerRule = rule({
       uuid: "r-reader",
       name: "Reader interface fits the controller",
@@ -566,8 +593,18 @@ describe("Match", () => {
       evaluateRelationship(
         readerRule,
         [
-          { productUuid: "r", name: "Reader", quantity: 1, values: { "a-iface": "osdp" } },
-          { productUuid: "c", name: "Controller", quantity: 1, values: { "a-ifaces": ["osdp", "wiegand"] } },
+          {
+            productUuid: "r",
+            name: "Reader",
+            quantity: 1,
+            values: { "a-iface": "osdp" },
+          },
+          {
+            productUuid: "c",
+            name: "Controller",
+            quantity: 1,
+            values: { "a-ifaces": ["osdp", "wiegand"] },
+          },
         ],
         ctx,
       ).status,
@@ -577,8 +614,18 @@ describe("Match", () => {
       evaluateRelationship(
         readerRule,
         [
-          { productUuid: "r", name: "Reader", quantity: 1, values: { "a-iface": "osdp" } },
-          { productUuid: "c", name: "Controller", quantity: 1, values: { "a-ifaces": ["wiegand"] } },
+          {
+            productUuid: "r",
+            name: "Reader",
+            quantity: 1,
+            values: { "a-iface": "osdp" },
+          },
+          {
+            productUuid: "c",
+            name: "Controller",
+            quantity: 1,
+            values: { "a-ifaces": ["wiegand"] },
+          },
         ],
         ctx,
       ).status,
@@ -690,7 +737,14 @@ describe("Conditional", () => {
   it("does not apply when nothing matches a row", () => {
     const finding = evaluateRelationship(
       cableRun,
-      [{ productUuid: "x", name: "Switch", quantity: 1, values: { "a-length": 80 } }],
+      [
+        {
+          productUuid: "x",
+          name: "Switch",
+          quantity: 1,
+          values: { "a-length": 80 },
+        },
+      ],
       context(),
     );
     expect(finding.status).toBe("not_applicable");
@@ -760,7 +814,12 @@ describe("Presence", () => {
         variables: new Map([
           [
             "v-cloud",
-            { uuid: "v-cloud", label: "Cloud recording", unit: null, value: true },
+            {
+              uuid: "v-cloud",
+              label: "Cloud recording",
+              unit: null,
+              value: true,
+            },
           ],
         ]),
       }),
@@ -903,8 +962,18 @@ describe("never guessing", () => {
     const finding = evaluateRelationship(
       mismatched,
       [
-        { productUuid: "ups", name: "UPS", quantity: 1, values: { "a-va": 1500 } },
-        { productUuid: "x", name: "Server", quantity: 1, values: { "a-draw": 1200 } },
+        {
+          productUuid: "ups",
+          name: "UPS",
+          quantity: 1,
+          values: { "a-va": 1500 },
+        },
+        {
+          productUuid: "x",
+          name: "Server",
+          quantity: 1,
+          values: { "a-draw": 1200 },
+        },
       ],
       context({ attributes: indexAttributes([draw, va]) }),
     );
@@ -923,7 +992,12 @@ describe("never guessing", () => {
     const finding = evaluateRelationship(
       kwRule,
       [
-        { productUuid: "sw", name: "Big switch", quantity: 1, values: { "a-budget-kw": 1 } },
+        {
+          productUuid: "sw",
+          name: "Big switch",
+          quantity: 1,
+          values: { "a-budget-kw": 1 },
+        },
         { ...camera, quantity: 20 },
       ],
       context(),
@@ -962,7 +1036,11 @@ describe("evaluateSelection", () => {
         suggestedFix: null,
       },
     });
-    const warnOnly = { ...poeBudgetRule, uuid: "r-warn", gate: "warn" as const };
+    const warnOnly = {
+      ...poeBudgetRule,
+      uuid: "r-warn",
+      gate: "warn" as const,
+    };
 
     const report = evaluateSelection(
       [warnOnly, presence],
@@ -997,5 +1075,150 @@ describe("evaluateSelection", () => {
     );
     expect(report.notApplicable).toBe(1);
     expect(report.blockers).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ranges — a number answered as a span rather than a point.
+//
+// The whole reason a span is stored as two numbers rather than flattened to one
+// is that the two ends mean different things, and the engine has to pick per
+// SIDE rather than per attribute. A camera drawing 4–12 W costs 12; a switch
+// budget of 120–130 W supplies 120. Every test below exists to catch the day
+// somebody "simplifies" that into one number.
+// ---------------------------------------------------------------------------
+
+describe("Range values", () => {
+  // A camera that draws between 4 and 12 W, on the same rule as the point-value
+  // camera above. It has to cost the same as a flat 12 W one.
+  const rangeCamera: EngineItem = {
+    productUuid: "p-camera-range",
+    name: "Varifocal dome",
+    quantity: 20,
+    values: {
+      "a-role": ["camera"],
+      "a-draw": { min: 4, max: 12 },
+      "a-poe-in": "af",
+    },
+  };
+
+  it("budgets a consuming range at its worst case, not its best", () => {
+    const finding = evaluateRelationship(
+      poeBudgetRule,
+      [switch24, rangeCamera],
+      context(),
+    );
+    // 20 × 12 = 240, exactly as if the camera were a flat 12 W part. Reading the
+    // low end would give 80 W and wave a genuinely overloaded switch through.
+    expect(finding.demand).toBe(240);
+    expect(finding.status).toBe("block");
+  });
+
+  it("supplies from a providing range at its guaranteed end", () => {
+    const rangeSwitch: EngineItem = {
+      ...switch24,
+      values: { ...switch24.values, "a-budget": { min: 120, max: 130 } },
+    };
+    const finding = evaluateRelationship(
+      poeBudgetRule,
+      [rangeSwitch, { ...camera, quantity: 10 }],
+      context(),
+    );
+    // 120, never 130 — promising the top of a span is promising capacity the
+    // part does not always have.
+    expect(finding.capacity).toBe(120);
+    expect(finding.demand).toBe(120);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("fails a cart that only fits at the top of the supplier's span", () => {
+    const rangeSwitch: EngineItem = {
+      ...switch24,
+      values: { ...switch24.values, "a-budget": { min: 120, max: 130 } },
+    };
+    const finding = evaluateRelationship(
+      poeBudgetRule,
+      // 11 × 12 = 132 W: over 120, under nothing anyone promised.
+      [rangeSwitch, { ...camera, quantity: 11 }],
+      context(),
+    );
+    expect(finding.status).toBe("block");
+    expect(finding.capacity).toBe(120);
+  });
+
+  it("treats a point value as the span where both ends are equal", () => {
+    const flat = evaluateRelationship(
+      poeBudgetRule,
+      [switch24, { ...camera, quantity: 10 }],
+      context(),
+    );
+    const spanned = evaluateRelationship(
+      poeBudgetRule,
+      [
+        switch24,
+        {
+          ...camera,
+          quantity: 10,
+          values: { ...camera.values, "a-draw": { min: 12, max: 12 } },
+        },
+      ],
+      context(),
+    );
+    expect(spanned.demand).toBe(flat.demand);
+    expect(spanned.status).toBe(flat.status);
+  });
+
+  it("reports a malformed span as unreadable rather than counting it", () => {
+    const halfFilled: EngineItem = {
+      productUuid: "p-camera-broken",
+      name: "Half-filled camera",
+      quantity: 5,
+      // Only one end — exactly what a form would produce mid-typing. It must
+      // not read as 0 W, and it must not read as absent either.
+      values: {
+        "a-role": ["camera"],
+        "a-draw": { min: 4 } as unknown as number,
+        "a-poe-in": "af",
+      },
+    };
+    const finding = evaluateRelationship(
+      {
+        ...poeBudgetRule,
+        consumerWhen: {
+          op: "in",
+          attr: "a-role",
+          values: ["camera"],
+          mode: "any",
+        },
+      },
+      [switch24, halfFilled],
+      context(),
+    );
+    expect(finding.status).toBe("unknown");
+    expect(finding.skipped.map((entry) => entry.name)).toContain(
+      "Half-filled camera",
+    );
+  });
+
+  it("names both ends when it explains the value", () => {
+    const finding = evaluateRelationship(
+      rule({
+        uuid: "r-match-range",
+        name: "Draw within the port maximum",
+        family: "budget",
+        perItem: true,
+        consumer: { source: "spec", specUuid: "a-draw" },
+        provider: { source: "spec", specUuid: "a-budget" },
+      }),
+      [
+        { ...switch24, values: { ...switch24.values, "a-budget": 5 } },
+        rangeCamera,
+      ],
+      context(),
+    );
+    expect(finding.status).toBe("block");
+    // The buyer is shown the number that failed, which for a consumer is the
+    // top of the span.
+    expect(finding.failingItems[0]?.unitValue).toBe(12);
   });
 });

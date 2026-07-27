@@ -1,10 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
-import type {
-  CatalogAuditAction,
-  CatalogAuditTarget,
-} from "../../../db/enum";
+import type { CatalogAuditAction, CatalogAuditTarget } from "../../../db/enum";
 import { CatalogAudit } from "../../../db/schema/catalog-audit";
 
 // The audit trail. Rules and assignments are what get blamed when a sale is

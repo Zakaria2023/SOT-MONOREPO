@@ -179,13 +179,13 @@ export const requestPayout = async ({
     }
 
     // Integer minor units. This is money owed to a partner, accumulated over an
-  // arbitrary number of earnings rows — adding decimal strings as floats drifts
-  // as the row count grows, and toFixed at the end cannot recover a cent that
-  // was lost mid-sum.
-  const totalMinor = accrued.reduce(
-    (sum, row) => sum + toMinorUnits(row.amount),
-    0,
-  );
+    // arbitrary number of earnings rows — adding decimal strings as floats drifts
+    // as the row count grows, and toFixed at the end cannot recover a cent that
+    // was lost mid-sum.
+    const totalMinor = accrued.reduce(
+      (sum, row) => sum + toMinorUnits(row.amount),
+      0,
+    );
     await tx.insert(PartnerPayouts).values({
       uuid: payoutUuid,
       reference: `PAY-${payoutUuid.slice(0, 8).toUpperCase()}`,

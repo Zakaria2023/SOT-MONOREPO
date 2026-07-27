@@ -1,5 +1,11 @@
 import { UNIT_DIMENSIONS, type SpecificationType } from "../../../db/enum";
-import type { ProductValue, ProductValues, SpecOption } from "../../../db/types";
+import {
+  isSpecRange,
+  type ProductValue,
+  type ProductValues,
+  type SpecOption,
+  type SpecRange,
+} from "../../../db/types";
 
 // ---------------------------------------------------------------------------
 // Reading attribute values, and the unit safety that has to happen before any
@@ -22,15 +28,26 @@ export type AttributeMeta = {
   options: SpecOption[];
 };
 
+// Deliberately NOT here: `allowRange`. Every reader below decides a value is a
+// span by its SHAPE, so nothing in a computation needs the flag — and a value
+// that is a range stays read as one even if an author later turned the flag off.
+// The flag belongs to the authoring surfaces, which is where it lives.
+
+// Which end of a span to read.
+//
+// Not a preference — the two ends mean different things and picking the wrong
+// one is silently unsafe. A span that CONSUMES has to be budgeted at its worst
+// case (a 4–12 W camera can draw 12), and a span that SUPPLIES may only promise
+// what it always delivers (a 20–30 W port budget guarantees 20).
+export type RangeBound = "max" | "min";
+
 export type AttributeIndex = Map<string, AttributeMeta>;
 
-export const indexAttributes = (
-  attributes: AttributeMeta[],
-): AttributeIndex => new Map(attributes.map((meta) => [meta.uuid, meta]));
+export const indexAttributes = (attributes: AttributeMeta[]): AttributeIndex =>
+  new Map(attributes.map((meta) => [meta.uuid, meta]));
 
 /** Round to 2dp — money-and-watts precision, applied at every boundary. */
-export const round2 = (value: number): number =>
-  Math.round(value * 100) / 100;
+export const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 // ---------------------------------------------------------------------------
 // Presence of a value
@@ -54,9 +71,19 @@ export const hasValue = (raw: ProductValue | undefined): boolean => {
   if (typeof raw === "string") {
     return raw.trim().length > 0;
   }
+  // An object is only a value if it is a well-formed range. A half-filled
+  // {min: 4} would otherwise read as present and then be unreadable, which is
+  // the exact confusion between "absent" and "unreadable" this guards.
+  if (typeof raw === "object") {
+    return isSpecRange(raw);
+  }
   // 0 and false are real answers.
   return true;
 };
+
+/** A value as a span, or null when it is not one. */
+export const asRange = (raw: ProductValue | undefined): SpecRange | null =>
+  isSpecRange(raw) ? raw : null;
 
 export const readValue = (
   values: ProductValues,
@@ -84,6 +111,11 @@ export const asOptionList = (raw: ProductValue | undefined): string[] => {
   if (Array.isArray(raw)) {
     return raw.map(String);
   }
+  // A span is a quantity, not a set membership. Stringifying it would give the
+  // set operators an option value of "[object Object]" to match against.
+  if (isSpecRange(raw)) {
+    return [];
+  }
   return [String(raw)];
 };
 
@@ -97,13 +129,22 @@ export const asOptionList = (raw: ProductValue | undefined): string[] => {
  *
  * A multi-select resolves to its highest-ranked ticked option: a device that
  * accepts af/at/bt supplies bt, which is the useful reading for a provider.
+ *
+ * A SPAN collapses to the end named by `bound`, and the caller must name it —
+ * see RangeBound. The default is "max" because every reader that does not know
+ * which side it is on is safer over-counting demand than over-promising supply.
  */
 export const asNumber = (
   raw: ProductValue | undefined,
   meta: AttributeMeta,
+  bound: RangeBound = "max",
 ): number | null => {
   if (!hasValue(raw) || raw === undefined) {
     return null;
+  }
+  const range = asRange(raw);
+  if (range) {
+    return bound === "min" ? range.min : range.max;
   }
   if (meta.type === "number") {
     const parsed = typeof raw === "number" ? raw : Number(raw);
@@ -239,6 +280,11 @@ export const describeValue = (
 ): string => {
   if (!hasValue(raw) || raw === undefined) {
     return "—";
+  }
+  const range = asRange(raw);
+  if (range) {
+    // One unit, at the end — "4 to 12 W", not "4 W to 12 W".
+    return `${round2(range.min)} to ${formatValue(range.max, meta.unit)}`;
   }
   if (meta.type === "number") {
     return formatValue(Number(raw), meta.unit);

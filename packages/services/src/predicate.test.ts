@@ -190,9 +190,9 @@ describe("evaluatePredicate", () => {
 
     expect(predicateMatches(both, values, attributes)).toBe(true);
     expect(predicateMatches(either, values, attributes)).toBe(true);
-    expect(predicateMatches({ op: "not", child: both }, values, attributes)).toBe(
-      false,
-    );
+    expect(
+      predicateMatches({ op: "not", child: both }, values, attributes),
+    ).toBe(false);
   });
 
   it("collects every missing attribute, not just the first", () => {
@@ -213,10 +213,18 @@ describe("evaluatePredicate", () => {
 
   it("treats zero and false as real answers, not as blanks", () => {
     expect(
-      predicateMatches({ op: "exists", attr: "a-draw" }, { "a-draw": 0 }, attributes),
+      predicateMatches(
+        { op: "exists", attr: "a-draw" },
+        { "a-draw": 0 },
+        attributes,
+      ),
     ).toBe(true);
     expect(
-      predicateMatches({ op: "exists", attr: "a-poe" }, { "a-poe": false }, attributes),
+      predicateMatches(
+        { op: "exists", attr: "a-poe" },
+        { "a-poe": false },
+        attributes,
+      ),
     ).toBe(true);
   });
 });
@@ -233,7 +241,10 @@ describe("validatePredicate", () => {
 
   it("allows a numeric comparison on an ordered list", () => {
     expect(
-      validatePredicate({ op: "lte", attr: "a-poe-type", value: 2 }, attributes),
+      validatePredicate(
+        { op: "lte", attr: "a-poe-type", value: 2 },
+        attributes,
+      ),
     ).toEqual([]);
   });
 
@@ -311,5 +322,116 @@ describe("asNumber", () => {
 
   it("returns null for an unordered select", () => {
     expect(asNumber(["poe"], powerMode)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ranges in a condition.
+//
+// A condition on a span has to hold for the WHOLE span, so each operator reads
+// the end that could break it. Reading the wrong end is silently wrong in the
+// unsafe direction: a −20 to 60 °C part would pass "rated at most 40" because
+// one end of it happens to be.
+// ---------------------------------------------------------------------------
+
+describe("Ranges in a condition", () => {
+  const temperature: AttributeMeta = {
+    uuid: "a-temp",
+    label: "Operating Temperature",
+    type: "number",
+    unit: "°C",
+    ordered: false,
+    options: [],
+  };
+  const withTemperature = indexAttributes([
+    poe,
+    poeType,
+    powerMode,
+    draw,
+    temperature,
+  ]);
+
+  // A part rated −20 to 60 °C.
+  const outdoor = { "a-temp": { min: -20, max: 60 } };
+
+  it("holds 'at least' only when the whole span clears the floor", () => {
+    expect(
+      predicateMatches(
+        { op: "gte", attr: "a-temp", value: -30 },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(true);
+    // The top end is above −10, but the bottom is not, so the part is not
+    // "always at least −10".
+    expect(
+      predicateMatches(
+        { op: "gte", attr: "a-temp", value: -10 },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(false);
+  });
+
+  it("holds 'at most' only when the whole span stays under the ceiling", () => {
+    expect(
+      predicateMatches(
+        { op: "lte", attr: "a-temp", value: 70 },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(true);
+    expect(
+      predicateMatches(
+        { op: "lte", attr: "a-temp", value: 40 },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(false);
+  });
+
+  it("holds 'between' only when the span sits entirely inside", () => {
+    expect(
+      predicateMatches(
+        { op: "between", attr: "a-temp", min: -40, max: 80 },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(true);
+    expect(
+      predicateMatches(
+        { op: "between", attr: "a-temp", min: 0, max: 80 },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(false);
+  });
+
+  it("counts a span as a value for exists", () => {
+    expect(
+      predicateMatches(
+        { op: "exists", attr: "a-temp" },
+        outdoor,
+        withTemperature,
+      ),
+    ).toBe(true);
+  });
+
+  it("reports a malformed span as missing, never as a non-match", () => {
+    const result = evaluatePredicate(
+      { op: "gte", attr: "a-temp", value: 0 },
+      { "a-temp": { max: 60 } as unknown as number },
+      withTemperature,
+    );
+    expect(result.matched).toBe(false);
+    expect(result.missing).toEqual(["a-temp"]);
+  });
+
+  it("reads a span at the named end", () => {
+    expect(asNumber({ min: 4, max: 12 }, draw)).toBe(12);
+    expect(asNumber({ min: 4, max: 12 }, draw, "min")).toBe(4);
+    // Defaulting to the top is the safe default: a reader that does not know
+    // which side it is on over-counts demand rather than over-promising supply.
+    expect(asNumber({ min: 4, max: 12 }, draw, "max")).toBe(12);
   });
 });

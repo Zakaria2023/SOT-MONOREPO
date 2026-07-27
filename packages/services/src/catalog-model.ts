@@ -69,6 +69,7 @@ const toDefinition = (
   internalName: row.internalName,
   description: row.description,
   audience: row.audience,
+  allowRange: row.allowRange,
   order: row.order,
   groupUuid: row.groupUuid,
 });

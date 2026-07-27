@@ -3,7 +3,12 @@ import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
 import { SpecificationGroups } from "../../../db/schema/specification-groups";
-import type { ProductValues } from "../../../db/types";
+import {
+  isSpecRange,
+  type ProductValue,
+  type ProductValues,
+  type SpecRange,
+} from "../../../db/types";
 import {
   clearHiddenValues,
   completenessProblems,
@@ -36,6 +41,23 @@ export type ProductCompleteness = {
 };
 
 /**
+ * A span from whatever the form sent, or null when it is not a complete one.
+ *
+ * Swaps the ends if the author typed them the wrong way round — "60 to −20" is
+ * unambiguous about what was meant, and refusing it would only teach people to
+ * retype it.
+ */
+const toRange = (value: ProductValue): SpecRange | null => {
+  if (isSpecRange(value)) {
+    return value.min <= value.max ? value : { min: value.max, max: value.min };
+  }
+  // A single number is the degenerate span, so switching an existing attribute
+  // to a range does not invalidate what is already stored.
+  const single = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(single) ? { min: single, max: single } : null;
+};
+
+/**
  * Normalise a product's values before they are stored.
  *
  * Two jobs, both of which have to happen on the SERVER and not merely in the
@@ -60,6 +82,17 @@ export const normalizeProductValues = async (
     }
 
     if (definition.type === "number") {
+      // A span, when the attribute allows one and both ends came through. A
+      // half-filled span is dropped rather than half-stored: {min: 4} would read
+      // as present and then be unreadable, which is the one state the engine
+      // cannot tell apart from a real answer.
+      if (definition.allowRange) {
+        const range = toRange(value);
+        if (range) {
+          typed[definition.uuid] = range;
+        }
+        continue;
+      }
       const parsed = typeof value === "number" ? value : Number(value);
       if (Number.isFinite(parsed)) {
         typed[definition.uuid] = parsed;
@@ -254,6 +287,9 @@ export type ProductFormField = {
   type: ResolvedAssignment["definition"]["type"];
   unit: string | null;
   ordered: boolean;
+  // Render two number boxes rather than one. Authoring only — see
+  // AssignmentDefinition.
+  allowRange: boolean;
   options: ResolvedAssignment["offeredOptions"];
   isRule: boolean;
   isFilter: boolean;
@@ -289,7 +325,11 @@ const toFormReveal = (
     predicate.op === "gt" ||
     predicate.op === "lt"
   ) {
-    return { attr: predicate.attr, op: predicate.op, values: [predicate.value] };
+    return {
+      attr: predicate.attr,
+      op: predicate.op,
+      values: [predicate.value],
+    };
   }
   // Composite, negated, or a range — the form shows the field and the server
   // applies the real condition when the product is saved.
@@ -306,6 +346,7 @@ const toFormField = (
   type: assignment.definition.type,
   unit: assignment.definition.unit,
   ordered: assignment.definition.ordered,
+  allowRange: assignment.definition.allowRange,
   // The slice this category offers, never the whole master list.
   options: assignment.offeredOptions,
   isRule: assignment.isRule,

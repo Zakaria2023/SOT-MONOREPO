@@ -127,7 +127,12 @@ export const getBrandsPage = async (
       db.select({ total: count() }).from(Brands).where(where),
     ]);
 
-    return buildPaginatedResult(rows, Number(totals?.total ?? 0), page, pageSize);
+    return buildPaginatedResult(
+      rows,
+      Number(totals?.total ?? 0),
+      page,
+      pageSize,
+    );
   } catch (error) {
     console.error("getBrandsPage failed:", error);
     throw new Error("Failed to fetch brands", { cause: error });
@@ -150,7 +155,9 @@ export const getBrandChildren = async (
       .leftJoin(Products, eq(Products.brandUuid, Brands.uuid))
       .leftJoin(ChildBrands, eq(ChildBrands.parentUuid, Brands.uuid))
       .where(
-        parentUuid ? eq(Brands.parentUuid, parentUuid) : isNull(Brands.parentUuid),
+        parentUuid
+          ? eq(Brands.parentUuid, parentUuid)
+          : isNull(Brands.parentUuid),
       )
       .groupBy(Brands.id)
       .orderBy(asc(Brands.order));
@@ -264,7 +271,9 @@ export const reorderBrandChildren = async (
     .select({ uuid: Brands.uuid })
     .from(Brands)
     .where(
-      parentUuid ? eq(Brands.parentUuid, parentUuid) : isNull(Brands.parentUuid),
+      parentUuid
+        ? eq(Brands.parentUuid, parentUuid)
+        : isNull(Brands.parentUuid),
     )
     .orderBy(asc(Brands.order));
 
@@ -361,7 +370,9 @@ export const createBrand = async (fields: BrandFields): Promise<string> => {
       .filter((code): code is string => Boolean(code)),
   );
   const code = resolveUniqueCode(deriveCode(fields.name), taken);
-  await db.insert(Brands).values({ ...fields, uuid, order: existing.length, code });
+  await db
+    .insert(Brands)
+    .values({ ...fields, uuid, order: existing.length, code });
   return uuid;
 };
 

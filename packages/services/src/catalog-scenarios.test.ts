@@ -66,6 +66,7 @@ const attr = (
   internalName: null,
   description: null,
   audience: "everyone",
+  allowRange: false,
   order: 0,
   groupUuid: null,
   ...overrides,
@@ -209,7 +210,11 @@ const row = (
 // How the catalog team would actually set this up: Port Speed branch-wide at
 // Networking, the PoE trio on Switches with the reveal, roles everywhere.
 const ASSIGNMENTS: AssignmentRow[] = [
-  row({ specificationUuid: "a-speed", categoryUuid: NETWORKING, scope: "branch" }),
+  row({
+    specificationUuid: "a-speed",
+    categoryUuid: NETWORKING,
+    scope: "branch",
+  }),
   row({
     specificationUuid: "a-role",
     categoryUuid: NETWORKING,
@@ -462,9 +467,9 @@ describe("SCENARIO 1 — the acceptance test, end to end", () => {
       (finding) => finding.relationshipUuid === "R-poe-budget",
     );
     // Only those that clear 240 W, smallest first. The 90 W switch is not a fix.
-    expect(
-      budget?.corrections[0]?.products.map((entry) => entry.name),
-    ).toEqual(["250W switch", "370W switch"]);
+    expect(budget?.corrections[0]?.products.map((entry) => entry.name)).toEqual(
+      ["250W switch", "370W switch"],
+    );
   });
 
   it("offers the cloud-recording escape hatch instead of a recorder", () => {
@@ -601,9 +606,7 @@ describe("SCENARIO 2 — authoring a category, and what a product form shows", (
     const broken = resolveAssignments({
       chain: CHAINS.get(SMB) ?? [SMB],
       // PoE removed, but PoE Budget still watches it.
-      rows: ASSIGNMENTS.filter(
-        (entry) => entry.specificationUuid !== "a-poe",
-      ),
+      rows: ASSIGNMENTS.filter((entry) => entry.specificationUuid !== "a-poe"),
       definitions: LIBRARY,
     });
     expect(revealProblems(broken)[0]?.code).toBe("unassigned_trigger");
@@ -618,7 +621,8 @@ describe("SCENARIO 2 — authoring a category, and what a product form shows", (
         ...ASSIGNMENTS.filter(
           (entry) =>
             !(
-              entry.categoryUuid === SMB && entry.specificationUuid === "a-speed"
+              entry.categoryUuid === SMB &&
+              entry.specificationUuid === "a-speed"
             ),
         ),
         row({
@@ -760,9 +764,9 @@ describe("SCENARIO 4 — the shopper's filters", () => {
       ordered: false,
       options: [],
     };
-    expect(
-      facetSelectionValues({ "a-poe": ["true"] }, [boolFacet]),
-    ).toEqual({ "a-poe": true });
+    expect(facetSelectionValues({ "a-poe": ["true"] }, [boolFacet])).toEqual({
+      "a-poe": true,
+    });
     expect(
       facetSelectionValues({ "a-bands": ["2.4", "6"] }, [bandFacet]),
     ).toEqual({ "a-bands": ["2.4", "6"] });
@@ -823,7 +827,12 @@ describe("SCENARIO 5 — the engine never guesses", () => {
         provider: { source: "spec", specUuid: "a-va" },
       }),
       [
-        { productUuid: "ups", name: "UPS", quantity: 1, values: { "a-va": 1500 } },
+        {
+          productUuid: "ups",
+          name: "UPS",
+          quantity: 1,
+          values: { "a-va": 1500 },
+        },
         {
           productUuid: "srv",
           name: "Server",
@@ -855,7 +864,12 @@ describe("SCENARIO 5 — the engine never guesses", () => {
         provider: { source: "spec", specUuid: "a-kw" },
       }),
       [
-        { productUuid: "sw", name: "Switch", quantity: 1, values: { "a-kw": 1 } },
+        {
+          productUuid: "sw",
+          name: "Switch",
+          quantity: 1,
+          values: { "a-kw": 1 },
+        },
         CAMERA,
       ],
       context({ attributes: indexAttributes([DRAW, kw]) }),
@@ -880,7 +894,12 @@ describe("SCENARIO 5 — the engine never guesses", () => {
         variables: new Map([
           [
             "v-demand",
-            { uuid: "v-demand", label: "Access demand", unit: "ports", value: null },
+            {
+              uuid: "v-demand",
+              label: "Access demand",
+              unit: "ports",
+              value: null,
+            },
           ],
         ]),
       }),
@@ -953,9 +972,9 @@ describe("SCENARIO 7 — counting, pairing, and lookups", () => {
       evaluateRelationship(ports, [SWITCH, CAMERA, PANEL], context()).demand,
     ).toBe(20);
     // The patch panel's 24 ports must not count as switch capacity.
-    expect(
-      evaluateRelationship(ports, [PANEL, CAMERA], context()).status,
-    ).toBe("not_applicable");
+    expect(evaluateRelationship(ports, [PANEL, CAMERA], context()).status).toBe(
+      "not_applicable",
+    );
   });
 
   it("pairs quantities: 20 triggers demand 20 companions", () => {
@@ -1126,9 +1145,9 @@ describe("SCENARIO 8 — authoring mistakes are caught, not shipped", () => {
       rows: [row({ specificationUuid: "a-legacy", categoryUuid: SMB })],
       definitions: [withRetired],
     });
-    expect(
-      resolved[0]?.offeredOptions.map((option) => option.value),
-    ).toEqual(["keep"]);
+    expect(resolved[0]?.offeredOptions.map((option) => option.value)).toEqual([
+      "keep",
+    ]);
     // A product still holding "old" is not reported as being outside the slice —
     // the value stays valid, it simply cannot be picked again.
     expect(outOfSliceValues(resolved, { "a-legacy": "old" })).toHaveLength(1);

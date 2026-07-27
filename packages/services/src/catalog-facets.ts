@@ -42,7 +42,6 @@ export const getCategoryFacets = async (
   }));
 };
 
-
 // The pure half — choice expansion and reveal values — lives in
 // `facet-selection.ts` so it is testable without database credentials.
 export * from "./facet-selection";

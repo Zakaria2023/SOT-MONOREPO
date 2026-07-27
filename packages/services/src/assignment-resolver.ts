@@ -41,6 +41,10 @@ export type AssignmentDefinition = AttributeMeta & {
   internalName: string | null;
   description: string | null;
   audience: AssignmentAudience;
+  // Whether a `number` attribute is answered as a span. Authoring only — it
+  // tells the product form to render two boxes. The engine never reads it; it
+  // recognises a span by its shape.
+  allowRange: boolean;
   order: number;
   // Library group — filing only, carried so a product page can section its spec
   // table the way the library is organised. Never read by the engine.
@@ -386,8 +390,7 @@ export const facetAssignments = (
 /** The assignments the compatibility engine may read. Audience never gates this. */
 export const ruleAssignments = (
   resolved: ResolvedAssignment[],
-): ResolvedAssignment[] =>
-  resolved.filter((assignment) => assignment.isRule);
+): ResolvedAssignment[] => resolved.filter((assignment) => assignment.isRule);
 
 // ---------------------------------------------------------------------------
 // Completeness — the most dangerous failure mode in the system
@@ -472,7 +475,10 @@ export const outOfSliceValues = (
 
   for (const assignment of resolved) {
     const { definition } = assignment;
-    if (definition.type !== "single_select" && definition.type !== "multi_select") {
+    if (
+      definition.type !== "single_select" &&
+      definition.type !== "multi_select"
+    ) {
       continue;
     }
     const raw = readValue(values, definition.uuid);

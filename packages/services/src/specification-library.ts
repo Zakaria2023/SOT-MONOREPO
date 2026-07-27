@@ -51,6 +51,8 @@ export type LibraryAttributeInput = {
   type: SpecificationType;
   unit: string | null;
   ordered: boolean;
+  // Only meaningful on `number`. Whether a product answers with a span.
+  allowRange: boolean;
   audience: AssignmentAudience;
   options: LibraryOptionInput[];
 };
@@ -65,6 +67,7 @@ export type LibraryAttribute = {
   type: SpecificationType;
   unit: SelectSpecifications["unit"];
   ordered: boolean;
+  allowRange: SelectSpecifications["allowRange"];
   audience: AssignmentAudience;
   options: SpecOption[];
   order: number;
@@ -125,7 +128,8 @@ export const mergeOptions = (
     }
     // A stable value is derived once, at creation, and then carried forward by
     // the author's editor. Editing a label never re-derives it.
-    const value = entry.value?.trim() || slugify(label) || `option-${index + 1}`;
+    const value =
+      entry.value?.trim() || slugify(label) || `option-${index + 1}`;
     if (seen.has(value)) {
       return;
     }
@@ -211,6 +215,7 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
     type: spec.type,
     unit: spec.unit,
     ordered: spec.ordered,
+    allowRange: spec.allowRange,
     audience: spec.audience,
     options: spec.options ?? [],
     order: spec.order,
@@ -334,6 +339,9 @@ export const createLibraryAttribute = async (
     type: input.type,
     unit: input.type === "number" ? input.unit?.trim() || null : null,
     ordered: isOptionBacked(input.type) ? input.ordered : false,
+    // Normalised to its own type, exactly as `ordered` is: a select that claimed
+    // allowRange would leave the product form with no honest control to render.
+    allowRange: input.type === "number" ? input.allowRange : false,
     audience: input.audience,
     options: isOptionBacked(input.type)
       ? mergeOptions([], input.options, input.ordered)
@@ -396,6 +404,7 @@ export const updateLibraryAttribute = async (
       type: input.type,
       unit: input.type === "number" ? input.unit?.trim() || null : null,
       ordered: nextOrdered,
+      allowRange: input.type === "number" ? input.allowRange : false,
       audience: input.audience,
       options: isOptionBacked(input.type)
         ? mergeOptions(current.options ?? [], input.options, nextOrdered)
@@ -555,9 +564,7 @@ export const createProjectVariable = async (
     throw new ValidationError("A project input needs a question.");
   }
   const uuid = generateUuid();
-  const [total] = await db
-    .select({ value: count() })
-    .from(ProjectVariables);
+  const [total] = await db.select({ value: count() }).from(ProjectVariables);
 
   await db.insert(ProjectVariables).values({
     uuid,
@@ -566,7 +573,8 @@ export const createProjectVariable = async (
     description: input.description?.trim() || null,
     type: input.type,
     unit: input.type === "number" ? input.unit?.trim() || null : null,
-    defaultValue: input.defaultValue === null ? null : String(input.defaultValue),
+    defaultValue:
+      input.defaultValue === null ? null : String(input.defaultValue),
     order: Number(total?.value ?? 0),
   });
 

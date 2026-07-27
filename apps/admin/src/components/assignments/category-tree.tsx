@@ -371,12 +371,6 @@ export const CategoryTree = ({ categories, selected }: CategoryTreeProps) => {
           },
         )}
       </ul>
-
-      <p className="shrink-0 border-t border-hairline px-3 py-2.5 text-sm text-faint">
-        {selected && descendants.size > 0
-          ? `${descendants.size} categor${descendants.size === 1 ? "y" : "ies"} below this one inherit whatever you assign here.`
-          : "Pick a category — its attributes are what it inherits, plus its own."}
-      </p>
     </div>
   );
 };

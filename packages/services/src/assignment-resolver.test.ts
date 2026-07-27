@@ -33,6 +33,7 @@ const definition = (
   internalName: null,
   description: null,
   audience: "everyone",
+  allowRange: false,
   order: 0,
   groupUuid: null,
   ...overrides,
@@ -127,7 +128,9 @@ describe("resolveAssignments", () => {
   it("ignores rows from categories outside the chain", () => {
     const resolved = resolveAssignments({
       chain: CHAIN,
-      rows: [row({ specificationUuid: "a-speed", categoryUuid: "cat-cameras" })],
+      rows: [
+        row({ specificationUuid: "a-speed", categoryUuid: "cat-cameras" }),
+      ],
       definitions,
     });
     expect(resolved).toEqual([]);

@@ -9,6 +9,7 @@ import {
 import {
   asNumber,
   asOptionList,
+  asRange,
   hasValue,
   readValue,
   type AttributeIndex,
@@ -36,10 +37,7 @@ export type PredicateResult = {
   missing: string[];
 };
 
-const scalarEquals = (
-  values: string[],
-  target: PredicateScalar,
-): boolean => {
+const scalarEquals = (values: string[], target: PredicateScalar): boolean => {
   const wanted = String(target);
   // On a multi-select, "equals" means the ticked set is exactly this one value —
   // not "contains it". Containment is `in` with mode "any".
@@ -128,26 +126,32 @@ export const evaluatePredicate = (
       case "lt":
       case "lte":
       case "between": {
-        const numeric = asNumber(raw, meta);
+        // On a SPAN, a comparison holds only if the WHOLE span satisfies it, so
+        // each operator reads the end that could break it: "at least 10" is
+        // judged on the low end, "at most 10" on the high end. A −20 to 60 °C
+        // part is not "at most 40" just because one end of it is.
+        const range = asRange(raw);
+        const low = range ? range.min : asNumber(raw, meta);
+        const high = range ? range.max : low;
         // An unordered dropdown has no magnitude, so a numeric comparison on it
         // is not false — it is unanswerable. Reported as missing.
-        if (numeric === null) {
+        if (low === null || high === null) {
           missing.add(node.attr);
           return false;
         }
         if (node.op === "gt") {
-          return numeric > node.value;
+          return low > node.value;
         }
         if (node.op === "gte") {
-          return numeric >= node.value;
+          return low >= node.value;
         }
         if (node.op === "lt") {
-          return numeric < node.value;
+          return high < node.value;
         }
         if (node.op === "lte") {
-          return numeric <= node.value;
+          return high <= node.value;
         }
-        return numeric >= node.min && numeric <= node.max;
+        return low >= node.min && high <= node.max;
       }
       default:
         return false;
@@ -231,7 +235,10 @@ export const validatePredicate = (
       });
       return;
     }
-    if ((node.op === "in" || node.op === "not_in") && node.values.length === 0) {
+    if (
+      (node.op === "in" || node.op === "not_in") &&
+      node.values.length === 0
+    ) {
       problems.push({
         code: "empty_values",
         message: `"${meta.label} is one of" has no values selected, so it can never match.`,

@@ -3,7 +3,7 @@
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
-import type { ProductValue, SpecOption } from "@/db/types";
+import { isSpecRange, type ProductValue, type SpecOption } from "@/db/types";
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -32,6 +32,8 @@ export type FormField = {
   type: SpecificationType;
   unit: string | null;
   ordered: boolean;
+  // A number answered as a span — two boxes instead of one.
+  allowRange: boolean;
   // The slice this category offers — not the whole master list.
   options: SpecOption[];
   isRule: boolean;
@@ -72,12 +74,49 @@ const asList = (value: ProductValue | undefined): string[] => {
   if (value === undefined || value === null || value === "") {
     return [];
   }
+  // A span is a quantity, never a set membership — stringifying it would give
+  // the equals/in branches "[object Object]" to compare against.
+  if (isSpecRange(value)) {
+    return [];
+  }
   return Array.isArray(value) ? value.map(String) : [String(value)];
+};
+
+/** One end of a span, as text for its box. */
+const rangeEnd = (
+  value: ProductValue | undefined,
+  end: "min" | "max",
+): string => (isSpecRange(value) ? String(value[end]) : "");
+
+/**
+ * A span with one end replaced.
+ *
+ * Both ends live in state even while one is blank, so typing into the first box
+ * does not discard what is in the second. A blank end becomes NaN, which the
+ * server's `isSpecRange` rejects — so a half-filled span is never stored, and
+ * never mistaken for a real answer.
+ */
+const patchRange = (
+  value: ProductValue | undefined,
+  end: "min" | "max",
+  text: string,
+): ProductValue | undefined => {
+  const current = isSpecRange(value)
+    ? value
+    : { min: Number.NaN, max: Number.NaN };
+  const next = { ...current, [end]: text === "" ? Number.NaN : Number(text) };
+  return Number.isNaN(next.min) && Number.isNaN(next.max) ? undefined : next;
 };
 
 const hasValue = (value: ProductValue | undefined): boolean => {
   if (value === undefined || value === null || value === "") {
     return false;
+  }
+  // A half-filled span does not count. The server drops it, so treating it as
+  // answered here would show the author a complete product that saves
+  // incomplete — and an incomplete product silently passes every rule.
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return isSpecRange(value);
   }
   return !(Array.isArray(value) && value.length === 0);
 };
@@ -90,12 +129,37 @@ const satisfied = (
     return true;
   }
   const raw = values[condition.attr];
+  if (condition.op === "exists") {
+    return hasValue(raw);
+  }
+  // A span, judged the way the server judges it: the condition has to hold for
+  // the WHOLE span, so "at least" reads the low end and "at most" the high one.
+  const span = isSpecRange(raw) ? raw : null;
+  if (span) {
+    const target = Number(condition.values[0]);
+    if (!Number.isFinite(target)) {
+      return false;
+    }
+    if (condition.op === "gte") {
+      return span.min >= target;
+    }
+    if (condition.op === "gt") {
+      return span.min > target;
+    }
+    if (condition.op === "lte") {
+      return span.max <= target;
+    }
+    if (condition.op === "lt") {
+      return span.max < target;
+    }
+    // equals/in on a span is not a comparison the form can answer — the server
+    // decides on save rather than the field guessing.
+    return true;
+  }
+
   const list = asList(raw);
   if (list.length === 0) {
     return false;
-  }
-  if (condition.op === "exists") {
-    return true;
   }
   if (condition.op === "equals") {
     return list.length === 1 && String(condition.values[0]) === list[0];
@@ -141,24 +205,54 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
         )}
       </div>
 
-      {field.type === "number" && (
-        <Input
-          type="number"
-          value={value === undefined ? "" : String(value)}
-          onChange={(event) =>
-            onChange(
-              event.target.value === ""
-                ? undefined
-                : Number(event.target.value),
-            )
-          }
-          rightSlot={
-            field.unit ? (
-              <span className="text-xs text-faint">{field.unit}</span>
-            ) : undefined
-          }
-        />
-      )}
+      {field.type === "number" &&
+        (field.allowRange ? (
+          // Two boxes, one value. Both ends are kept in state even while one is
+          // blank so typing the first does not wipe the second; the SERVER drops
+          // a half-filled span, because a value it cannot read back is worse
+          // than no value at all.
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              placeholder="Lowest"
+              value={rangeEnd(value, "min")}
+              onChange={(event) =>
+                onChange(patchRange(value, "min", event.target.value))
+              }
+            />
+            <span className="shrink-0 text-xs text-faint">to</span>
+            <Input
+              type="number"
+              placeholder="Highest"
+              value={rangeEnd(value, "max")}
+              onChange={(event) =>
+                onChange(patchRange(value, "max", event.target.value))
+              }
+              rightSlot={
+                field.unit ? (
+                  <span className="text-xs text-faint">{field.unit}</span>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : (
+          <Input
+            type="number"
+            value={value === undefined ? "" : String(value)}
+            onChange={(event) =>
+              onChange(
+                event.target.value === ""
+                  ? undefined
+                  : Number(event.target.value),
+              )
+            }
+            rightSlot={
+              field.unit ? (
+                <span className="text-xs text-faint">{field.unit}</span>
+              ) : undefined
+            }
+          />
+        ))}
 
       {field.type === "boolean" && (
         <Dropdown

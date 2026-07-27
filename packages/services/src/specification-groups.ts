@@ -54,9 +54,7 @@ export const updateSpecificationGroup = async (
     .where(eq(SpecificationGroups.uuid, uuid));
 };
 
-export const deleteSpecificationGroup = async (
-  uuid: string,
-): Promise<void> => {
+export const deleteSpecificationGroup = async (uuid: string): Promise<void> => {
   // Specs in the group survive — their groupUuid is set null by the FK.
   await db
     .delete(SpecificationGroups)

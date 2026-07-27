@@ -201,7 +201,13 @@ export const addToCart = async ({
   // (cart_uuid, product_uuid) turns a repeat add into a quantity bump.
   await db
     .insert(CartItems)
-    .values({ uuid: randomUUID(), cartUuid, productUuid, quantity, kind: "product" })
+    .values({
+      uuid: randomUUID(),
+      cartUuid,
+      productUuid,
+      quantity,
+      kind: "product",
+    })
     .onDuplicateKeyUpdate({
       set: { quantity: sql`${CartItems.quantity} + ${quantity}` },
     });

@@ -88,7 +88,9 @@ export const createHandoverPack = async ({
   const productLines = await db
     .select()
     .from(BoqItems)
-    .where(and(eq(BoqItems.boqUuid, boqUuid), eq(BoqItems.lineType, "product")));
+    .where(
+      and(eq(BoqItems.boqUuid, boqUuid), eq(BoqItems.lineType, "product")),
+    );
 
   const packUuid = randomUUID();
 
@@ -166,9 +168,7 @@ export const getCustomerHandover = async (
  * Packs that need a SOT operator's attention — awaiting the remote check,
  * awaiting release, or disputed — newest activity first (verifier queue).
  */
-export const listHandoversForReview = async (): Promise<
-  HandoverReviewItem[]
-> =>
+export const listHandoversForReview = async (): Promise<HandoverReviewItem[]> =>
   db
     .select({ ...getTableColumns(HandoverPacks), boqReference: Boqs.reference })
     .from(HandoverPacks)

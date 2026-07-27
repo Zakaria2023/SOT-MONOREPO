@@ -70,6 +70,17 @@ export const Specifications = mysqlTable("Specifications", {
   // property of the attribute itself, not of where it is used.
   ordered: boolean("ordered").default(false).notNull(),
 
+  // Only meaningful for `number`. Whether a product answers this with a SPAN
+  // (−20 to 60 °C) rather than a single figure.
+  //
+  // Definition-level for the same reason `ordered` is: whether a quantity is
+  // naturally a range is a property of the quantity, not of the category asking
+  // for it. Operating temperature is a range on a switch and on a camera.
+  //
+  // A plain number is the degenerate range where min equals max, so turning this
+  // on never invalidates the values already stored.
+  allowRange: boolean("allow_range").default(false).notNull(),
+
   // The MASTER option list. Categories narrow which of these they offer (see
   // SpecificationCategories.enabledValues) but never edit this list — a
   // per-category edit would fork the attribute and break every rule comparing

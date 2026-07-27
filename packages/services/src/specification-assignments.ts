@@ -186,9 +186,7 @@ export const saveAssignment = async (
   invalidateCatalogModel();
 };
 
-const describeAssignment = async (
-  input: AssignmentInput,
-): Promise<string> => {
+const describeAssignment = async (input: AssignmentInput): Promise<string> => {
   const model = await getCatalogModel();
   const label =
     model.attributes.get(input.specificationUuid)?.label ??

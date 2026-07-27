@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  PARTNER_DISCOUNT_PERCENT,
-  computePartnerCartPricing,
-} from "./pricing";
+import { PARTNER_DISCOUNT_PERCENT, computePartnerCartPricing } from "./pricing";
 
 describe("computePartnerCartPricing", () => {
   it("takes the partner percent off a whole subtotal", () => {
@@ -32,7 +29,9 @@ describe("computePartnerCartPricing", () => {
   });
 
   it("always splits the subtotal exactly: discount + total === subtotal", () => {
-    for (const subtotal of [0.05, 0.1, 100, 999.99, 1234.56, 4200.55, 87654.32]) {
+    for (const subtotal of [
+      0.05, 0.1, 100, 999.99, 1234.56, 4200.55, 87654.32,
+    ]) {
       const { discountAmount, total } = computePartnerCartPricing(subtotal);
       // Compared in minor units — the caller's invariant, not float equality.
       expect(Math.round((discountAmount + total) * 100)).toBe(
