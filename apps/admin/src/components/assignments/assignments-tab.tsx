@@ -27,6 +27,7 @@ import {
   EyeOff,
   Hash,
   ListChecks,
+  Plus,
   ToggleLeft,
   TriangleAlert,
   X,
@@ -75,7 +76,8 @@ type AssignmentFieldsProps = {
 
 type AddAssignmentFormProps = {
   categoryUuid: string;
-  attribute: PredicateAttribute;
+  // Everything in the library this category does not already carry.
+  available: PredicateAttribute[];
   triggers: PredicateAttribute[];
   order: number;
   onDone: () => void;
@@ -314,7 +316,7 @@ const AssignmentFields = ({
  */
 const AddAssignmentForm = ({
   categoryUuid,
-  attribute,
+  available,
   triggers,
   order,
   onDone,
@@ -323,9 +325,15 @@ const AddAssignmentForm = ({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
+  const [picked, setPicked] = useState("");
   const [draft, setDraft] = useState<Draft>(emptyDraft());
 
+  const attribute = available.find((entry) => entry.uuid === picked);
+
   const save = (): void => {
+    if (!attribute) {
+      return;
+    }
     setError(undefined);
     const input: AssignmentInput = {
       categoryUuid,
@@ -354,14 +362,7 @@ const AddAssignmentForm = ({
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-ink">
-          {attribute.label}
-          {attribute.unit && (
-            <span className="ml-1.5 text-xs font-normal text-faint">
-              ({attribute.unit})
-            </span>
-          )}
-        </span>
+        <span className="text-sm font-semibold text-ink">Add an attribute</span>
         <button
           type="button"
           onClick={onCancel}
@@ -372,12 +373,36 @@ const AddAssignmentForm = ({
         </button>
       </div>
 
-      <AssignmentFields
-        draft={draft}
-        onChange={(next) => setDraft((current) => ({ ...current, ...next }))}
-        attribute={attribute}
-        triggers={triggers}
-      />
+      <Field label="Attribute">
+        <Dropdown
+          value={picked}
+          onChange={(next) => {
+            setPicked(next);
+            // A fresh attribute means a fresh set of switches — carrying an
+            // option slice or a condition across from the last pick would name
+            // values the new attribute does not have.
+            setDraft(emptyDraft());
+          }}
+          options={available.map((entry) => ({
+            value: entry.uuid,
+            label: entry.unit ? `${entry.label} (${entry.unit})` : entry.label,
+          }))}
+          searchable
+          placeholder="Choose an attribute"
+          emptyMessage="Every library attribute is already here"
+        />
+      </Field>
+
+      {/* The switches wait for an attribute, because its TYPE decides which of
+          them apply at all — there is no option slice on a number. */}
+      {attribute && (
+        <AssignmentFields
+          draft={draft}
+          onChange={(next) => setDraft((current) => ({ ...current, ...next }))}
+          attribute={attribute}
+          triggers={triggers}
+        />
+      )}
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 
@@ -385,7 +410,7 @@ const AddAssignmentForm = ({
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
-        <Button onClick={save} disabled={pending}>
+        <Button onClick={save} disabled={pending || !attribute}>
           {pending ? "Adding…" : "Add to this category"}
         </Button>
       </div>
@@ -584,8 +609,8 @@ export const AssignmentsTab = ({
   library,
 }: AssignmentsTabProps) => {
   const [expanded, setExpanded] = useState<string | null>(null);
-  // The attribute being added, before anything is written.
-  const [adding, setAdding] = useState<PredicateAttribute | null>(null);
+  // Whether the add form is open. Nothing is written until it is submitted.
+  const [adding, setAdding] = useState(false);
 
   const assigned = useMemo(
     () => new Set(resolved.map((entry) => entry.definition.uuid)),
@@ -600,17 +625,6 @@ export const AssignmentsTab = ({
   const unassigned = useMemo(
     () => library.filter((attribute) => !assigned.has(attribute.uuid)),
     [library, assigned],
-  );
-
-  const addOptions = useMemo<DropdownOption[]>(
-    () =>
-      unassigned.map((attribute) => ({
-        value: attribute.uuid,
-        label: attribute.unit
-          ? `${attribute.label} (${attribute.unit})`
-          : attribute.label,
-      })),
-    [unassigned],
   );
 
   return (
@@ -634,30 +648,26 @@ export const AssignmentsTab = ({
           {resolved.length} attribute{resolved.length === 1 ? "" : "s"} —{" "}
           {resolved.filter((entry) => !entry.inherited).length} authored here
         </p>
-        <div className="w-64">
-          <Dropdown
-            value=""
-            onChange={(uuid) =>
-              setAdding(
-                unassigned.find((attribute) => attribute.uuid === uuid) ?? null,
-              )
-            }
-            options={addOptions}
-            searchable
-            triggerLabel="+ Add attribute"
-            emptyMessage="Every library attribute is already here"
-          />
-        </div>
+        {!adding && (
+          <Button
+            variant="outline"
+            onClick={() => setAdding(true)}
+            disabled={unassigned.length === 0}
+          >
+            <Plus size={14} />
+            Add attribute
+          </Button>
+        )}
       </div>
 
       {adding && (
         <AddAssignmentForm
           categoryUuid={categoryUuid}
-          attribute={adding}
+          available={unassigned}
           triggers={triggers}
           order={resolved.length}
-          onDone={() => setAdding(null)}
-          onCancel={() => setAdding(null)}
+          onDone={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
         />
       )}
 
