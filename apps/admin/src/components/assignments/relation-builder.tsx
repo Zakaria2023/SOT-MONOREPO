@@ -14,40 +14,27 @@ import { RelationPreview } from "@/components/assignments/relation-preview";
 import { Field } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
-  ConditionPicker,
   describePredicate,
   type PredicateAttribute,
 } from "@/components/assignments/condition-picker";
 import { LookupEditor } from "@/components/assignments/lookup-editor";
 import type {
-  MatchMode,
   ProjectVariableType,
-  RelationshipAllocation,
   RelationshipComparator,
   RelationshipFamily,
 } from "@/db/enum";
+import { relationshipFamilies, relationshipGates } from "@/db/enum";
 import {
-  matchModes,
-  relationshipAllocations,
-  relationshipFamilies,
-  relationshipGates,
-} from "@/db/enum";
-import {
-  MATCH_MODE_LABELS,
-  RELATIONSHIP_ALLOCATION_HINTS,
-  RELATIONSHIP_ALLOCATION_LABELS,
   RELATIONSHIP_COMPARATOR_LABELS,
   RELATIONSHIP_FAMILY_HINTS,
   RELATIONSHIP_FAMILY_LABELS,
   RELATIONSHIP_GATE_LABELS,
   RELATIONSHIP_STATUS_LABELS,
 } from "@/db/label";
-import type { LookupTable, Operand, Predicate, PresenceSpec } from "@/db/types";
+import type { LookupTable, Operand, PresenceSpec } from "@/db/types";
 import {
   Archive,
   Check,
-  ChevronDown,
-  ChevronUp,
   FlaskConical,
   Pencil,
   Plus,
@@ -60,7 +47,6 @@ import { useMemo, useState, useTransition } from "react";
 import type { SelectRelationships } from "@/db/schema/relationships";
 import {
   Button,
-  Checkbox,
   ConfirmDialog,
   Dropdown,
   Input,
@@ -96,13 +82,6 @@ const FAMILY_OPTIONS: DropdownOption[] = relationshipFamilies.map((family) => ({
   value: family,
   label: RELATIONSHIP_FAMILY_LABELS[family],
 }));
-
-const ALLOCATION_OPTIONS: DropdownOption[] = relationshipAllocations.map(
-  (allocation) => ({
-    value: allocation,
-    label: RELATIONSHIP_ALLOCATION_LABELS[allocation],
-  }),
-);
 
 // What each side is CALLED, per family. The two sides are always consumer and
 // provider underneath — only the word for them changes, because "Demand ÷
@@ -210,7 +189,6 @@ const RelationForm = ({
   const [checking, setChecking] = useState(false);
   const [checked, setChecked] = useState(false);
   const [groups, setGroups] = useState<string[]>([]);
-  const [showMore, setShowMore] = useState(false);
 
   // Every group in the LIBRARY. Not the selected category's — a rule is global,
   // and the whole point of one is comparing a camera's attribute against a
@@ -331,25 +309,6 @@ const RelationForm = ({
       label: RELATIONSHIP_COMPARATOR_LABELS[comparator],
     }),
   );
-
-  const capacityFamily =
-    form.family === "budget" ||
-    form.family === "count" ||
-    form.family === "ratio";
-
-  // How many of the collapsed settings differ from the family's defaults. A
-  // rule that relies on one of them must not look identical to one that does
-  // not, or "More" becomes a place things go to be forgotten.
-  const tuned = [
-    form.consumerWhen !== null,
-    form.providerWhen !== null,
-    form.family !== "match" &&
-      form.comparator !== comparatorsFor(form.family)[0],
-    form.family === "match" && form.matchMode !== "any",
-    form.headroomPercent !== 100,
-    form.allocation !== "per_unit",
-    form.perItem,
-  ].filter(Boolean).length;
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
@@ -484,128 +443,6 @@ const RelationForm = ({
               attributes={attributes}
             />
           )}
-
-          {/* Everything the six defaults already get right, for the rule that
-              needs one of them changed. Collapsed, because a rule that needs
-              none of it is the normal case — and it carries a count so a rule
-              that DOES use one is never silently hidden. */}
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => setShowMore((open) => !open)}
-              className="flex w-fit items-center gap-1.5 text-xs text-muted hover:text-ink"
-            >
-              {showMore ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              More
-              {tuned > 0 && (
-                <span className="rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">
-                  {tuned}
-                </span>
-              )}
-            </button>
-
-            {showMore && (
-              <div className="flex flex-col gap-4 rounded-control border border-hairline bg-base/40 p-3">
-                <Field
-                  label="Which items count"
-                  hint="Left empty, anything carrying the attribute above takes part."
-                >
-                  <ConditionPicker
-                    value={form.consumerWhen}
-                    onChange={(consumerWhen: Predicate | null) =>
-                      patch({ consumerWhen })
-                    }
-                    attributes={attributes}
-                    emptyLabel="Anything carrying that attribute"
-                  />
-                </Field>
-
-                {form.family !== "conditional" && (
-                  <Field label="Which items supply it">
-                    <ConditionPicker
-                      value={form.providerWhen}
-                      onChange={(providerWhen: Predicate | null) =>
-                        patch({ providerWhen })
-                      }
-                      attributes={attributes}
-                      emptyLabel="Anything carrying that attribute"
-                    />
-                  </Field>
-                )}
-
-                {form.family !== "match" && (
-                  <Field label="Comparison">
-                    <Dropdown
-                      value={form.comparator}
-                      onChange={(next) =>
-                        patch({ comparator: next as RelationshipComparator })
-                      }
-                      options={comparatorOptions}
-                    />
-                  </Field>
-                )}
-
-                {form.family === "match" && (
-                  <Field label="On several values">
-                    <Dropdown
-                      value={form.matchMode}
-                      onChange={(next) =>
-                        patch({ matchMode: next as MatchMode })
-                      }
-                      options={matchModes.map((mode) => ({
-                        value: mode,
-                        label: MATCH_MODE_LABELS[mode],
-                      }))}
-                    />
-                  </Field>
-                )}
-
-                {capacityFamily && (
-                  <Input
-                    label="Headroom %"
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={String(form.headroomPercent)}
-                    onChange={(event) =>
-                      patch({ headroomPercent: Number(event.target.value) })
-                    }
-                  />
-                )}
-
-                {(form.family === "budget" || form.family === "count") && (
-                  <Field
-                    label="How capacity is applied"
-                    hint={RELATIONSHIP_ALLOCATION_HINTS[form.allocation]}
-                  >
-                    <Dropdown
-                      value={form.allocation}
-                      onChange={(next) =>
-                        patch({ allocation: next as RelationshipAllocation })
-                      }
-                      options={ALLOCATION_OPTIONS}
-                    />
-                  </Field>
-                )}
-
-                {form.family === "budget" && (
-                  <div className="flex flex-col gap-1">
-                    <Checkbox
-                      label="Judge each item on its own, against the single best supplier value"
-                      checked={form.perItem}
-                      onChange={(event) =>
-                        patch({ perItem: event.target.checked })
-                      }
-                    />
-                    <span className="pl-6 text-[11px] text-muted">
-                      One camera&apos;s draw against the per-port maximum,
-                      rather than the total against the whole budget.
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </>
       )}
 

@@ -216,20 +216,39 @@ export const loadSelection = async (
     return [];
   }
 
-  const rows = await db
-    .select({
-      uuid: Products.uuid,
-      name: Products.name,
-      specValues: Products.specValues,
-    })
-    .from(Products)
-    .where(
-      inArray(
-        Products.uuid,
-        active.map((line) => line.productUuid),
+  const [rows, model] = await Promise.all([
+    db
+      .select({
+        uuid: Products.uuid,
+        name: Products.name,
+        categoryUuid: Products.categoryUuid,
+        specValues: Products.specValues,
+      })
+      .from(Products)
+      .where(
+        inArray(
+          Products.uuid,
+          active.map((line) => line.productUuid),
+        ),
       ),
-    );
+    getCatalogModel(),
+  ]);
   const byUuid = new Map(rows.map((row) => [row.uuid, row]));
+
+  // What each CATEGORY owes the engine, resolved once per category rather than
+  // once per line — a cart of thirty cameras from one category resolves once.
+  const expectedByCategory = new Map<string, string[]>();
+  const expectsFor = (categoryUuid: string): string[] => {
+    const cached = expectedByCategory.get(categoryUuid);
+    if (cached) {
+      return cached;
+    }
+    const expects = resolveFromModel(model, categoryUuid)
+      .filter((assignment) => assignment.isRule)
+      .map((assignment) => assignment.definition.uuid);
+    expectedByCategory.set(categoryUuid, expects);
+    return expects;
+  };
 
   return active.flatMap((line) => {
     const product = byUuid.get(line.productUuid);
@@ -242,6 +261,7 @@ export const loadSelection = async (
         name: product.name,
         quantity: line.quantity,
         values: (product.specValues ?? {}) as ProductValues,
+        expects: expectsFor(product.categoryUuid),
       },
     ];
   });

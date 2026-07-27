@@ -60,6 +60,18 @@ export type EngineItem = {
   name: string;
   quantity: number;
   values: ProductValues;
+  // Attribute uuids this item's CATEGORY says the engine reads — the ones its
+  // assignments marked `isRule`.
+  //
+  // This is how a blank is told apart from an absence. Without it, a camera with
+  // no operating power looks exactly like a switch that has no operating power
+  // to give: both just "do not carry the attribute", and the camera is dropped
+  // from the budget check in silence. With it, the camera is reported as
+  // unreadable and the switch is correctly left out.
+  //
+  // Optional because a caller may genuinely not know (a fixture, an ad-hoc
+  // check). Absent means "no expectation recorded", never "expects nothing".
+  expects?: string[];
 };
 
 export type EngineCatalogProduct = {
@@ -303,15 +315,23 @@ const collectSide = (
     // second one is how a camera with a blank power draw silently passes every
     // budget check.
     //
-    // The side's FILTER is what tells them apart. If the rule said "consumers
-    // are items whose role is Camera" and this item matched that, then it was
-    // supposed to carry a draw and the blank is a data gap. With no filter at
-    // all, participation is defined purely by carrying the attribute, so a
-    // switch that has no camera resolution is genuinely not a participant.
+    // TWO things tell them apart, and either is enough:
+    //
+    //   The side's FILTER. If the rule said "consumers are items whose role is
+    //   Camera" and this item matched that, it was supposed to carry a draw.
+    //
+    //   The item's own CATEGORY. If its assignments marked this attribute as one
+    //   the engine reads, then every product in that category owes a value, and
+    //   a blank is a gap no matter what the rule asked for.
+    //
+    // The second is what carries this now that a rule need not have a filter at
+    // all. Neither holding means participation is defined purely by carrying the
+    // attribute — a switch has no camera resolution and genuinely is not a
+    // participant.
     if (operand.source === "spec") {
       const raw = readValue(item.values, operand.specUuid);
       if (!hasValue(raw)) {
-        if (when) {
+        if (when || item.expects?.includes(operand.specUuid)) {
           skipped.push({
             productUuid: item.productUuid,
             name: item.name,

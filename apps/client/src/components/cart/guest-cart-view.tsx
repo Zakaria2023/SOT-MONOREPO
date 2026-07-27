@@ -9,7 +9,14 @@ import {
   setGuestCartQuantity,
   useGuestCart,
 } from "@/lib/guest-cart";
-import { ArrowLeft, ArrowRight, Minus, Package, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Minus,
+  Package,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -50,9 +57,7 @@ export const GuestCartView = () => {
     };
   }, [productKey]);
 
-  const detailByProduct = new Map(
-    details.map((row) => [row.productUuid, row]),
-  );
+  const detailByProduct = new Map(details.map((row) => [row.productUuid, row]));
 
   const lines: CartLineItem[] = items.flatMap((item) => {
     const detail = detailByProduct.get(item.productUuid);
@@ -64,7 +69,7 @@ export const GuestCartView = () => {
   const { subtotal, vat, total } = summarizeCart(lines);
 
   // Same design check as the signed-in cart.
-  const { blockers, warnings } = useCompatibility(lines);
+  const { blockers, warnings, unknowns } = useCompatibility(lines);
 
   return (
     <main className="min-h-screen w-full bg-page">
@@ -88,115 +93,131 @@ export const GuestCartView = () => {
           </p>
         ) : (
           <>
-          <div className="mt-8">
-            <DesignCheck blockers={blockers} warnings={warnings} />
-          </div>
-          <section className="mt-6 rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)]">
-            <div className="divide-y divide-hairline border-b border-hairline">
-              {lines.map((item) => (
-                <div key={item.productUuid} className="flex items-center gap-4 py-5">
-                  <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-primary-tint">
-                    {item.image ? (
-                      <Image
-                        src={documentDownloadUrl(item.image)}
-                        alt={item.name}
-                        fill
-                        unoptimized
-                        className="object-contain p-2"
-                      />
-                    ) : (
-                      <Package size={26} className="text-primary" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    {item.categoryName && (
-                      <p className="font-grotesk text-xs text-faint">
-                        {item.categoryName}
-                      </p>
-                    )}
-                    <p className="font-heading text-base font-bold text-ink">
-                      {item.name}
-                    </p>
-                    <p className="font-grotesk text-xs text-faint">
-                      {formatMoney(Number(item.unitPrice), currency)} each
-                    </p>
-                  </div>
-
-                  <div className="flex items-center rounded-full border border-search-border">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setGuestCartQuantity(item.productUuid, item.quantity - 1)
-                      }
-                      disabled={item.quantity <= 1}
-                      aria-label="Decrease quantity"
-                      className="flex h-9 w-9 items-center justify-center rounded-l-full text-muted transition-colors hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-                    >
-                      <Minus size={15} />
-                    </button>
-                    <span className="font-grotesk w-8 text-center text-sm font-medium tabular-nums text-ink">
-                      {item.quantity}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setGuestCartQuantity(item.productUuid, item.quantity + 1)
-                      }
-                      aria-label="Increase quantity"
-                      className="flex h-9 w-9 items-center justify-center rounded-r-full text-muted transition-colors hover:text-primary"
-                    >
-                      <Plus size={15} />
-                    </button>
-                  </div>
-
-                  <span className="font-grotesk w-24 text-right text-base font-bold tabular-nums text-ink">
-                    {formatMoney(lineTotal(item.unitPrice, item.quantity), currency)}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => removeFromGuestCart(item.productUuid)}
-                    aria-label={`Remove ${item.name}`}
-                    className="text-faint transition-colors hover:text-red-500"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ))}
+            <div className="mt-8">
+              <DesignCheck
+                blockers={blockers}
+                warnings={warnings}
+                unknowns={unknowns}
+              />
             </div>
+            <section className="mt-6 rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)]">
+              <div className="divide-y divide-hairline border-b border-hairline">
+                {lines.map((item) => (
+                  <div
+                    key={item.productUuid}
+                    className="flex items-center gap-4 py-5"
+                  >
+                    <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-primary-tint">
+                      {item.image ? (
+                        <Image
+                          src={documentDownloadUrl(item.image)}
+                          alt={item.name}
+                          fill
+                          unoptimized
+                          className="object-contain p-2"
+                        />
+                      ) : (
+                        <Package size={26} className="text-primary" />
+                      )}
+                    </div>
 
-            <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="font-grotesk w-full max-w-56 space-y-1 text-sm">
-                <div className="flex items-center justify-between text-muted">
-                  <span>Subtotal</span>
-                  <span className="tabular-nums text-ink">
-                    {formatMoney(subtotal, currency)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-muted">
-                  <span>VAT (15%)</span>
-                  <span className="tabular-nums text-ink">
-                    {formatMoney(vat, currency)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-1 text-base font-medium text-ink">
-                  <span>Total</span>
-                  <span className="font-heading text-xl tabular-nums">
-                    {formatMoney(total, currency)}
-                  </span>
-                </div>
+                    <div className="min-w-0 flex-1">
+                      {item.categoryName && (
+                        <p className="font-grotesk text-xs text-faint">
+                          {item.categoryName}
+                        </p>
+                      )}
+                      <p className="font-heading text-base font-bold text-ink">
+                        {item.name}
+                      </p>
+                      <p className="font-grotesk text-xs text-faint">
+                        {formatMoney(Number(item.unitPrice), currency)} each
+                      </p>
+                    </div>
+
+                    <div className="flex items-center rounded-full border border-search-border">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setGuestCartQuantity(
+                            item.productUuid,
+                            item.quantity - 1,
+                          )
+                        }
+                        disabled={item.quantity <= 1}
+                        aria-label="Decrease quantity"
+                        className="flex h-9 w-9 items-center justify-center rounded-l-full text-muted transition-colors hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        <Minus size={15} />
+                      </button>
+                      <span className="font-grotesk w-8 text-center text-sm font-medium tabular-nums text-ink">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setGuestCartQuantity(
+                            item.productUuid,
+                            item.quantity + 1,
+                          )
+                        }
+                        aria-label="Increase quantity"
+                        className="flex h-9 w-9 items-center justify-center rounded-r-full text-muted transition-colors hover:text-primary"
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+
+                    <span className="font-grotesk w-24 text-right text-base font-bold tabular-nums text-ink">
+                      {formatMoney(
+                        lineTotal(item.unitPrice, item.quantity),
+                        currency,
+                      )}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => removeFromGuestCart(item.productUuid)}
+                      aria-label={`Remove ${item.name}`}
+                      className="text-faint transition-colors hover:text-red-500"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
               </div>
 
-              <Link
-                href="/sign-in"
-                className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
-              >
-                Sign in to checkout
-                <ArrowRight size={17} />
-              </Link>
-            </div>
-          </section>
+              <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="font-grotesk w-full max-w-56 space-y-1 text-sm">
+                  <div className="flex items-center justify-between text-muted">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums text-ink">
+                      {formatMoney(subtotal, currency)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted">
+                    <span>VAT (15%)</span>
+                    <span className="tabular-nums text-ink">
+                      {formatMoney(vat, currency)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 text-base font-medium text-ink">
+                    <span>Total</span>
+                    <span className="font-heading text-xl tabular-nums">
+                      {formatMoney(total, currency)}
+                    </span>
+                  </div>
+                </div>
+
+                <Link
+                  href="/sign-in"
+                  className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+                >
+                  Sign in to checkout
+                  <ArrowRight size={17} />
+                </Link>
+              </div>
+            </section>
           </>
         )}
       </div>

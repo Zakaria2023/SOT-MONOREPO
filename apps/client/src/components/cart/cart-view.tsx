@@ -26,7 +26,12 @@ import Link from "next/link";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { CartLineItem } from "services";
-import { applyPercentDiscount, formatMoney, lineTotal, summarizeCart } from "utils";
+import {
+  applyPercentDiscount,
+  formatMoney,
+  lineTotal,
+  summarizeCart,
+} from "utils";
 
 type CartViewProps = {
   items: CartLineItem[];
@@ -220,7 +225,11 @@ const ProductCheckoutButton = () => {
       disabled={pending}
       className="bg-accent-gradient font-grotesk inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-[#07101F] transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-70"
     >
-      {pending ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
+      {pending ? (
+        <Loader2 size={17} className="animate-spin" />
+      ) : (
+        <CreditCard size={17} />
+      )}
       {pending ? "Placing order…" : "Checkout & pay"}
     </button>
   );
@@ -237,7 +246,7 @@ export const CartView = ({
 
   // Design check over everything in the cart, re-run (debounced) on change.
   // Blockers (missing companions + broken rules) must be fixed; warnings caution.
-  const { blockers, warnings } = useCompatibility(items);
+  const { blockers, warnings, unknowns } = useCompatibility(items);
   // The form intercepted before checkout; "Continue anyway" (warnings only)
   // re-submits it with the gate bypassed.
   const [pendingCheckout, setPendingCheckout] =
@@ -314,7 +323,11 @@ export const CartView = ({
           </p>
         ) : (
           <div className="mt-8 flex flex-col gap-6">
-            <DesignCheck blockers={blockers} warnings={warnings} />
+            <DesignCheck
+              blockers={blockers}
+              warnings={warnings}
+              unknowns={unknowns}
+            />
 
             {[...solutionGroups.entries()].map(([categoryUuid, groupItems]) => (
               <CartSection
@@ -339,7 +352,8 @@ export const CartView = ({
                       // one more look. Both open the design-check gate.
                       if (
                         blockers.length > 0 ||
-                        (warnings.length > 0 && !bypassCompatibilityGate.current)
+                        (warnings.length > 0 &&
+                          !bypassCompatibilityGate.current)
                       ) {
                         event.preventDefault();
                         setPendingCheckout(event.currentTarget);

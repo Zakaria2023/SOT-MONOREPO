@@ -1222,3 +1222,125 @@ describe("Range values", () => {
     expect(finding.failingItems[0]?.unitValue).toBe(12);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Rules with NO side filter.
+//
+// The builder authors a rule as two attributes and a comparison — no "which
+// items count" filter. That takes away the signal the engine used to tell a
+// blank apart from an absence, so `expects` carries it instead: what the item's
+// own category says the engine reads.
+//
+// Getting this wrong is the failure the whole design exists to prevent, and it
+// fails in the direction that looks like approval.
+// ---------------------------------------------------------------------------
+
+describe("Rules with no side filter", () => {
+  // Exactly what the simplified builder produces: two attributes, a comparison,
+  // a gate. Nothing else.
+  const plainBudget = rule({
+    uuid: "r-plain",
+    name: "PoE budget covers device draw",
+    family: "budget",
+    consumer: { source: "spec", specUuid: "a-draw" },
+    provider: { source: "spec", specUuid: "a-budget" },
+  });
+
+  it("still finds both sides by the attributes alone", () => {
+    const finding = evaluateRelationship(
+      plainBudget,
+      [switch24, camera, patchPanel],
+      context(),
+    );
+    // The patch panel carries neither attribute and is simply not involved.
+    expect(finding.status).toBe("block");
+    expect(finding.demand).toBe(240);
+    expect(finding.capacity).toBe(130);
+    expect(finding.consumers).toHaveLength(1);
+    expect(finding.providers).toHaveLength(1);
+  });
+
+  it("reports a blank the category owed, with no filter to notice it", () => {
+    const blankCamera: EngineItem = {
+      productUuid: "p-blank",
+      name: "Unfilled camera",
+      quantity: 20,
+      values: { "a-role": ["camera"], "a-poe-in": "af" },
+      // Its category marks Operating Power as read by the engine, so the blank
+      // is a gap rather than a reason to skip it.
+      expects: ["a-draw"],
+    };
+    const finding = evaluateRelationship(
+      plainBudget,
+      [switch24, blankCamera],
+      context(),
+    );
+    expect(finding.status).toBe("unknown");
+    expect(finding.skipped.map((entry) => entry.name)).toContain(
+      "Unfilled camera",
+    );
+  });
+
+  it("leaves out an item whose category never owed the attribute", () => {
+    const rack: EngineItem = {
+      productUuid: "p-rack",
+      name: "42U rack",
+      quantity: 1,
+      values: { "a-role": ["patch_panel"] },
+      // A rack's category says nothing about operating power, so its absence is
+      // an absence — not a gap, and not a reason to fail the rule.
+      expects: [],
+    };
+    const finding = evaluateRelationship(
+      plainBudget,
+      [switch24, { ...camera, quantity: 5 }, rack],
+      context(),
+    );
+    expect(finding.status).toBe("pass");
+    expect(finding.skipped).toEqual([]);
+  });
+
+  it("still trusts a side filter when a rule has one", () => {
+    // The three rules authored before the builder was simplified carry filters,
+    // and they have to keep behaving exactly as they did.
+    const filtered = {
+      ...plainBudget,
+      consumerWhen: {
+        op: "in" as const,
+        attr: "a-role",
+        values: ["camera"],
+        mode: "any" as const,
+      },
+    };
+    const blankNoExpectation: EngineItem = {
+      productUuid: "p-blank2",
+      name: "Legacy camera",
+      quantity: 4,
+      values: { "a-role": ["camera"] },
+      // No expectation recorded at all — the filter alone has to catch it.
+    };
+    const finding = evaluateRelationship(
+      filtered,
+      [switch24, blankNoExpectation],
+      context(),
+    );
+    expect(finding.status).toBe("unknown");
+    expect(finding.skipped.map((entry) => entry.name)).toContain(
+      "Legacy camera",
+    );
+  });
+
+  it("uses the family defaults the simplified builder leaves alone", () => {
+    // headroom 100, allocation per_unit, perItem false, comparator lte — the
+    // form no longer offers these, so the defaults are the whole behaviour.
+    expect(plainBudget.headroomPercent).toBe(100);
+    expect(plainBudget.allocation).toBe("pooled");
+    const finding = evaluateRelationship(
+      { ...plainBudget, allocation: "per_unit" },
+      [switch24, { ...camera, quantity: 10 }],
+      context(),
+    );
+    expect(finding.status).toBe("pass");
+    expect(finding.effectiveCapacity).toBe(130);
+  });
+});

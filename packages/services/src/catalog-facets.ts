@@ -28,18 +28,27 @@ export const getCategoryFacets = async (
   const model = await getCatalogModel();
   const resolved = resolveFromModel(model, categoryUuid);
 
-  return facetAssignments(resolved, viewer, selection).map((assignment) => ({
-    key: assignment.definition.uuid,
-    label: assignment.definition.label,
-    type: assignment.definition.type,
-    unit: assignment.definition.unit,
-    ordered: assignment.definition.ordered,
-    options: assignment.offeredOptions.map((option) => ({
-      value: option.value,
-      label: option.label,
-      rank: option.rank,
-    })),
-  }));
+  return (
+    facetAssignments(resolved, viewer, selection)
+      .map((assignment) => ({
+        key: assignment.definition.uuid,
+        label: assignment.definition.label,
+        type: assignment.definition.type,
+        unit: assignment.definition.unit,
+        ordered: assignment.definition.ordered,
+        options: assignment.offeredOptions.map((option) => ({
+          value: option.value,
+          label: option.label,
+          rank: option.rank,
+        })),
+      }))
+      // A facet with nothing to tick cannot be filtered on. A `number` marked as
+      // a filter has no option list at all, and it was rendering as a heading
+      // over an empty box — a control the shopper cannot use and cannot be told
+      // why. Dropped here rather than in each surface, so the client, the API and
+      // mobile agree.
+      .filter((facet) => facet.options.length > 0)
+  );
 };
 
 // The pure half — choice expansion and reveal values — lives in
