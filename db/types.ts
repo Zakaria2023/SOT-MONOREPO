@@ -77,6 +77,19 @@ export type Predicate =
   | { op: "between"; attr: string; min: number; max: number }
   // Has any value at all — the "is this filled in" test.
   | { op: "exists"; attr: string }
+  // A PRODUCT GROUP: is this item in that category, or anywhere beneath it?
+  //
+  // The one operator that does not name an attribute. It exists because some
+  // rules are about what a thing IS rather than what it measures — "the basket
+  // contains a camera" — and forcing that through an attribute means every
+  // category must first be given a Device Role and every product filled in
+  // before a single rule can be written.
+  //
+  // Matched by UUID and never by name, so renaming or translating a category
+  // cannot silently change which products a rule covers. Matching the SUBTREE
+  // and not just the exact category is the same inheritance the rest of the
+  // model runs on: a rule about Networking covers a switch filed under SOHO.
+  | { op: "in_category"; categoryUuid: string }
   // Composition. `all` = AND, `any` = OR.
   | { op: "all"; children: Predicate[] }
   | { op: "any"; children: Predicate[] }
@@ -99,6 +112,11 @@ export const predicateAttributes = (predicate: Predicate | null): string[] => {
   const walk = (node: Predicate): void => {
     if (isAttributePredicate(node)) {
       found.add(node.attr);
+      return;
+    }
+    // A product group names no attribute, so there is nothing to collect — and
+    // nothing for the reveal-cycle checker to chase either.
+    if (node.op === "in_category") {
       return;
     }
     if (node.op === "not") {

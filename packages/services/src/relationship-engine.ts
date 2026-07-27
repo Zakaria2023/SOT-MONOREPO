@@ -72,12 +72,16 @@ export type EngineItem = {
   // Optional because a caller may genuinely not know (a fixture, an ad-hoc
   // check). Absent means "no expectation recorded", never "expects nothing".
   expects?: string[];
+  // The item's own category, then each ancestor. What a product-group condition
+  // matches against — see PredicateSubject.
+  categoryChain?: string[];
 };
 
 export type EngineCatalogProduct = {
   productUuid: string;
   name: string;
   values: ProductValues;
+  categoryChain?: string[];
 };
 
 // A project input the buyer supplied. `value` is null when unanswered — and a
@@ -293,7 +297,9 @@ const collectSide = (
   }
 
   for (const item of selection) {
-    const filter = evaluatePredicate(when, item.values, context.attributes);
+    const filter = evaluatePredicate(when, item.values, context.attributes, {
+      categoryChain: item.categoryChain,
+    });
     if (!filter.matched) {
       // A filter that failed only because data was missing is a data problem,
       // not a non-match — otherwise an unfilled product quietly drops out of
@@ -425,6 +431,7 @@ const suggestProviders = (
         rule.providerWhen,
         product.values,
         context.attributes,
+        { categoryChain: product.categoryChain },
       );
       if (!filter.matched) {
         return [];
@@ -927,8 +934,9 @@ const evaluateMatch = (
   const consumers = selection.filter(
     (item) =>
       hasValue(readValue(item.values, consumerOperand.specUuid)) &&
-      evaluatePredicate(rule.consumerWhen, item.values, context.attributes)
-        .matched,
+      evaluatePredicate(rule.consumerWhen, item.values, context.attributes, {
+        categoryChain: item.categoryChain,
+      }).matched,
   );
   if (consumers.length === 0) {
     return {
@@ -941,8 +949,9 @@ const evaluateMatch = (
   const providers = selection.filter(
     (item) =>
       hasValue(readValue(item.values, providerOperand.specUuid)) &&
-      evaluatePredicate(rule.providerWhen, item.values, context.attributes)
-        .matched,
+      evaluatePredicate(rule.providerWhen, item.values, context.attributes, {
+        categoryChain: item.categoryChain,
+      }).matched,
   );
   const withSides = {
     ...base,
@@ -1159,8 +1168,9 @@ const evaluateConditional = (
 
   const judged = selection.flatMap((item) => {
     if (
-      !evaluatePredicate(rule.consumerWhen, item.values, context.attributes)
-        .matched
+      !evaluatePredicate(rule.consumerWhen, item.values, context.attributes, {
+        categoryChain: item.categoryChain,
+      }).matched
     ) {
       return [];
     }
@@ -1179,8 +1189,9 @@ const evaluateConditional = (
     // which is a gap in the table rather than a failure by the item.
     const matched = lookup.rows.find(
       (candidate) =>
-        evaluatePredicate(candidate.when, item.values, context.attributes)
-          .matched,
+        evaluatePredicate(candidate.when, item.values, context.attributes, {
+          categoryChain: item.categoryChain,
+        }).matched,
     );
     if (!matched) {
       return [];
@@ -1268,7 +1279,9 @@ const evaluatePresence = (
 
   const triggered = selection.filter(
     (item) =>
-      evaluatePredicate(spec.trigger, item.values, context.attributes).matched,
+      evaluatePredicate(spec.trigger, item.values, context.attributes, {
+        categoryChain: item.categoryChain,
+      }).matched,
   );
   if (triggered.length === 0) {
     return {
@@ -1311,6 +1324,7 @@ const evaluatePresence = (
             alternative.predicate,
             item.values,
             context.attributes,
+            { categoryChain: item.categoryChain },
           ).matched,
       );
       if (companions.length === 0) {

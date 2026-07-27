@@ -31,17 +31,18 @@ import {
   UserType,
 } from "./enum";
 
-export const SPECIFICATION_DOMAIN_LABELS: Record<SpecificationDomain, string> = {
-  core: "Core",
-  networking: "Networking & Connectivity",
-  control_panel: "Control-Panel Systems",
-  video: "Video Surveillance",
-  access: "Access Control & Intercom",
-  unified_comms: "Unified Communications",
-  audio: "Audio & Multiroom",
-  power_racks: "Power Protection & Racks",
-  passive: "Passive / Cabling",
-};
+export const SPECIFICATION_DOMAIN_LABELS: Record<SpecificationDomain, string> =
+  {
+    core: "Core",
+    networking: "Networking & Connectivity",
+    control_panel: "Control-Panel Systems",
+    video: "Video Surveillance",
+    access: "Access Control & Intercom",
+    unified_comms: "Unified Communications",
+    audio: "Audio & Multiroom",
+    power_racks: "Power Protection & Racks",
+    passive: "Passive / Cabling",
+  };
 
 export const RELATIONSHIP_FAMILY_LABELS: Record<RelationshipFamily, string> = {
   budget: "Budget — capacity ≥ Σ demand",
@@ -128,6 +129,7 @@ export const PREDICATE_OPERATOR_LABELS: Record<PredicateOperator, string> = {
   lte: "is at most",
   between: "is between",
   exists: "has any value",
+  in_category: "is in product group",
   all: "all of",
   any: "any of",
   not: "not",

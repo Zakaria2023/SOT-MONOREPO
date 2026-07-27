@@ -435,3 +435,99 @@ describe("Ranges in a condition", () => {
     expect(asNumber({ min: 4, max: 12 }, draw, "max")).toBe(12);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Product groups — the one condition that is about what a thing IS.
+//
+// Every other operator reads a value. This one reads the item's place in the
+// category tree, which is why it needs a subject and not just values. It exists
+// so a rule can say "the basket contains a camera" without first demanding that
+// every category be given a Device Role and every product filled in.
+// ---------------------------------------------------------------------------
+
+describe("Product-group conditions", () => {
+  const NETWORKING = "cat-networking";
+  const SWITCH = "cat-switch";
+  const SOHO = "cat-soho";
+  // Nearest-first, exactly as the model stores a chain.
+  const sohoSwitch = { categoryChain: [SOHO, SWITCH, NETWORKING] };
+
+  it("matches the item's own category", () => {
+    expect(
+      predicateMatches(
+        { op: "in_category", categoryUuid: SOHO },
+        {},
+        attributes,
+        sohoSwitch,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches an ancestor, so a rule about a branch covers its leaves", () => {
+    expect(
+      predicateMatches(
+        { op: "in_category", categoryUuid: NETWORKING },
+        {},
+        attributes,
+        sohoSwitch,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match a sibling branch", () => {
+    expect(
+      predicateMatches(
+        { op: "in_category", categoryUuid: "cat-cameras" },
+        {},
+        attributes,
+        sohoSwitch,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not match when the caller supplied no chain", () => {
+    // A form applying a reveal has no cart and no tree. It must read as "does
+    // not apply", never as a silent yes.
+    expect(
+      predicateMatches(
+        { op: "in_category", categoryUuid: NETWORKING },
+        {},
+        attributes,
+      ),
+    ).toBe(false);
+  });
+
+  it("combines with a value condition", () => {
+    const both: Predicate = {
+      op: "all",
+      children: [
+        { op: "in_category", categoryUuid: NETWORKING },
+        { op: "equals", attr: "a-poe", value: true },
+      ],
+    };
+    expect(
+      predicateMatches(both, { "a-poe": true }, attributes, sohoSwitch),
+    ).toBe(true);
+    expect(
+      predicateMatches(both, { "a-poe": false }, attributes, sohoSwitch),
+    ).toBe(false);
+  });
+
+  it("needs no attribute, so it can never break a reveal cycle check", () => {
+    expect(
+      validatePredicate(
+        { op: "in_category", categoryUuid: NETWORKING },
+        attributes,
+      ),
+    ).toEqual([]);
+  });
+
+  it("refuses a group that was never picked", () => {
+    const problems = validatePredicate(
+      { op: "in_category", categoryUuid: "" },
+      attributes,
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.message).toContain("no group picked");
+  });
+});

@@ -328,6 +328,11 @@ export const describePredicate = (
   if (predicate.op === "exists") {
     return `${label(predicate.attr)} is filled in`;
   }
+  if (predicate.op === "in_category") {
+    // The tree is not in scope here, so the uuid is all there is to say. Every
+    // surface that HAS the tree renders the group name instead.
+    return "in a product group";
+  }
   if (predicate.op === "between") {
     return `${label(predicate.attr)} is between ${predicate.min} and ${predicate.max}`;
   }

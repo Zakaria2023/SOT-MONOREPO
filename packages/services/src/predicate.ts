@@ -60,6 +60,16 @@ const setMatches = (
   return values.some((value) => targets.has(value));
 };
 
+// What the item IS, as opposed to what it measures. Optional because most
+// callers evaluate a predicate against values alone — a product form applying a
+// reveal has no cart and no category chain to offer.
+export type PredicateSubject = {
+  // The item's own category, then each ancestor up to the root. A product-group
+  // condition matches if the named category is anywhere in here, which is what
+  // makes a rule about Networking cover a switch filed under SOHO.
+  categoryChain?: string[];
+};
+
 /**
  * Evaluate a predicate against one item's values.
  *
@@ -71,6 +81,7 @@ export const evaluatePredicate = (
   predicate: Predicate | null,
   values: ProductValues,
   attributes: AttributeIndex,
+  subject: PredicateSubject = {},
 ): PredicateResult => {
   if (!predicate) {
     return { matched: true, missing: [] };
@@ -87,6 +98,12 @@ export const evaluatePredicate = (
     }
     if (node.op === "not") {
       return !walk(node.child);
+    }
+    if (node.op === "in_category") {
+      // A caller that supplied no chain cannot answer this. NOT a match, and
+      // not silently true either — the rule simply does not fire, the same way
+      // an unreadable value does.
+      return (subject.categoryChain ?? []).includes(node.categoryUuid);
     }
 
     const meta = attributes.get(node.attr);
@@ -166,7 +183,8 @@ export const predicateMatches = (
   predicate: Predicate | null,
   values: ProductValues,
   attributes: AttributeIndex,
-): boolean => evaluatePredicate(predicate, values, attributes).matched;
+  subject: PredicateSubject = {},
+): boolean => evaluatePredicate(predicate, values, attributes, subject).matched;
 
 // ---------------------------------------------------------------------------
 // Authoring-time validation
@@ -223,6 +241,18 @@ export const validatePredicate = (
     }
     if (node.op === "not") {
       walk(node.child, depth + 1);
+      return;
+    }
+    if (node.op === "in_category") {
+      if (node.categoryUuid.trim() === "") {
+        problems.push({
+          code: "empty_values",
+          message: "A product-group condition has no group picked.",
+        });
+      }
+      // Whether the category still EXISTS is not checked here: this validator
+      // is given the attribute index, not the tree. The resolver already refuses
+      // to save a rule pointing at a deleted category.
       return;
     }
 

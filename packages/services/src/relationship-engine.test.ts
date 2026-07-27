@@ -1344,3 +1344,149 @@ describe("Rules with no side filter", () => {
     expect(finding.effectiveCapacity).toBe(130);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Product groups in a rule.
+//
+// The Count and Presence forms ask "which items?" as a group rather than as a
+// condition, so the engine has to answer that question about a real cart —
+// including down a branch, since a rule about Networking covers a switch filed
+// under SOHO.
+// ---------------------------------------------------------------------------
+
+describe("Product groups in a rule", () => {
+  const CAMERAS = "cat-cameras";
+  const NETWORKING = "cat-networking";
+  const SWITCHES = "cat-switches";
+
+  const groupedCamera: EngineItem = {
+    ...camera,
+    quantity: 20,
+    categoryChain: [CAMERAS],
+  };
+  const groupedSwitch: EngineItem = {
+    ...switch24,
+    // Filed two levels down, so only an ancestor match will find it.
+    categoryChain: ["cat-soho", SWITCHES, NETWORKING],
+  };
+
+  // Exactly what the Count form writes: item_count filtered to a product group,
+  // against a limit attribute on the container.
+  const portsRule = rule({
+    uuid: "r-ports-group",
+    name: "Cameras fit the available ports",
+    family: "count",
+    consumer: { source: "item_count" },
+    consumerWhen: { op: "in_category", categoryUuid: CAMERAS },
+    provider: { source: "spec", specUuid: "a-ports" },
+  });
+
+  it("counts only the items inside the group", () => {
+    const finding = evaluateRelationship(
+      portsRule,
+      [
+        groupedSwitch,
+        groupedCamera,
+        { ...patchPanel, categoryChain: ["cat-passive"] },
+      ],
+      context(),
+    );
+    // 20 cameras against 24 ports. The patch panel also carries a-ports but is
+    // not in the camera group, so it is not counted as demand.
+    expect(finding.demand).toBe(20);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("blocks when the group overruns the limit", () => {
+    const finding = evaluateRelationship(
+      portsRule,
+      [groupedSwitch, { ...groupedCamera, quantity: 30 }],
+      context(),
+    );
+    expect(finding.status).toBe("block");
+    expect(finding.demand).toBe(30);
+  });
+
+  it("matches a group anywhere up the item's branch", () => {
+    const branchRule = {
+      ...portsRule,
+      // The switch is filed under SOHO; the rule names Networking.
+      providerWhen: {
+        op: "in_category" as const,
+        categoryUuid: NETWORKING,
+      },
+    };
+    const finding = evaluateRelationship(
+      branchRule,
+      [groupedSwitch, groupedCamera],
+      context(),
+    );
+    expect(finding.capacity).toBe(24);
+    expect(finding.status).toBe("pass");
+  });
+
+  it("finds nothing when the group names a branch the cart is not in", () => {
+    const elsewhere = {
+      ...portsRule,
+      consumerWhen: {
+        op: "in_category" as const,
+        categoryUuid: "cat-access-control",
+      },
+    };
+    const finding = evaluateRelationship(
+      elsewhere,
+      [groupedSwitch, groupedCamera],
+      context(),
+    );
+    expect(finding.status).toBe("not_applicable");
+  });
+
+  it("drives a presence rule from two groups", () => {
+    // The shape the Presence form writes: a group triggers, a group satisfies.
+    const needsRecorder = rule({
+      uuid: "r-presence-group",
+      name: "Cameras need somewhere to record",
+      family: "presence",
+      presence: {
+        trigger: { op: "in_category", categoryUuid: CAMERAS },
+        requires: [
+          {
+            description: "",
+            satisfiedBy: [
+              {
+                type: "item_exists",
+                predicate: { op: "in_category", categoryUuid: "cat-recorders" },
+              },
+            ],
+            perTriggerQuantity: 0,
+          },
+        ],
+        suggestedFix: null,
+      },
+    });
+
+    const without = evaluateRelationship(
+      needsRecorder,
+      [groupedSwitch, groupedCamera],
+      context(),
+    );
+    expect(without.status).toBe("block");
+
+    const withRecorder = evaluateRelationship(
+      needsRecorder,
+      [
+        groupedSwitch,
+        groupedCamera,
+        {
+          productUuid: "p-nvr",
+          name: "16-channel NVR",
+          quantity: 1,
+          values: {},
+          categoryChain: ["cat-recorders"],
+        },
+      ],
+      context(),
+    );
+    expect(withRecorder.status).toBe("pass");
+  });
+});

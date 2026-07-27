@@ -7,6 +7,7 @@ import {
   type RelationVariable,
 } from "@/components/assignments/relation-builder";
 import type { SelectRelationships } from "@/db/schema/relationships";
+import type { DropdownOption } from "ui";
 import { useState } from "react";
 import type { ResolvedAssignment, RevealProblem } from "services";
 
@@ -19,6 +20,9 @@ type AssignmentWorkspaceProps = {
   library: PredicateAttribute[];
   relationships: SelectRelationships[];
   variables: RelationVariable[];
+  // The whole tree, for the product-group picker on a rule. Not the selected
+  // category's subtree — a rule relates one part of the tree to another.
+  categoryOptions: DropdownOption[];
 };
 
 type Tab = "assignments" | "relations";
@@ -32,6 +36,7 @@ export const AssignmentWorkspace = ({
   library,
   relationships,
   variables,
+  categoryOptions,
 }: AssignmentWorkspaceProps) => {
   const [tab, setTab] = useState<Tab>("assignments");
 
@@ -95,6 +100,7 @@ export const AssignmentWorkspace = ({
           relationships={relationships}
           attributes={library}
           variables={variables}
+          categoryOptions={categoryOptions}
         />
       )}
     </div>

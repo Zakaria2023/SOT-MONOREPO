@@ -17,7 +17,10 @@ import {
   describePredicate,
   type PredicateAttribute,
 } from "@/components/assignments/condition-picker";
-import { LookupEditor } from "@/components/assignments/lookup-editor";
+import {
+  LookupEditor,
+  LookupLimit,
+} from "@/components/assignments/lookup-editor";
 import type {
   ProjectVariableType,
   RelationshipComparator,
@@ -31,7 +34,7 @@ import {
   RELATIONSHIP_GATE_LABELS,
   RELATIONSHIP_STATUS_LABELS,
 } from "@/db/label";
-import type { LookupTable, Operand, PresenceSpec } from "@/db/types";
+import type { LookupTable, Operand, Predicate, PresenceSpec } from "@/db/types";
 import {
   Archive,
   Check,
@@ -66,12 +69,17 @@ type RelationBuilderProps = {
   relationships: SelectRelationships[];
   attributes: PredicateAttribute[];
   variables: RelationVariable[];
+  // The whole category tree, depth-ordered — what a "product group" picks from.
+  // Never narrowed to the category selected in the sidebar: a rule is global,
+  // and its whole job is to relate one part of the tree to another.
+  categoryOptions: DropdownOption[];
 };
 
 type RelationFormProps = {
   initial?: SelectRelationships;
   attributes: PredicateAttribute[];
   variables: RelationVariable[];
+  categoryOptions: DropdownOption[];
   onSubmit: (input: RelationshipInput) => void;
   onCancel: () => void;
   pending: boolean;
@@ -83,29 +91,49 @@ const FAMILY_OPTIONS: DropdownOption[] = relationshipFamilies.map((family) => ({
   label: RELATIONSHIP_FAMILY_LABELS[family],
 }));
 
-// What each side is CALLED, per family. The two sides are always consumer and
-// provider underneath — only the word for them changes, because "Demand ÷
-// Supply" and "Attribute A / Attribute B" describe the same two operands.
-const SIDE_A_LABEL: Record<RelationshipFamily, string> = {
-  budget: "What is drawn",
-  count: "What is counted",
-  match: "Attribute A",
-  ratio: "Demand",
-  presence: "Trigger",
-  conditional: "What is measured",
-};
-
-const SIDE_B_LABEL: Record<RelationshipFamily, string> = {
-  budget: "What supplies it",
-  count: "The limit",
-  match: "Attribute B",
-  ratio: "Supply",
-  presence: "—",
-  conditional: "—",
-};
-
 // Attributes filed under no group still need a bucket to be filtered by.
 const UNGROUPED = "Ungrouped";
+
+// The Count family's consumer, as a single picker value. `item_count` alone
+// counts everything, so the useful question is WHICH items — which is a product
+// group — or, when the number comes from the buyer, a project variable.
+const COUNT_EVERYTHING = "__everything__";
+
+const countedSource = (form: RelationshipInput): string => {
+  if (form.consumer?.source === "variable") {
+    return form.consumer.variableUuid;
+  }
+  if (form.consumerWhen?.op === "in_category") {
+    return form.consumerWhen.categoryUuid;
+  }
+  return COUNT_EVERYTHING;
+};
+
+/**
+ * Turn the picked source into the two fields it actually sets.
+ *
+ * A product group is not an operand — it is a FILTER over item_count, which is
+ * why this writes `consumerWhen` and not `consumer`. Keeping that in one place
+ * is what stops the two fields drifting into disagreeing about what is counted.
+ */
+const countedPatch = (
+  uuid: string,
+  variables: RelationVariable[],
+): Partial<RelationshipInput> => {
+  if (variables.some((variable) => variable.uuid === uuid)) {
+    return {
+      consumer: { source: "variable", variableUuid: uuid },
+      consumerWhen: null,
+    };
+  }
+  if (uuid === COUNT_EVERYTHING) {
+    return { consumer: { source: "item_count" }, consumerWhen: null };
+  }
+  return {
+    consumer: { source: "item_count" },
+    consumerWhen: { op: "in_category", categoryUuid: uuid },
+  };
+};
 
 /** What a side points at, or "" when it points at neither an attribute nor an
  * input — item_count and a constant have no uuid to show in a picker. */
@@ -177,6 +205,7 @@ const RelationForm = ({
   initial,
   attributes,
   variables,
+  categoryOptions,
   onSubmit,
   onCancel,
   pending,
@@ -290,7 +319,7 @@ const RelationForm = ({
       presence:
         family === "presence"
           ? (form.presence ?? {
-              trigger: { op: "exists", attr: attributes[0]?.uuid ?? "" },
+              trigger: { op: "in_category", categoryUuid: "" },
               requires: [],
               suggestedFix: null,
             })
@@ -309,6 +338,70 @@ const RelationForm = ({
       label: RELATIONSHIP_COMPARATOR_LABELS[comparator],
     }),
   );
+
+  const countedOptions: DropdownOption[] = [
+    { value: COUNT_EVERYTHING, label: "Every item in the basket" },
+    ...categoryOptions,
+    ...variables.map((variable) => ({
+      value: variable.uuid,
+      label: `${variable.label} — the buyer tells us`,
+    })),
+  ];
+
+  // The rule in one line, derived from the form. A hand-written summary drifts
+  // from what is stored the first time somebody edits one and not the other.
+  const label = (uuid: string): string =>
+    attributes.find((entry) => entry.uuid === uuid)?.label ??
+    variables.find((entry) => entry.uuid === uuid)?.label ??
+    "…";
+  const groupLabel = (uuid: string): string =>
+    categoryOptions.find((option) => option.value === uuid)?.label.trim() ??
+    "…";
+  const a = label(operandUuid(form.consumer));
+  const b = label(operandUuid(form.provider));
+
+  const shorthand = ((): string => {
+    if (form.family === "budget") {
+      const headroom =
+        form.headroomPercent === 100 ? "" : ` × ${form.headroomPercent}%`;
+      return `Σ("${a}" × qty) ≤ "${b}"${headroom}`;
+    }
+    if (form.family === "count") {
+      const source = countedSource(form);
+      const counted =
+        source === COUNT_EVERYTHING
+          ? "items"
+          : variables.some((variable) => variable.uuid === source)
+            ? label(source)
+            : groupLabel(source);
+      return `${counted} ≤ Σ("${b}" × qty)`;
+    }
+    if (form.family === "match") {
+      return `"${a}" ${RELATIONSHIP_COMPARATOR_LABELS[form.comparator]} "${b}"`;
+    }
+    if (form.family === "ratio") {
+      return `"${a}" ÷ "${b}" ≤ ${form.ratioLimit ?? "…"}:1`;
+    }
+    if (form.family === "presence") {
+      const describe = (predicate: Predicate | null): string => {
+        if (predicate?.op === "in_category") {
+          return groupLabel(predicate.categoryUuid);
+        }
+        if (predicate && "attr" in predicate) {
+          return label(predicate.attr);
+        }
+        return "…";
+      };
+      const trigger = describe(form.presence?.trigger ?? null);
+      const requires = form.presence?.requires[0]?.satisfiedBy[0];
+      const needed =
+        requires?.type === "item_exists" ? describe(requires.predicate) : "…";
+      return `if [${trigger}] ⇒ [${needed}] present`;
+    }
+    const rows = form.lookup?.rows ?? [];
+    const first = rows[0];
+    return `if … then "${a}" ≤ ${first ? first.limit : "…"}`;
+  })();
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
@@ -367,84 +460,193 @@ const RelationForm = ({
         </Field>
       )}
 
-      {form.family === "presence" ? (
+      {form.family === "presence" && (
         <PresenceEditor
           value={
             form.presence ?? {
-              trigger: { op: "exists", attr: attributes[0]?.uuid ?? "" },
+              trigger: { op: "in_category", categoryUuid: "" },
               requires: [],
               suggestedFix: null,
             }
           }
           onChange={(presence: PresenceSpec) => patch({ presence })}
           attributes={attributes}
-          variables={variables}
+          categoryOptions={categoryOptions}
         />
-      ) : (
+      )}
+
+      {/* BUDGET — capacity first, because the sentence is "capacity covers
+          draw" and reading it in the other order inverts the rule. */}
+      {form.family === "budget" && (
         <>
-          {/* Count measures how many items there are, not a value on them, so
-              it has no A side to pick. */}
-          {form.family !== "count" && (
-            <Field label={SIDE_A_LABEL[form.family]}>
-              <Dropdown
-                value={operandUuid(form.consumer)}
-                onChange={(uuid) => patch({ consumer: toOperand(uuid) })}
-                options={sideOptions}
-                searchable
-                placeholder="— attribute —"
-              />
-            </Field>
-          )}
-
-          {form.family === "match" && (
-            <Field label="Compatible via">
-              <Dropdown
-                value={form.comparator}
-                onChange={(next) =>
-                  patch({ comparator: next as RelationshipComparator })
-                }
-                options={comparatorOptions}
-              />
-            </Field>
-          )}
-
-          {form.family !== "conditional" && (
-            <Field label={SIDE_B_LABEL[form.family]}>
-              <Dropdown
-                value={operandUuid(form.provider)}
-                onChange={(uuid) => patch({ provider: toOperand(uuid) })}
-                options={sideOptions}
-                searchable
-                placeholder="— attribute —"
-              />
-            </Field>
-          )}
-
-          {form.family === "ratio" && (
-            <Input
-              label="Target ratio (N:1)"
-              type="number"
-              value={form.ratioLimit === null ? "" : String(form.ratioLimit)}
-              onChange={(event) =>
-                patch({
-                  ratioLimit:
-                    event.target.value === ""
-                      ? null
-                      : Number(event.target.value),
-                })
-              }
+          <Field label="Capacity attribute">
+            <Dropdown
+              value={operandUuid(form.provider)}
+              onChange={(uuid) => patch({ provider: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— attribute —"
             />
-          )}
-
-          {form.family === "conditional" && (
-            <LookupEditor
-              value={form.lookup ?? { inputs: [], rows: [] }}
-              onChange={(lookup: LookupTable) => patch({ lookup })}
-              attributes={attributes}
+          </Field>
+          <Field label="Consumer attribute (summed × qty)">
+            <Dropdown
+              value={operandUuid(form.consumer)}
+              onChange={(uuid) => patch({ consumer: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— attribute —"
             />
-          )}
+          </Field>
+          <Input
+            label="Headroom %"
+            type="number"
+            min={1}
+            max={100}
+            value={String(form.headroomPercent)}
+            onChange={(event) =>
+              patch({ headroomPercent: Number(event.target.value) })
+            }
+          />
         </>
       )}
+
+      {/* COUNT — the limit is an attribute on the container; what gets counted
+          is a group of products, not a value they carry. */}
+      {form.family === "count" && (
+        <>
+          <Field label="Limit attribute (summed × qty across containers)">
+            <Dropdown
+              value={operandUuid(form.provider)}
+              onChange={(uuid) => patch({ provider: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— attribute —"
+            />
+          </Field>
+          <Field label="Counted source — a product group or a project variable">
+            <Dropdown
+              value={countedSource(form)}
+              onChange={(next) => patch(countedPatch(next, variables))}
+              options={countedOptions}
+              searchable
+              placeholder="— source —"
+            />
+          </Field>
+        </>
+      )}
+
+      {/* MATCH — two values and how they have to relate. No arithmetic. */}
+      {form.family === "match" && (
+        <>
+          <Field label="Attribute A">
+            <Dropdown
+              value={operandUuid(form.consumer)}
+              onChange={(uuid) => patch({ consumer: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— attribute —"
+            />
+          </Field>
+          <Field label="Compatible via">
+            <Dropdown
+              value={form.comparator}
+              onChange={(next) =>
+                patch({ comparator: next as RelationshipComparator })
+              }
+              options={comparatorOptions}
+            />
+          </Field>
+          <Field label="Attribute B">
+            <Dropdown
+              value={operandUuid(form.provider)}
+              onChange={(uuid) => patch({ provider: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— attribute —"
+            />
+          </Field>
+        </>
+      )}
+
+      {/* RATIO — either side may be something the buyer told us, which is the
+          only reason project variables exist at all. */}
+      {form.family === "ratio" && (
+        <>
+          <Field label="Demand — attribute or project variable">
+            <Dropdown
+              value={operandUuid(form.consumer)}
+              onChange={(uuid) => patch({ consumer: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— source —"
+            />
+          </Field>
+          <Field label="Supply — attribute or project variable">
+            <Dropdown
+              value={operandUuid(form.provider)}
+              onChange={(uuid) => patch({ provider: toOperand(uuid) })}
+              options={sideOptions}
+              searchable
+              placeholder="— source —"
+            />
+          </Field>
+          <Input
+            label="Target ratio (n : 1)"
+            type="number"
+            value={form.ratioLimit === null ? "" : String(form.ratioLimit)}
+            onChange={(event) =>
+              patch({
+                ratioLimit:
+                  event.target.value === "" ? null : Number(event.target.value),
+              })
+            }
+          />
+        </>
+      )}
+
+      {/* CONDITIONAL — the key is the item's own other values, and the limit is
+          read from the table rather than supplied by another product. */}
+      {form.family === "conditional" && (
+        <>
+          <LookupEditor
+            value={form.lookup ?? { inputs: [], rows: [] }}
+            onChange={(lookup: LookupTable) => patch({ lookup })}
+            attributes={attributes}
+          />
+          <LookupLimit
+            rows={form.lookup?.rows ?? []}
+            limitAttr={operandUuid(form.consumer)}
+            attributes={attributes}
+            onLimitAttr={(uuid) => patch({ consumer: toOperand(uuid) })}
+            onLimit={(at, limit) => {
+              const rows = form.lookup?.rows ?? [];
+              patch({
+                lookup: {
+                  inputs: form.lookup?.inputs ?? [],
+                  rows: (rows.length > 0
+                    ? rows
+                    : [
+                        {
+                          when: { op: "exists" as const, attr: "" },
+                          limit: 0,
+                        },
+                      ]
+                  ).map((row, position) =>
+                    position === at ? { ...row, limit } : row,
+                  ),
+                },
+              });
+            }}
+          />
+        </>
+      )}
+
+      {/* The rule read back as one line, built from the form rather than
+          written by hand — so it cannot describe something the form is not
+          about to save. */}
+      <p className="rounded-control bg-primary-tint px-3 py-2 font-mono text-[11px] text-primary">
+        {shorthand}
+      </p>
 
       {/* Everything wrong with the rule, at once — the author fixes the set
           rather than resubmitting to discover the next one. */}
@@ -502,6 +704,7 @@ export const RelationBuilder = ({
   relationships,
   attributes,
   variables,
+  categoryOptions,
 }: RelationBuilderProps) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -571,6 +774,7 @@ export const RelationBuilder = ({
         <RelationForm
           attributes={attributes}
           variables={variables}
+          categoryOptions={categoryOptions}
           pending={pending}
           error={error}
           onCancel={() => {
@@ -603,6 +807,7 @@ export const RelationBuilder = ({
             initial={row}
             attributes={attributes}
             variables={variables}
+            categoryOptions={categoryOptions}
             pending={pending}
             error={error}
             onCancel={() => {

@@ -1,22 +1,20 @@
 "use client";
 
-import {
-  ConditionPicker,
-  describePredicate,
-  type PredicateAttribute,
-} from "@/components/assignments/condition-picker";
-import { FieldSet } from "@/components/shared/field";
+import type { PredicateAttribute } from "@/components/assignments/condition-picker";
+import { Field } from "@/components/shared/field";
 import type { LookupTable, Predicate } from "@/db/types";
-import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
-import { Input } from "ui";
+import { Plus, X } from "lucide-react";
+import { Dropdown, Input } from "ui";
 
 // The Conditional family's table. The limit is not supplied by another product —
 // it is read from here, keyed by the item's OWN other values.
 //
 // Cat6 at 10G runs 55 m while Cat6A at 10G runs 100 m, so the same measured
 // length passes or fails depending on the grade and speed of the very same item.
-// Rows are tried in author order, which is why the ordering controls matter: a
-// specific row has to sit above a catch-all or the catch-all wins first.
+//
+// A row reads: if A = x and B = y, then the limit is n. Rows are tried top to
+// bottom and the first match wins, which is why a specific row has to sit above
+// a catch-all — and why the order is the author's to set, not alphabetical.
 
 type LookupEditorProps = {
   value: LookupTable;
@@ -24,148 +22,261 @@ type LookupEditorProps = {
   attributes: PredicateAttribute[];
 };
 
+type LookupLimitProps = {
+  rows: LookupTable["rows"];
+  limitAttr: string;
+  attributes: PredicateAttribute[];
+  onLimitAttr: (uuid: string) => void;
+  onLimit: (at: number, limit: number) => void;
+};
+
+type RowEditorProps = {
+  when: Predicate | null;
+  limit: number;
+  attributes: PredicateAttribute[];
+  onChange: (when: Predicate | null, limit: number) => void;
+  onRemove?: () => void;
+  index: number;
+};
+
+// A row's condition is a flat AND of "attribute = value" pairs. Deliberately
+// flat: a lookup key with nested OR inside it is a rule nobody can read back.
+type Clause = { attr: string; value: string };
+
+// A row before anything is picked. `when` cannot be null in the stored shape,
+// and an `exists` on no attribute matches nothing — which is the honest reading
+// of a half-authored row.
+const BLANK_ROW: LookupTable["rows"][number] = {
+  when: { op: "exists", attr: "" },
+  limit: 0,
+};
+
+const toClauses = (predicate: Predicate | null): Clause[] => {
+  const one = (node: Predicate): Clause | null => {
+    if (node.op === "equals") {
+      return { attr: node.attr, value: String(node.value) };
+    }
+    if (node.op === "in" && node.values.length > 0) {
+      return { attr: node.attr, value: String(node.values[0]) };
+    }
+    if (node.op === "exists") {
+      return { attr: node.attr, value: "" };
+    }
+    return null;
+  };
+
+  if (!predicate) {
+    return [];
+  }
+  if (predicate.op === "all") {
+    return predicate.children.flatMap((child) => {
+      const clause = one(child);
+      return clause ? [clause] : [];
+    });
+  }
+  const clause = one(predicate);
+  return clause ? [clause] : [];
+};
+
+const toPredicate = (clauses: Clause[]): Predicate | null => {
+  const children: Predicate[] = clauses
+    .filter((clause) => clause.attr !== "")
+    .map((clause) =>
+      clause.value === ""
+        ? { op: "exists", attr: clause.attr }
+        : { op: "in", attr: clause.attr, values: [clause.value], mode: "any" },
+    );
+  const only = children[0];
+  if (!only) {
+    return null;
+  }
+  return children.length === 1 ? only : { op: "all", children };
+};
+
+const RowEditor = ({
+  when,
+  limit,
+  attributes,
+  onChange,
+  onRemove,
+  index,
+}: RowEditorProps) => {
+  // Always two slots, because that shape IS the common case: a grade and a
+  // speed, a material and a diameter. An empty second slot does not become a
+  // clause, so "if A = x" alone is written by leaving it be.
+  const clauses = toClauses(when);
+  const slots: Clause[] = [
+    clauses[0] ?? { attr: "", value: "" },
+    clauses[1] ?? { attr: "", value: "" },
+  ];
+
+  const setSlot = (at: number, patch: Partial<Clause>): void => {
+    onChange(
+      toPredicate(
+        slots.map((slot, position) =>
+          position === at ? { ...slot, ...patch } : slot,
+        ),
+      ),
+      limit,
+    );
+  };
+
+  const optionsFor = (attr: string) =>
+    (attributes.find((entry) => entry.uuid === attr)?.options ?? [])
+      .filter((option) => !option.retired)
+      .map((option) => ({ value: option.value, label: option.label }));
+
+  const attributeOptions = attributes.map((entry) => ({
+    value: entry.uuid,
+    label: entry.unit ? `${entry.label} (${entry.unit})` : entry.label,
+  }));
+
+  return (
+    <div className="flex flex-col gap-2">
+      {onRemove && (
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-secondary">
+            Row {index + 1}
+          </span>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove row ${index + 1}`}
+            className="rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
+      {slots.map((slot, at) => (
+        <div key={at} className="flex flex-col gap-1.5">
+          <span className="text-xs text-secondary">
+            {at === 0 ? "if" : "and"}
+          </span>
+          <Dropdown
+            value={slot.attr}
+            onChange={(attr) => setSlot(at, { attr, value: "" })}
+            options={attributeOptions}
+            searchable
+            placeholder="— attribute —"
+          />
+          <div className="flex items-center gap-2">
+            <span className="w-3 shrink-0 text-sm text-faint">=</span>
+            <div className="min-w-0 flex-1">
+              <Dropdown
+                value={slot.value}
+                onChange={(value) => setSlot(at, { value })}
+                options={optionsFor(slot.attr)}
+                placeholder="value"
+                emptyMessage="Pick an attribute first"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const LookupEditor = ({
   value,
   onChange,
   attributes,
 }: LookupEditorProps) => {
-  const setRow = (
-    index: number,
-    when: Predicate | null,
-    limit: number,
-  ): void => {
-    onChange({
-      ...value,
-      rows: value.rows.map((row, at) =>
-        at === index
-          ? {
-              when: when ?? { op: "exists", attr: attributes[0]?.uuid ?? "" },
-              limit,
-            }
-          : row,
-      ),
-    });
-  };
-
-  const move = (index: number, direction: -1 | 1): void => {
-    const target = index + direction;
-    if (target < 0 || target >= value.rows.length) {
-      return;
-    }
-    const rows = [...value.rows];
-    const a = rows[index];
-    const b = rows[target];
-    if (!a || !b) {
-      return;
-    }
-    rows[index] = b;
-    rows[target] = a;
-    onChange({ ...value, rows });
-  };
+  // One row is what the form shows by default. More than one is what the family
+  // is FOR — Cat6 at 55 m and Cat6A at 100 m are two rows of one rule, not two
+  // rules — so adding another is one click rather than a second relation.
+  const rows = value.rows.length > 0 ? value.rows : [BLANK_ROW];
 
   return (
-    <FieldSet
-      title="Limit table"
-      hint="Rows are tried top to bottom and the first match wins, so put the specific combinations above the catch-all. An item matching no row is outside what the table describes and is left alone."
-    >
-      {value.rows.length === 0 && (
-        <p className="rounded-control border border-dashed border-hairline px-3 py-4 text-center text-[11px] text-faint">
-          No rows yet — a conditional rule with an empty table cannot run.
-        </p>
-      )}
-
-      {value.rows.map((row, index) => (
-        <div
-          key={index}
-          className="flex flex-col gap-2 rounded-control border border-hairline bg-base p-2.5"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-secondary">
-              Row {index + 1}
-              {index === value.rows.length - 1 && value.rows.length > 1 && (
-                <span className="ml-1.5 text-faint">(last — the fallback)</span>
-              )}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => move(index, -1)}
-                disabled={index === 0}
-                aria-label="Move row up"
-                className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-40"
-              >
-                <ArrowUp size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => move(index, 1)}
-                disabled={index === value.rows.length - 1}
-                aria-label="Move row down"
-                className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-40"
-              >
-                <ArrowDown size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onChange({
-                    ...value,
-                    rows: value.rows.filter((_, at) => at !== index),
-                  })
-                }
-                aria-label="Remove row"
-                className="rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          </div>
-
-          <ConditionPicker
-            value={row.when}
-            onChange={(when) => setRow(index, when, row.limit)}
+    <Field label="When (all conditions true)">
+      <div className="flex flex-col gap-4">
+        {rows.map((row, at) => (
+          <RowEditor
+            key={at}
+            index={at}
+            when={row.when}
+            limit={row.limit}
             attributes={attributes}
-            emptyLabel="Matches anything"
+            onChange={(when, limit) =>
+              onChange({
+                ...value,
+                rows: rows.map((current, position) =>
+                  position === at
+                    ? { when: when ?? { op: "exists", attr: "" }, limit }
+                    : current,
+                ),
+              })
+            }
+            onRemove={
+              rows.length > 1
+                ? () =>
+                    onChange({
+                      ...value,
+                      rows: rows.filter((_, position) => position !== at),
+                    })
+                : undefined
+            }
           />
+        ))}
 
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-[11px] text-secondary">
-              then the limit is
-            </span>
+        <button
+          type="button"
+          onClick={() => onChange({ ...value, rows: [...rows, BLANK_ROW] })}
+          className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+        >
+          <Plus size={13} />
+          Another combination
+        </button>
+      </div>
+    </Field>
+  );
+};
+
+/**
+ * The limit side, authored beside the table rather than inside it.
+ *
+ * The attribute being measured is the same for every row — repeating it per row
+ * invites two rows that measure different things, which is a rule that cannot
+ * be explained. Only the number varies.
+ */
+export const LookupLimit = ({
+  rows,
+  limitAttr,
+  attributes,
+  onLimitAttr,
+  onLimit,
+}: LookupLimitProps) => (
+  <Field label="Then limit">
+    <Dropdown
+      value={limitAttr}
+      onChange={onLimitAttr}
+      options={attributes.map((entry) => ({
+        value: entry.uuid,
+        label: entry.unit ? `${entry.label} (${entry.unit})` : entry.label,
+      }))}
+      searchable
+      placeholder="— attribute —"
+    />
+    <div className="flex flex-col gap-2 pt-1">
+      {(rows.length > 0 ? rows : [BLANK_ROW]).map((row, at) => (
+        <div key={at} className="flex items-center gap-2">
+          <span className="w-3 shrink-0 text-sm text-faint">≤</span>
+          <div className="min-w-0 flex-1">
             <Input
               type="number"
               value={String(row.limit)}
-              onChange={(event) =>
-                setRow(index, row.when, Number(event.target.value))
-              }
+              onChange={(event) => onLimit(at, Number(event.target.value))}
             />
           </div>
-
-          <p className="text-[11px] text-faint">
-            {describePredicate(row.when, attributes)} → {row.limit}
-          </p>
+          {rows.length > 1 && (
+            <span className="shrink-0 text-[11px] text-faint">
+              row {at + 1}
+            </span>
+          )}
         </div>
       ))}
-
-      <button
-        type="button"
-        onClick={() =>
-          onChange({
-            ...value,
-            rows: [
-              ...value.rows,
-              {
-                when: { op: "exists", attr: attributes[0]?.uuid ?? "" },
-                limit: 0,
-              },
-            ],
-          })
-        }
-        className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
-      >
-        <Plus size={13} />
-        Add row
-      </button>
-    </FieldSet>
-  );
-};
+    </div>
+  </Field>
+);

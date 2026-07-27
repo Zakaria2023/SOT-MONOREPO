@@ -262,6 +262,11 @@ export const loadSelection = async (
         quantity: line.quantity,
         values: (product.specValues ?? {}) as ProductValues,
         expects: expectsFor(product.categoryUuid),
+        // The chain is already in the model — it is what resolution walks — so
+        // a product-group condition costs nothing extra to answer.
+        categoryChain: model.chains.get(product.categoryUuid) ?? [
+          product.categoryUuid,
+        ],
       },
     ];
   });
@@ -280,21 +285,34 @@ const SUGGESTION_LIMIT = 400;
  * query does not need to know anything about the rules.
  */
 export const loadSuggestionCatalog = async (): Promise<
-  { productUuid: string; name: string; values: ProductValues }[]
+  {
+    productUuid: string;
+    name: string;
+    values: ProductValues;
+    categoryChain: string[];
+  }[]
 > => {
-  const rows = await db
-    .select({
-      uuid: Products.uuid,
-      name: Products.name,
-      specValues: Products.specValues,
-    })
-    .from(Products)
-    .where(eq(Products.isAvailable, true))
-    .limit(SUGGESTION_LIMIT);
+  const [rows, model] = await Promise.all([
+    db
+      .select({
+        uuid: Products.uuid,
+        name: Products.name,
+        categoryUuid: Products.categoryUuid,
+        specValues: Products.specValues,
+      })
+      .from(Products)
+      .where(eq(Products.isAvailable, true))
+      .limit(SUGGESTION_LIMIT),
+    getCatalogModel(),
+  ]);
 
   return rows.map((row) => ({
     productUuid: row.uuid,
     name: row.name,
     values: (row.specValues ?? {}) as ProductValues,
+    // Suggestions are filtered against the rule's provider side, and that side
+    // may be a product group — so a candidate has to know what it is, not only
+    // what it measures.
+    categoryChain: model.chains.get(row.categoryUuid) ?? [row.categoryUuid],
   }));
 };

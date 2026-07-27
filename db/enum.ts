@@ -72,53 +72,54 @@ export type UnitDimension = {
   toBase: number;
 };
 
-export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> = {
-  // Power — base W
-  W: { dimension: "power", toBase: 1 },
-  kW: { dimension: "power", toBase: 1000 },
-  // Apparent power is deliberately its OWN dimension: 1500 VA is not 1500 W,
-  // and letting them convert would be the classic UPS sizing mistake.
-  VA: { dimension: "apparent_power", toBase: 1 },
-  // Electrical
-  V: { dimension: "voltage", toBase: 1 },
-  A: { dimension: "current", toBase: 1 },
-  mA: { dimension: "current", toBase: 0.001 },
-  Ah: { dimension: "charge", toBase: 1 },
-  mAh: { dimension: "charge", toBase: 0.001 },
-  // Distance — base m
-  m: { dimension: "distance", toBase: 1 },
-  cm: { dimension: "distance", toBase: 0.01 },
-  mm: { dimension: "distance", toBase: 0.001 },
-  km: { dimension: "distance", toBase: 1000 },
-  // Mass — base g
-  kg: { dimension: "mass", toBase: 1000 },
-  g: { dimension: "mass", toBase: 1 },
-  // Storage — base MB
-  MB: { dimension: "storage", toBase: 1 },
-  GB: { dimension: "storage", toBase: 1000 },
-  TB: { dimension: "storage", toBase: 1000000 },
-  // Throughput — base Mbps
-  Mbps: { dimension: "throughput", toBase: 1 },
-  Gbps: { dimension: "throughput", toBase: 1000 },
-  // Frequency — base MHz
-  MHz: { dimension: "frequency", toBase: 1 },
-  GHz: { dimension: "frequency", toBase: 1000 },
-  Hz: { dimension: "frequency", toBase: 0.000001 },
-  // Time — base min
-  min: { dimension: "duration", toBase: 1 },
-  h: { dimension: "duration", toBase: 60 },
-  months: { dimension: "period", toBase: 1 },
-  years: { dimension: "period", toBase: 12 },
-  // Countable things. Each is its own dimension so "ports" never sums with
-  // "channels" just because both happen to be integers.
-  count: { dimension: "count", toBase: 1 },
-  ports: { dimension: "ports", toBase: 1 },
-  channels: { dimension: "channels", toBase: 1 },
-  devices: { dimension: "devices", toBase: 1 },
-  users: { dimension: "users", toBase: 1 },
-  licenses: { dimension: "licenses", toBase: 1 },
-  calls: { dimension: "calls", toBase: 1 },
-};
+export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
+  {
+    // Power — base W
+    W: { dimension: "power", toBase: 1 },
+    kW: { dimension: "power", toBase: 1000 },
+    // Apparent power is deliberately its OWN dimension: 1500 VA is not 1500 W,
+    // and letting them convert would be the classic UPS sizing mistake.
+    VA: { dimension: "apparent_power", toBase: 1 },
+    // Electrical
+    V: { dimension: "voltage", toBase: 1 },
+    A: { dimension: "current", toBase: 1 },
+    mA: { dimension: "current", toBase: 0.001 },
+    Ah: { dimension: "charge", toBase: 1 },
+    mAh: { dimension: "charge", toBase: 0.001 },
+    // Distance — base m
+    m: { dimension: "distance", toBase: 1 },
+    cm: { dimension: "distance", toBase: 0.01 },
+    mm: { dimension: "distance", toBase: 0.001 },
+    km: { dimension: "distance", toBase: 1000 },
+    // Mass — base g
+    kg: { dimension: "mass", toBase: 1000 },
+    g: { dimension: "mass", toBase: 1 },
+    // Storage — base MB
+    MB: { dimension: "storage", toBase: 1 },
+    GB: { dimension: "storage", toBase: 1000 },
+    TB: { dimension: "storage", toBase: 1000000 },
+    // Throughput — base Mbps
+    Mbps: { dimension: "throughput", toBase: 1 },
+    Gbps: { dimension: "throughput", toBase: 1000 },
+    // Frequency — base MHz
+    MHz: { dimension: "frequency", toBase: 1 },
+    GHz: { dimension: "frequency", toBase: 1000 },
+    Hz: { dimension: "frequency", toBase: 0.000001 },
+    // Time — base min
+    min: { dimension: "duration", toBase: 1 },
+    h: { dimension: "duration", toBase: 60 },
+    months: { dimension: "period", toBase: 1 },
+    years: { dimension: "period", toBase: 12 },
+    // Countable things. Each is its own dimension so "ports" never sums with
+    // "channels" just because both happen to be integers.
+    count: { dimension: "count", toBase: 1 },
+    ports: { dimension: "ports", toBase: 1 },
+    channels: { dimension: "channels", toBase: 1 },
+    devices: { dimension: "devices", toBase: 1 },
+    users: { dimension: "users", toBase: 1 },
+    licenses: { dimension: "licenses", toBase: 1 },
+    calls: { dimension: "calls", toBase: 1 },
+  };
 
 // Navigation domains for the specification library — a functional grouping
 // above SpecificationGroups (never brand-based). A stable universe, so it lives
@@ -224,6 +225,7 @@ export const predicateOperators = [
   "lte",
   "between",
   "exists",
+  "in_category",
   "all",
   "any",
   "not",
