@@ -64,5 +64,5 @@ export const POST = async (request: Request) => {
     return [{ productUuid, quantity: Math.floor(count) }];
   });
 
-  return NextResponse.json(await checkDesign(selection));
+  return NextResponse.json(await checkDesign({ selection }));
 };

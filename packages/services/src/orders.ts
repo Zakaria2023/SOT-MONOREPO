@@ -19,6 +19,7 @@ import {
   SelectInvoices,
   SelectOrders,
 } from "../../../db/schema/orders";
+import { gateSelection } from "./design-check";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
 
@@ -132,15 +133,45 @@ export const createOrderFromSelectedOffer = async ({
 export const createOrderFromCart = async ({
   userUuid,
   discountPercent = 0,
+  override,
+  region,
+  variables,
 }: {
   userUuid: string;
   discountPercent?: number;
+  // A partner may know better than the catalog; an ordinary user has no way to
+  // judge whether the engine is wrong, so only a caller that says the actor may
+  // override gets one — and the recorded reason is what makes it auditable.
+  override?: { allowed: boolean; reason: string };
+  region?: string;
+  variables?: Record<string, number | boolean>;
 }): Promise<SelectOrders> => {
   const items = (await getCart(userUuid)).filter(
     (item) => item.kind === "product",
   );
   if (items.length === 0) {
     throw new ValidationError("Your cart has no products to order");
+  }
+
+  // THE GATE. The cart UI shows the design check live, but a check that only
+  // lives in the UI is bypassed by any direct API call — and web and mobile
+  // would drift. So it runs again HERE, on the server, at the moment the order
+  // is created, through the same service both transports use.
+  const gate = await gateSelection({
+    selection: items.map((item) => ({
+      productUuid: item.productUuid,
+      quantity: item.quantity,
+    })),
+    variables,
+    region,
+    override,
+  });
+  if (!gate.allowed) {
+    throw new ValidationError(
+      `This design cannot be ordered yet: ${gate.blockers
+        .map((finding) => finding.message)
+        .join(" ")}`,
+    );
   }
 
   const currency = items[0].currency ?? "SAR";
@@ -175,6 +206,11 @@ export const createOrderFromCart = async ({
       serviceTotal: "0.00",
       grandTotal,
       currency,
+      // Snapshotted, not re-derived later: a rule edited next month must not
+      // silently change what this order was judged against. It is also how we
+      // find out which rules are wrong.
+      designFindings: [...gate.blockers, ...gate.warnings],
+      designOverrideReason: gate.overridden ? (override?.reason ?? null) : null,
     });
 
     for (const line of lines) {

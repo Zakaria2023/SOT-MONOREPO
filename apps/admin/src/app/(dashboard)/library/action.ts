@@ -4,205 +4,156 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
   createLibraryAttribute,
-  createSpecificationGroup,
-  createTemplateFromGroup,
+  createProjectVariable,
   deleteLibraryAttribute,
-  deleteSpecificationGroup,
-  deleteSpecificationTemplate,
-  getLibraryBuilder,
-  getLibraryReadModel,
-  getSpecificationTemplates,
+  deleteProjectVariable,
+  getLibrary,
+  getProjectVariables,
   moveLibraryAttribute,
-  reorderSpecificationGroups,
+  reorderLibraryAttributes,
   updateLibraryAttribute,
-  updateSpecificationGroup,
-} from "services";
-import type {
-  AttributeInput as ServiceAttributeInput,
-  LibraryBuilderGroup as ServiceLibraryBuilderGroup,
-  LibraryReadModel as ServiceLibraryReadModel,
-  SelectSpecificationTemplates as ServiceSelectSpecificationTemplates,
+  updateProjectVariable,
+  type LibraryAttributeInput as ServiceLibraryAttributeInput,
+  type LibraryGroup as ServiceLibraryGroup,
+  type ProjectVariableInput as ServiceProjectVariableInput,
 } from "services";
 
-// Types re-declared as local aliases (a "use server" file may only export
-// async functions).
-export type AttributeInput = ServiceAttributeInput;
-export type LibraryBuilderGroup = ServiceLibraryBuilderGroup;
-export type LibraryReadModel = ServiceLibraryReadModel;
-export type SpecificationTemplate = ServiceSelectSpecificationTemplates;
+// Types re-declared as local aliases — a "use server" file may only export
+// async functions.
+export type LibraryAttributeInput = ServiceLibraryAttributeInput;
+export type LibraryGroup = ServiceLibraryGroup;
+export type ProjectVariableInput = ServiceProjectVariableInput;
 
-export type LibraryActionResult = { error?: string };
+export type ActionResult = {
+  error?: string;
+  success?: boolean;
+};
 
-const revalidate = () => revalidatePath("/library");
-
-const fail = (error: unknown, fallback: string): LibraryActionResult => ({
+const fail = (error: unknown, fallback: string): ActionResult => ({
   error: error instanceof Error ? error.message : fallback,
 });
 
-// --- Reads ---
-export const getBuilder = async (): Promise<LibraryBuilderGroup[]> => {
+export const getLibraryData = async (): Promise<LibraryGroup[]> => {
   await requireAdmin();
-  return getLibraryBuilder();
+  return getLibrary();
 };
 
-export const getReadModel = async (): Promise<LibraryReadModel> => {
+export const getVariables = async () => {
   await requireAdmin();
-  return getLibraryReadModel();
+  return getProjectVariables();
 };
 
-export const getTemplates = async (): Promise<SpecificationTemplate[]> => {
-  await requireAdmin();
-  return getSpecificationTemplates();
-};
-
-// --- Groups ---
-export const addGroupAction = async (
-  name: string,
-  domain: string | null,
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  if (!name.trim()) {
-    return { error: "Name is required" };
-  }
-  try {
-    await createSpecificationGroup({ name: name.trim(), domain });
-  } catch (error) {
-    return fail(error, "Failed to add group");
-  }
-  revalidate();
-  return {};
-};
-
-// Saves the group's name and domain together — both come from the same inline
-// editor, so neither is ever written blind over the other.
-export const updateGroupAction = async (
-  uuid: string,
-  name: string,
-  domain: string | null,
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  if (!name.trim()) {
-    return { error: "Name is required" };
-  }
-  try {
-    await updateSpecificationGroup(uuid, { name: name.trim(), domain });
-  } catch (error) {
-    return fail(error, "Failed to update group");
-  }
-  revalidate();
-  return {};
-};
-
-export const deleteGroupAction = async (
-  uuid: string,
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  try {
-    await deleteSpecificationGroup(uuid);
-  } catch (error) {
-    return fail(error, "Failed to delete group");
-  }
-  revalidate();
-  return {};
-};
-
-export const reorderGroupsAction = async (
-  orderedUuids: string[],
-): Promise<LibraryActionResult> => {
-  await requireAdmin();
-  try {
-    await reorderSpecificationGroups(orderedUuids);
-  } catch (error) {
-    return fail(error, "Failed to reorder groups");
-  }
-  revalidate();
-  return {};
-};
-
-// --- Attributes ---
 export const addAttributeAction = async (
-  input: AttributeInput,
-): Promise<LibraryActionResult> => {
+  input: LibraryAttributeInput,
+): Promise<ActionResult> => {
   await requireAdmin();
-  if (!input.label.trim()) {
-    return { error: "Name is required" };
-  }
   try {
-    await createLibraryAttribute({ ...input, label: input.label.trim() });
+    await createLibraryAttribute(input);
   } catch (error) {
-    return fail(error, "Failed to add attribute");
+    return fail(error, "Failed to create the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
 };
 
 export const updateAttributeAction = async (
   uuid: string,
-  input: AttributeInput,
-): Promise<LibraryActionResult> => {
+  input: LibraryAttributeInput,
+): Promise<ActionResult> => {
   await requireAdmin();
-  if (!input.label.trim()) {
-    return { error: "Name is required" };
-  }
   try {
-    await updateLibraryAttribute(uuid, { ...input, label: input.label.trim() });
+    await updateLibraryAttribute(uuid, input);
   } catch (error) {
-    return fail(error, "Failed to update attribute");
+    return fail(error, "Failed to update the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
 };
 
+/**
+ * Delete an attribute. The service REFUSES while any rule or assignment
+ * references it, and its message names what is in the way — so this surfaces
+ * that message rather than a generic failure.
+ */
 export const deleteAttributeAction = async (
   uuid: string,
-): Promise<LibraryActionResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
     await deleteLibraryAttribute(uuid);
   } catch (error) {
-    return fail(error, "Failed to delete attribute");
+    return fail(error, "Failed to delete the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  revalidatePath("/assignments");
+  return { success: true };
 };
 
 export const moveAttributeAction = async (
   uuid: string,
   groupUuid: string | null,
-): Promise<LibraryActionResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
     await moveLibraryAttribute(uuid, groupUuid);
   } catch (error) {
-    return fail(error, "Failed to move attribute");
+    return fail(error, "Failed to move the attribute");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  return { success: true };
 };
 
-// --- Templates ---
-export const createTemplateFromGroupAction = async (
-  groupUuid: string,
-): Promise<LibraryActionResult> => {
+export const reorderAttributesAction = async (
+  order: { uuid: string; order: number }[],
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
-    await createTemplateFromGroup(groupUuid);
+    await reorderLibraryAttributes(order);
   } catch (error) {
-    return fail(error, "Failed to create template");
+    return fail(error, "Failed to reorder");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  return { success: true };
 };
 
-export const deleteTemplateAction = async (
+export const addVariableAction = async (
+  input: ProjectVariableInput,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await createProjectVariable(input);
+  } catch (error) {
+    return fail(error, "Failed to create the project input");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const updateVariableAction = async (
   uuid: string,
-): Promise<LibraryActionResult> => {
+  input: ProjectVariableInput,
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
-    await deleteSpecificationTemplate(uuid);
+    await updateProjectVariable(uuid, input);
   } catch (error) {
-    return fail(error, "Failed to delete template");
+    return fail(error, "Failed to update the project input");
   }
-  revalidate();
-  return {};
+  revalidatePath("/library");
+  return { success: true };
+};
+
+export const deleteVariableAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteProjectVariable(uuid);
+  } catch (error) {
+    return fail(error, "Failed to delete the project input");
+  }
+  revalidatePath("/library");
+  return { success: true };
 };

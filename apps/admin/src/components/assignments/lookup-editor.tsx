@@ -1,202 +1,167 @@
 "use client";
 
-import type { LookupRow } from "@/db/types";
-import { Plus, Trash2 } from "lucide-react";
-import { Dropdown, Input } from "ui";
-import type { DropdownOption } from "ui";
+import {
+  PredicateEditor,
+  describePredicate,
+  type PredicateAttribute,
+} from "@/components/assignments/predicate-editor";
+import type { LookupTable, Predicate } from "@/db/types";
+import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { Input } from "ui";
+
+// The Conditional family's table. The limit is not supplied by another product —
+// it is read from here, keyed by the item's OWN other values.
+//
+// Cat6 at 10G runs 55 m while Cat6A at 10G runs 100 m, so the same measured
+// length passes or fails depending on the grade and speed of the very same item.
+// Rows are tried in author order, which is why the ordering controls matter: a
+// specific row has to sit above a catch-all or the catch-all wins first.
 
 type LookupEditorProps = {
-  // The spec keys the table is keyed by, in column order.
-  inputs: string[];
-  rows: LookupRow[];
-  // Every dropdown spec that could key the table: { value: key, label }.
-  inputOptions: DropdownOption[];
-  // The values each input spec offers, keyed by spec key.
-  valuesByKey: Record<string, string[]>;
-  // Unit of the measured spec, shown on the limit column.
-  limitUnit: string | null | undefined;
-  onChange: (inputs: string[], rows: LookupRow[]) => void;
+  value: LookupTable;
+  onChange: (next: LookupTable) => void;
+  attributes: PredicateAttribute[];
 };
 
 export const LookupEditor = ({
-  inputs,
-  rows,
-  inputOptions,
-  valuesByKey,
-  limitUnit,
+  value,
   onChange,
+  attributes,
 }: LookupEditorProps) => {
-  const labelFor = (key: string) =>
-    inputOptions.find((option) => option.value === key)?.label ?? key;
-
-  const addInput = (key: string) => {
-    if (!key || inputs.includes(key)) {
-      return;
-    }
-    onChange([...inputs, key], rows);
-  };
-
-  // Dropping a column also drops it from every row — a leftover condition on a
-  // column nobody can see would silently stop rows matching.
-  const removeInput = (key: string) =>
-    onChange(
-      inputs.filter((input) => input !== key),
-      rows.map((row) => {
-        const when = { ...row.when };
-        delete when[key];
-        return { ...row, when };
-      }),
-    );
-
-  const addRow = () =>
-    onChange(inputs, [...rows, { when: {}, limit: 0 }]);
-
-  const removeRow = (index: number) =>
-    onChange(
-      inputs,
-      rows.filter((_, position) => position !== index),
-    );
-
-  const setCell = (index: number, key: string, value: string) =>
-    onChange(
-      inputs,
-      rows.map((row, position) =>
-        position === index
-          ? { ...row, when: { ...row.when, [key]: value } }
+  const setRow = (index: number, when: Predicate | null, limit: number): void => {
+    onChange({
+      ...value,
+      rows: value.rows.map((row, at) =>
+        at === index
+          ? { when: when ?? { op: "exists", attr: attributes[0]?.uuid ?? "" }, limit }
           : row,
       ),
-    );
+    });
+  };
 
-  const setLimit = (index: number, limit: number) =>
-    onChange(
-      inputs,
-      rows.map((row, position) =>
-        position === index ? { ...row, limit } : row,
-      ),
-    );
+  const move = (index: number, direction: -1 | 1): void => {
+    const target = index + direction;
+    if (target < 0 || target >= value.rows.length) {
+      return;
+    }
+    const rows = [...value.rows];
+    const a = rows[index];
+    const b = rows[target];
+    if (!a || !b) {
+      return;
+    }
+    rows[index] = b;
+    rows[target] = a;
+    onChange({ ...value, rows });
+  };
 
   return (
-    <div className="flex flex-col gap-3 rounded-control border border-hairline p-4">
+    <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
       <div>
-        <p className="text-sm font-semibold text-ink">Lookup table</p>
-        <p className="mt-0.5 text-sm text-muted">
-          The limit is read from here, keyed by the item&apos;s own attribute
-          values. Rows are tried top to bottom, so a specific row can sit above
-          a catch-all. An item matching no row is left alone — that&apos;s a gap
-          in the table, not a failure.
+        <span className="text-xs font-semibold text-ink">Limit table</span>
+        <p className="mt-0.5 text-[11px] text-muted">
+          Rows are tried top to bottom and the first match wins, so put the
+          specific combinations above the catch-all. An item matching no row is
+          outside what the table describes and is left alone.
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted">Keyed by</span>
-        {inputs.map((key) => (
-          <span
-            key={key}
-            className="flex items-center gap-1 rounded-md bg-primary-tint px-2 py-1 text-sm font-medium text-primary"
-          >
-            {labelFor(key)}
-            <button
-              type="button"
-              onClick={() => removeInput(key)}
-              aria-label={`Remove ${labelFor(key)} column`}
-              className="text-primary/70 transition-colors hover:text-primary"
-            >
-              <Trash2 size={12} />
-            </button>
-          </span>
-        ))}
-        <div className="w-56">
-          <Dropdown
-            searchable
-            value=""
-            onChange={addInput}
-            placeholder="Add an attribute column…"
-            options={inputOptions.filter(
-              (option) => !inputs.includes(option.value),
-            )}
-          />
-        </div>
-      </div>
-
-      {inputs.length === 0 ? (
-        <p className="rounded-control border border-dashed border-hairline p-4 text-sm text-faint">
-          Pick at least one attribute to key the table by — cable grade and
-          link speed, for instance.
+      {value.rows.length === 0 && (
+        <p className="rounded-control border border-dashed border-hairline px-3 py-4 text-center text-[11px] text-faint">
+          No rows yet — a conditional rule with an empty table cannot run.
         </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-max text-sm">
-            <thead>
-              <tr className="border-b border-hairline text-left">
-                {inputs.map((key) => (
-                  <th
-                    key={key}
-                    className="px-2 py-2 text-sm font-semibold tracking-wide text-muted uppercase"
-                  >
-                    {labelFor(key)}
-                  </th>
-                ))}
-                <th className="px-2 py-2 text-sm font-semibold tracking-wide text-muted uppercase">
-                  Limit{limitUnit ? ` (${limitUnit})` : ""}
-                </th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={index} className="border-b border-hairline">
-                  {inputs.map((key) => (
-                    <td key={key} className="px-2 py-2">
-                      <div className="w-40">
-                        <Dropdown
-                          searchable
-                          value={row.when[key] ?? ""}
-                          onChange={(value) => setCell(index, key, value)}
-                          placeholder="Any value…"
-                          options={(valuesByKey[key] ?? []).map((value) => ({
-                            value,
-                            label: value,
-                          }))}
-                        />
-                      </div>
-                    </td>
-                  ))}
-                  <td className="px-2 py-2">
-                    <div className="w-28">
-                      <Input
-                        type="number"
-                        step="any"
-                        value={String(row.limit)}
-                        onChange={(event) =>
-                          setLimit(index, Number(event.target.value))
-                        }
-                      />
-                    </div>
-                  </td>
-                  <td className="px-2 py-2">
-                    <button
-                      type="button"
-                      onClick={() => removeRow(index)}
-                      aria-label={`Remove row ${index + 1}`}
-                      className="rounded p-1.5 text-faint transition-colors hover:bg-page hover:text-danger"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
+
+      {value.rows.map((row, index) => (
+        <div
+          key={index}
+          className="flex flex-col gap-2 rounded-control border border-hairline bg-base p-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-secondary">
+              Row {index + 1}
+              {index === value.rows.length - 1 && value.rows.length > 1 && (
+                <span className="ml-1.5 text-faint">(last — the fallback)</span>
+              )}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => move(index, -1)}
+                disabled={index === 0}
+                aria-label="Move row up"
+                className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-40"
+              >
+                <ArrowUp size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(index, 1)}
+                disabled={index === value.rows.length - 1}
+                aria-label="Move row down"
+                className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-40"
+              >
+                <ArrowDown size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    rows: value.rows.filter((_, at) => at !== index),
+                  })
+                }
+                aria-label="Remove row"
+                className="rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+
+          <PredicateEditor
+            value={row.when}
+            onChange={(when) => setRow(index, when, row.limit)}
+            attributes={attributes}
+            emptyLabel="Matches anything"
+          />
+
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-[11px] text-secondary">
+              then the limit is
+            </span>
+            <Input
+              type="number"
+              value={String(row.limit)}
+              onChange={(event) =>
+                setRow(index, row.when, Number(event.target.value))
+              }
+            />
+          </div>
+
+          <p className="text-[11px] text-faint">
+            {describePredicate(row.when, attributes)} → {row.limit}
+          </p>
+        </div>
+      ))}
 
       <button
         type="button"
-        onClick={addRow}
-        disabled={inputs.length === 0}
-        className="flex w-fit items-center gap-1.5 rounded-control border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={() =>
+          onChange({
+            ...value,
+            rows: [
+              ...value.rows,
+              {
+                when: { op: "exists", attr: attributes[0]?.uuid ?? "" },
+                limit: 0,
+              },
+            ],
+          })
+        }
+        className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
       >
-        <Plus size={14} />
+        <Plus size={13} />
         Add row
       </button>
     </div>

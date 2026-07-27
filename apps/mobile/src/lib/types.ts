@@ -21,18 +21,20 @@ export type Product = {
 export type ProductDetail = Product & {
   category: Category | null;
   brandBusinessLines: string[] | null;
-  // Values the API decided this viewer may read — already filtered by
-  // audience, so a partner-only attribute simply is not here.
-  technicalAttributes: Record<string, string> | null;
-  // Label/unit/group resolved per key, so the app renders a spec table
-  // without carrying its own copy of the attribute library.
+  // Raw values the API decided this viewer may read — already filtered by
+  // audience, so a partner-only attribute simply is not here. Keyed by attribute
+  // uuid and typed.
+  specValues: Record<string, number | boolean | string | string[]> | null;
+  // Label + already-FORMATTED value per attribute, so the app renders a spec
+  // table without carrying its own copy of the attribute library, its option
+  // labels, or its units.
   specs: ProductSpec[] | null;
 };
 
 export type ProductSpec = {
-  key: string;
+  uuid: string;
   label: string;
-  unit: string | null;
+  value: string;
   groupName: string | null;
 };
 
@@ -44,7 +46,7 @@ export type SpecFacet = {
   label: string;
   unit: string | null;
   ordered: boolean;
-  options: string[];
+  options: { value: string; label: string; rank: number | null }[];
 };
 
 // One thing wrong with a design, from either engine.
@@ -52,8 +54,16 @@ export type DesignFinding = {
   id: string;
   title: string;
   message: string;
-  tone: "block" | "warn";
-  suggestions: string[];
+  // "unknown" is a check that could not be run — missing product data, or a
+  // project question the buyer has not answered. Surfaced, never treated as a
+  // pass: a check we could not run must not look like one that succeeded.
+  tone: "block" | "warn" | "unknown";
+  corrections: {
+    shape: "add_supply" | "reduce_demand" | "swap";
+    message: string;
+    products: { productUuid: string; name: string; capacity: number }[];
+  }[];
+  failingProductUuids: string[];
 };
 
 export type DesignCheckResult = {

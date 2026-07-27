@@ -1,7 +1,12 @@
 import { getViewerFromRequest } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { getCategoryFacets, getProducts, type ProductSort } from "services";
-import { expandFacetChoices, parseSpecParams } from "utils";
+import {
+  expandFacetChoices,
+  getCategoryFacets,
+  getProducts,
+  type ProductSort,
+} from "services";
+import { parseSpecParams } from "utils";
 
 export const GET = async (request: Request) => {
   const { searchParams } = new URL(request.url);

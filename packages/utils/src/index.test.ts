@@ -4,6 +4,7 @@ import {
   capitalize,
   formatMoney,
   formatSpecValue,
+  hasSpecValue,
   formatPrice,
   formatSar,
   fromMinorUnits,
@@ -212,24 +213,40 @@ describe("getReviewerName", () => {
   });
 });
 
+// Values arrive TYPED now — a number as a number, a multi-select as an array, a
+// boolean as true/false. The old comma-joined-string encoding is gone, along with
+// the ranges that were stored as "from - to".
 describe("formatSpecValue", () => {
-  it("appends the unit to a plain value", () => {
-    expect(formatSpecValue("45", "W")).toBe("45 W");
+  it("appends the unit to a number", () => {
+    expect(formatSpecValue(45, "W")).toBe("45 W");
+    expect(formatSpecValue(0, "W")).toBe("0 W");
   });
 
-  it("renders a range once, with an en dash", () => {
-    expect(formatSpecValue("220 - 240", "V")).toBe("220 – 240 V");
+  it("reads a real boolean as Yes / No", () => {
+    expect(formatSpecValue(true)).toBe("Yes");
+    expect(formatSpecValue(false)).toBe("No");
   });
 
-  it("joins multi-select values and omits the unit", () => {
-    expect(formatSpecValue("802.3af, 802.3at", null)).toBe(
-      "802.3af, 802.3at",
-    );
+  it("joins a multi-select and swaps values for labels", () => {
+    expect(
+      formatSpecValue(["af", "at"], null, {
+        af: "802.3af",
+        at: "802.3at",
+      }),
+    ).toBe("802.3af, 802.3at");
+  });
+
+  it("falls back to the stored value when there is no label", () => {
+    expect(formatSpecValue(["af"], null)).toBe("af");
+  });
+
+  it("labels a single select value", () => {
+    expect(formatSpecValue("cat6", null, { cat6: "Cat6" })).toBe("Cat6");
   });
 
   it("omits the suffix when there is no unit", () => {
-    expect(formatSpecValue("Yes", null)).toBe("Yes");
-    expect(formatSpecValue("Yes", "   ")).toBe("Yes");
+    expect(formatSpecValue(45, null)).toBe("45");
+    expect(formatSpecValue(45, "   ")).toBe("45");
   });
 
   it("returns an empty string for an unset value", () => {
@@ -237,10 +254,24 @@ describe("formatSpecValue", () => {
     expect(formatSpecValue(null, "W")).toBe("");
     expect(formatSpecValue(undefined, "W")).toBe("");
     expect(formatSpecValue("   ", "W")).toBe("");
+    expect(formatSpecValue([], null)).toBe("");
+  });
+});
+
+describe("hasSpecValue", () => {
+  // 0 and false are real answers — treating them as blanks is how a 0 W draw
+  // becomes "missing data" and drops out of a budget check.
+  it("treats zero and false as filled in", () => {
+    expect(hasSpecValue(0)).toBe(true);
+    expect(hasSpecValue(false)).toBe(true);
   });
 
-  it("handles an open-ended range", () => {
-    expect(formatSpecValue("10 - ", "V")).toBe("10 V");
+  it("treats blanks and empty lists as unset", () => {
+    expect(hasSpecValue(null)).toBe(false);
+    expect(hasSpecValue(undefined)).toBe(false);
+    expect(hasSpecValue("")).toBe(false);
+    expect(hasSpecValue("  ")).toBe(false);
+    expect(hasSpecValue([])).toBe(false);
   });
 });
 

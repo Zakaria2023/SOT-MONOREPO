@@ -1,0 +1,1397 @@
+import type {
+  MatchMode,
+  RelationshipAllocation,
+  RelationshipComparator,
+  RelationshipFamily,
+  RelationshipGate,
+} from "../../../db/enum";
+import type {
+  CorrectionShape,
+  FindingCorrection,
+  LookupTable,
+  Operand,
+  Predicate,
+  PresenceSpec,
+  ProductValues,
+  RelationshipScope,
+} from "../../../db/types";
+import { evaluatePredicate } from "./predicate";
+import {
+  asNumber,
+  asOptionList,
+  describeValue,
+  formatValue,
+  hasValue,
+  optionLabel,
+  optionRank,
+  readValue,
+  round2,
+  unitFactor,
+  type AttributeIndex,
+  type AttributeMeta,
+} from "./spec-values";
+
+// ---------------------------------------------------------------------------
+// THE RELATIONSHIP ENGINE. Deterministic, pure, no I/O, no language model.
+//
+// It takes rule rows, a selection, and the library, then resolves participants,
+// aggregates, compares, and explains. It knows nothing about PoE, cameras or
+// switches — all meaning lives in the data.
+//
+// Two invariants it will not break:
+//
+//   1. It NEVER guesses. If a value is missing or two units do not convert, the
+//      rule reports UNKNOWN and names what it could not read. A missing value
+//      must never look like a pass, because incomplete data does not look like
+//      an error to a buyer — it looks like approval.
+//   2. Presence owns "what is missing"; every other family owns "what
+//      conflicts". So a selection with cameras and no switch produces exactly
+//      one finding, not two saying the same thing in different words.
+// ---------------------------------------------------------------------------
+
+export type SelectionInput = {
+  productUuid: string;
+  quantity: number;
+};
+
+export type EngineItem = {
+  productUuid: string;
+  name: string;
+  quantity: number;
+  values: ProductValues;
+};
+
+export type EngineCatalogProduct = {
+  productUuid: string;
+  name: string;
+  values: ProductValues;
+};
+
+// A project input the buyer supplied. `value` is null when unanswered — and a
+// rule needing an unanswered variable does not run, rather than running on a
+// number nobody provided.
+export type EngineVariable = {
+  uuid: string;
+  label: string;
+  unit: string | null;
+  value: number | boolean | null;
+};
+
+export type EngineRelationship = {
+  uuid: string;
+  name: string;
+  description: string | null;
+  family: RelationshipFamily;
+  gate: RelationshipGate;
+  comparator: RelationshipComparator;
+  matchMode: MatchMode;
+  headroomPercent: number;
+  ratioLimit: number | null;
+  allocation: RelationshipAllocation;
+  perItem: boolean;
+  consumer: Operand | null;
+  provider: Operand | null;
+  consumerWhen: Predicate | null;
+  providerWhen: Predicate | null;
+  lookup: LookupTable | null;
+  presence: PresenceSpec | null;
+  scope: RelationshipScope | null;
+};
+
+export type EngineContext = {
+  attributes: AttributeIndex;
+  variables: Map<string, EngineVariable>;
+  catalog: EngineCatalogProduct[];
+  // The market the selection is being priced for, matched against a rule's
+  // scope. Undefined = run every rule regardless of scope.
+  region?: string;
+};
+
+// pass        — checked and satisfied
+// warn        — violated, and the rule only cautions
+// block       — violated, and the rule gates checkout
+// not_applicable — nothing in the selection participates
+// unknown     — could not be checked. Never treated as a pass.
+export type FindingStatus =
+  | "pass"
+  | "warn"
+  | "block"
+  | "not_applicable"
+  | "unknown";
+
+export type Participant = {
+  productUuid: string;
+  name: string;
+  quantity: number;
+  unitValue: number;
+  totalValue: number;
+};
+
+// One physical provider unit (e.g. switch #2 of 3) and what was placed in it.
+export type ProviderBin = {
+  productUuid: string;
+  name: string;
+  unitIndex: number;
+  capacity: number;
+  used: number;
+  items: { productUuid: string; name: string; count: number; size: number }[];
+};
+
+export type SkippedItem = {
+  productUuid: string;
+  name: string;
+  // Attribute labels the engine needed and could not read.
+  missing: string[];
+};
+
+export type Finding = {
+  relationshipUuid: string;
+  name: string;
+  description: string | null;
+  family: RelationshipFamily;
+  gate: RelationshipGate;
+  status: FindingStatus;
+  // One sentence, with the numbers in it. "Incompatible" is useless; the buyer
+  // needs to see both sides and the gap.
+  message: string;
+  demand: number;
+  capacity: number;
+  effectiveCapacity: number;
+  unit: string | null;
+  consumers: Participant[];
+  providers: Participant[];
+  failingItems: Participant[];
+  bins: ProviderBin[];
+  // Items that matched but could not be judged — the honest half of Q40.
+  skipped: SkippedItem[];
+  corrections: FindingCorrection[];
+};
+
+export type DesignReport = {
+  findings: Finding[];
+  blockers: Finding[];
+  warnings: Finding[];
+  // Rules that could not be evaluated. Surfaced, never swallowed.
+  unknowns: Finding[];
+  passed: number;
+  notApplicable: number;
+};
+
+// ---------------------------------------------------------------------------
+// Operands
+// ---------------------------------------------------------------------------
+
+const operandMeta = (
+  operand: Operand | null,
+  context: EngineContext,
+): AttributeMeta | null => {
+  if (!operand || operand.source !== "spec") {
+    return null;
+  }
+  return context.attributes.get(operand.specUuid) ?? null;
+};
+
+const operandUnit = (
+  operand: Operand | null,
+  context: EngineContext,
+): string | null => {
+  if (!operand) {
+    return null;
+  }
+  if (operand.source === "spec") {
+    return operandMeta(operand, context)?.unit ?? null;
+  }
+  if (operand.source === "variable") {
+    return context.variables.get(operand.variableUuid)?.unit ?? null;
+  }
+  return null;
+};
+
+const operandLabel = (
+  operand: Operand | null,
+  context: EngineContext,
+): string => {
+  if (!operand) {
+    return "—";
+  }
+  if (operand.source === "spec") {
+    return operandMeta(operand, context)?.label ?? "a deleted attribute";
+  }
+  if (operand.source === "variable") {
+    return context.variables.get(operand.variableUuid)?.label ?? "a deleted input";
+  }
+  if (operand.source === "item_count") {
+    return "item count";
+  }
+  return `${operand.value}`;
+};
+
+// The per-unit number an item contributes on this side, or null when the item
+// carries no readable value for it.
+const itemOperandValue = (
+  operand: Operand,
+  item: EngineItem,
+  context: EngineContext,
+): number | null => {
+  if (operand.source === "constant") {
+    return operand.value;
+  }
+  if (operand.source === "item_count") {
+    return 1;
+  }
+  if (operand.source === "variable") {
+    const variable = context.variables.get(operand.variableUuid);
+    return typeof variable?.value === "number" ? variable.value : null;
+  }
+  const meta = context.attributes.get(operand.specUuid);
+  if (!meta) {
+    return null;
+  }
+  return asNumber(readValue(item.values, operand.specUuid), meta);
+};
+
+// ---------------------------------------------------------------------------
+// Participants
+// ---------------------------------------------------------------------------
+
+type Side = {
+  participants: Participant[];
+  skipped: SkippedItem[];
+  // Items that matched the side's filter at all — used to tell "nothing
+  // participates" apart from "everything that participates is unreadable".
+  matched: number;
+};
+
+const collectSide = (
+  operand: Operand | null,
+  when: Predicate | null,
+  selection: EngineItem[],
+  context: EngineContext,
+): Side => {
+  const participants: Participant[] = [];
+  const skipped: SkippedItem[] = [];
+  let matched = 0;
+
+  if (!operand) {
+    return { participants, skipped, matched };
+  }
+
+  for (const item of selection) {
+    const filter = evaluatePredicate(when, item.values, context.attributes);
+    if (!filter.matched) {
+      // A filter that failed only because data was missing is a data problem,
+      // not a non-match — otherwise an unfilled product quietly drops out of
+      // every rule that would have judged it.
+      if (filter.missing.length > 0) {
+        skipped.push({
+          productUuid: item.productUuid,
+          name: item.name,
+          missing: filter.missing.map(
+            (uuid) => context.attributes.get(uuid)?.label ?? uuid,
+          ),
+        });
+      }
+      continue;
+    }
+
+    // A missing operand value is either "this item is not part of this rule" or
+    // "somebody forgot to fill this in", and the two must not be confused — the
+    // second one is how a camera with a blank power draw silently passes every
+    // budget check.
+    //
+    // The side's FILTER is what tells them apart. If the rule said "consumers
+    // are items whose role is Camera" and this item matched that, then it was
+    // supposed to carry a draw and the blank is a data gap. With no filter at
+    // all, participation is defined purely by carrying the attribute, so a
+    // switch that has no camera resolution is genuinely not a participant.
+    if (operand.source === "spec") {
+      const raw = readValue(item.values, operand.specUuid);
+      if (!hasValue(raw)) {
+        if (when) {
+          skipped.push({
+            productUuid: item.productUuid,
+            name: item.name,
+            missing: [operandLabel(operand, context)],
+          });
+        }
+        continue;
+      }
+    }
+
+    matched += 1;
+    const unitValue = itemOperandValue(operand, item, context);
+    if (unitValue === null) {
+      skipped.push({
+        productUuid: item.productUuid,
+        name: item.name,
+        missing: [operandLabel(operand, context)],
+      });
+      continue;
+    }
+    participants.push({
+      productUuid: item.productUuid,
+      name: item.name,
+      quantity: item.quantity,
+      unitValue,
+      totalValue: round2(unitValue * item.quantity),
+    });
+  }
+
+  return { participants, skipped, matched };
+};
+
+// ---------------------------------------------------------------------------
+// Finding scaffolding
+// ---------------------------------------------------------------------------
+
+const emptyFinding = (
+  rule: EngineRelationship,
+  unit: string | null,
+): Omit<Finding, "status" | "message"> => ({
+  relationshipUuid: rule.uuid,
+  name: rule.name,
+  description: rule.description,
+  family: rule.family,
+  gate: rule.gate,
+  demand: 0,
+  capacity: 0,
+  effectiveCapacity: 0,
+  unit,
+  consumers: [],
+  providers: [],
+  failingItems: [],
+  bins: [],
+  skipped: [],
+  corrections: [],
+});
+
+const violation = (rule: EngineRelationship): FindingStatus =>
+  rule.gate === "warn" ? "warn" : "block";
+
+const correction = (
+  shape: CorrectionShape,
+  message: string,
+  products: FindingCorrection["products"] = [],
+): FindingCorrection => ({ shape, message, products });
+
+/**
+ * Catalog products that would satisfy the failed demand on their own, smallest
+ * sufficient capacity first.
+ *
+ * Only offered for a capacity comparison, where "bigger number" is a real fix.
+ * For a compatibility mismatch there is no arithmetic to search on, so the
+ * correction describes the swap instead of guessing at a product.
+ */
+const suggestProviders = (
+  rule: EngineRelationship,
+  demand: number,
+  context: EngineContext,
+): FindingCorrection["products"] => {
+  const operand = rule.provider;
+  if (!operand || operand.source !== "spec" || rule.comparator === "gte") {
+    return [];
+  }
+  const meta = context.attributes.get(operand.specUuid);
+  if (!meta) {
+    return [];
+  }
+  return context.catalog
+    .flatMap((product) => {
+      const filter = evaluatePredicate(
+        rule.providerWhen,
+        product.values,
+        context.attributes,
+      );
+      if (!filter.matched) {
+        return [];
+      }
+      const capacity = asNumber(readValue(product.values, operand.specUuid), meta);
+      if (capacity === null) {
+        return [];
+      }
+      const usable = round2((capacity * rule.headroomPercent) / 100);
+      return usable >= demand
+        ? [{ productUuid: product.productUuid, name: product.name, capacity }]
+        : [];
+    })
+    .sort((a, b) => a.capacity - b.capacity)
+    .slice(0, 3);
+};
+
+// ---------------------------------------------------------------------------
+// Capacity, pooled or per unit
+// ---------------------------------------------------------------------------
+
+type Packing = {
+  bins: ProviderBin[];
+  unplaced: Participant[];
+};
+
+/**
+ * Distribute consumer units across provider units, first-fit-decreasing.
+ *
+ * The default, because two switches with 130 W each are NOT one switch with
+ * 260 W: pooling would approve a design where a single 200 W load cannot
+ * physically attach to either of them.
+ */
+const packPerUnit = (
+  consumers: Participant[],
+  providers: Participant[],
+  headroomPercent: number,
+): Packing => {
+  const bins: ProviderBin[] = providers.flatMap((provider) =>
+    Array.from({ length: Math.max(1, provider.quantity) }, (_, index) => ({
+      productUuid: provider.productUuid,
+      name: provider.name,
+      unitIndex: index + 1,
+      capacity: round2((provider.unitValue * headroomPercent) / 100),
+      used: 0,
+      items: [] as ProviderBin["items"],
+    })),
+  );
+
+  const units = consumers
+    .flatMap((consumer) =>
+      Array.from({ length: Math.max(1, consumer.quantity) }, () => ({
+        productUuid: consumer.productUuid,
+        name: consumer.name,
+        size: consumer.unitValue,
+      })),
+    )
+    .sort((a, b) => b.size - a.size);
+
+  const unplacedByProduct = new Map<string, Participant>();
+
+  for (const unit of units) {
+    const bin = bins.find(
+      (candidate) => candidate.used + unit.size <= candidate.capacity + 1e-9,
+    );
+    if (!bin) {
+      const existing = unplacedByProduct.get(unit.productUuid);
+      if (existing) {
+        existing.quantity += 1;
+        existing.totalValue = round2(existing.totalValue + unit.size);
+      } else {
+        unplacedByProduct.set(unit.productUuid, {
+          productUuid: unit.productUuid,
+          name: unit.name,
+          quantity: 1,
+          unitValue: unit.size,
+          totalValue: unit.size,
+        });
+      }
+      continue;
+    }
+    bin.used = round2(bin.used + unit.size);
+    const entry = bin.items.find((item) => item.productUuid === unit.productUuid);
+    if (entry) {
+      entry.count += 1;
+    } else {
+      bin.items.push({
+        productUuid: unit.productUuid,
+        name: unit.name,
+        count: 1,
+        size: unit.size,
+      });
+    }
+  }
+
+  return { bins, unplaced: [...unplacedByProduct.values()] };
+};
+
+const compare = (
+  demand: number,
+  limit: number,
+  comparator: RelationshipComparator,
+): boolean => {
+  if (comparator === "gte") {
+    return demand >= limit;
+  }
+  if (comparator === "eq") {
+    return demand === limit;
+  }
+  return demand <= limit;
+};
+
+// ---------------------------------------------------------------------------
+// Budget and Count
+// ---------------------------------------------------------------------------
+
+const evaluateCapacity = (
+  rule: EngineRelationship,
+  selection: EngineItem[],
+  context: EngineContext,
+): Finding => {
+  const consumerUnit = operandUnit(rule.consumer, context);
+  const providerUnit = operandUnit(rule.provider, context);
+  const base = emptyFinding(rule, providerUnit);
+
+  const consumerSide = collectSide(
+    rule.consumer,
+    rule.consumerWhen,
+    selection,
+    context,
+  );
+  const providerSide = collectSide(
+    rule.provider,
+    rule.providerWhen,
+    selection,
+    context,
+  );
+  const skipped = [...consumerSide.skipped, ...providerSide.skipped];
+
+  if (consumerSide.participants.length === 0) {
+    // Everything that would have participated is unreadable — that is a data
+    // problem the catalog team has to see, not a rule that does not apply.
+    if (consumerSide.skipped.length > 0) {
+      return {
+        ...base,
+        skipped,
+        status: "unknown",
+        message: `Could not check "${rule.name}": ${describeSkipped(consumerSide.skipped)}`,
+      };
+    }
+    return {
+      ...base,
+      skipped,
+      status: "not_applicable",
+      message: `Nothing in the selection carries "${operandLabel(rule.consumer, context)}" — this check does not apply.`,
+    };
+  }
+
+  // Unit safety before any arithmetic. An item count is deliberately
+  // dimensionless, so a Count rule compares it against the provider's own unit
+  // without conversion.
+  let toProvider = 1;
+  if (rule.consumer?.source !== "item_count") {
+    const conversion = unitFactor(consumerUnit, providerUnit);
+    if (!conversion.ok) {
+      return {
+        ...base,
+        skipped,
+        status: "unknown",
+        message: `Could not check "${rule.name}": ${conversion.reason}. Fix the units in the library before this rule can run.`,
+      };
+    }
+    toProvider = conversion.factor;
+  }
+
+  const consumers = consumerSide.participants.map((participant) => ({
+    ...participant,
+    unitValue: round2(participant.unitValue * toProvider),
+    totalValue: round2(participant.unitValue * toProvider * participant.quantity),
+  }));
+  const providers = providerSide.participants;
+
+  const demand = round2(
+    consumers.reduce((sum, consumer) => sum + consumer.totalValue, 0),
+  );
+
+  // Q30: an absent provider is Presence's concern, not Budget's. Reporting it
+  // here too would show the buyer the same problem twice in different words.
+  if (providers.length === 0) {
+    if (providerSide.skipped.length > 0) {
+      return {
+        ...base,
+        consumers,
+        skipped,
+        status: "unknown",
+        message: `Could not check "${rule.name}": ${describeSkipped(providerSide.skipped)}`,
+      };
+    }
+    return {
+      ...base,
+      consumers,
+      demand,
+      skipped,
+      status: "not_applicable",
+      message: `Nothing in the selection supplies "${operandLabel(rule.provider, context)}" — this check does not apply.`,
+    };
+  }
+
+  const withSides = { ...base, consumers, providers, skipped };
+  const consumerName = operandLabel(rule.consumer, context);
+  const providerName = operandLabel(rule.provider, context);
+
+  // Budget in per-item mode: each unit against the single best provider value.
+  if (rule.perItem) {
+    const limit = Math.max(...providers.map((provider) => provider.unitValue));
+    const effective = round2((limit * rule.headroomPercent) / 100);
+    const failing = consumers.filter(
+      (consumer) => !compare(consumer.unitValue, effective, rule.comparator),
+    );
+    const worst = Math.max(...consumers.map((consumer) => consumer.unitValue));
+
+    if (failing.length === 0) {
+      return {
+        ...withSides,
+        demand: worst,
+        capacity: limit,
+        effectiveCapacity: effective,
+        status: "pass",
+        message: `Every item's "${consumerName}" (highest ${formatValue(worst, providerUnit)}) fits the per-device limit of ${formatValue(effective, providerUnit)}.`,
+      };
+    }
+    return {
+      ...withSides,
+      demand: worst,
+      capacity: limit,
+      effectiveCapacity: effective,
+      failingItems: failing,
+      status: violation(rule),
+      message: `${failing.length} item(s) exceed the per-device limit of ${formatValue(effective, providerUnit)}: ${failing.map((item) => `${item.name} (${formatValue(item.unitValue, providerUnit)})`).join(", ")}.`,
+      corrections: [
+        correction(
+          "swap",
+          `Choose a ${providerName.toLowerCase()} of at least ${formatValue(worst, providerUnit)}, or a lower-draw alternative for the failing item(s).`,
+          suggestProviders(rule, worst, context),
+        ),
+      ],
+    };
+  }
+
+  const pooledCapacity = round2(
+    providers.reduce((sum, provider) => sum + provider.totalValue, 0),
+  );
+  const pooledEffective = round2((pooledCapacity * rule.headroomPercent) / 100);
+  const headroomNote =
+    rule.headroomPercent === 100
+      ? ""
+      : ` (${formatValue(pooledCapacity, providerUnit)} × ${rule.headroomPercent}%)`;
+
+  if (rule.allocation === "per_unit" && rule.comparator === "lte") {
+    const { bins, unplaced } = packPerUnit(
+      consumers,
+      providers,
+      rule.headroomPercent,
+    );
+    if (unplaced.length === 0) {
+      return {
+        ...withSides,
+        demand,
+        capacity: pooledCapacity,
+        effectiveCapacity: pooledEffective,
+        bins,
+        status: "pass",
+        message: `Everything fits: ${formatValue(demand, providerUnit)} of "${consumerName}" spread across ${bins.length} device(s), each within its own "${providerName}".`,
+      };
+    }
+    const leftover = unplaced.reduce((sum, item) => sum + item.quantity, 0);
+    const largest = Math.max(...unplaced.map((item) => item.unitValue));
+    const shortfall = round2(Math.max(0, demand - pooledEffective));
+
+    return {
+      ...withSides,
+      demand,
+      capacity: pooledCapacity,
+      effectiveCapacity: pooledEffective,
+      bins,
+      failingItems: unplaced,
+      status: violation(rule),
+      message: `${leftover} item(s) do not fit on any single device even after spreading the load across ${bins.length}: ${unplaced.map((item) => `${item.quantity} × ${item.name}`).join(", ")}. Total "${consumerName}" is ${formatValue(demand, providerUnit)} against a usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote}.`,
+      corrections: [
+        correction(
+          "add_supply",
+          shortfall > 0
+            ? `Add at least ${formatValue(shortfall, providerUnit)} more "${providerName}" — another device, or a bigger one.`
+            : `Add another device: the total is within budget but no single unit can take the largest item (${formatValue(largest, providerUnit)}).`,
+          suggestProviders(rule, largest, context),
+        ),
+        correction(
+          "reduce_demand",
+          `Reduce "${consumerName}" by removing items or choosing lower-draw alternatives.`,
+        ),
+      ],
+    };
+  }
+
+  if (compare(demand, pooledEffective, rule.comparator)) {
+    return {
+      ...withSides,
+      demand,
+      capacity: pooledCapacity,
+      effectiveCapacity: pooledEffective,
+      status: "pass",
+      message: `Total "${consumerName}" of ${formatValue(demand, providerUnit)} fits the usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote}.`,
+    };
+  }
+
+  const gap = round2(Math.abs(demand - pooledEffective));
+  const over = rule.comparator === "lte";
+  return {
+    ...withSides,
+    demand,
+    capacity: pooledCapacity,
+    effectiveCapacity: pooledEffective,
+    status: violation(rule),
+    message: `Total "${consumerName}" of ${formatValue(demand, providerUnit)} ${over ? "exceeds" : "falls short of"} the usable "${providerName}" of ${formatValue(pooledEffective, providerUnit)}${headroomNote} — ${over ? "over" : "short"} by ${formatValue(gap, providerUnit)}.`,
+    corrections: [
+      correction(
+        "add_supply",
+        `Add at least ${formatValue(gap, providerUnit)} more "${providerName}".`,
+        suggestProviders(rule, demand, context),
+      ),
+      correction(
+        "reduce_demand",
+        `Reduce "${consumerName}" by ${formatValue(gap, providerUnit)}.`,
+      ),
+    ],
+  };
+};
+
+const describeSkipped = (skipped: SkippedItem[]): string =>
+  skipped
+    .slice(0, 3)
+    .map((item) => `${item.name} has no value for ${item.missing.join(", ")}`)
+    .join("; ");
+
+// ---------------------------------------------------------------------------
+// Match
+// ---------------------------------------------------------------------------
+
+const scaleRank = (
+  value: string,
+  metas: (AttributeMeta | null)[],
+): number | null => {
+  for (const meta of metas) {
+    if (!meta) {
+      continue;
+    }
+    const rank = optionRank(meta, value);
+    if (rank !== null) {
+      return rank;
+    }
+  }
+  return null;
+};
+
+/**
+ * Whether a consumer's value(s) fit a provider's.
+ *
+ *   in         — consumer ⊆ provider  (an impedance the amp supports)
+ *   intersects — the sets overlap     (two codec lists sharing one codec)
+ *   lte / gte  — position on the scale (an af device fits an at switch, but not
+ *                the reverse)
+ *   eq         — the two sets are identical
+ */
+const matchSatisfied = (
+  consumerValues: string[],
+  providerValues: string[],
+  rule: EngineRelationship,
+  consumerMeta: AttributeMeta | null,
+  providerMeta: AttributeMeta | null,
+): boolean => {
+  const provider = new Set(providerValues);
+
+  if (rule.comparator === "intersects") {
+    return consumerValues.some((value) => provider.has(value));
+  }
+  if (rule.comparator === "in") {
+    if (consumerValues.length === 0) {
+      return false;
+    }
+    return rule.matchMode === "any"
+      ? consumerValues.some((value) => provider.has(value))
+      : consumerValues.every((value) => provider.has(value));
+  }
+  if (rule.comparator === "lte" || rule.comparator === "gte") {
+    // A ceiling comparison is only meaningful on a scale. An unordered list has
+    // no "at most", so it degrades to plain membership rather than silently
+    // comparing alphabetical position.
+    if (!consumerMeta?.ordered && !providerMeta?.ordered) {
+      return (
+        consumerValues.length > 0 &&
+        consumerValues.every((value) => provider.has(value))
+      );
+    }
+    const metas = [providerMeta, consumerMeta];
+    const providerRanks = providerValues
+      .map((value) => scaleRank(value, metas))
+      .filter((rank): rank is number => rank !== null);
+    const consumerRanks = consumerValues
+      .map((value) => scaleRank(value, metas))
+      .filter((rank): rank is number => rank !== null);
+    if (providerRanks.length === 0 || consumerRanks.length === 0) {
+      return false;
+    }
+    // The provider offers its best rung: the highest it supports for "at most",
+    // the lowest it requires for "at least".
+    const best =
+      rule.comparator === "lte"
+        ? Math.max(...providerRanks)
+        : Math.min(...providerRanks);
+    return consumerRanks.every((rank) =>
+      rule.comparator === "lte" ? rank <= best : rank >= best,
+    );
+  }
+
+  const consumer = new Set(consumerValues);
+  return (
+    consumer.size === provider.size &&
+    [...consumer].every((value) => provider.has(value))
+  );
+};
+
+const evaluateMatch = (
+  rule: EngineRelationship,
+  selection: EngineItem[],
+  context: EngineContext,
+): Finding => {
+  const base = emptyFinding(rule, null);
+  const consumerOperand = rule.consumer;
+  const providerOperand = rule.provider;
+
+  if (
+    !consumerOperand ||
+    consumerOperand.source !== "spec" ||
+    !providerOperand ||
+    providerOperand.source !== "spec"
+  ) {
+    return {
+      ...base,
+      status: "unknown",
+      message: `"${rule.name}" compares values, so both sides must be attributes.`,
+    };
+  }
+
+  const consumerMeta = context.attributes.get(consumerOperand.specUuid) ?? null;
+  const providerMeta = context.attributes.get(providerOperand.specUuid) ?? null;
+  if (!consumerMeta || !providerMeta) {
+    return {
+      ...base,
+      status: "unknown",
+      message: `"${rule.name}" refers to an attribute that no longer exists.`,
+    };
+  }
+
+  const participant = (item: EngineItem): Participant => ({
+    productUuid: item.productUuid,
+    name: item.name,
+    quantity: item.quantity,
+    unitValue: 0,
+    totalValue: 0,
+  });
+
+  const consumers = selection.filter(
+    (item) =>
+      hasValue(readValue(item.values, consumerOperand.specUuid)) &&
+      evaluatePredicate(rule.consumerWhen, item.values, context.attributes)
+        .matched,
+  );
+  if (consumers.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `Nothing in the selection carries "${consumerMeta.label}" — this check does not apply.`,
+    };
+  }
+
+  const providers = selection.filter(
+    (item) =>
+      hasValue(readValue(item.values, providerOperand.specUuid)) &&
+      evaluatePredicate(rule.providerWhen, item.values, context.attributes)
+        .matched,
+  );
+  const withSides = {
+    ...base,
+    consumers: consumers.map(participant),
+    providers: providers.map(participant),
+  };
+
+  if (providers.length === 0) {
+    return {
+      ...withSides,
+      status: "not_applicable",
+      message: `Nothing in the selection carries "${providerMeta.label}" to match against.`,
+    };
+  }
+
+  const failing = consumers.filter(
+    (item) =>
+      !providers.some((provider) =>
+        matchSatisfied(
+          asOptionList(readValue(item.values, consumerOperand.specUuid)),
+          asOptionList(readValue(provider.values, providerOperand.specUuid)),
+          rule,
+          consumerMeta,
+          providerMeta,
+        ),
+      ),
+  );
+
+  if (failing.length === 0) {
+    return {
+      ...withSides,
+      status: "pass",
+      message: `Every item's "${consumerMeta.label}" is compatible with the available "${providerMeta.label}".`,
+    };
+  }
+
+  const offered = [
+    ...new Set(
+      providers.flatMap((item) =>
+        asOptionList(readValue(item.values, providerOperand.specUuid)),
+      ),
+    ),
+  ].map((value) => optionLabel(providerMeta, value));
+
+  return {
+    ...withSides,
+    failingItems: failing.map(participant),
+    status: violation(rule),
+    message: `${failing.length} item(s) have a "${consumerMeta.label}" the available "${providerMeta.label}" (${offered.join(", ") || "none"}) cannot support: ${failing
+      .map(
+        (item) =>
+          `${item.name} (${describeValue(readValue(item.values, consumerOperand.specUuid), consumerMeta)})`,
+      )
+      .join(", ")}.`,
+    corrections: [
+      correction(
+        "swap",
+        `Swap either side: pick items whose "${consumerMeta.label}" is one of ${offered.join(", ") || "the supported values"}, or a device whose "${providerMeta.label}" covers what you have.`,
+      ),
+    ],
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Ratio
+// ---------------------------------------------------------------------------
+
+const evaluateRatio = (
+  rule: EngineRelationship,
+  selection: EngineItem[],
+  context: EngineContext,
+): Finding => {
+  const providerUnit = operandUnit(rule.provider, context);
+  const base = emptyFinding(rule, providerUnit);
+  const target = rule.ratioLimit;
+
+  if (target === null || target <= 0) {
+    return {
+      ...base,
+      status: "unknown",
+      message: `"${rule.name}" has no target ratio set, so it cannot be checked.`,
+    };
+  }
+
+  const consumerSide = collectSide(
+    rule.consumer,
+    rule.consumerWhen,
+    selection,
+    context,
+  );
+  const providerSide = collectSide(
+    rule.provider,
+    rule.providerWhen,
+    selection,
+    context,
+  );
+  const skipped = [...consumerSide.skipped, ...providerSide.skipped];
+
+  // A ratio whose demand comes from an unanswered project input cannot run —
+  // and must say so, so the UI can ask the buyer the question.
+  const demandFromVariable =
+    rule.consumer?.source === "variable"
+      ? context.variables.get(rule.consumer.variableUuid)
+      : null;
+  if (rule.consumer?.source === "variable" && demandFromVariable?.value === null) {
+    return {
+      ...base,
+      skipped,
+      status: "unknown",
+      message: `Tell us "${demandFromVariable.label}" and we can check "${rule.name}".`,
+    };
+  }
+
+  const demand =
+    rule.consumer?.source === "variable"
+      ? Number(demandFromVariable?.value ?? 0)
+      : round2(
+          consumerSide.participants.reduce(
+            (sum, consumer) => sum + consumer.totalValue,
+            0,
+          ),
+        );
+  const supply = round2(
+    providerSide.participants.reduce(
+      (sum, provider) => sum + provider.totalValue,
+      0,
+    ),
+  );
+
+  if (demand === 0) {
+    return {
+      ...base,
+      skipped,
+      status: "not_applicable",
+      message: `Nothing in the selection creates demand for "${rule.name}".`,
+    };
+  }
+  if (supply === 0) {
+    return {
+      ...base,
+      demand,
+      skipped,
+      status: "not_applicable",
+      message: `Nothing in the selection supplies "${operandLabel(rule.provider, context)}" — this check does not apply.`,
+    };
+  }
+
+  const actual = round2(demand / supply);
+  const withSides = {
+    ...base,
+    consumers: consumerSide.participants,
+    providers: providerSide.participants,
+    skipped,
+    demand,
+    capacity: supply,
+    effectiveCapacity: target,
+  };
+
+  if (actual <= target) {
+    return {
+      ...withSides,
+      status: "pass",
+      message: `Contention is ${actual}:1, within the ${target}:1 target (${formatValue(demand, operandUnit(rule.consumer, context))} demand ÷ ${formatValue(supply, providerUnit)} supply).`,
+    };
+  }
+  return {
+    ...withSides,
+    status: violation(rule),
+    message: `Contention is ${actual}:1, above the ${target}:1 target (${formatValue(demand, operandUnit(rule.consumer, context))} demand ÷ ${formatValue(supply, providerUnit)} supply).`,
+    corrections: [
+      correction(
+        "add_supply",
+        `Raise supply to at least ${formatValue(round2(demand / target), providerUnit)}.`,
+        suggestProviders(rule, round2(demand / target), context),
+      ),
+      correction("reduce_demand", "Reduce demand, or accept the contention."),
+    ],
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Conditional
+// ---------------------------------------------------------------------------
+
+const evaluateConditional = (
+  rule: EngineRelationship,
+  selection: EngineItem[],
+  context: EngineContext,
+): Finding => {
+  const operand = rule.consumer;
+  const meta = operandMeta(operand, context);
+  const base = emptyFinding(rule, meta?.unit ?? null);
+
+  if (!operand || operand.source !== "spec" || !meta) {
+    return {
+      ...base,
+      status: "unknown",
+      message: `"${rule.name}" measures an attribute that no longer exists.`,
+    };
+  }
+  const lookup = rule.lookup;
+  if (!lookup || lookup.rows.length === 0) {
+    return {
+      ...base,
+      status: "unknown",
+      message: `"${rule.name}" has no lookup table to read a limit from.`,
+    };
+  }
+
+  const judged = selection.flatMap((item) => {
+    if (
+      !evaluatePredicate(rule.consumerWhen, item.values, context.attributes)
+        .matched
+    ) {
+      return [];
+    }
+    const value = asNumber(readValue(item.values, operand.specUuid), meta);
+    if (value === null) {
+      return [];
+    }
+    // Rows are tried in author order, so a specific row may sit above a
+    // catch-all. An item matching no row is outside what the table describes,
+    // which is a gap in the table rather than a failure by the item.
+    const matched = lookup.rows.find(
+      (candidate) =>
+        evaluatePredicate(candidate.when, item.values, context.attributes)
+          .matched,
+    );
+    if (!matched) {
+      return [];
+    }
+    return [{ item, value, limit: matched.limit }];
+  });
+
+  if (judged.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `Nothing in the selection has a combination "${rule.name}" covers.`,
+    };
+  }
+
+  const participant = (entry: (typeof judged)[number]): Participant => ({
+    productUuid: entry.item.productUuid,
+    name: entry.item.name,
+    quantity: entry.item.quantity,
+    unitValue: entry.value,
+    totalValue: round2(entry.value * entry.item.quantity),
+  });
+
+  const failing = judged.filter(
+    (entry) =>
+      !compare(
+        entry.value,
+        round2((entry.limit * rule.headroomPercent) / 100),
+        rule.comparator,
+      ),
+  );
+  const tightest = Math.min(...judged.map((entry) => entry.limit));
+  const withSides = {
+    ...base,
+    consumers: judged.map(participant),
+    capacity: tightest,
+    effectiveCapacity: round2((tightest * rule.headroomPercent) / 100),
+    demand: Math.max(...judged.map((entry) => entry.value)),
+  };
+
+  if (failing.length === 0) {
+    return {
+      ...withSides,
+      status: "pass",
+      message: `Every item's "${meta.label}" is within the limit its own configuration allows (tightest ${formatValue(tightest, meta.unit)}).`,
+    };
+  }
+  return {
+    ...withSides,
+    failingItems: failing.map(participant),
+    status: violation(rule),
+    message: `${failing.length} item(s) exceed the limit their configuration allows: ${failing
+      .map(
+        (entry) =>
+          `${entry.item.name} (${formatValue(entry.value, meta.unit)} against a limit of ${formatValue(entry.limit, meta.unit)})`,
+      )
+      .join(", ")}.`,
+    corrections: [
+      correction(
+        "reduce_demand",
+        `Bring "${meta.label}" within ${formatValue(tightest, meta.unit)}, or change the configuration that sets the limit.`,
+      ),
+    ],
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Presence
+// ---------------------------------------------------------------------------
+
+const evaluatePresence = (
+  rule: EngineRelationship,
+  selection: EngineItem[],
+  context: EngineContext,
+): Finding => {
+  const base = emptyFinding(rule, null);
+  const spec = rule.presence;
+  if (!spec) {
+    return {
+      ...base,
+      status: "unknown",
+      message: `"${rule.name}" has no trigger set.`,
+    };
+  }
+
+  const triggered = selection.filter(
+    (item) => evaluatePredicate(spec.trigger, item.values, context.attributes).matched,
+  );
+  if (triggered.length === 0) {
+    return {
+      ...base,
+      status: "not_applicable",
+      message: `Nothing in the selection triggers "${rule.name}".`,
+    };
+  }
+
+  const triggerQuantity = triggered.reduce(
+    (sum, item) => sum + item.quantity,
+    0,
+  );
+  const participant = (item: EngineItem): Participant => ({
+    productUuid: item.productUuid,
+    name: item.name,
+    quantity: item.quantity,
+    unitValue: 0,
+    totalValue: 0,
+  });
+  const withSides = { ...base, consumers: triggered.map(participant) };
+
+  for (const requirement of spec.requires) {
+    // ANY one alternative satisfies the requirement.
+    let satisfied = false;
+    let companionQuantity = 0;
+
+    for (const alternative of requirement.satisfiedBy) {
+      if (alternative.type === "variable_true") {
+        const variable = context.variables.get(alternative.variableUuid);
+        if (variable?.value === true) {
+          satisfied = true;
+          break;
+        }
+        continue;
+      }
+      const companions = selection.filter(
+        (item) =>
+          evaluatePredicate(alternative.predicate, item.values, context.attributes)
+            .matched,
+      );
+      if (companions.length === 0) {
+        continue;
+      }
+      companionQuantity += companions.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      satisfied = true;
+    }
+
+    if (!satisfied) {
+      return {
+        ...withSides,
+        status: violation(rule),
+        demand: triggerQuantity,
+        message: `${requirement.description} — ${triggerQuantity} item(s) in the selection need it and nothing provides it.`,
+        corrections: [
+          correction(
+            "add_supply",
+            spec.suggestedFix ?? `Add what "${requirement.description}" asks for.`,
+          ),
+        ],
+      };
+    }
+
+    // Quantity pairing: N triggers demand N companions. This is what lets
+    // "every door needs a reader" be checked in total, without modelling
+    // per-door grouping.
+    if (requirement.perTriggerQuantity > 0) {
+      const needed = Math.ceil(triggerQuantity * requirement.perTriggerQuantity);
+      if (companionQuantity < needed) {
+        return {
+          ...withSides,
+          status: violation(rule),
+          demand: needed,
+          capacity: companionQuantity,
+          message: `${requirement.description} — ${triggerQuantity} item(s) need ${needed} in total, but the selection has ${companionQuantity}.`,
+          corrections: [
+            correction(
+              "add_supply",
+              `Add ${needed - companionQuantity} more to match the quantity.`,
+            ),
+          ],
+        };
+      }
+    }
+  }
+
+  return {
+    ...withSides,
+    status: "pass",
+    message: `Everything "${rule.name}" requires is in the selection.`,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Public entry points
+// ---------------------------------------------------------------------------
+
+const inScope = (
+  rule: EngineRelationship,
+  region: string | undefined,
+): boolean => {
+  if (!rule.scope || rule.scope.regions.length === 0) {
+    return true;
+  }
+  if (!region) {
+    return true;
+  }
+  return rule.scope.regions.includes(region);
+};
+
+/**
+ * A check that passed while some items could not be read did not really pass —
+ * it passed on the items it could see. The caveat goes into the message itself
+ * rather than only into a field, because the buyer reads the sentence.
+ */
+const noteSkipped = (finding: Finding): Finding => {
+  if (finding.skipped.length === 0 || finding.status === "unknown") {
+    return finding;
+  }
+  const names = finding.skipped.map((item) => item.name).join(", ");
+  return {
+    ...finding,
+    message: `${finding.message} ${finding.skipped.length} item(s) could not be checked because data is missing: ${names}.`,
+  };
+};
+
+/** Evaluate one relationship against a selection — pure, no I/O. */
+export const evaluateRelationship = (
+  rule: EngineRelationship,
+  selection: EngineItem[],
+  context: EngineContext,
+): Finding => {
+  if (!inScope(rule, context.region)) {
+    return {
+      ...emptyFinding(rule, null),
+      status: "not_applicable",
+      message: `"${rule.name}" does not apply in this market.`,
+    };
+  }
+  if (rule.family === "presence") {
+    return evaluatePresence(rule, selection, context);
+  }
+  if (rule.family === "match") {
+    return evaluateMatch(rule, selection, context);
+  }
+  if (rule.family === "ratio") {
+    return noteSkipped(evaluateRatio(rule, selection, context));
+  }
+  if (rule.family === "conditional") {
+    return evaluateConditional(rule, selection, context);
+  }
+  // budget and count share the capacity evaluator; the only difference is that
+  // count's consumer operand is `item_count`.
+  return noteSkipped(evaluateCapacity(rule, selection, context));
+};
+
+/**
+ * Evaluate every relationship against a selection.
+ *
+ * Presence findings come first: "you forgot the recorder" is more actionable
+ * than "the recorder you have is too small", and a buyer reads the list in
+ * order.
+ */
+export const evaluateSelection = (
+  rules: EngineRelationship[],
+  selection: EngineItem[],
+  context: EngineContext,
+): DesignReport => {
+  const ordered = [
+    ...rules.filter((rule) => rule.family === "presence"),
+    ...rules.filter((rule) => rule.family !== "presence"),
+  ];
+  const findings = ordered.map((rule) =>
+    evaluateRelationship(rule, selection, context),
+  );
+
+  return {
+    findings,
+    blockers: findings.filter((finding) => finding.status === "block"),
+    warnings: findings.filter((finding) => finding.status === "warn"),
+    unknowns: findings.filter((finding) => finding.status === "unknown"),
+    passed: findings.filter((finding) => finding.status === "pass").length,
+    notApplicable: findings.filter(
+      (finding) => finding.status === "not_applicable",
+    ).length,
+  };
+};

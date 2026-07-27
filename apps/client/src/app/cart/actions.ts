@@ -100,7 +100,7 @@ export type DesignCheckResult = ServiceDesignCheckResult;
 
 export const checkCartDesign = async (
   selection: SelectionInput[],
-): Promise<DesignCheckResult> => checkDesign(selection);
+): Promise<DesignCheckResult> => checkDesign({ selection });
 
 // Checkout turns one solution in the cart into a draft BOQ. The category comes
 // from a hidden field on the solution's checkout form. The draft lands in the

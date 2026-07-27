@@ -9,7 +9,7 @@ import {
   getComparableProducts,
   getProductDetailBySlug,
   getRelatedProducts,
-  getProductDisplaySpecs,
+  getProductSpecsForDisplay,
 } from "services";
 import { formatSpecValue } from "utils";
 
@@ -24,11 +24,6 @@ const ProductPage = async ({ params }: Props) => {
     notFound();
   }
 
-  // The attributes chosen for this product (fallback to whatever it has values
-  // for, for products created before per-product selection).
-  const specKeys =
-    product.specKeys ?? Object.keys(product.technicalAttributes ?? {});
-
   const viewerPricing = await getViewerPartnerPricing();
 
   const [comparables, related, specs] = await Promise.all([
@@ -36,22 +31,26 @@ const ProductPage = async ({ params }: Props) => {
     getRelatedProducts(product.uuid),
     // Audience gates reading too: a partner-only attribute must be absent from
     // this table for a regular user, not merely missing from the filters.
-    getProductDisplaySpecs(
+    // WHICH attributes appear comes from the category's assignments, and the
+    // reveal is applied too — so a product whose PoE is "No" does not show a PoE
+    // Budget row. Audience gates reading as well as filtering: a partner-only
+    // attribute is absent from this table for a regular user, not merely missing
+    // from the facets.
+    getProductSpecsForDisplay(
       product.categoryUuid,
-      specKeys,
+      product.specValues ?? {},
       viewerPricing.isPartner ? "partner" : "user",
     ),
   ]);
 
-  // Values are rendered through the shared formatter, so a range reads
-  // "220 – 240 V" and a plain number carries its unit — same as the admin form.
-  const attributes = specs
-    .map((spec) => ({
-      label: spec.label,
-      group: spec.groupName,
-      value: formatSpecValue(product.technicalAttributes?.[spec.key], spec.unit),
-    }))
-    .filter((attribute) => attribute.value !== "");
+  // Already formatted server-side, through the same renderer the engine uses to
+  // explain a finding — so a spec row and a design message never describe the
+  // same value two different ways.
+  const attributes = specs.map((spec) => ({
+    label: spec.label,
+    group: spec.groupName,
+    value: spec.value,
+  }));
 
   // Sectioned by library group, groups in first-seen order so the table reads
   // the way the library is organised. Ungrouped attributes trail behind.
@@ -68,9 +67,9 @@ const ProductPage = async ({ params }: Props) => {
   }, []);
 
   const specFields = specs.map((spec) => ({
-    key: spec.key,
+    key: spec.uuid,
     label: spec.label,
-    unit: spec.unit,
+    unit: null,
   }));
 
   return (

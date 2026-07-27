@@ -1,482 +1,300 @@
-import { randomUUID } from "node:crypto";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { generateUuid } from "utils";
 import { db } from "../../../db";
-
-import { Categories, SelectCategories } from "../../../db/schema/categories";
-import { Products, SelectProducts } from "../../../db/schema/products";
+import type { AssignmentAudience, AssignmentScope } from "../../../db/enum";
+import { Categories } from "../../../db/schema/categories";
+import { SpecificationCategories } from "../../../db/schema/specification-categories";
+import { predicateAttributes, type Predicate } from "../../../db/types";
 import {
-  SelectSpecificationCategories,
-  SpecificationCategories,
-} from "../../../db/schema/specification-categories";
-import {
-  SelectSpecificationGroups,
-  SpecificationGroups,
-} from "../../../db/schema/specification-groups";
-import {
-  SelectSpecifications,
-  Specifications,
-} from "../../../db/schema/specifications";
-import {
-  type AssignmentDefinition,
-  type AssignmentRow,
-  type AssignmentSwitches,
-  type ResolvedAssignment,
-  type Viewer,
-  facetAssignments,
-  isVisibleTo,
   resolveAssignments,
+  revealProblems,
+  type ResolvedAssignment,
 } from "./assignment-resolver";
+import { recordAudit } from "./catalog-audit";
+import {
+  getCatalogModel,
+  invalidateCatalogModel,
+  resolveCategoryAssignments,
+} from "./catalog-model";
+import { ValidationError } from "./errors";
+import { validatePredicate } from "./predicate";
 
-export type { ResolvedAssignment, AssignmentSwitches };
+// ---------------------------------------------------------------------------
+// THE ASSIGNMENT SERVICE — the ONLY writer of category ↔ attribute links.
+//
+// One writer is a hard rule, not a convention. When the library screen could
+// also create and remove these rows, editing an attribute's name silently reset
+// how every category used it: two screens disagreed about what a link meant, and
+// the last one to save won.
+// ---------------------------------------------------------------------------
 
-// A facet as the storefront renders it: the library definition flattened to
-// what a filter panel needs, with the options already narrowed to the
-// category's enabled slice.
-export type CategoryFacet = {
-  key: SelectSpecifications["key"];
-  label: SelectSpecifications["label"];
-  unit: SelectSpecifications["unit"];
-  ordered: SelectSpecifications["ordered"];
-  allowMultiple: SelectSpecifications["allowMultiple"];
-  valueType: SelectSpecifications["valueType"];
-  options: string[];
-};
-
-// One assignment as the admin builder edits it — the switches plus enough of
-// the definition to render the row, and where it came from.
-export type CategoryAssignment = AssignmentSwitches & {
-  specificationUuid: SelectSpecifications["uuid"];
-  key: SelectSpecifications["key"];
-  label: SelectSpecifications["label"];
-  unit: SelectSpecifications["unit"];
-  ordered: SelectSpecifications["ordered"];
-  valueType: SelectSpecifications["valueType"];
-  inputType: SelectSpecifications["inputType"];
-  allowMultiple: SelectSpecifications["allowMultiple"];
-  // Who the attribute itself is for, and the narrower of that and this
-  // category's setting — what a viewer is actually judged against.
-  definitionAudience: SelectSpecifications["audience"];
-  effectiveAudience: SelectSpecifications["audience"];
-  // The full master list, so the builder can show which options the slice
-  // leaves out — it must never let a category edit this list.
-  masterOptions: string[];
-  // The master list narrowed to this category's slice.
-  offeredOptions: string[];
-  sourceCategoryUuid: string;
-  sourceCategoryName: string | null;
-  inherited: boolean;
-};
-
-// The switches an admin may write for one category → attribute pointer.
-export type AssignmentInput = AssignmentSwitches & {
+export type AssignmentInput = {
+  categoryUuid: string;
   specificationUuid: string;
+  isFilter: boolean;
+  isRule: boolean;
+  scope: AssignmentScope;
+  showIf: Predicate | null;
+  audience: AssignmentAudience;
+  enabledValues: string[] | null;
+  suppressed: boolean;
+  order: number;
 };
 
-const DEFINITION_COLUMNS = {
-  uuid: Specifications.uuid,
-  key: Specifications.key,
-  label: Specifications.label,
-  valueType: Specifications.valueType,
-  inputType: Specifications.inputType,
-  unit: Specifications.unit,
-  allowMultiple: Specifications.allowMultiple,
-  allowRange: Specifications.allowRange,
-  ordered: Specifications.ordered,
-  options: Specifications.options,
-  order: Specifications.order,
-  audience: Specifications.audience,
+export type CategoryAssignments = {
+  categoryUuid: string;
+  categoryName: string;
+  resolved: ResolvedAssignment[];
+  // Attributes authored on this very category, as opposed to inherited. The
+  // admin needs the distinction to know what it may edit here.
+  ownUuids: string[];
+  problems: ReturnType<typeof revealProblems>;
 };
 
 /**
- * The category itself plus every ancestor, nearest first. An assignment on any
- * of these applies to the category; the nearest one wins when several assign
- * the same attribute.
+ * Everything a category carries, plus what is wrong with its reveal graph.
+ *
+ * The problems are returned alongside rather than thrown: an author needs to SEE
+ * a broken reveal in order to fix it, and refusing to load the page would hide
+ * the very thing they came to repair.
  */
-export const getCategoryAndAncestors = async (
-  categoryUuid: string,
-): Promise<string[]> => {
-  const all = await db
-    .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
-    .from(Categories);
-  const parentOf = new Map(all.map((row) => [row.uuid, row.parentUuid]));
-
-  const chain: string[] = [];
-  const seen = new Set<string>();
-  let current: string | null = categoryUuid;
-  // `seen` also guards against a cycle introduced by bad parent data.
-  while (current && !seen.has(current)) {
-    seen.add(current);
-    chain.push(current);
-    current = parentOf.get(current) ?? null;
-  }
-  return chain;
-};
-
-// Load the rows + definitions for a chain and resolve them. Shared by every
-// public reader below so inheritance is applied in exactly one place.
-const resolveForChain = async (
-  chain: string[],
-): Promise<ResolvedAssignment[]> => {
-  if (chain.length === 0) {
-    return [];
-  }
-
-  const rows = await db
-    .select({
-      specificationUuid: SpecificationCategories.specificationUuid,
-      categoryUuid: SpecificationCategories.categoryUuid,
-      isFilter: SpecificationCategories.isFilter,
-      isRule: SpecificationCategories.isRule,
-      scope: SpecificationCategories.scope,
-      showIf: SpecificationCategories.showIf,
-      audience: SpecificationCategories.audience,
-      enabledValues: SpecificationCategories.enabledValues,
-      order: SpecificationCategories.order,
-    })
-    .from(SpecificationCategories)
-    .where(inArray(SpecificationCategories.categoryUuid, chain));
-
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const definitions: AssignmentDefinition[] = await db
-    .select(DEFINITION_COLUMNS)
-    .from(Specifications)
-    .where(
-      inArray(
-        Specifications.uuid,
-        rows.map((row) => row.specificationUuid),
-      ),
-    )
-    .orderBy(asc(Specifications.order));
-
-  return resolveAssignments({
-    chain,
-    rows: rows satisfies AssignmentRow[],
-    definitions,
-  });
-};
-
-/** Every attribute a category carries — its own plus inherited, nearest wins. */
 export const getCategoryAssignments = async (
   categoryUuid: string,
-): Promise<ResolvedAssignment[]> =>
-  resolveForChain(await getCategoryAndAncestors(categoryUuid));
-
-/**
- * The facets a category page offers a given viewer: assignments with "show as
- * filter" on, audience-permitted, and either authored on this category or
- * inherited as branch-wide.
- */
-export const getCategoryFacets = async (
-  categoryUuid: string,
-  viewer: Viewer = "user",
-): Promise<CategoryFacet[]> => {
-  try {
-    const resolved = await getCategoryAssignments(categoryUuid);
-    return facetAssignments(resolved, viewer).map((assignment) => ({
-      key: assignment.definition.key,
-      label: assignment.definition.label,
-      unit: assignment.definition.unit,
-      ordered: assignment.definition.ordered,
-      allowMultiple: assignment.definition.allowMultiple,
-      valueType: assignment.definition.valueType,
-      options: assignment.offeredOptions.map((option) => option.value),
-    }));
-  } catch (error) {
-    console.error("getCategoryFacets failed:", error);
-    throw new Error("Failed to fetch category facets", { cause: error });
+): Promise<CategoryAssignments> => {
+  const [category] = await db
+    .select({ uuid: Categories.uuid, name: Categories.name })
+    .from(Categories)
+    .where(eq(Categories.uuid, categoryUuid));
+  if (!category) {
+    throw new ValidationError("That category no longer exists.");
   }
+
+  const resolved = await resolveCategoryAssignments(categoryUuid);
+  return {
+    categoryUuid,
+    categoryName: category.name,
+    resolved,
+    ownUuids: resolved
+      .filter((assignment) => !assignment.inherited)
+      .map((assignment) => assignment.definition.uuid),
+    problems: revealProblems(resolved),
+  };
 };
 
 /**
- * Every attribute a category carries, shaped for the admin assignment builder:
- * inherited rows included and flagged, so an admin can see what came from above
- * before overriding it.
+ * Validate an assignment before it is written.
+ *
+ * Three failures, all of which would otherwise be invisible until someone
+ * noticed a field that never appears:
+ *
+ *  - the reveal references an attribute that does not exist;
+ *  - the reveal names a trigger this category does not carry, so the field can
+ *    never show;
+ *  - the reveal closes a cycle with another attribute, so neither can show and
+ *    which one wins depends on evaluation order.
  */
-export const getCategoryAssignmentRows = async (
-  categoryUuid: string,
-): Promise<CategoryAssignment[]> => {
-  try {
-    const resolved = await getCategoryAssignments(categoryUuid);
-    if (resolved.length === 0) {
-      return [];
+const assertAssignmentValid = async (input: AssignmentInput): Promise<void> => {
+  const model = await getCatalogModel();
+
+  if (input.showIf) {
+    const problems = validatePredicate(input.showIf, model.attributes);
+    const first = problems[0];
+    if (first) {
+      throw new ValidationError(first.message);
     }
-
-    const sourceUuids = [
-      ...new Set(resolved.map((assignment) => assignment.sourceCategoryUuid)),
-    ];
-    const sources = await db
-      .select({ uuid: Categories.uuid, name: Categories.name })
-      .from(Categories)
-      .where(inArray(Categories.uuid, sourceUuids));
-    const nameByUuid = new Map(sources.map((row) => [row.uuid, row.name]));
-
-    return resolved.map((assignment) => ({
-      isFilter: assignment.isFilter,
-      isRule: assignment.isRule,
-      scope: assignment.scope,
-      showIf: assignment.showIf,
-      audience: assignment.audience,
-      enabledValues: assignment.enabledValues,
-      order: assignment.order,
-      specificationUuid: assignment.definition.uuid,
-      key: assignment.definition.key,
-      label: assignment.definition.label,
-      unit: assignment.definition.unit,
-      ordered: assignment.definition.ordered,
-      valueType: assignment.definition.valueType,
-      inputType: assignment.definition.inputType,
-      allowMultiple: assignment.definition.allowMultiple,
-      definitionAudience: assignment.definition.audience,
-      effectiveAudience: assignment.effectiveAudience,
-      masterOptions: (assignment.definition.options ?? []).map(
-        (option) => option.value,
-      ),
-      offeredOptions: assignment.offeredOptions.map((option) => option.value),
-      sourceCategoryUuid: assignment.sourceCategoryUuid,
-      sourceCategoryName:
-        nameByUuid.get(assignment.sourceCategoryUuid) ?? null,
-      inherited: assignment.inherited,
-    }));
-  } catch (error) {
-    console.error("getCategoryAssignmentRows failed:", error);
-    throw new Error("Failed to fetch category assignments", { cause: error });
   }
-};
 
-/**
- * Replace the assignments authored ON this category. Inherited ones are
- * untouched — they belong to the ancestor that authored them, and removing an
- * attribute here simply drops the override so the parent's row applies again.
- */
-export const setCategoryAssignments = async (
-  categoryUuid: string,
-  assignments: AssignmentInput[],
-): Promise<void> => {
-  // Dedupe on the attribute — a category points at each one at most once.
-  const bySpec = new Map(
-    assignments.map((assignment) => [assignment.specificationUuid, assignment]),
+  // Resolve the category AS IF this assignment were already saved, so the checks
+  // see the graph the author is actually creating.
+  const chain = model.chains.get(input.categoryUuid) ?? [input.categoryUuid];
+  const rows = [
+    ...model.assignments.filter(
+      (row) =>
+        !(
+          row.categoryUuid === input.categoryUuid &&
+          row.specificationUuid === input.specificationUuid
+        ),
+    ),
+    input,
+  ];
+  const resolved = resolveAssignments({
+    chain,
+    rows,
+    definitions: model.definitions,
+  });
+
+  const problem = revealProblems(resolved).find(
+    (entry) => entry.specificationUuid === input.specificationUuid,
   );
-
-  try {
-    await db.transaction(async (tx) => {
-      await tx
-        .delete(SpecificationCategories)
-        .where(eq(SpecificationCategories.categoryUuid, categoryUuid));
-
-      if (bySpec.size === 0) {
-        return;
-      }
-      await tx.insert(SpecificationCategories).values(
-        [...bySpec.values()].map((assignment, index) => ({
-          uuid: randomUUID(),
-          categoryUuid,
-          specificationUuid: assignment.specificationUuid,
-          isFilter: assignment.isFilter,
-          isRule: assignment.isRule,
-          scope: assignment.scope,
-          showIf: assignment.showIf,
-          audience: assignment.audience,
-          enabledValues: assignment.enabledValues,
-          order: assignment.order || index,
-        })),
-      );
-    });
-  } catch (error) {
-    console.error("setCategoryAssignments failed:", error);
-    throw new Error("Failed to save category assignments", { cause: error });
+  if (problem) {
+    throw new ValidationError(problem.message);
   }
 };
 
-// ---------------------------------------------------------------------------
-// The product form's view of assignments.
-// ---------------------------------------------------------------------------
+/** Create or update one assignment. Upsert, because the pair is unique. */
+export const saveAssignment = async (
+  input: AssignmentInput,
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  await assertAssignmentValid(input);
 
-// One attribute a product in a given category fills in. Options are already
-// the category's enabled slice, so the form can never offer a value the
-// category has disabled.
-export type ProductFormAttribute = {
-  key: SelectSpecifications["key"];
-  label: SelectSpecifications["label"];
-  unit: SelectSpecifications["unit"];
-  valueType: SelectSpecifications["valueType"];
-  allowMultiple: SelectSpecifications["allowMultiple"];
-  allowRange: SelectSpecifications["allowRange"];
-  ordered: SelectSpecifications["ordered"];
-  options: string[];
-  isFilter: SelectSpecificationCategories["isFilter"];
-  isRule: SelectSpecificationCategories["isRule"];
-  showIf: SelectSpecificationCategories["showIf"];
-  audience: SelectSpecificationCategories["audience"];
-  groupName: string | null;
+  const [existing] = await db
+    .select({ uuid: SpecificationCategories.uuid })
+    .from(SpecificationCategories)
+    .where(
+      and(
+        eq(SpecificationCategories.categoryUuid, input.categoryUuid),
+        eq(SpecificationCategories.specificationUuid, input.specificationUuid),
+      ),
+    );
+
+  const values = {
+    isFilter: input.isFilter,
+    isRule: input.isRule,
+    scope: input.scope,
+    showIf: input.showIf,
+    audience: input.audience,
+    enabledValues:
+      input.enabledValues && input.enabledValues.length > 0
+        ? input.enabledValues
+        : null,
+    suppressed: input.suppressed,
+    order: input.order,
+  };
+
+  if (existing) {
+    await db
+      .update(SpecificationCategories)
+      .set(values)
+      .where(eq(SpecificationCategories.uuid, existing.uuid));
+  } else {
+    await db.insert(SpecificationCategories).values({
+      uuid: generateUuid(),
+      categoryUuid: input.categoryUuid,
+      specificationUuid: input.specificationUuid,
+      ...values,
+    });
+  }
+
+  await recordAudit({
+    target: "assignment",
+    action: existing ? "update" : "create",
+    targetUuid: `${input.categoryUuid}:${input.specificationUuid}`,
+    targetLabel: await describeAssignment(input),
+    actor,
+  });
+  invalidateCatalogModel();
+};
+
+const describeAssignment = async (
+  input: AssignmentInput,
+): Promise<string> => {
+  const model = await getCatalogModel();
+  const label =
+    model.attributes.get(input.specificationUuid)?.label ??
+    input.specificationUuid;
+  return `${label} on ${input.categoryUuid}`;
 };
 
 /**
- * Every category's resolved attributes, keyed by category uuid — what a
- * product in that category is asked to fill in.
+ * Remove an assignment — REFUSED while another assignment on the same category
+ * uses that attribute as its reveal trigger.
  *
- * Returned for ALL categories in one go because the product form lets an admin
- * change a product's category without leaving the page; resolving on each
- * change would mean a round trip per keystroke of indecision. Three queries,
- * resolved in memory.
+ * Otherwise the dependent field is left watching something nobody can set, which
+ * means it is permanently hidden and nothing says so.
  */
-export const getProductFormAttributes = async (): Promise<
-  Record<string, ProductFormAttribute[]>
-> => {
-  try {
-    const [categoryRows, assignmentRows, specRows] = await Promise.all([
-      db
-        .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
-        .from(Categories),
-      db
-        .select({
-          specificationUuid: SpecificationCategories.specificationUuid,
-          categoryUuid: SpecificationCategories.categoryUuid,
-          isFilter: SpecificationCategories.isFilter,
-          isRule: SpecificationCategories.isRule,
-          scope: SpecificationCategories.scope,
-          showIf: SpecificationCategories.showIf,
-          audience: SpecificationCategories.audience,
-          enabledValues: SpecificationCategories.enabledValues,
-          order: SpecificationCategories.order,
-        })
-        .from(SpecificationCategories),
-      db
-        .select({
-          ...DEFINITION_COLUMNS,
-          groupName: SpecificationGroups.name,
-        })
-        .from(Specifications)
-        .leftJoin(
-          SpecificationGroups,
-          eq(Specifications.groupUuid, SpecificationGroups.uuid),
-        )
-        .orderBy(asc(Specifications.order)),
-    ]);
+export const removeAssignment = async (
+  categoryUuid: string,
+  specificationUuid: string,
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  const resolved = await resolveCategoryAssignments(categoryUuid);
 
-    const parentOf = new Map(
-      categoryRows.map((category) => [category.uuid, category.parentUuid]),
+  const dependents = resolved.filter(
+    (assignment) =>
+      assignment.definition.uuid !== specificationUuid &&
+      predicateAttributes(assignment.showIf).includes(specificationUuid),
+  );
+  if (dependents.length > 0) {
+    const names = dependents
+      .map((assignment) => assignment.definition.label)
+      .join(", ");
+    throw new ValidationError(
+      `This attribute reveals ${names} on this category. Change ${dependents.length > 1 ? "those reveals" : "that reveal"} first, or ${names} would be permanently hidden.`,
     );
-    const groupByUuid = new Map(
-      specRows.map((spec) => [spec.uuid, spec.groupName]),
-    );
-    const definitions: AssignmentDefinition[] = specRows.map(
-      ({ groupName: _groupName, ...definition }) => definition,
-    );
-
-    const byCategory: Record<string, ProductFormAttribute[]> = {};
-    for (const category of categoryRows) {
-      const chain: string[] = [];
-      const seen = new Set<string>();
-      let current: string | null = category.uuid;
-      while (current && !seen.has(current)) {
-        seen.add(current);
-        chain.push(current);
-        current = parentOf.get(current) ?? null;
-      }
-
-      byCategory[category.uuid] = resolveAssignments({
-        chain,
-        rows: assignmentRows satisfies AssignmentRow[],
-        definitions,
-      }).map((assignment) => ({
-        key: assignment.definition.key,
-        label: assignment.definition.label,
-        unit: assignment.definition.unit,
-        valueType: assignment.definition.valueType,
-        allowMultiple: assignment.definition.allowMultiple,
-        allowRange: assignment.definition.allowRange,
-        ordered: assignment.definition.ordered,
-        options: assignment.offeredOptions.map((option) => option.value),
-        isFilter: assignment.isFilter,
-        isRule: assignment.isRule,
-        showIf: assignment.showIf,
-        audience: assignment.effectiveAudience,
-        groupName: groupByUuid.get(assignment.definition.uuid) ?? null,
-      }));
-    }
-    return byCategory;
-  } catch (error) {
-    console.error("getProductFormAttributes failed:", error);
-    throw new Error("Failed to fetch product form attributes", {
-      cause: error,
-    });
   }
-};
 
-// ---------------------------------------------------------------------------
-// What a shopper is allowed to READ on a product page.
-// ---------------------------------------------------------------------------
+  await db
+    .delete(SpecificationCategories)
+    .where(
+      and(
+        eq(SpecificationCategories.categoryUuid, categoryUuid),
+        eq(SpecificationCategories.specificationUuid, specificationUuid),
+      ),
+    );
 
-export type ProductDisplaySpec = {
-  key: SelectSpecifications["key"];
-  label: SelectSpecifications["label"];
-  unit: SelectSpecifications["unit"];
-  groupName: SelectSpecificationGroups["name"] | null;
+  await recordAudit({
+    target: "assignment",
+    action: "delete",
+    targetUuid: `${categoryUuid}:${specificationUuid}`,
+    targetLabel:
+      resolved.find(
+        (assignment) => assignment.definition.uuid === specificationUuid,
+      )?.definition.label ?? specificationUuid,
+    actor,
+  });
+  invalidateCatalogModel();
 };
 
 /**
- * The specs a product may show THIS viewer, in the order the product stores
- * them.
+ * Suppress an inherited attribute on this category.
  *
- * Audience gates reading, not just filtering. Hiding a partner-only attribute
- * from the facet list while printing its value in the spec table underneath
- * would defeat the point — trade-only detail has to be absent from the page,
- * not merely un-clickable.
- *
- * A key the product carries but its category doesn't assign is shown: it is
- * unmanaged legacy data rather than something deliberately restricted, and
- * hiding it would silently blank spec tables on older products.
+ * Stored as its own row with `suppressed` on, because there is nothing else to
+ * delete — the assignment lives on an ancestor. This is why suppression has to
+ * exist: without it, dropping an inherited attribute from one leaf would mean
+ * removing it from the ancestor and re-adding it to every sibling.
  */
-export const getProductDisplaySpecs = async (
-  categoryUuid: string | null,
-  specKeys: string[],
-  viewer: Viewer = "user",
-): Promise<ProductDisplaySpec[]> => {
-  if (specKeys.length === 0) {
-    return [];
-  }
-  try {
-    const rows = await db
-      .select({
-        key: Specifications.key,
-        label: Specifications.label,
-        unit: Specifications.unit,
-        groupName: SpecificationGroups.name,
-      })
-      .from(Specifications)
-      .leftJoin(
-        SpecificationGroups,
-        eq(Specifications.groupUuid, SpecificationGroups.uuid),
-      )
-      .where(inArray(Specifications.key, specKeys));
-    const byKey = new Map(rows.map((row) => [row.key, row]));
+export const suppressInherited = async (
+  categoryUuid: string,
+  specificationUuid: string,
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  await saveAssignment(
+    {
+      categoryUuid,
+      specificationUuid,
+      isFilter: false,
+      isRule: false,
+      scope: "leaf",
+      showIf: null,
+      audience: "everyone",
+      enabledValues: null,
+      suppressed: true,
+      order: 0,
+    },
+    actor,
+  );
+};
 
-    // Without a category there are no assignments to judge against, so the
-    // product shows what it stores.
-    const restricted = new Map<string, boolean>();
-    if (categoryUuid) {
-      for (const assignment of await getCategoryAssignments(categoryUuid)) {
-        restricted.set(
-          assignment.definition.key,
-          !isVisibleTo(assignment.effectiveAudience, viewer),
-        );
-      }
-    }
-
-    return specKeys.flatMap((key) => {
-      if (restricted.get(key)) {
-        return [];
-      }
-      const row = byKey.get(key);
-      return [
-        row ?? { key, label: key, unit: null, groupName: null },
-      ];
-    });
-  } catch (error) {
-    console.error("getProductDisplaySpecs failed:", error);
-    throw new Error("Failed to fetch product specs", { cause: error });
-  }
+export const reorderAssignments = async (
+  categoryUuid: string,
+  order: { specificationUuid: string; order: number }[],
+): Promise<void> => {
+  await Promise.all(
+    order.map((entry) =>
+      db
+        .update(SpecificationCategories)
+        .set({ order: entry.order })
+        .where(
+          and(
+            eq(SpecificationCategories.categoryUuid, categoryUuid),
+            eq(
+              SpecificationCategories.specificationUuid,
+              entry.specificationUuid,
+            ),
+          ),
+        ),
+    ),
+  );
+  invalidateCatalogModel();
 };

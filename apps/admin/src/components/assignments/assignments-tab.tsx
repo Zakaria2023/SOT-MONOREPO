@@ -1,425 +1,588 @@
 "use client";
 
-import type { SpecificationWithCategories } from "@/app/(dashboard)/assignments/actions";
-import type { DraftRow } from "@/components/assignments/assignment-workspace";
-import { RelationSection } from "@/components/assignments/relation-section";
-import type { SpecRelation } from "@/app/(dashboard)/assignments/actions";
+import {
+  removeAssignmentAction,
+  saveAssignmentAction,
+  suppressAssignmentAction,
+  type AssignmentInput,
+} from "@/app/(dashboard)/assignments/actions";
+import {
+  PredicateEditor,
+  describePredicate,
+  type PredicateAttribute,
+} from "@/components/assignments/predicate-editor";
 import type { AssignmentAudience, AssignmentScope } from "@/db/enum";
-import { ASSIGNMENT_AUDIENCE_LABELS } from "@/db/label";
-import { ArrowUpFromLine, Eye, EyeOff, X, Zap, ZapOff } from "lucide-react";
-import type { ReactNode } from "react";
-import { Dropdown } from "ui";
+import { assignmentAudiences, assignmentScopes } from "@/db/enum";
+import {
+  ASSIGNMENT_AUDIENCE_LABELS,
+  ASSIGNMENT_SCOPE_LABELS,
+} from "@/db/label";
+import type { Predicate } from "@/db/types";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Hash,
+  ListChecks,
+  Plus,
+  ToggleLeft,
+  TriangleAlert,
+  X,
+  Zap,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import type { ResolvedAssignment, RevealProblem } from "services";
+import { Button, Checkbox, Dropdown, type DropdownOption } from "ui";
 
 type AssignmentsTabProps = {
-  rows: DraftRow[];
-  library: SpecificationWithCategories[];
-  // Rules touching each assigned attribute, keyed by spec uuid.
-  relations: Record<string, SpecRelation[]>;
-  onChange: (specificationUuid: string, patch: Partial<DraftRow>) => void;
-  onReset: (specificationUuid: string) => void;
-  onRemove: (specificationUuid: string) => void;
-  onAdd: (specificationUuid: string) => void;
+  categoryUuid: string;
+  resolved: ResolvedAssignment[];
+  problems: RevealProblem[];
+  // Every attribute in the library, for the "add attribute" picker.
+  library: PredicateAttribute[];
 };
 
 type AssignmentCardProps = {
-  row: DraftRow;
-  relations: SpecRelation[];
-  otherSpecs: {
-    value: string;
-    label: string;
-    valueType: "number" | "select";
-    unit: string | null;
-    ordered: boolean;
-  }[];
-  lookupSpecs: { key: string; label: string; options: string[] }[];
-  // How many other attributes this category carries at all, so an empty
-  // controller list can explain itself rather than look broken.
-  siblingCount: number;
-  // Other attributes on this category that could gate this one.
-  controllers: { value: string; label: string }[];
-  controllerOptions: Record<string, string[]>;
-  onChange: (specificationUuid: string, patch: Partial<DraftRow>) => void;
-  onReset: (specificationUuid: string) => void;
-  onRemove: (specificationUuid: string) => void;
+  categoryUuid: string;
+  assignment: ResolvedAssignment;
+  // Attributes usable as a reveal trigger: anything this category resolves,
+  // minus the attribute itself. Inherited triggers are allowed — otherwise every
+  // branch-level attribute would have to be re-assigned on each leaf just to be
+  // usable, which defeats inheritance.
+  triggers: PredicateAttribute[];
+  expanded: boolean;
+  onToggle: () => void;
+  onSaved: () => void;
 };
 
-type SwitchProps = {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-  children: ReactNode;
-};
+const SCOPE_OPTIONS: DropdownOption[] = assignmentScopes.map((scope) => ({
+  value: scope,
+  label: ASSIGNMENT_SCOPE_LABELS[scope],
+}));
 
-const Switch = ({ active, onClick, disabled, title, children }: SwitchProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-pressed={active}
-    className={
-      active
-        ? "flex items-center gap-1.5 rounded-control bg-primary px-3.5 py-2 text-sm font-semibold text-white"
-        : "flex items-center gap-1.5 rounded-control border border-hairline bg-page px-3.5 py-2 text-sm font-medium text-faint transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-hairline disabled:hover:text-faint"
-    }
-  >
-    {children}
-  </button>
+const AUDIENCE_OPTIONS: DropdownOption[] = assignmentAudiences.map(
+  (audience) => ({
+    value: audience,
+    label: ASSIGNMENT_AUDIENCE_LABELS[audience],
+  }),
 );
 
-const AssignmentCard = ({
-  row,
-  relations,
-  otherSpecs,
-  lookupSpecs,
-  siblingCount,
-  controllers,
-  controllerOptions,
-  onChange,
-  onReset,
-  onRemove,
-}: AssignmentCardProps) => {
-  const enabled = new Set(row.enabledValues ?? row.masterOptions);
-  const hasOptions = row.masterOptions.length > 0;
-  const isBoolean = row.inputType === "boolean";
-  const showIfValues = row.showIf?.values ?? [];
+const toPredicateAttribute = (
+  assignment: ResolvedAssignment,
+): PredicateAttribute => ({
+  uuid: assignment.definition.uuid,
+  label: assignment.definition.label,
+  type: assignment.definition.type,
+  ordered: assignment.definition.ordered,
+  unit: assignment.definition.unit,
+  options: assignment.definition.options,
+});
 
-  const toggleEnabled = (option: string) => {
-    const current = new Set(row.enabledValues ?? row.masterOptions);
-    if (current.has(option)) {
-      current.delete(option);
-    } else {
-      current.add(option);
-    }
-    // Everything ticked means "no narrowing" — store null rather than a slice
-    // equal to the master list, so the category keeps tracking options added
-    // to the library later.
-    const next = row.masterOptions.filter((value) => current.has(value));
-    onChange(row.specificationUuid, {
-      enabledValues: next.length === row.masterOptions.length ? null : next,
+const TypeIcon = ({ assignment }: { assignment: ResolvedAssignment }) => {
+  const { type, ordered } = assignment.definition;
+  if (type === "number") {
+    return <Hash size={14} className="text-faint" />;
+  }
+  if (type === "boolean") {
+    return <ToggleLeft size={14} className="text-faint" />;
+  }
+  if (type === "multi_select") {
+    return <ListChecks size={14} className="text-faint" />;
+  }
+  return ordered ? (
+    <ArrowUpDown size={14} className="text-faint" />
+  ) : (
+    <ListChecks size={14} className="text-faint" />
+  );
+};
+
+const AssignmentCard = ({
+  categoryUuid,
+  assignment,
+  triggers,
+  expanded,
+  onToggle,
+  onSaved,
+}: AssignmentCardProps) => {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+
+  const [isFilter, setIsFilter] = useState(assignment.isFilter);
+  const [isRule, setIsRule] = useState(assignment.isRule);
+  const [scope, setScope] = useState<AssignmentScope>(assignment.scope);
+  const [audience, setAudience] = useState<AssignmentAudience>(
+    assignment.audience,
+  );
+  const [showIf, setShowIf] = useState<Predicate | null>(assignment.showIf);
+  const [enabled, setEnabled] = useState<string[]>(
+    assignment.enabledValues ?? [],
+  );
+
+  const { definition } = assignment;
+  const optionBacked =
+    definition.type === "single_select" || definition.type === "multi_select";
+  const liveOptions = definition.options.filter((option) => !option.retired);
+
+  const save = (): void => {
+    setError(undefined);
+    const input: AssignmentInput = {
+      categoryUuid,
+      specificationUuid: definition.uuid,
+      isFilter,
+      isRule,
+      scope,
+      showIf,
+      audience,
+      enabledValues: enabled.length > 0 ? enabled : null,
+      suppressed: false,
+      order: assignment.order,
+    };
+    startTransition(async () => {
+      const result = await saveAssignmentAction(input);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onSaved();
+      router.refresh();
     });
   };
 
-  const toggleShowIfValue = (value: string) => {
-    if (!row.showIf) {
+  const remove = (): void => {
+    setError(undefined);
+    startTransition(async () => {
+      const result = assignment.inherited
+        ? await suppressAssignmentAction(categoryUuid, definition.uuid)
+        : await removeAssignmentAction(categoryUuid, definition.uuid);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  // The "up to" helper: on an ordered scale, pick everything at or below one
+  // option. The slice stored is still the literal list of values — the helper
+  // just fills it in, so nothing is reinterpreted later.
+  const fillUpTo = (value: string): void => {
+    const ceiling = liveOptions.find((option) => option.value === value);
+    const rank = ceiling?.rank;
+    if (rank === undefined || rank === null) {
+      setEnabled([value]);
       return;
     }
-    const current = new Set(showIfValues);
-    if (current.has(value)) {
-      current.delete(value);
-    } else {
-      current.add(value);
-    }
-    onChange(row.specificationUuid, {
-      showIf: { specKey: row.showIf.specKey, values: [...current] },
-    });
+    setEnabled(
+      liveOptions
+        .filter((option) => option.rank !== null && option.rank <= rank)
+        .map((option) => option.value),
+    );
   };
 
   return (
-    <li className="flex flex-col gap-2.5 rounded-control border border-hairline bg-page p-3.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-base font-semibold text-ink">{row.label}</span>
-        <span className="rounded bg-primary-tint px-1.5 py-0.5 text-xs font-semibold text-primary">
-          {isBoolean ? "yes / no" : row.valueType === "number" ? "number" : "select"}
-        </span>
-        {hasOptions && (
-          <span className="rounded bg-surface px-1.5 py-0.5 text-sm font-medium text-muted">
-            {row.ordered ? "ordered · ceiling" : "unordered · inclusion"}
-          </span>
-        )}
-        {row.inherited && !row.owned ? (
-          <span className="flex items-center gap-1 text-sm font-medium text-faint">
-            <ArrowUpFromLine size={15} />
-            from {row.sourceCategoryName ?? "an ancestor"}
-          </span>
-        ) : (
-          <span className="text-sm font-medium text-faint">own</span>
-        )}
-
-        <span className="ml-auto flex items-center gap-1">
-          {row.owned && row.inherited && (
-            <button
-              type="button"
-              onClick={() => onReset(row.specificationUuid)}
-              className="rounded px-2 py-1 text-sm text-muted transition-colors hover:bg-surface hover:text-ink"
-            >
-              Reset to inherited
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => onRemove(row.specificationUuid)}
-            aria-label={`Remove ${row.label}`}
-            className="rounded-control border border-hairline p-1.5 text-faint transition-colors hover:border-danger hover:text-danger"
-          >
-            <X size={14} />
-          </button>
-        </span>
-      </div>
-
-      {/* Switches 1 and 2, then scope. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Switch
-          active={row.isFilter}
-          onClick={() =>
-            onChange(row.specificationUuid, { isFilter: !row.isFilter })
-          }
-        >
-          {row.isFilter ? <Eye size={15} /> : <EyeOff size={15} />}
-          Filter
-        </Switch>
-        <Switch
-          active={row.isRule}
-          onClick={() =>
-            onChange(row.specificationUuid, { isRule: !row.isRule })
-          }
-        >
-          {row.isRule ? <Zap size={15} /> : <ZapOff size={15} />}
-          Rule
-        </Switch>
-        {(["branch", "leaf"] as AssignmentScope[]).map((scope) => (
-          <Switch
-            key={scope}
-            active={row.scope === scope}
-            onClick={() => onChange(row.specificationUuid, { scope })}
-          >
-            {scope === "branch" ? "Branch" : "Leaf"}
-          </Switch>
-        ))}
-      </div>
-
-      {/* Audience. The library already fixed who the attribute is FOR; this
-          can only narrow it, so anything wider is shown as unavailable. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(["everyone", "user", "partner"] as AssignmentAudience[]).map(
-          (audience) => {
-            // Once the library has picked a side, a category cannot move it.
-            const lockedByDefinition =
-              row.definitionAudience !== "everyone" &&
-              audience !== row.definitionAudience;
-            return (
-              <Switch
-                key={audience}
-                active={row.effectiveAudience === audience}
-                disabled={lockedByDefinition}
-                title={
-                  lockedByDefinition
-                    ? `The library marks this attribute ${ASSIGNMENT_AUDIENCE_LABELS[row.definitionAudience]} — a category cannot change that`
-                    : undefined
-                }
-                onClick={() => onChange(row.specificationUuid, { audience })}
-              >
-                {ASSIGNMENT_AUDIENCE_LABELS[audience]}
-              </Switch>
-            );
-          },
-        )}
-        {row.definitionAudience !== "everyone" && (
-          <span className="text-sm text-faint">set in the library</span>
-        )}
-      </div>
-
-      {!row.isFilter && row.isRule && (
-        <p className="text-sm text-faint">
-          Living, not showing — the engine reads this value, no shopper sees it.
-        </p>
-      )}
-
-      {hasOptions && (
-        <div>
-          <p className="text-sm text-muted">
-            {isBoolean
-              ? "Enabled values: any yes / no"
-              : "Enabled values (slice of the master list):"}
-          </p>
-          {!isBoolean && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {row.masterOptions.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => toggleEnabled(option)}
-                  aria-pressed={enabled.has(option)}
-                  className={
-                    enabled.has(option)
-                      ? "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-white"
-                      : "rounded-md border border-hairline bg-surface px-2.5 py-1 text-sm text-faint"
-                  }
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          )}
+    <div
+      className={`rounded-card border bg-surface ${
+        assignment.inherited ? "border-hairline" : "border-primary/25"
+      }`}
+    >
+      <div className="flex items-start gap-3 px-3 py-2.5">
+        <div className="mt-0.5">
+          <TypeIcon assignment={assignment} />
         </div>
-      )}
 
-      <div className="flex flex-col gap-1.5">
-        <span className="flex items-center gap-1 text-sm text-muted">
-          <EyeOff size={14} />
-          Show-if
-        </span>
-        {controllers.length === 0 ? (
-          // An empty dropdown reads as a bug. Say which of the two reasons it
-          // is: nothing else is assigned here, or what is assigned has no
-          // values to test against.
-          <p className="rounded-control border border-dashed border-hairline px-3 py-2 text-sm text-faint">
-            {siblingCount === 0
-              ? "Always shown — this is the only attribute on this category, so there is nothing to condition it on. Assign another and it can gate this one."
-              : "Always shown — the other attributes here are numbers with no option list, and a condition tests against values. Assign one with options to gate this."}
-          </p>
-        ) : (
-          <Dropdown
-            value={row.showIf?.specKey ?? ""}
-            onChange={(specKey) =>
-              onChange(row.specificationUuid, {
-                showIf: specKey ? { specKey, values: [] } : null,
-              })
-            }
-            options={[
-              { value: "", label: "— always shown —" },
-              ...controllers,
-            ]}
-          />
-        )}
-        {row.showIf && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-sm text-muted">is</span>
-            {(controllerOptions[row.showIf.specKey] ?? []).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => toggleShowIfValue(value)}
-                aria-pressed={showIfValues.includes(value)}
-                className={
-                  showIfValues.includes(value)
-                    ? "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-white"
-                    : "rounded-md border border-hairline bg-surface px-2.5 py-1 text-sm text-faint"
-                }
-              >
-                {value}
-              </button>
-            ))}
-            {showIfValues.length === 0 && (
-              <span className="text-sm text-amber-700">
-                pick a value, or it is always hidden
+        <button
+          type="button"
+          onClick={onToggle}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-ink">
+              {definition.label}
+            </span>
+            {assignment.inherited && (
+              <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                inherited
+              </span>
+            )}
+            {assignment.isFilter && (
+              <span className="flex items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-400">
+                <Eye size={9} />
+                filter
+              </span>
+            )}
+            {assignment.isRule && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                <Zap size={9} />
+                rule
+              </span>
+            )}
+            {!assignment.isFilter && assignment.isRule && (
+              <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                living
+              </span>
+            )}
+            {assignment.effectiveAudience !== "everyone" && (
+              <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+                {ASSIGNMENT_AUDIENCE_LABELS[assignment.effectiveAudience]}
               </span>
             )}
           </div>
-        )}
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+            {assignment.showIf ? (
+              <span className="flex items-center gap-1 text-amber-500">
+                <EyeOff size={10} />
+                shown when {describePredicate(assignment.showIf, triggers)}
+              </span>
+            ) : (
+              <span className="text-faint">always shown</span>
+            )}
+            {optionBacked && (
+              <span>
+                {assignment.enabledValues
+                  ? `${assignment.offeredOptions.length} of ${liveOptions.length} options`
+                  : `all ${liveOptions.length} options`}
+              </span>
+            )}
+            {assignment.isFilter && (
+              <span>{ASSIGNMENT_SCOPE_LABELS[assignment.scope]}</span>
+            )}
+          </div>
+        </button>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? "Collapse" : "Edit"}
+            className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
+          >
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          <button
+            type="button"
+            onClick={remove}
+            disabled={pending}
+            aria-label={
+              assignment.inherited
+                ? `Drop ${definition.label} from this category`
+                : `Remove ${definition.label}`
+            }
+            className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
-      <RelationSection
-        specUuid={row.specificationUuid}
-        specLabel={row.label}
-        specUnit={row.unit}
-        specValueType={row.valueType}
-        specOrdered={row.ordered}
-        relations={relations}
-        otherSpecs={otherSpecs}
-        lookupSpecs={lookupSpecs}
-      />
-    </li>
+      {expanded && (
+        <div className="flex flex-col gap-4 border-t border-hairline px-3 py-3">
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <Checkbox
+              label="Shopper sees it (filter)"
+              checked={isFilter}
+              onChange={(event) => setIsFilter(event.target.checked)}
+            />
+            <Checkbox
+              label="Engine reads it (rule)"
+              checked={isRule}
+              onChange={(event) => setIsRule(event.target.checked)}
+            />
+          </div>
+
+          {!isFilter && isRule && (
+            <p className="-mt-2 text-[11px] text-muted">
+              A <strong className="text-secondary">living</strong> attribute:
+              invisible to the shopper, still read by the engine. An access
+              point&apos;s uplink speed is never shopped by, but the engine needs
+              it to size the switch.
+            </p>
+          )}
+          {isRule && (
+            <p className="-mt-2 text-[11px] text-amber-500">
+              Because the engine reads this, every product in this category must
+              have a value for it before it can be sold — a blank would make the
+              product silently pass every rule that reads it.
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {isFilter && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-secondary">
+                  Filter reaches
+                </span>
+                <Dropdown
+                  value={scope}
+                  onChange={(next) => setScope(next as AssignmentScope)}
+                  options={SCOPE_OPTIONS}
+                />
+                <span className="text-[11px] text-muted">
+                  Affects the shopper&apos;s facet only. Rule participation
+                  always inherits down the whole subtree.
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-secondary">
+                Surfaced to
+              </span>
+              <Dropdown
+                value={audience}
+                onChange={(next) => setAudience(next as AssignmentAudience)}
+                options={AUDIENCE_OPTIONS}
+              />
+              {definition.audience !== "everyone" && (
+                <span className="text-[11px] text-amber-500">
+                  The library marks this{" "}
+                  {ASSIGNMENT_AUDIENCE_LABELS[definition.audience]} — a category
+                  can narrow that, never widen it.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {optionBacked && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-secondary">
+                  Options this category offers
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEnabled([])}
+                  className="rounded-control px-2 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
+                >
+                  offer all
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {liveOptions.map((option) => {
+                  const picked =
+                    enabled.length === 0 || enabled.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setEnabled((current) => {
+                          const base =
+                            current.length === 0
+                              ? liveOptions.map((entry) => entry.value)
+                              : current;
+                          return base.includes(option.value)
+                            ? base.filter((entry) => entry !== option.value)
+                            : [...base, option.value];
+                        })
+                      }
+                      className={`rounded-full px-2 py-0.5 text-[11px] ${
+                        picked
+                          ? "bg-primary/20 text-primary"
+                          : "bg-hover text-faint hover:text-secondary"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {definition.ordered && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-faint">up to:</span>
+                  {liveOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => fillUpTo(option.value)}
+                      className="rounded-control bg-hover px-1.5 py-0.5 text-[11px] text-secondary hover:text-ink"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted">
+                Exactly the options ticked here are offered — gaps included.
+                Nothing is re-expanded later, so what you pick is what the
+                shopper and the product form get.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-secondary">
+              Shown only when
+            </span>
+            <PredicateEditor
+              value={showIf}
+              onChange={setShowIf}
+              attributes={triggers}
+              emptyLabel="Always shown"
+            />
+            {showIf && (
+              <p className="text-[11px] text-muted">
+                When this stops matching, the field is hidden{" "}
+                <strong className="text-secondary">and its value cleared</strong>{" "}
+                — a leftover number on a hidden field would still be feeding the
+                engine.
+              </p>
+            )}
+          </div>
+
+          {error && <p className="text-xs text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onToggle} disabled={pending}>
+              Close
+            </Button>
+            <Button onClick={save} disabled={pending}>
+              {assignment.inherited ? "Override here" : "Save"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
 export const AssignmentsTab = ({
-  rows,
+  categoryUuid,
+  resolved,
+  problems,
   library,
-  relations,
-  onChange,
-  onReset,
-  onRemove,
-  onAdd,
 }: AssignmentsTabProps) => {
-  const assigned = new Set(rows.map((row) => row.specificationUuid));
-  const addable = library
-    .filter((specification) => !assigned.has(specification.uuid))
-    .map((specification) => ({
-      value: specification.uuid,
-      label: specification.unit
-        ? `${specification.label} (${specification.unit})`
-        : specification.label,
-    }));
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [adding, setAdding] = useState("");
+  const [error, setError] = useState<string>();
 
-  // Show-if can only point at another attribute on this same category, and
-  // only one that has values to test.
-  const controllersFor = (specificationUuid: string) =>
-    rows
-      .filter(
-        (row) =>
-          row.specificationUuid !== specificationUuid &&
-          row.masterOptions.length > 0,
-      )
-      .map((row) => ({ value: row.key, label: `only if ${row.label}` }));
-
-  const controllerOptions = Object.fromEntries(
-    rows.map((row) => [row.key, row.masterOptions]),
+  const assigned = useMemo(
+    () => new Set(resolved.map((entry) => entry.definition.uuid)),
+    [resolved],
   );
 
-  // A conditional table is keyed by chosen values, so only attributes with an
-  // option list can key one.
-  const lookupSpecs = library
-    .filter((specification) => (specification.options ?? []).length > 0)
-    .map((specification) => ({
-      key: specification.key,
-      label: specification.label,
-      options: (specification.options ?? []).map((option) => option.value),
-    }));
+  const triggers = useMemo(
+    () => resolved.map(toPredicateAttribute),
+    [resolved],
+  );
 
-  // A relation can bind any attribute in the library, not only ones this
-  // category carries — a camera's power draw is measured against a switch's
-  // budget, and those live in different trees.
-  const otherSpecsFor = (specificationUuid: string) =>
-    library
-      .filter((specification) => specification.uuid !== specificationUuid)
-      .map((specification) => ({
-        value: specification.uuid,
-        label: specification.unit
-          ? `${specification.label} (${specification.unit})`
-          : specification.label,
-        valueType: specification.valueType,
-        unit: specification.unit,
-        ordered: specification.ordered,
-      }));
+  const addOptions = useMemo<DropdownOption[]>(
+    () =>
+      library
+        .filter((attribute) => !assigned.has(attribute.uuid))
+        .map((attribute) => ({
+          value: attribute.uuid,
+          label: attribute.unit
+            ? `${attribute.label} (${attribute.unit})`
+            : attribute.label,
+        })),
+    [library, assigned],
+  );
+
+  const add = (uuid: string): void => {
+    setAdding(uuid);
+    setError(undefined);
+    startTransition(async () => {
+      const result = await saveAssignmentAction({
+        categoryUuid,
+        specificationUuid: uuid,
+        // Sensible default: the engine reads it, the shopper does not filter on
+        // it yet. Turning the filter on is a deliberate merchandising decision.
+        isFilter: false,
+        isRule: true,
+        scope: "branch",
+        showIf: null,
+        audience: "everyone",
+        enabledValues: null,
+        suppressed: false,
+        order: resolved.length,
+      });
+      setAdding("");
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setExpanded(uuid);
+      router.refresh();
+    });
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      {rows.length === 0 ? (
-        <p className="rounded-control border border-dashed border-hairline p-8 text-center text-sm text-faint">
-          This category carries no attributes yet. Assign one from the library.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2.5">
-          {rows.map((row) => (
-            <AssignmentCard
-              key={row.specificationUuid}
-              row={row}
-              relations={relations[row.specificationUuid] ?? []}
-              otherSpecs={otherSpecsFor(row.specificationUuid)}
-              lookupSpecs={lookupSpecs}
-              siblingCount={rows.length - 1}
-              controllers={controllersFor(row.specificationUuid)}
-              controllerOptions={controllerOptions}
-              onChange={onChange}
-              onReset={onReset}
-              onRemove={onRemove}
-            />
+      {problems.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+          {problems.map((problem) => (
+            <p
+              key={`${problem.specificationUuid}-${problem.code}`}
+              className="flex items-start gap-1.5 text-xs text-amber-500"
+            >
+              <TriangleAlert size={12} className="mt-0.5 shrink-0" />
+              {problem.message}
+            </p>
           ))}
-        </ul>
+        </div>
       )}
 
-      <div className="w-72">
-        <Dropdown
-          searchable
-          value=""
-          onChange={onAdd}
-          placeholder="Assign attribute from library…"
-          searchPlaceholder="Search the library…"
-          options={addable}
-        />
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted">
+          {resolved.length} attribute{resolved.length === 1 ? "" : "s"} —{" "}
+          {resolved.filter((entry) => !entry.inherited).length} authored here
+        </p>
+        <div className="w-64">
+          <Dropdown
+            value={adding}
+            onChange={add}
+            options={addOptions}
+            searchable
+            triggerLabel="+ Add attribute"
+            emptyMessage="Every library attribute is already here"
+          />
+        </div>
       </div>
+
+      {error && (
+        <p className="rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {error}
+        </p>
+      )}
+
+      {resolved.length === 0 && (
+        <p className="rounded-card border border-dashed border-hairline px-3 py-8 text-center text-xs text-faint">
+          Nothing assigned yet. Add an attribute from the library, or assign it
+          higher up the tree so a whole branch inherits it.
+        </p>
+      )}
+
+      {resolved.map((assignment) => (
+        <AssignmentCard
+          key={assignment.definition.uuid}
+          categoryUuid={categoryUuid}
+          assignment={assignment}
+          triggers={triggers.filter(
+            (entry) => entry.uuid !== assignment.definition.uuid,
+          )}
+          expanded={expanded === assignment.definition.uuid}
+          onToggle={() =>
+            setExpanded((current) =>
+              current === assignment.definition.uuid
+                ? null
+                : assignment.definition.uuid,
+            )
+          }
+          onSaved={() => setExpanded(null)}
+        />
+      ))}
+
+      {pending && <p className="text-xs text-faint">Saving…</p>}
     </div>
   );
 };

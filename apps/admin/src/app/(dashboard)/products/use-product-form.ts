@@ -47,12 +47,10 @@ export const useProductForm = (args: UseProductFormArgs) => {
       price: product?.price ?? "",
       currency: product?.currency ?? "SAR",
       isAvailable: product?.isAvailable ?? true,
-      // Existing products with no explicit selection fall back to the keys they
-      // already have values for.
-      specKeys:
-        product?.specKeys ??
-        Object.keys(product?.technicalAttributes ?? {}),
-      technicalAttributes: product?.technicalAttributes ?? {},
+      // WHICH attributes a product carries is not stored — it is resolved from
+      // the category's assignment chain, so adding an attribute to a category
+      // applies to every product in it immediately.
+      specValues: product?.specValues ?? {},
       status: product?.status ?? "in_stock",
       order: product?.order ?? 0,
     },
@@ -78,8 +76,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
         price: values.price || null,
         currency: values.currency,
         isAvailable: values.isAvailable,
-        specKeys: values.specKeys,
-        technicalAttributes: values.technicalAttributes,
+        specValues: values.specValues,
         status: values.status,
         order: values.order,
       });

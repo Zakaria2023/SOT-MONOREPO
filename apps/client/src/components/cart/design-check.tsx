@@ -21,8 +21,13 @@ const FindingRow = ({ finding, tone }: FindingRowProps) => (
     <p className={tone === "block" ? "mt-0.5 text-red-800" : "mt-0.5 text-amber-800"}>
       {finding.message}
     </p>
-    {finding.suggestions.length > 0 && (
+    {/* Every correction is one of three shapes — add supply, reduce demand, or
+        swap for compatibility — so the buyer is never told only that something
+        is wrong. Where the rule is a plain capacity comparison the engine also
+        names products that would actually fit. */}
+    {finding.corrections.map((correction, index) => (
       <p
+        key={index}
         className={
           tone === "block"
             ? "mt-1 flex items-start gap-1.5 text-red-700"
@@ -30,9 +35,16 @@ const FindingRow = ({ finding, tone }: FindingRowProps) => (
         }
       >
         <Lightbulb size={14} className="mt-0.5 shrink-0" />
-        <span>Add one of: {finding.suggestions.join(", ")}</span>
+        <span>
+          {correction.message}
+          {correction.products.length > 0 && (
+            <span className="block opacity-80">
+              e.g. {correction.products.map((entry) => entry.name).join(", ")}
+            </span>
+          )}
+        </span>
       </p>
-    )}
+    ))}
   </div>
 );
 

@@ -1,61 +1,63 @@
 "use client";
 
+import type { LibraryGroup } from "@/app/(dashboard)/library/action";
 import { LibraryBuilder } from "@/components/library/library-builder";
-import type { LibraryBuilderGroup } from "@/app/(dashboard)/library/action";
-import type { SelectCategories } from "@/db/schema/categories";
-import { GitCompare, ShieldCheck } from "lucide-react";
+import { ProjectInputs } from "@/components/library/project-inputs";
+import type { SelectProjectVariables } from "@/db/schema/project-variables";
+import { GitCompare, Layers, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 type LibraryWorkspaceProps = {
-  groups: LibraryBuilderGroup[];
-  categories: SelectCategories[];
+  groups: LibraryGroup[];
+  variables: SelectProjectVariables[];
 };
 
-// The four nested concepts and the two kinds of link are the things people
-// conflate, so the page says what each one is before showing the builder.
+type Tab = "attributes" | "inputs";
+
+// The three objects are what people conflate, so the page states the boundary
+// before showing anything. It is the same boundary the code enforces: a
+// definition here may never mention another attribute, because the moment it can,
+// it has become an assignment and there are two places to look.
 const Orientation = () => (
-  <div className="grid grid-cols-1 gap-4 rounded-card border border-hairline bg-surface p-4 lg:grid-cols-2">
+  <div className="grid grid-cols-1 gap-4 rounded-card border border-hairline bg-surface p-4 lg:grid-cols-3">
     <div>
-      <p className="text-sm font-semibold text-ink">
-        Domain <span className="text-faint">›</span> Group{" "}
-        <span className="text-faint">›</span> Attribute
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+        <Layers size={14} className="text-primary" />
+        Here: what an attribute IS
       </p>
       <p className="mt-1 text-xs text-muted">
-        A <strong className="font-semibold text-secondary">domain</strong>{" "}
-        buckets groups on the product picker (Power, Networking). A{" "}
-        <strong className="font-semibold text-secondary">group</strong> is the
-        folder an attribute lives in.
-      </p>
-      <p className="mt-1.5 text-xs text-muted">
-        A <strong className="font-semibold text-secondary">category</strong> is
-        different — it&apos;s the product taxonomy (IP Cameras), and it decides
-        which products may use the attribute. Leave it empty and the attribute
-        applies everywhere.
+        Name, type, unit, and the master option list. Authored once — every
+        category that uses it points at this one definition, which is what makes
+        1G on a switch and 1G on a NAS the same value to a rule.
       </p>
     </div>
 
     <div>
-      <p className="text-sm font-semibold text-ink">
-        Two ways attributes relate
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+        <SlidersHorizontal size={14} className="text-primary" />
+        <Link href="/assignments" className="hover:underline">
+          Assignments: how a category uses it
+        </Link>
       </p>
-      <p className="mt-1 flex items-start gap-1.5 text-xs text-muted">
-        <ShieldCheck size={13} className="mt-0.5 shrink-0 text-primary" />
-        <span>
-          <strong className="font-semibold text-secondary">Auto-add</strong> —
-          set here, on an option. Choosing that option adds another attribute to
-          the product. Convenience while filling a product in.
-        </span>
+      <p className="mt-1 text-xs text-muted">
+        Whether the shopper sees it, whether the engine reads it, which slice of
+        the options this category offers, and what reveals it. Nothing about a
+        category lives on this page.
       </p>
-      <p className="mt-1.5 flex items-start gap-1.5 text-xs text-muted">
-        <GitCompare size={13} className="mt-0.5 shrink-0 text-primary" />
-        <span>
-          <strong className="font-semibold text-secondary">Relations</strong>{" "}
-          — authored on the attribute itself in{" "}
-          <Link href="/assignments" className="text-primary hover:underline">
-            Assignments
-          </Link>
-          . They validate a selection, e.g. the PoE budget covers the devices.
-        </span>
+    </div>
+
+    <div>
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+        <GitCompare size={14} className="text-primary" />
+        <Link href="/assignments" className="hover:underline">
+          Relations: how two items fit
+        </Link>
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        A camera&apos;s draw against a switch&apos;s budget. Rules reference
+        attributes, never products, so a new SKU joins every existing rule as
+        soon as its values are filled in.
       </p>
     </div>
   </div>
@@ -63,18 +65,53 @@ const Orientation = () => (
 
 export const LibraryWorkspace = ({
   groups,
-  categories,
-}: LibraryWorkspaceProps) => (
-  <div className="flex flex-col gap-5">
-    <div>
-      <h1 className="font-heading text-2xl text-ink">Specification library</h1>
-      <p className="mt-1 text-sm text-muted">
-        Build an attribute once, then add it to any product.
-      </p>
+  variables,
+}: LibraryWorkspaceProps) => {
+  const [tab, setTab] = useState<Tab>("attributes");
+
+  const tabClass = (active: boolean): string =>
+    `rounded-control px-3 py-1.5 text-sm ${
+      active
+        ? "bg-primary/15 font-medium text-primary"
+        : "text-muted hover:bg-hover hover:text-ink"
+    }`;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="font-heading text-2xl text-ink">
+          Specification library
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          Define an attribute once, then let any category borrow it.
+        </p>
+      </div>
+
+      <Orientation />
+
+      <div className="flex items-center gap-1 border-b border-hairline pb-2">
+        <button
+          type="button"
+          onClick={() => setTab("attributes")}
+          className={tabClass(tab === "attributes")}
+        >
+          Attributes
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("inputs")}
+          className={tabClass(tab === "inputs")}
+        >
+          Project inputs
+          <span className="ml-1.5 text-xs text-faint">{variables.length}</span>
+        </button>
+      </div>
+
+      {tab === "attributes" ? (
+        <LibraryBuilder groups={groups} />
+      ) : (
+        <ProjectInputs variables={variables} />
+      )}
     </div>
-
-    <Orientation />
-
-    <LibraryBuilder groups={groups} categories={categories} />
-  </div>
-);
+  );
+};

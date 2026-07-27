@@ -27,6 +27,7 @@ import {
   Products,
   SelectProducts,
 } from "../../../db/schema/products";
+import { normalizeProductValues } from "./product-completeness";
 
 export type { SelectProducts };
 
@@ -74,21 +75,28 @@ export type ProductFilters = {
 };
 
 /**
- * Match one spec facet against a product's `technicalAttributes` JSON.
+ * Match one spec facet against a product's `specValues` JSON.
  *
- * A multi-select attribute stores its chosen options comma-joined
- * ("802.3af, 802.3at"), so a plain equality check would miss them. Normalising
- * ", " to "," turns the stored value into a SET literal that FIND_IN_SET can
- * search, which also covers the single-value case.
+ * Keyed by attribute uuid, and the stored value is TYPED — a single-select is a
+ * JSON string, a multi-select a JSON array. `json_contains` handles both: it
+ * matches an array element, and on a scalar it compares the value itself. That is
+ * why the values are typed rather than comma-joined — the old encoding needed
+ * string surgery here and broke on any option containing a comma.
  */
-const specValueCondition = (key: string, values: string[]): SQL | undefined => {
+const specValueCondition = (
+  attrUuid: string,
+  values: string[],
+): SQL | undefined => {
   const wanted = values.filter((value) => value.trim().length > 0);
   if (wanted.length === 0) {
     return undefined;
   }
-  const stored = sql`replace(json_unquote(json_extract(${Products.technicalAttributes}, ${`$."${key}"`})), ', ', ',')`;
+  const path = `$."${attrUuid}"`;
   return or(
-    ...wanted.map((value) => sql`find_in_set(${value}, ${stored}) > 0`),
+    ...wanted.map(
+      (value) =>
+        sql`json_contains(json_extract(${Products.specValues}, ${path}), json_quote(${value}))`,
+    ),
   );
 };
 
@@ -275,6 +283,14 @@ export const createProduct = async (
   });
   await db.insert(Products).values({
     ...fields,
+    // The form's values are convenience, never the authority: the server coerces
+    // each one to the type its attribute declares and drops anything the reveal
+    // conditions now hide. A leftover value on a hidden field would still feed
+    // the engine, and nobody could see the number doing it.
+    specValues: await normalizeProductValues(
+      fields.categoryUuid,
+      fields.specValues ?? {},
+    ),
     sku,
     uuid,
     order: total,
@@ -296,7 +312,15 @@ export const updateProduct = async (
   });
   await db
     .update(Products)
-    .set({ ...fields, sku, slug: slugify(fields.name) })
+    .set({
+      ...fields,
+      specValues: await normalizeProductValues(
+        fields.categoryUuid,
+        fields.specValues ?? {},
+      ),
+      sku,
+      slug: slugify(fields.name),
+    })
     .where(eq(Products.uuid, uuid));
 };
 

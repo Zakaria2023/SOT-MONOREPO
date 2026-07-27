@@ -2,53 +2,40 @@
 
 import {
   addAttributeAction,
-  addGroupAction,
   deleteAttributeAction,
-  deleteGroupAction,
   moveAttributeAction,
-  reorderGroupsAction,
-  updateGroupAction,
   updateAttributeAction,
-  type AttributeInput,
-  type LibraryBuilderGroup,
+  type LibraryAttributeInput,
+  type LibraryGroup,
 } from "@/app/(dashboard)/library/action";
-import type {
-  AssignmentAudience,
-  SpecificationDomain,
-  SpecInputType,
-} from "@/db/enum";
+import type { AssignmentAudience, SpecificationType } from "@/db/enum";
 import {
   assignmentAudiences,
   measurementUnits,
-  specInputTypes,
-  specificationDomains,
+  specificationTypes,
+  UNIT_DIMENSIONS,
 } from "@/db/enum";
 import {
   ASSIGNMENT_AUDIENCE_LABELS,
-  SPECIFICATION_DOMAIN_LABELS,
-  SPEC_INPUT_TYPE_LABELS,
+  SPECIFICATION_TYPE_LABELS,
 } from "@/db/label";
-import type { SelectCategories } from "@/db/schema/categories";
-import { buildCategoryTreeOptions } from "@/lib/categories";
+import type { SpecOption } from "@/db/types";
 import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  GitCompare,
-  ShieldCheck,
+  ArrowUpDown,
   Hash,
-  List,
+  Link2,
   ListChecks,
+  Lock,
   Pencil,
   Plus,
   Search,
   ToggleLeft,
   Trash2,
-  Type,
+  Undo2,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   Button,
   Checkbox,
@@ -57,68 +44,80 @@ import {
   Dropdown,
   Input,
   Textarea,
+  type DropdownOption,
 } from "ui";
-import type { DropdownOption } from "ui";
+
+type LibraryAttribute = LibraryGroup["attributes"][number];
 
 type LibraryBuilderProps = {
-  groups: LibraryBuilderGroup[];
-  categories: SelectCategories[];
-};
-
-// An attribute in the list. When a search is active it comes from any group,
-// so it carries that group's name to stay locatable.
-type SearchResult = LibraryBuilderGroup["attributes"][number] & {
-  groupLabel?: string;
+  groups: LibraryGroup[];
 };
 
 type AttributeFormProps = {
   groupUuid: string | null;
-  initial?: AttributeInput & { uuid: string };
-  // Depth-ordered category options the attribute can be assigned to.
-  categoryOptions: DropdownOption[];
-  onSubmit: (input: AttributeInput) => void;
+  groupOptions: DropdownOption[];
+  initial?: LibraryAttribute;
+  onSubmit: (input: LibraryAttributeInput) => void;
   onCancel: () => void;
   pending: boolean;
+  error?: string;
 };
 
-const INPUT_TYPES: { value: SpecInputType; label: string }[] =
-  specInputTypes.map((type) => ({
-    value: type,
-    label: SPEC_INPUT_TYPE_LABELS[type],
-  }));
+// One row of the option editor. `value` is present on an option that already
+// exists — carrying it through is what keeps its identity stable when its label
+// is edited, so no product's stored value is orphaned by a rename.
+type OptionDraft = {
+  value?: string;
+  label: string;
+  rank: string;
+  retired: boolean;
+};
 
-// The navigation domain a group is bucketed under. "" means no domain — the
-// group falls into the trailing "Other" bucket.
-const DOMAIN_OPTIONS: DropdownOption[] = [
-  { value: "", label: "No domain" },
-  ...specificationDomains.map((domain) => ({
-    value: domain,
-    label: SPECIFICATION_DOMAIN_LABELS[domain],
-  })),
-];
+type SearchHit = LibraryAttribute & { groupLabel: string };
+
+const TYPE_OPTIONS: DropdownOption[] = specificationTypes.map((type) => ({
+  value: type,
+  label: SPECIFICATION_TYPE_LABELS[type],
+}));
+
+const AUDIENCE_OPTIONS: DropdownOption[] = assignmentAudiences.map(
+  (audience) => ({
+    value: audience,
+    label: ASSIGNMENT_AUDIENCE_LABELS[audience],
+  }),
+);
+
+// The unit picker shows what each unit MEASURES, because that is what decides
+// whether a rule may compare two attributes. W and kW convert; W and VA never
+// do, and the label is where an author finds that out.
+const UNIT_OPTIONS: DropdownOption[] = measurementUnits.map((unit) => {
+  const dimension = UNIT_DIMENSIONS[unit];
+  return {
+    value: unit,
+    label: dimension ? `${unit} — ${dimension.dimension}` : unit,
+  };
+});
 
 const TYPE_META: Record<
-  SpecInputType,
-  { label: string; className: string }
+  SpecificationType,
+  { badge: string; className: string }
 > = {
-  number: { label: "num", className: "bg-blue-500/15 text-blue-400" },
-  single_select: { label: "select", className: "bg-violet-500/15 text-violet-400" },
-  multi_select: { label: "multi", className: "bg-emerald-500/15 text-emerald-400" },
-  boolean: { label: "yes / no", className: "bg-amber-500/15 text-amber-500" },
-  text: { label: "text", className: "bg-hover text-secondary" },
+  number: { badge: "number", className: "bg-blue-500/15 text-blue-400" },
+  single_select: {
+    badge: "select",
+    className: "bg-violet-500/15 text-violet-400",
+  },
+  multi_select: {
+    badge: "multi",
+    className: "bg-emerald-500/15 text-emerald-400",
+  },
+  boolean: { badge: "yes / no", className: "bg-amber-500/15 text-amber-500" },
 };
 
-// Options are edited one per line. They must be able to contain spaces —
-// "802.3at (PoE+)" is a single option — so the separator can only be the
-// newline, never whitespace.
-const parseOptionLines = (raw: string): string[] =>
-  raw
-    .split("\n")
-    .map((value) => value.trim())
-    .filter(Boolean);
+const isOptionType = (type: SpecificationType): boolean =>
+  type === "single_select" || type === "multi_select";
 
-// Total auto-add links across all of an attribute's options.
-const TypeIcon = ({ type }: { type: SpecInputType }) => {
+const TypeIcon = ({ type }: { type: SpecificationType }) => {
   if (type === "number") {
     return <Hash size={15} className="text-faint" />;
   }
@@ -128,828 +127,562 @@ const TypeIcon = ({ type }: { type: SpecInputType }) => {
   if (type === "multi_select") {
     return <ListChecks size={15} className="text-faint" />;
   }
-  if (type === "text") {
-    return <Type size={15} className="text-faint" />;
-  }
-  return <List size={15} className="text-faint" />;
+  return <ArrowUpDown size={15} className="text-faint" />;
 };
 
-// Inline add/edit form. Options are edited pipe-separated (AC|DC|PoE), matching
-// how the attribute reads.
+const toDrafts = (options: SpecOption[]): OptionDraft[] =>
+  options.map((option) => ({
+    value: option.value,
+    label: option.label,
+    rank: option.rank === null ? "" : String(option.rank),
+    retired: option.retired,
+  }));
+
 const AttributeForm = ({
   groupUuid,
+  groupOptions,
   initial,
-  categoryOptions,
   onSubmit,
   onCancel,
   pending,
+  error,
 }: AttributeFormProps) => {
   const [label, setLabel] = useState(initial?.label ?? "");
-  const [inputType, setInputType] = useState<SpecInputType>(
-    initial?.inputType ?? "single_select",
+  const [internalName, setInternalName] = useState(initial?.internalName ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [type, setType] = useState<SpecificationType>(
+    initial?.type ?? "single_select",
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
-  const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [audience, setAudience] = useState<AssignmentAudience>(
     initial?.audience ?? "everyone",
   );
-  const [optionsText, setOptionsText] = useState(
-    (initial?.options ?? []).join("\n"),
-  );
-  const [categoryUuids, setCategoryUuids] = useState<string[]>(
-    initial?.categoryUuids ?? [],
+  const [group, setGroup] = useState(initial?.groupUuid ?? groupUuid ?? "");
+  const [options, setOptions] = useState<OptionDraft[]>(
+    initial ? toDrafts(initial.options) : [{ label: "", rank: "", retired: false }],
   );
 
-  // The option values that currently exist for this attribute: Yes/No for a
-  // boolean, the parsed tokens for a select, nothing otherwise. These are the
-  // values that can carry reveal links.
-  const optionValues =
-    inputType === "boolean"
-      ? ["Yes", "No"]
-      : inputType === "single_select" || inputType === "multi_select"
-        ? parseOptionLines(optionsText)
-        : [];
+  const locked = (initial?.relationshipCount ?? 0) > 0;
 
-  // The canonical unit list, plus whatever this attribute already stores if it
-  // predates the list — so opening the form never silently drops its unit.
-  const unitOptions = [
-    ...((unit && !(measurementUnits as readonly string[]).includes(unit)
-      ? [{ value: unit, label: `${unit} (existing)` }]
-      : []) as DropdownOption[]),
-    ...measurementUnits.map((value) => ({ value, label: value })),
-  ];
+  const setOption = (index: number, patch: Partial<OptionDraft>): void => {
+    setOptions((current) =>
+      current.map((option, at) =>
+        at === index ? { ...option, ...patch } : option,
+      ),
+    );
+  };
 
-  const submit = () => {
-    const options =
-      inputType === "single_select" || inputType === "multi_select"
-        ? parseOptionLines(optionsText)
-        : [];
+  const submit = (): void => {
     onSubmit({
-      groupUuid,
+      groupUuid: group === "" ? null : group,
       label,
-      inputType,
-      unit: inputType === "number" ? unit : null,
-      allowRange: inputType === "number" ? allowRange : false,
-      ordered:
-        inputType === "single_select" || inputType === "multi_select"
-          ? ordered
-          : false,
+      internalName: internalName.trim() === "" ? null : internalName,
+      description: description.trim() === "" ? null : description,
+      type,
+      unit: type === "number" ? unit || null : null,
+      ordered: isOptionType(type) ? ordered : false,
       audience,
-      options,
-      categoryUuids,
+      options: isOptionType(type)
+        ? options
+            .filter((option) => option.label.trim() !== "" && !option.retired)
+            .map((option) => ({
+              value: option.value,
+              label: option.label,
+              rank: option.rank.trim() === "" ? null : Number(option.rank),
+            }))
+        : [],
     });
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-control border border-primary/40 bg-primary-tint/20 p-3">
-      <div>
-        <label className="text-xs font-semibold text-ink">Name</label>
+    <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input
+          label="Name"
+          placeholder="PoE Budget"
           value={label}
           onChange={(event) => setLabel(event.target.value)}
-          placeholder="Attribute name"
-          className="mt-1"
+        />
+        <Input
+          label="Internal name (optional)"
+          placeholder="How staff tell it apart from another “Type”"
+          value={internalName}
+          onChange={(event) => setInternalName(event.target.value)}
         />
       </div>
-      <div>
-        <label className="text-xs font-semibold text-ink">Type</label>
-        <div className="mt-1">
-          <Dropdown
-            value={inputType}
-            onChange={(value) => setInputType(value as SpecInputType)}
-            options={INPUT_TYPES}
-          />
+
+      <Textarea
+        label="Description (optional)"
+        rows={2}
+        placeholder="What this measures, in one line."
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-secondary">Type</span>
+          {/* A type change would turn every stored value into an unreadable one,
+              so once a rule depends on the attribute the type is shown, not
+              offered. The service refuses it too — this is only the explanation. */}
+          {locked ? (
+            <div className="flex items-center gap-2 rounded-control border border-hairline bg-hover px-3 py-2 text-sm text-secondary">
+              <Lock size={13} className="text-faint" />
+              {SPECIFICATION_TYPE_LABELS[type]}
+            </div>
+          ) : (
+            <Dropdown
+              value={type}
+              onChange={(next) => setType(next as SpecificationType)}
+              options={TYPE_OPTIONS}
+            />
+          )}
+          {locked && (
+            <span className="text-[11px] text-amber-500">
+              {initial?.relationshipCount} rule(s) use this — the type is fixed.
+              Create a new attribute instead.
+            </span>
+          )}
         </div>
-      </div>
-      <div>
-        <label className="text-xs font-semibold text-ink">Categories</label>
-        <p className="mt-0.5 text-xs text-faint">
-          Products in these categories (and their sub-categories) can use this
-          attribute. Leave empty to make it available everywhere.
-        </p>
-        <div className="mt-1">
-          <Dropdown
-            multiple
-            searchable
-            value={categoryUuids}
-            onChange={setCategoryUuids}
-            placeholder="All categories"
-            searchPlaceholder="Search categories…"
-            options={categoryOptions}
-          />
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-secondary">Group</span>
+          <Dropdown value={group} onChange={setGroup} options={groupOptions} />
         </div>
-      </div>
-      <div>
-        <label className="text-xs font-semibold text-ink">Who is it for</label>
-        <p className="mt-0.5 text-xs text-faint">
-          Set once, here. Users and partner users are separate audiences —
-          &ldquo;Everyone&rdquo; means both. An installer certification is a
-          partner concern wherever it is used, so a category cannot override it.
-        </p>
-        <div className="mt-1">
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-secondary">Shown to</span>
           <Dropdown
             value={audience}
-            onChange={(value) => setAudience(value as AssignmentAudience)}
-            options={assignmentAudiences.map((value) => ({
-              value,
-              label: ASSIGNMENT_AUDIENCE_LABELS[value],
-            }))}
+            onChange={(next) => setAudience(next as AssignmentAudience)}
+            options={AUDIENCE_OPTIONS}
           />
         </div>
       </div>
 
-      {inputType === "number" && (
-        <>
-          <div>
-            <label className="text-xs font-semibold text-ink">Unit</label>
-            <p className="mt-0.5 text-xs text-faint">
-              Rules compare units as text, so pick from the list rather than
-              inventing a spelling.
-            </p>
-            <div className="mt-1">
-              <Combobox
-                value={unit}
-                onChange={setUnit}
-                placeholder="Pick a unit"
-                searchPlaceholder="Search units…"
-                options={unitOptions}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface p-3">
-            <Checkbox
-              label="Range — the product enters a from–to pair"
-              checked={allowRange}
-              onChange={(event) => setAllowRange(event.target.checked)}
-            />
-            <p className="text-xs text-faint">
-              Use this for spans like an input voltage range. Rules budget a
-              range at its max when consuming and its min when providing.
-            </p>
-            <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs text-faint">Product sees:</span>
-              {allowRange ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="rounded-control border border-hairline bg-page px-2 py-1 text-xs text-faint">
-                    From
-                  </span>
-                  <span className="text-xs text-faint">–</span>
-                  <span className="rounded-control border border-hairline bg-page px-2 py-1 text-xs text-faint">
-                    To {unit.trim()}
-                  </span>
-                </span>
-              ) : (
-                <span className="rounded-control border border-hairline bg-page px-2 py-1 text-xs text-faint">
-                  0 {unit.trim()}
-                </span>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-      {(inputType === "single_select" || inputType === "multi_select") && (
-        <div>
-          <label className="text-xs font-semibold text-ink">
-            Options — one per line
-          </label>
-          <p className="mt-0.5 text-xs text-faint">
-            An option can contain spaces and brackets, e.g. 802.3at (PoE+).
-          </p>
-          <Textarea
-            value={optionsText}
-            onChange={(event) => setOptionsText(event.target.value)}
-            rows={Math.min(8, Math.max(3, optionValues.length + 1))}
-            placeholder={"802.3af (PoE)\n802.3at (PoE+)\n802.3bt (PoE++)"}
-            className="mt-1"
+      {type === "number" && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-secondary">Unit</span>
+          <Combobox
+            value={unit}
+            onChange={setUnit}
+            options={UNIT_OPTIONS}
+            placeholder="Search units…"
           />
-          <label className="mt-2 flex items-start gap-2">
-            <Checkbox
-              checked={ordered}
-              onChange={(event) => setOrdered(event.target.checked)}
-            />
-            <span className="text-xs text-ink">
-              These options are an ordered scale (low to high)
-              <span className="mt-0.5 block text-faint">
-                Turn this on when the list runs in a direction — 802.3af → at →
-                bt, 100M → 1G → 10G, Cat5e → Cat6 → Cat6a. Rules can then use
-                &ldquo;at most&rdquo; and &ldquo;at least&rdquo; on it, and a
-                category enabling one value offers everything up to it. Leave
-                off for a plain set like Black / White / Grey.
-              </span>
-            </span>
-          </label>
-        </div>
-      )}
-      {inputType === "text" && (
-        <div>
-          <label className="text-xs font-semibold text-ink">
-            Free-text field
-          </label>
-          <Textarea
-            disabled
-            rows={3}
-            placeholder="A text attribute — the product fills this in as free text."
-            className="mt-1"
-          />
+          <span className="text-[11px] text-muted">
+            A rule can only compare two numbers that measure the same thing. W
+            converts to kW; W and VA never convert, because 1500 VA is not
+            1500 W.
+          </span>
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      {isOptionType(type) && (
+        <div className="flex flex-col gap-2">
+          <Checkbox
+            label="These options are an ordered scale"
+            checked={ordered}
+            onChange={(event) => setOrdered(event.target.checked)}
+          />
+          <p className="-mt-1 text-[11px] text-muted">
+            Turn this on for 802.3af &lt; at &lt; bt or 1G &lt; 10G. It is what
+            makes “at most” comparisons possible. Each option then needs a rank —
+            use the real magnitude where there is one (1G = 1000).
+          </p>
+
+          <div className="flex flex-col gap-1.5">
+            {options.map((option, index) => (
+              <div
+                key={option.value ?? `new-${index}`}
+                className="flex items-center gap-2"
+              >
+                <Input
+                  placeholder="Option label"
+                  value={option.label}
+                  disabled={option.retired}
+                  onChange={(event) =>
+                    setOption(index, { label: event.target.value })
+                  }
+                />
+                {ordered && (
+                  <div className="w-24 shrink-0">
+                    <Input
+                      type="number"
+                      placeholder="rank"
+                      value={option.rank}
+                      disabled={option.retired}
+                      onChange={(event) =>
+                        setOption(index, { rank: event.target.value })
+                      }
+                    />
+                  </div>
+                )}
+                {option.retired ? (
+                  <button
+                    type="button"
+                    onClick={() => setOption(index, { retired: false })}
+                    className="flex shrink-0 items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
+                    aria-label={`Bring back ${option.label}`}
+                  >
+                    <Undo2 size={12} />
+                    retired
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      option.value
+                        ? setOption(index, { retired: true })
+                        : setOptions((current) =>
+                            current.filter((_, at) => at !== index),
+                          )
+                    }
+                    className="shrink-0 rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+                    aria-label={
+                      option.value
+                        ? `Retire ${option.label}`
+                        : "Remove this option"
+                    }
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setOptions((current) => [
+                  ...current,
+                  { label: "", rank: "", retired: false },
+                ])
+              }
+              className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+            >
+              <Plus size={13} />
+              Add option
+            </button>
+          </div>
+
+          <p className="text-[11px] text-muted">
+            Options are never deleted, only retired. A product already holding a
+            retired value keeps it — deleting the option would leave that product
+            pointing at something that no longer exists, and it would quietly
+            drop out of every rule reading this attribute.
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
-        <Button type="button" onClick={submit} disabled={pending}>
-          {initial ? "Save changes" : "Add attribute"}
+        <Button onClick={submit} disabled={pending || label.trim() === ""}>
+          {initial ? "Save" : "Add attribute"}
         </Button>
       </div>
     </div>
   );
 };
 
-export const LibraryBuilder = ({
-  groups,
-  categories,
-}: LibraryBuilderProps) => {
-  const router = useRouter();
-  const categoryOptions = buildCategoryTreeOptions(categories);
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | undefined>(undefined);
+const AttributeRow = ({
+  attribute,
+  onEdit,
+  onDelete,
+}: {
+  attribute: LibraryAttribute;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => {
+  const meta = TYPE_META[attribute.type];
+  const live = attribute.options.filter((option) => !option.retired);
+  const referenced = attribute.relationshipCount > 0;
 
-  const realGroups = groups.filter((group) => group.uuid);
+  return (
+    <div className="flex items-start gap-3 rounded-card border border-hairline bg-surface px-3 py-2.5">
+      <div className="mt-0.5">
+        <TypeIcon type={attribute.type} />
+      </div>
 
-  // Deleting from the library cascades: an attribute takes every assignment of
-  // it and every relation binding it. That is not something a single click on
-  // a trash icon should do.
-  const [pendingAttribute, setPendingAttribute] = useState<
-    SearchResult | LibraryBuilderGroup["attributes"][number] | null
-  >(null);
-  const [pendingGroup, setPendingGroup] = useState<
-    LibraryBuilderGroup | null
-  >(null);
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-ink">{attribute.label}</span>
+          {attribute.internalName && (
+            <span className="text-[11px] text-faint">
+              ({attribute.internalName})
+            </span>
+          )}
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${meta.className}`}
+          >
+            {meta.badge}
+          </span>
+          {attribute.unit && (
+            <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+              {attribute.unit}
+            </span>
+          )}
+          {attribute.ordered && (
+            <span className="flex items-center gap-1 rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+              <ArrowUpDown size={9} />
+              scale
+            </span>
+          )}
+          {attribute.audience !== "everyone" && (
+            <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+              {ASSIGNMENT_AUDIENCE_LABELS[attribute.audience]}
+            </span>
+          )}
+        </div>
 
-  const [selectedUuid, setSelectedUuid] = useState<string>(
-    realGroups[0]?.uuid ?? "",
+        {live.length > 0 && (
+          <p className="mt-1 line-clamp-1 text-xs text-muted">
+            {live
+              .map((option) =>
+                attribute.ordered && option.rank !== null
+                  ? `${option.label} (${option.rank})`
+                  : option.label,
+              )
+              .join(" · ")}
+          </p>
+        )}
+
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-faint">
+          {referenced && (
+            <span className="flex items-center gap-1 text-primary">
+              <Link2 size={10} />
+              {attribute.relationshipCount} rule
+              {attribute.relationshipCount === 1 ? "" : "s"}
+            </span>
+          )}
+          <span>
+            {attribute.categoryCount} categor
+            {attribute.categoryCount === 1 ? "y" : "ies"}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Edit ${attribute.label}`}
+          className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
+        >
+          <Pencil size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Delete ${attribute.label}`}
+          className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
   );
-  const selected =
-    groups.find((group) => group.uuid === selectedUuid) ?? realGroups[0];
+};
 
-  const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupDomain, setNewGroupDomain] = useState("");
-  const [addingGroup, setAddingGroup] = useState(false);
-  // The inline group editor holds name + domain together, so saving one can
-  // never blank the other.
-  const [editingGroup, setEditingGroup] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [groupDomain, setGroupDomain] = useState("");
-  const [attributeSearch, setAttributeSearch] = useState("");
-  const [addingAttribute, setAddingAttribute] = useState(false);
-  const [editingUuid, setEditingUuid] = useState<string | null>(null);
-  const [movingUuid, setMovingUuid] = useState<string | null>(null);
+export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [search, setSearch] = useState("");
+  const [addingIn, setAddingIn] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState<string>();
+  const [confirming, setConfirming] = useState<LibraryAttribute | null>(null);
 
-  const run = (action: () => Promise<{ error?: string }>) =>
+  const groupOptions = useMemo<DropdownOption[]>(
+    () => [
+      { value: "", label: "Ungrouped" },
+      ...groups
+        .filter((group) => group.uuid !== "")
+        .map((group) => ({ value: group.uuid, label: group.name })),
+    ],
+    [groups],
+  );
+
+  const hits = useMemo<SearchHit[]>(() => {
+    const term = search.trim().toLowerCase();
+    if (term === "") {
+      return [];
+    }
+    return groups.flatMap((group) =>
+      group.attributes
+        .filter(
+          (attribute) =>
+            attribute.label.toLowerCase().includes(term) ||
+            attribute.internalName?.toLowerCase().includes(term) ||
+            attribute.options.some((option) =>
+              option.label.toLowerCase().includes(term),
+            ),
+        )
+        .map((attribute) => ({ ...attribute, groupLabel: group.name })),
+    );
+  }, [groups, search]);
+
+  const run = (action: () => Promise<{ error?: string }>): void => {
+    setError(undefined);
     startTransition(async () => {
-      setError(undefined);
       const result = await action();
       if (result.error) {
         setError(result.error);
         return;
       }
+      setAddingIn(null);
+      setEditing(null);
+      setConfirming(null);
       router.refresh();
     });
+  };
 
-  const addGroup = () => {
-    const name = newGroupName.trim();
-    if (!name) {
-      return;
-    }
-    run(async () => {
-      const result = await addGroupAction(name, newGroupDomain || null);
-      if (!result.error) {
-        setNewGroupName("");
-        setNewGroupDomain("");
-        setAddingGroup(false);
+  const editForm = (attribute: LibraryAttribute) => (
+    <AttributeForm
+      key={attribute.uuid}
+      groupUuid={attribute.groupUuid}
+      groupOptions={groupOptions}
+      initial={attribute}
+      pending={pending}
+      error={error}
+      onCancel={() => {
+        setEditing(null);
+        setError(undefined);
+      }}
+      onSubmit={(input) =>
+        run(() => updateAttributeAction(attribute.uuid, input))
       }
-      return result;
-    });
-  };
-
-  const openGroupEditor = (group: LibraryBuilderGroup) => {
-    setEditingGroup(true);
-    setGroupName(group.name);
-    setGroupDomain(group.domain ?? "");
-  };
-
-  const saveGroup = (uuid: string) =>
-    run(async () => {
-      const result = await updateGroupAction(
-        uuid,
-        groupName,
-        groupDomain || null,
-      );
-      if (!result.error) {
-        setEditingGroup(false);
-      }
-      return result;
-    });
-
-  // Searching looks across every group, not just the selected one — otherwise
-  // finding an attribute means clicking through groups one at a time. Matches
-  // carry their group name so the result stays locatable.
-  const searchTerm = attributeSearch.trim().toLowerCase();
-  const searchResults: SearchResult[] =
-    searchTerm === ""
-      ? []
-      : groups.flatMap((group) =>
-          group.attributes
-            .filter(
-              (attribute) =>
-                attribute.label.toLowerCase().includes(searchTerm) ||
-                attribute.key.toLowerCase().includes(searchTerm),
-            )
-            .map((attribute) => ({ ...attribute, groupLabel: group.name })),
-        );
-  const isSearching = searchTerm !== "";
-  const visibleAttributes: SearchResult[] = isSearching
-    ? searchResults
-    : (selected?.attributes ?? []);
-
-  const move = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= realGroups.length) {
-      return;
-    }
-    const next = [...realGroups];
-    [next[index], next[target]] = [next[target], next[index]];
-    run(() => reorderGroupsAction(next.map((group) => group.uuid)));
-  };
+    />
+  );
 
   return (
-    <>
     <div className="flex flex-col gap-4">
-      {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="relative">
+        <Search
+          size={15}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
+        />
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search attributes and options…"
+          className="w-full rounded-control border border-hairline bg-surface py-2 pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-primary focus:outline-none"
+        />
+      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
-        {/* Groups panel */}
-        <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-ink">
-              Groups · {realGroups.length}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAddingGroup((value) => !value)}
-            >
-              <Plus size={15} /> New group
-            </Button>
-          </div>
+      {error && !addingIn && !editing && (
+        <p className="rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {error}
+        </p>
+      )}
 
-          {addingGroup && (
-            <div className="flex flex-col gap-2 rounded-control border border-primary/40 bg-primary-tint/20 p-3">
-              <Input
-                value={newGroupName}
-                onChange={(event) => setNewGroupName(event.target.value)}
-                placeholder="Group name"
-                onKeyDown={(event) => event.key === "Enter" && addGroup()}
-              />
-              <Dropdown
-                value={newGroupDomain}
-                onChange={setNewGroupDomain}
-                placeholder="No domain"
-                options={DOMAIN_OPTIONS}
-              />
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAddingGroup(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="button" onClick={addGroup} disabled={isPending}>
-                  <Check size={15} /> Add group
-                </Button>
+      {search.trim() !== "" ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted">
+            {hits.length} match{hits.length === 1 ? "" : "es"}
+          </p>
+          {hits.map((hit) =>
+            editing === hit.uuid ? (
+              editForm(hit)
+            ) : (
+              <div key={hit.uuid} className="flex flex-col gap-1">
+                <span className="text-[11px] text-faint">{hit.groupLabel}</span>
+                <AttributeRow
+                  attribute={hit}
+                  onEdit={() => setEditing(hit.uuid)}
+                  onDelete={() => setConfirming(hit)}
+                />
               </div>
-            </div>
+            ),
           )}
-
-          <ul className="flex flex-col gap-1">
-            {realGroups.map((group, index) => {
-              const isActive = group.uuid === selectedUuid;
-              return (
-                <li key={group.uuid}>
-                  <div
-                    className={`flex items-center gap-2 rounded-control px-3 py-2 ${
-                      isActive
-                        ? "bg-primary text-white"
-                        : "text-secondary hover:bg-hover"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedUuid(group.uuid);
-                        setEditingGroup(false);
-                        setAddingAttribute(false);
-                        setEditingUuid(null);
-                      }}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm"
-                    >
-                      <span className="min-w-0">
-                        <span className="line-clamp-1 font-medium">
-                          {group.name}
-                        </span>
-                        <span
-                          className={`line-clamp-1 text-xs ${
-                            isActive ? "text-white/70" : "text-faint"
-                          }`}
-                        >
-                          {group.domain
-                            ? (SPECIFICATION_DOMAIN_LABELS[
-                                group.domain as SpecificationDomain
-                              ] ?? group.domain)
-                            : "No domain"}
-                        </span>
-                      </span>
-                      <span
-                        className={isActive ? "text-white/70" : "text-faint"}
-                      >
-                        {group.attributes.length}
-                      </span>
-                    </button>
-                    {isActive && (
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => move(index, -1)}
-                          disabled={index === 0 || isPending}
-                          aria-label="Move up"
-                          className="rounded p-1 hover:bg-white/15 disabled:opacity-30"
-                        >
-                          <ArrowUp size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => move(index, 1)}
-                          disabled={index === realGroups.length - 1 || isPending}
-                          aria-label="Move down"
-                          className="rounded p-1 hover:bg-white/15 disabled:opacity-30"
-                        >
-                          <ArrowDown size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openGroupEditor(group)}
-                          aria-label="Edit group"
-                          className="rounded p-1 hover:bg-white/15"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingGroup(group)}
-                          aria-label="Delete group"
-                          className="rounded p-1 hover:bg-white/15"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {isActive && editingGroup && (
-                    <div className="mt-1 flex flex-col gap-2 rounded-control border border-hairline bg-page p-3">
-                      <div>
-                        <label className="text-xs font-semibold text-ink">
-                          Name
-                        </label>
-                        <Input
-                          value={groupName}
-                          onChange={(event) => setGroupName(event.target.value)}
-                          className="mt-1"
-                          onKeyDown={(event) =>
-                            event.key === "Enter" && saveGroup(group.uuid)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-ink">
-                          Domain
-                        </label>
-                        <p className="mt-0.5 text-xs text-faint">
-                          Buckets this group in the library and on the product
-                          attribute picker.
-                        </p>
-                        <div className="mt-1">
-                          <Dropdown
-                            value={groupDomain}
-                            onChange={setGroupDomain}
-                            placeholder="No domain"
-                            options={DOMAIN_OPTIONS}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setEditingGroup(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => saveGroup(group.uuid)}
-                          disabled={isPending}
-                        >
-                          <Check size={15} /> Save
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
         </div>
-
-        {/* Attributes panel */}
-        <div className="flex flex-col gap-3 rounded-card border border-hairline bg-surface p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-ink">
-              {isSearching
-                ? `Found ${searchResults.length} across all groups`
-                : `${selected ? selected.name : "Select a group"} · ${selected?.attributes.length ?? 0} attributes`}
-            </span>
-            {selected?.uuid && !isSearching && (
-              <Button
+      ) : (
+        groups.map((group) => (
+          <section key={group.uuid || "ungrouped"} className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">
+                {group.name}
+                <span className="ml-2 text-xs font-normal text-faint">
+                  {group.attributes.length}
+                </span>
+              </h2>
+              <button
                 type="button"
                 onClick={() => {
-                  setAddingAttribute(true);
-                  setEditingUuid(null);
+                  setAddingIn(group.uuid);
+                  setError(undefined);
                 }}
+                className="flex items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
               >
-                <Plus size={15} /> Add attribute
-              </Button>
+                <Plus size={13} />
+                Attribute
+              </button>
+            </div>
+
+            {addingIn === group.uuid && (
+              <AttributeForm
+                groupUuid={group.uuid === "" ? null : group.uuid}
+                groupOptions={groupOptions}
+                pending={pending}
+                error={error}
+                onCancel={() => {
+                  setAddingIn(null);
+                  setError(undefined);
+                }}
+                onSubmit={(input) => run(() => addAttributeAction(input))}
+              />
             )}
-          </div>
 
-          <Input
-            value={attributeSearch}
-            onChange={(event) => setAttributeSearch(event.target.value)}
-            placeholder="Search every attribute by name or key…"
-            icon={<Search size={15} />}
-            rightSlot={
-              attributeSearch ? (
-                <button
-                  type="button"
-                  onClick={() => setAttributeSearch("")}
-                  aria-label="Clear search"
-                  className="text-faint hover:text-ink"
-                >
-                  <X size={15} />
-                </button>
-              ) : undefined
-            }
-          />
-
-          {addingAttribute && selected?.uuid && (
-            <AttributeForm
-              groupUuid={selected.uuid}
-              pending={isPending}
-              categoryOptions={categoryOptions}
-              onCancel={() => setAddingAttribute(false)}
-              onSubmit={(input) =>
-                run(async () => {
-                  const result = await addAttributeAction(input);
-                  if (!result.error) {
-                    setAddingAttribute(false);
-                  }
-                  return result;
-                })
-              }
-            />
-          )}
-
-          <ul className="flex flex-col divide-y divide-hairline">
-            {visibleAttributes.map((attribute) => (
-              <li key={attribute.uuid} className="py-2.5">
-                {editingUuid === attribute.uuid ? (
-                  <AttributeForm
-                    groupUuid={attribute.groupUuid}
-                    pending={isPending}
-                    categoryOptions={categoryOptions}
-                    initial={{
-                      uuid: attribute.uuid,
-                      groupUuid: attribute.groupUuid,
-                      label: attribute.label,
-                      inputType: attribute.inputType,
-                      unit: attribute.unit,
-                      allowRange: attribute.allowRange,
-                      ordered: attribute.ordered,
-                      audience: attribute.audience,
-                      options: attribute.options,
-                      categoryUuids: attribute.categoryUuids,
-                    }}
-                    onCancel={() => setEditingUuid(null)}
-                    onSubmit={(input) =>
-                      run(async () => {
-                        const result = await updateAttributeAction(
-                          attribute.uuid,
-                          input,
-                        );
-                        if (!result.error) {
-                          setEditingUuid(null);
-                        }
-                        return result;
-                      })
-                    }
-                  />
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <TypeIcon type={attribute.inputType} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="line-clamp-1 text-sm font-medium text-ink">
-                          {attribute.label}
-                        </span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_META[attribute.inputType].className}`}
-                        >
-                          {TYPE_META[attribute.inputType].label}
-                        </span>
-                        {attribute.allowRange && (
-                          <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
-                            range
-                          </span>
-                        )}
-                        {attribute.ordered && (
-                          <span
-                            title="An ordered scale — ≤/≥ compare position on it, and a category slice reads as a ceiling"
-                            className="rounded bg-primary-tint px-1.5 py-0.5 text-[10px] font-semibold text-primary"
-                          >
-                            ordered
-                          </span>
-                        )}
-                        {attribute.audience !== "everyone" && (
-                          <span
-                            title={`${ASSIGNMENT_AUDIENCE_LABELS[attribute.audience]} — a category cannot change this`}
-                            className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-                          >
-                            <ShieldCheck size={10} />
-                            {attribute.audience}
-                          </span>
-                        )}
-                        {attribute.relationshipCount > 0 && (
-                          <span
-                            title={`${attribute.relationshipCount} relation(s) use this attribute — edit them on the attribute's card in Assignments`}
-                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-primary"
-                          >
-                            <GitCompare size={10} />
-                            {attribute.relationshipCount}
-                          </span>
-                        )}
-                      </div>
-                      <p className="line-clamp-1 text-xs text-faint">
-                        {attribute.groupLabel
-                          ? `${attribute.groupLabel} · `
-                          : ""}
-                        {attribute.unit ? `${attribute.unit} · ` : ""}
-                        {attribute.options.length > 0
-                          ? `${attribute.options.slice(0, 4).join(", ")}${attribute.options.length > 4 ? " …" : ""} · `
-                          : ""}
-                        <span className="font-mono">{attribute.key}</span>
-                      </p>
-                      {movingUuid === attribute.uuid && (
-                        <div className="mt-2 max-w-xs">
-                          <Dropdown
-                            value=""
-                            onChange={(value) =>
-                              run(async () => {
-                                const result = await moveAttributeAction(
-                                  attribute.uuid,
-                                  value || null,
-                                );
-                                if (!result.error) {
-                                  setMovingUuid(null);
-                                }
-                                return result;
-                              })
-                            }
-                            placeholder="Move to group…"
-                            options={realGroups
-                              .filter((group) => group.uuid !== selectedUuid)
-                              .map((group) => ({
-                                value: group.uuid,
-                                label: group.name,
-                              }))}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingUuid(attribute.uuid);
-                          setAddingAttribute(false);
-                        }}
-                        aria-label="Edit"
-                        title="Edit attribute"
-                        className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMovingUuid((value) =>
-                            value === attribute.uuid ? null : attribute.uuid,
-                          )
-                        }
-                        aria-label="Move to another group"
-                        title="Move to another group"
-                        className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
-                      >
-                        {movingUuid === attribute.uuid ? (
-                          <X size={14} />
-                        ) : (
-                          <span className="text-sm leading-none">→</span>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPendingAttribute(attribute)}
-                        aria-label="Delete"
-                        title="Delete attribute"
-                        className="rounded-control border border-hairline p-1.5 text-secondary hover:bg-hover"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            ))}
-            {isSearching && searchResults.length === 0 && (
-              <li className="py-6 text-center text-sm text-faint">
-                Nothing matches “{attributeSearch.trim()}” in any group.
-              </li>
+            {group.attributes.length === 0 && addingIn !== group.uuid && (
+              <p className="rounded-card border border-dashed border-hairline px-3 py-4 text-center text-xs text-faint">
+                No attributes here yet.
+              </p>
             )}
-            {!isSearching &&
-              selected &&
-              selected.attributes.length === 0 &&
-              !addingAttribute && (
-                <li className="py-6 text-center text-sm text-faint">
-                  No attributes in this group yet.
-                </li>
-              )}
-          </ul>
-        </div>
-      </div>
-      </div>
+
+            {group.attributes.map((attribute) =>
+              editing === attribute.uuid ? (
+                editForm(attribute)
+              ) : (
+                <AttributeRow
+                  key={attribute.uuid}
+                  attribute={attribute}
+                  onEdit={() => {
+                    setEditing(attribute.uuid);
+                    setError(undefined);
+                  }}
+                  onDelete={() => setConfirming(attribute)}
+                />
+              ),
+            )}
+          </section>
+        ))
+      )}
 
       <ConfirmDialog
-        open={Boolean(pendingAttribute)}
-        title="Delete attribute"
+        open={confirming !== null}
+        title={`Delete “${confirming?.label ?? ""}”?`}
         description={
-          pendingAttribute
-            ? `"${pendingAttribute.label}" is assigned to ${pendingAttribute.categoryUuids.length} categor${pendingAttribute.categoryUuids.length === 1 ? "y" : "ies"} and used by ${pendingAttribute.relationshipCount} relation${pendingAttribute.relationshipCount === 1 ? "" : "s"}. Deleting it removes every one of those too, and any value products already store under it stops being read. This cannot be undone.`
-            : ""
+          confirming && confirming.relationshipCount > 0
+            ? `${confirming.relationshipCount} rule(s) depend on this attribute, so it cannot be deleted yet. Repoint or archive those rules first.`
+            : "Products already holding a value for this attribute will lose it. This cannot be undone."
         }
-        confirmLabel="Delete attribute"
-        isConfirming={isPending}
+        confirmLabel="Delete"
+        isConfirming={pending}
+        error={error}
         onConfirm={() => {
-          const target = pendingAttribute;
-          if (!target) {
-            return;
+          if (confirming) {
+            run(() => deleteAttributeAction(confirming.uuid));
           }
-          setPendingAttribute(null);
-          run(() => deleteAttributeAction(target.uuid));
         }}
-        onCancel={() => setPendingAttribute(null)}
-      />
-
-      <ConfirmDialog
-        open={Boolean(pendingGroup)}
-        title="Delete group"
-        description={
-          pendingGroup
-            ? `"${pendingGroup.name}" holds ${pendingGroup.attributes.length} attribute${pendingGroup.attributes.length === 1 ? "" : "s"}. Deleting the group does not delete them — they become ungrouped and stay in the library.`
-            : ""
-        }
-        confirmLabel="Delete group"
-        isConfirming={isPending}
-        onConfirm={() => {
-          const target = pendingGroup;
-          if (!target) {
-            return;
-          }
-          setPendingGroup(null);
-          run(() => deleteGroupAction(target.uuid));
+        onCancel={() => {
+          setConfirming(null);
+          setError(undefined);
         }}
-        onCancel={() => setPendingGroup(null)}
       />
-    </>
+    </div>
   );
 };

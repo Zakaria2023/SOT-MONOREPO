@@ -1,13 +1,13 @@
 import { getBrands } from "@/app/(dashboard)/brands/action";
 import { getCategories } from "@/app/(dashboard)/categories/action";
 import { ProductForm } from "@/components/products/product-form";
-import { getProductFormAttributes } from "services";
+import { getProductFormFieldsByCategory } from "services";
 
 const NewProductPage = async () => {
-  const [categories, brands, attributesByCategory] = await Promise.all([
+  const [categories, brands, fieldsByCategory] = await Promise.all([
     getCategories(),
     getBrands(),
-    getProductFormAttributes(),
+    getProductFormFieldsByCategory(),
   ]);
 
   return (
@@ -15,7 +15,7 @@ const NewProductPage = async () => {
       mode="add"
       categories={categories}
       brands={brands}
-      attributesByCategory={attributesByCategory}
+      fieldsByCategory={fieldsByCategory}
     />
   );
 };

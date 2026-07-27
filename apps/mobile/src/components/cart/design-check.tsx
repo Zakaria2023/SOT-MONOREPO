@@ -25,11 +25,16 @@ const FindingRow = ({ finding }: FindingRowProps) => {
           {finding.title}
         </Text>
         <Text style={styles.findingMessage}>{finding.message}</Text>
-        {finding.suggestions.length > 0 ? (
-          <Text style={styles.suggestions}>
-            Try: {finding.suggestions.slice(0, 3).join(" · ")}
+        {/* Every correction is add supply, reduce demand, or swap — the buyer is
+            never told only that something is wrong. */}
+        {finding.corrections.map((correction, index) => (
+          <Text key={index} style={styles.suggestions}>
+            {correction.message}
+            {correction.products.length > 0
+              ? ` e.g. ${correction.products.map((entry) => entry.name).join(", ")}`
+              : ""}
           </Text>
-        ) : null}
+        ))}
       </View>
     </View>
   );
