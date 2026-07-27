@@ -1,7 +1,8 @@
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import { Products } from "../../../db/schema/products";
+import { SpecificationGroups } from "../../../db/schema/specification-groups";
 import type { ProductValues } from "../../../db/types";
 import {
   clearHiddenValues,
@@ -258,6 +259,13 @@ export type ProductFormField = {
   isFilter: boolean;
   inherited: boolean;
   showIf: FormRevealCondition | null;
+  // The library group this attribute is filed under, so the form can section a
+  // long list the way the library is organised. Filing only — it never affects
+  // which fields appear or what the engine reads.
+  groupName: string | null;
+  // Position of that group in the library, so sections come out in the order an
+  // author arranged them rather than the order the attributes happen to resolve.
+  groupOrder: number;
 };
 
 const toFormReveal = (
@@ -288,7 +296,10 @@ const toFormReveal = (
   return null;
 };
 
-const toFormField = (assignment: ResolvedAssignment): ProductFormField => ({
+const toFormField = (
+  assignment: ResolvedAssignment,
+  groups: Map<string, { name: string; order: number }>,
+): ProductFormField => ({
   specificationUuid: assignment.definition.uuid,
   label: assignment.definition.label,
   description: assignment.definition.description,
@@ -301,6 +312,14 @@ const toFormField = (assignment: ResolvedAssignment): ProductFormField => ({
   isFilter: assignment.isFilter,
   inherited: assignment.inherited,
   showIf: toFormReveal(assignment.showIf),
+  groupName: assignment.definition.groupUuid
+    ? (groups.get(assignment.definition.groupUuid)?.name ?? null)
+    : null,
+  // Ungrouped attributes trail behind every real group.
+  groupOrder: assignment.definition.groupUuid
+    ? (groups.get(assignment.definition.groupUuid)?.order ??
+      Number.MAX_SAFE_INTEGER)
+    : Number.MAX_SAFE_INTEGER,
 });
 
 /**
@@ -313,17 +332,31 @@ const toFormField = (assignment: ResolvedAssignment): ProductFormField => ({
 export const getProductFormFieldsByCategory = async (): Promise<
   Record<string, ProductFormField[]>
 > => {
-  const model = await getCatalogModel();
-  const byCategory: Record<string, ProductFormField[]> = {};
+  const [model, groupRows] = await Promise.all([
+    getCatalogModel(),
+    db
+      .select()
+      .from(SpecificationGroups)
+      .orderBy(asc(SpecificationGroups.order)),
+  ]);
+  const groups = new Map(
+    groupRows.map((group) => [
+      group.uuid,
+      { name: group.name, order: group.order },
+    ]),
+  );
 
+  const byCategory: Record<string, ProductFormField[]> = {};
   for (const categoryUuid of model.chains.keys()) {
     const resolved = resolveFromModel(model, categoryUuid);
     if (resolved.length === 0) {
       continue;
     }
-    // Staff-only attributes belong on the admin form; audience gates shopper
-    // surfaces, never authoring.
-    byCategory[categoryUuid] = resolved.map(toFormField);
+    // Audience gates shopper surfaces, never authoring — everything a category
+    // carries appears on the admin form.
+    byCategory[categoryUuid] = resolved.map((assignment) =>
+      toFormField(assignment, groups),
+    );
   }
   return byCategory;
 };

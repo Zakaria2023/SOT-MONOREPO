@@ -4,7 +4,7 @@ import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import type { SpecificationType } from "@/db/enum";
 import type { ProductValue, SpecOption } from "@/db/types";
 import { AlertCircle, EyeOff, Hash, ListChecks, ToggleLeft } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Dropdown, Input } from "ui";
 
@@ -36,6 +36,10 @@ export type FormField = {
   inherited: boolean;
   // Serialised reveal condition, evaluated client-side for responsiveness.
   showIf: RevealCondition | null;
+  // Filing only — which section this field appears under. It never affects which
+  // fields appear or what the engine reads.
+  groupName: string | null;
+  groupOrder: number;
 };
 
 // A deliberately narrow mirror of the server predicate: enough to drive the
@@ -233,6 +237,7 @@ const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
 export const SpecificationComposer = ({
   fieldsByCategory,
 }: SpecificationComposerProps) => {
+  const [groupFilter, setGroupFilter] = useState<string | null>(null);
   const { control, setValue } = useFormContext<ProductFormValues>();
   const categoryUuid = useWatch({ control, name: "categoryUuid" });
   const specValues = useWatch({ control, name: "specValues" }) ?? {};
@@ -281,6 +286,39 @@ export const SpecificationComposer = ({
       ),
     [visible, specValues],
   );
+
+  // Sections follow the library's own group order, so the form reads the way the
+  // library is arranged. Ungrouped fields trail behind under "Other".
+  const sections = useMemo(() => {
+    const byGroup = new Map<string | null, FormField[]>();
+    for (const field of visible) {
+      const list = byGroup.get(field.groupName) ?? [];
+      list.push(field);
+      byGroup.set(field.groupName, list);
+    }
+    return [...byGroup.entries()]
+      .map(([name, groupFields]) => ({
+        name,
+        fields: groupFields,
+        order: Math.min(...groupFields.map((field) => field.groupOrder)),
+        missing: groupFields.filter((field) =>
+          missing.has(field.specificationUuid),
+        ).length,
+      }))
+      .sort((a, b) => a.order - b.order);
+  }, [visible, missing]);
+
+  const shownSections =
+    groupFilter === null
+      ? sections
+      : sections.filter((section) => section.name === groupFilter);
+
+  // Values still needed that the filter is currently hiding. Without this, an
+  // author could filter to one group, see no warnings, and save an incomplete
+  // product — and an incomplete product silently passes every rule that reads it.
+  const hiddenMissing = sections
+    .filter((section) => !shownSections.includes(section))
+    .reduce((sum, section) => sum + section.missing, 0);
 
   const update = (uuid: string, next: ProductValue | undefined): void => {
     const values = { ...specValues };
@@ -342,21 +380,81 @@ export const SpecificationComposer = ({
       {missing.size > 0 && (
         <p className="rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
           {missing.size} value{missing.size === 1 ? "" : "s"} still needed before
-          this product can be sold.
+          this product can be sold
+          {hiddenMissing > 0 && (
+            <span>
+              {" "}
+              — {hiddenMissing} of them in a group this filter is hiding
+            </span>
+          )}
+          .
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {visible.map((field) => (
-          <FieldRow
-            key={field.specificationUuid}
-            field={field}
-            value={specValues[field.specificationUuid]}
-            onChange={(next) => update(field.specificationUuid, next)}
-            missing={missing.has(field.specificationUuid)}
-          />
-        ))}
-      </div>
+      {/* A filter, not a picker. It narrows what is ON SCREEN; the category still
+          decides which fields exist, so nothing here changes the product. */}
+      {sections.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setGroupFilter(null)}
+            className={`rounded-full px-2 py-0.5 text-[11px] ${
+              groupFilter === null
+                ? "bg-primary/20 text-primary"
+                : "bg-hover text-secondary hover:text-ink"
+            }`}
+          >
+            All
+          </button>
+          {sections.map((section) => {
+            const short = section.missing > 0;
+            return (
+              <button
+                key={section.name ?? "ungrouped"}
+                type="button"
+                onClick={() => setGroupFilter(section.name)}
+                className={`rounded-full px-2 py-0.5 text-[11px] ${
+                  groupFilter === section.name
+                    ? "bg-primary/20 text-primary"
+                    : "bg-hover text-secondary hover:text-ink"
+                }`}
+              >
+                {section.name ?? "Other"}
+                {short && (
+                  <span className="ml-1 text-amber-500">{section.missing}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {shownSections.map((section) => (
+        <section
+          key={section.name ?? "ungrouped"}
+          className="flex flex-col gap-3"
+        >
+          <h3 className="border-b border-hairline pb-1 text-xs font-semibold tracking-wide text-secondary uppercase">
+            {section.name ?? "Other"}
+            {section.missing > 0 && (
+              <span className="ml-2 font-normal text-amber-500">
+                {section.missing} needed
+              </span>
+            )}
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {section.fields.map((field) => (
+              <FieldRow
+                key={field.specificationUuid}
+                field={field}
+                value={specValues[field.specificationUuid]}
+                onChange={(next) => update(field.specificationUuid, next)}
+                missing={missing.has(field.specificationUuid)}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 };
