@@ -69,6 +69,9 @@ export type DesignFinding = {
 export type DesignCheckResult = {
   blockers: DesignFinding[];
   warnings: DesignFinding[];
+  // Checks that could not run. Same reason the web shows them: a check we could
+  // not make must not read as a check that passed.
+  unknowns: DesignFinding[];
 };
 
 export type Category = {

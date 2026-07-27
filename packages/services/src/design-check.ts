@@ -148,6 +148,12 @@ export type GateDecision = {
   allowed: boolean;
   blockers: DesignFinding[];
   warnings: DesignFinding[];
+  // Checks that could not run at the moment of the decision. They do NOT gate —
+  // refusing an order because our own data was incomplete punishes the buyer for
+  // our gap. But they are carried, because an order snapshot that records only
+  // what we managed to check cannot later tell "nothing was wrong" from "we
+  // never looked", and that snapshot is how a wrong rule gets found.
+  unknowns: DesignFinding[];
   // Set when the buyer is allowed through despite blockers, because they have a
   // recorded override.
   overridden: boolean;
@@ -184,6 +190,7 @@ export const gateSelection = async (
     allowed: !hasBlockers || overridden,
     blockers: result.blockers,
     warnings: result.warnings,
+    unknowns: result.unknowns,
     overridden,
     degraded: result.degraded,
   };

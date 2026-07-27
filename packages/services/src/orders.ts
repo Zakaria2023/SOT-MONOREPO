@@ -202,7 +202,10 @@ export const createOrderFromCart = async ({
       // Snapshotted, not re-derived later: a rule edited next month must not
       // silently change what this order was judged against. It is also how we
       // find out which rules are wrong.
-      designFindings: [...gate.blockers, ...gate.warnings],
+      // Unknowns included deliberately: an order judged against a check that
+      // could not run is a different fact from one judged clean, and this
+      // snapshot is the only place that distinction survives.
+      designFindings: [...gate.blockers, ...gate.warnings, ...gate.unknowns],
       designOverrideReason: gate.overridden ? (override?.reason ?? null) : null,
     });
 

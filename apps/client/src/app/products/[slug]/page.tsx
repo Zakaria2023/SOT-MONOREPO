@@ -11,7 +11,6 @@ import {
   getRelatedProducts,
   getProductSpecsForDisplay,
 } from "services";
-import { formatSpecValue } from "utils";
 
 type Props = {
   params: Promise<{ slug: string }>;
