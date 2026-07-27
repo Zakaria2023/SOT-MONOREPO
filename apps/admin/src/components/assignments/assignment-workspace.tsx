@@ -1,7 +1,7 @@
 "use client";
 
 import { AssignmentsTab } from "@/components/assignments/assignments-tab";
-import type { PredicateAttribute } from "@/components/assignments/predicate-editor";
+import type { PredicateAttribute } from "@/components/assignments/condition-picker";
 import {
   RelationBuilder,
   type RelationVariable,

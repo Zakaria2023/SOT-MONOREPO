@@ -15,10 +15,10 @@ import { RelationPreview } from "@/components/assignments/relation-preview";
 import { Field, FieldSet } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
-  PredicateEditor,
+  ConditionPicker,
   describePredicate,
   type PredicateAttribute,
-} from "@/components/assignments/predicate-editor";
+} from "@/components/assignments/condition-picker";
 import { LookupEditor } from "@/components/assignments/lookup-editor";
 import type {
   MatchMode,
@@ -302,7 +302,7 @@ const RelationForm = ({
                 allowItemCount={form.family === "count"}
               />
               <Field label="Which items count">
-                <PredicateEditor
+                <ConditionPicker
                   value={form.consumerWhen}
                   onChange={(consumerWhen: Predicate | null) =>
                     patch({ consumerWhen })
@@ -326,7 +326,7 @@ const RelationForm = ({
                   variables={variables}
                 />
                 <Field label="Which items supply it">
-                  <PredicateEditor
+                  <ConditionPicker
                     value={form.providerWhen}
                     onChange={(providerWhen: Predicate | null) =>
                       patch({ providerWhen })

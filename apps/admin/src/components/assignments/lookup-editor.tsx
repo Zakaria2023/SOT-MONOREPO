@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  PredicateEditor,
+  ConditionPicker,
   describePredicate,
   type PredicateAttribute,
-} from "@/components/assignments/predicate-editor";
+} from "@/components/assignments/condition-picker";
 import { FieldSet } from "@/components/shared/field";
 import type { LookupTable, Predicate } from "@/db/types";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
@@ -121,7 +121,7 @@ export const LookupEditor = ({
             </div>
           </div>
 
-          <PredicateEditor
+          <ConditionPicker
             value={row.when}
             onChange={(when) => setRow(index, when, row.limit)}
             attributes={attributes}

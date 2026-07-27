@@ -2,9 +2,9 @@
 
 import type { OperandVariable } from "@/components/assignments/operand-picker";
 import {
-  PredicateEditor,
+  ConditionPicker,
   type PredicateAttribute,
-} from "@/components/assignments/predicate-editor";
+} from "@/components/assignments/condition-picker";
 import { Field, FieldSet } from "@/components/shared/field";
 import type { PresenceAlternative, PresenceSpec } from "@/db/types";
 import { Plus, X } from "lucide-react";
@@ -72,7 +72,7 @@ export const PresenceEditor = ({
         title="This applies to items where…"
         hint="Usually a Device Role — “role is Camera”. Using an attribute rather than a category keeps the rule working after a category is renamed."
       >
-        <PredicateEditor
+        <ConditionPicker
           value={value.trigger}
           onChange={(trigger) =>
             onChange({
@@ -191,7 +191,7 @@ export const PresenceEditor = ({
                   </div>
 
                   {alternative.type === "item_exists" ? (
-                    <PredicateEditor
+                    <ConditionPicker
                       value={alternative.predicate}
                       onChange={(predicate) =>
                         setAlternative(requirementIndex, alternativeIndex, {

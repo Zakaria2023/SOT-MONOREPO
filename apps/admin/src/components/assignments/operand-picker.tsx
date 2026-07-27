@@ -1,6 +1,6 @@
 "use client";
 
-import type { PredicateAttribute } from "@/components/assignments/predicate-editor";
+import type { PredicateAttribute } from "@/components/assignments/condition-picker";
 import type { Operand } from "@/db/types";
 import { Dropdown, Input, type DropdownOption } from "ui";
 
