@@ -12,8 +12,8 @@ import {
   getAttributeCategories,
   getLibrary,
   getProjectVariables,
-  removeAssignment,
-  saveAssignment,
+  removeAssignments,
+  saveAssignments,
   moveLibraryAttribute,
   reorderLibraryAttributes,
   reorderSpecificationGroups,
@@ -66,7 +66,7 @@ export const addAttributeAction = async (
   try {
     const uuid = await createLibraryAttribute(definition);
     if (categoryUuids.length > 0) {
-      await applyAttributeCategories(uuid, categoryUuids);
+      await applyAttributeCategories(uuid, categoryUuids, true);
     }
   } catch (error) {
     return fail(error, "Failed to create the attribute");
@@ -148,36 +148,62 @@ export const reorderAttributesAction = async (
 const applyAttributeCategories = async (
   specificationUuid: string,
   categoryUuids: string[],
+  // Set when the attribute was created moments ago. Skips reading back links
+  // that cannot exist, and the diff that would be against an empty set.
+  justCreated = false,
 ): Promise<void> => {
+  if (justCreated) {
+    await saveAssignments(
+      categoryUuids
+        .filter((uuid) => uuid.length > 0)
+        .map((categoryUuid) => ({
+          categoryUuid,
+          specificationUuid,
+          isFilter: false,
+          isRule: true,
+          scope: "branch" as const,
+          showIf: null,
+          audience: "everyone" as const,
+          enabledValues: null,
+          suppressed: false,
+          order: 0,
+        })),
+      { noneExistYet: true },
+    );
+    return;
+  }
+
   const existing = await getAttributeCategories(specificationUuid);
   const wanted = new Set(categoryUuids.filter((uuid) => uuid.length > 0));
   const current = new Set(existing);
 
-  for (const categoryUuid of wanted) {
-    if (current.has(categoryUuid)) {
-      continue;
-    }
-    await saveAssignment({
-      categoryUuid,
-      specificationUuid,
-      // The engine reads it; the shopper does not filter on it until somebody
-      // decides that deliberately on the assignments screen.
-      isFilter: false,
-      isRule: true,
-      scope: "branch",
-      showIf: null,
-      audience: "everyone",
-      enabledValues: null,
-      suppressed: false,
-      order: 0,
-    });
-  }
+  // Both sides in BULK. As a loop this was a full catalog-model reload per
+  // category — each write invalidates the cache, so the next one rebuilt it
+  // just to validate — and four categories took about a minute against the
+  // remote database.
+  await saveAssignments(
+    [...wanted]
+      .filter((categoryUuid) => !current.has(categoryUuid))
+      .map((categoryUuid) => ({
+        categoryUuid,
+        specificationUuid,
+        // The engine reads it; the shopper does not filter on it until somebody
+        // decides that deliberately on the assignments screen.
+        isFilter: false,
+        isRule: true,
+        scope: "branch" as const,
+        showIf: null,
+        audience: "everyone" as const,
+        enabledValues: null,
+        suppressed: false,
+        order: 0,
+      })),
+  );
 
-  for (const categoryUuid of current) {
-    if (!wanted.has(categoryUuid)) {
-      await removeAssignment(categoryUuid, specificationUuid);
-    }
-  }
+  await removeAssignments(
+    specificationUuid,
+    [...current].filter((categoryUuid) => !wanted.has(categoryUuid)),
+  );
 };
 
 /**
