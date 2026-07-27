@@ -304,9 +304,7 @@ export const SpecificationComposer = ({
         )
         .map((field) => ({
           value: field.specificationUuid,
-          label: field.groupName
-            ? `${field.groupName} · ${field.label}`
-            : field.label,
+          label: field.label,
         })),
     [fields, shownUuids, allowedGroups],
   );
