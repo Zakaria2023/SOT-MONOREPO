@@ -44,6 +44,11 @@ export type PredicateAttribute = {
   ordered: boolean;
   unit: string | null;
   options: SpecOption[];
+  // The library group it is filed under, for narrowing a long picker. Filing
+  // only, and never read here — a condition means the same thing whichever
+  // drawer the attribute was found in. Absent on attributes resolved from a
+  // category, which are already narrowed to that category.
+  groupName?: string | null;
 };
 
 type ConditionPickerProps = {

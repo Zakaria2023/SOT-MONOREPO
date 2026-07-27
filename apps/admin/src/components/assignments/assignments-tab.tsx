@@ -93,6 +93,10 @@ type AssignmentCardProps = {
   onSaved: () => void;
 };
 
+// Attributes filed under no group still need a bucket to be filtered by, and a
+// dropdown value has to be a string.
+const UNGROUPED = "Ungrouped";
+
 const SCOPE_OPTIONS: DropdownOption[] = assignmentScopes.map((scope) => ({
   value: scope,
   label: ASSIGNMENT_SCOPE_LABELS[scope],
@@ -287,8 +291,29 @@ const AddAssignmentForm = ({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
+  const [groups, setGroups] = useState<string[]>([]);
   const [picked, setPicked] = useState("");
   const [draft, setDraft] = useState<Draft>(emptyDraft());
+
+  // Only groups that still have something to offer. A group whose attributes are
+  // all assigned already would filter the picker down to nothing.
+  const groupOptions = useMemo<DropdownOption[]>(() => {
+    const names = new Set<string>();
+    for (const entry of available) {
+      names.add(entry.groupName ?? UNGROUPED);
+    }
+    return [...names].sort().map((name) => ({ value: name, label: name }));
+  }, [available]);
+
+  const listed = useMemo(
+    () =>
+      groups.length === 0
+        ? available
+        : available.filter((entry) =>
+            groups.includes(entry.groupName ?? UNGROUPED),
+          ),
+    [available, groups],
+  );
 
   const attribute = available.find((entry) => entry.uuid === picked);
 
@@ -335,25 +360,62 @@ const AddAssignmentForm = ({
         </button>
       </div>
 
-      <Field label="Attribute">
-        <Dropdown
-          value={picked}
-          onChange={(next) => {
-            setPicked(next);
-            // A fresh attribute means a fresh set of switches — carrying an
-            // option slice or a condition across from the last pick would name
-            // values the new attribute does not have.
-            setDraft(emptyDraft());
-          }}
-          options={available.map((entry) => ({
-            value: entry.uuid,
-            label: entry.unit ? `${entry.label} (${entry.unit})` : entry.label,
-          }))}
-          searchable
-          placeholder="Choose an attribute"
-          emptyMessage="Every library attribute is already here"
-        />
-      </Field>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* A filter, not a field. It narrows what the picker beside it LISTS and
+            is never saved — which group an attribute was found in has no bearing
+            on how this category uses it. */}
+        <Field label="Groups">
+          <Dropdown
+            multiple
+            value={groups}
+            onChange={(next) => {
+              setGroups(next);
+              // Narrowing past the current pick would leave the picker showing
+              // its placeholder with the switches still open underneath it.
+              const stillListed =
+                next.length === 0 ||
+                available.some(
+                  (entry) =>
+                    entry.uuid === picked &&
+                    next.includes(entry.groupName ?? UNGROUPED),
+                );
+              if (!stillListed) {
+                setPicked("");
+                setDraft(emptyDraft());
+              }
+            }}
+            options={groupOptions}
+            placeholder={`All ${groupOptions.length} groups`}
+            searchable={groupOptions.length > 8}
+          />
+        </Field>
+
+        <Field label="Attribute">
+          <Dropdown
+            value={picked}
+            onChange={(next) => {
+              setPicked(next);
+              // A fresh attribute means a fresh set of switches — carrying an
+              // option slice or a condition across from the last pick would name
+              // values the new attribute does not have.
+              setDraft(emptyDraft());
+            }}
+            options={listed.map((entry) => ({
+              value: entry.uuid,
+              label: entry.unit
+                ? `${entry.label} (${entry.unit})`
+                : entry.label,
+            }))}
+            searchable
+            placeholder="Choose an attribute"
+            emptyMessage={
+              groups.length > 0
+                ? "Nothing left in those groups"
+                : "Every library attribute is already here"
+            }
+          />
+        </Field>
+      </div>
 
       {/* The switches wait for an attribute, because its TYPE decides which of
           them apply at all — there is no option slice on a number. */}

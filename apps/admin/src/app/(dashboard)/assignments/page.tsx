@@ -56,6 +56,7 @@ const Workspace = async ({ categoryUuid }: WorkspaceProps) => {
         ordered: spec.ordered,
         unit: spec.unit,
         options: spec.options,
+        groupName: spec.groupName,
       }))}
       relationships={relationships}
       variables={variables.map((variable) => ({
