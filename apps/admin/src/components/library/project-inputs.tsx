@@ -6,6 +6,7 @@ import {
   updateVariableAction,
   type ProjectVariableInput,
 } from "@/app/(dashboard)/library/action";
+import { Field } from "@/components/shared/field";
 import { measurementUnits, projectVariableTypes, UNIT_DIMENSIONS } from "@/db/enum";
 import { PROJECT_VARIABLE_TYPE_LABELS } from "@/db/label";
 import type { SelectProjectVariables } from "@/db/schema/project-variables";
@@ -82,25 +83,23 @@ const VariableForm = ({
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">Answer type</span>
+        <Field label="Answer type">
           <Dropdown
             value={type}
             onChange={(next) => setType(next as "number" | "boolean")}
             options={TYPE_OPTIONS}
           />
-        </div>
+        </Field>
 
         {type === "number" && (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-secondary">Unit</span>
+          <Field label="Unit">
             <Combobox
               value={unit}
               onChange={setUnit}
               options={UNIT_OPTIONS}
               placeholder="Search units…"
             />
-          </div>
+          </Field>
         )}
 
         <Input

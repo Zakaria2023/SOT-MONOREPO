@@ -23,6 +23,7 @@ import {
   SPECIFICATION_DOMAIN_LABELS,
   SPECIFICATION_TYPE_LABELS,
 } from "@/db/label";
+import { Field } from "@/components/shared/field";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SpecOption } from "@/db/types";
 import { buildCategoryTreeOptions } from "@/lib/categories";
@@ -44,7 +45,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   Button,
   Checkbox,
@@ -103,14 +104,9 @@ const GroupForm = ({
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-secondary">Domain</span>
-        <Dropdown
-          value={domain}
-          onChange={setDomain}
-          options={DOMAIN_OPTIONS}
-        />
-      </div>
+      <Field label="Domain">
+        <Dropdown value={domain} onChange={setDomain} options={DOMAIN_OPTIONS} />
+      </Field>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
@@ -127,26 +123,6 @@ const GroupForm = ({
     </div>
   );
 };
-
-type FieldProps = {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-};
-
-// Input renders its own label as `text-sm font-semibold text-ink` with `gap-2`
-// above the control. Anything sitting beside an Input has to use exactly that or
-// the two controls land on different baselines — which is what made the Name
-// input and the Categories dropdown look misaligned.
-const Field = ({ label, hint, children }: FieldProps) => (
-  <div className="flex flex-col gap-2">
-    <span className="text-sm font-semibold text-ink">{label}</span>
-    <div className="flex flex-col gap-1">
-      {children}
-      {hint && <span className="text-[11px] text-muted">{hint}</span>}
-    </div>
-  </div>
-);
 
 type AttributeFormProps = {
   groupUuid: string | null;
@@ -166,7 +142,6 @@ type AttributeFormProps = {
 type OptionDraft = {
   value?: string;
   label: string;
-  rank: string;
   retired: boolean;
 };
 
@@ -224,7 +199,6 @@ const toDrafts = (options: SpecOption[]): OptionDraft[] =>
   options.map((option) => ({
     value: option.value,
     label: option.label,
-    rank: option.rank === null ? "" : String(option.rank),
     retired: option.retired,
   }));
 
@@ -251,7 +225,7 @@ const AttributeForm = ({
   const [options, setOptions] = useState<OptionDraft[]>(
     initial
       ? toDrafts(initial.options)
-      : [{ label: "", rank: "", retired: false }],
+      : [{ label: "", retired: false }],
   );
 
   const locked = (initial?.relationshipCount ?? 0) > 0;
@@ -262,6 +236,26 @@ const AttributeForm = ({
         at === index ? { ...option, ...patch } : option,
       ),
     );
+  };
+
+  // Swap with the neighbour. On an ordered attribute the position IS the rank, so
+  // this is the whole ordering mechanism — no numbers for the author to invent.
+  const moveOption = (index: number, direction: -1 | 1): void => {
+    setOptions((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) {
+        return current;
+      }
+      const next = [...current];
+      const a = next[index];
+      const b = next[target];
+      if (!a || !b) {
+        return current;
+      }
+      next[index] = b;
+      next[target] = a;
+      return next;
+    });
   };
 
   const submit = (): void => {
@@ -280,10 +274,13 @@ const AttributeForm = ({
       options: isOptionType(type)
         ? options
             .filter((option) => option.label.trim() !== "" && !option.retired)
-            .map((option) => ({
+            // The rank is the option's POSITION, so the author orders by moving
+            // options rather than by inventing numbers. The service falls back to
+            // position too, so the two agree.
+            .map((option, index) => ({
               value: option.value,
               label: option.label,
-              rank: option.rank.trim() === "" ? null : Number(option.rank),
+              rank: ordered ? index + 1 : null,
             }))
         : [],
     });
@@ -299,8 +296,10 @@ const AttributeForm = ({
           onChange={(event) => setLabel(event.target.value)}
         />
 
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">Categories</span>
+        <Field
+          label="Categories"
+          hint="Which categories use this attribute. How each one uses it is set in Assignments."
+        >
           <Dropdown
             multiple
             value={categories}
@@ -309,7 +308,7 @@ const AttributeForm = ({
             searchable
             placeholder="Select categories"
           />
-        </div>
+        </Field>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -344,60 +343,78 @@ const AttributeForm = ({
       </div>
 
       {type === "number" && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">Unit</span>
+        <Field
+          label="Unit"
+          hint="A rule can only compare two numbers that measure the same thing. W converts to kW; W and VA never convert, because 1500 VA is not 1500 W."
+        >
           <Combobox
             value={unit}
             onChange={setUnit}
             options={UNIT_OPTIONS}
             placeholder="Search units…"
           />
-          <span className="text-[11px] text-muted">
-            A rule can only compare two numbers that measure the same thing. W
-            converts to kW; W and VA never convert, because 1500 VA is not 1500
-            W.
-          </span>
-        </div>
+        </Field>
       )}
 
       {isOptionType(type) && (
         <div className="flex flex-col gap-2">
+          {/* One plain question instead of the jargon it replaces. The author is
+              not told about ranks or comparators — the rank is derived from the
+              order the options are listed in, which is the thing they can
+              actually see. */}
           <Checkbox
-            label="These options are an ordered scale"
+            label="These options go from smallest to largest"
             checked={ordered}
             onChange={(event) => setOrdered(event.target.checked)}
           />
           <p className="-mt-1 text-[11px] text-muted">
-            Turn this on for 802.3af &lt; at &lt; bt or 1G &lt; 10G. It is what
-            makes “at most” comparisons possible. Each option then needs a rank
-            — use the real magnitude where there is one (1G = 1000).
+            {ordered
+              ? "Listed smallest first. Use the arrows to reorder — a device needing the 2nd option will accept the 3rd, but not the other way round."
+              : "Leave this off for a plain list like Black / White, where no option is bigger than another."}
           </p>
 
-          <div className="flex flex-col gap-1.5">
+          {/* Wrapping flow, not a fixed grid. A grid stretches every box to an
+              equal share of the row, so three short options ate the full width;
+              a fixed-width box lets as many fit per row as the screen allows —
+              six or seven on a wide monitor. */}
+          <div className="flex flex-wrap gap-2">
             {options.map((option, index) => (
               <div
                 key={option.value ?? `new-${index}`}
-                className="flex items-center gap-2"
+                className="flex shrink-0 items-center gap-1"
               >
-                <Input
-                  placeholder="Option label"
-                  value={option.label}
-                  disabled={option.retired}
-                  onChange={(event) =>
-                    setOption(index, { label: event.target.value })
-                  }
-                />
-                {ordered && (
-                  <div className="w-24 shrink-0">
-                    <Input
-                      type="number"
-                      placeholder="rank"
-                      value={option.rank}
-                      disabled={option.retired}
-                      onChange={(event) =>
-                        setOption(index, { rank: event.target.value })
-                      }
-                    />
+                <div className="w-40">
+                  <Input
+                    placeholder="Option label"
+                    value={option.label}
+                    disabled={option.retired}
+                    onChange={(event) =>
+                      setOption(index, { label: event.target.value })
+                    }
+                  />
+                </div>
+                {/* Position is the rank, so ordering is done by moving options
+                    rather than by typing a number nobody wants to think about. */}
+                {ordered && !option.retired && (
+                  <div className="flex shrink-0 flex-col">
+                    <button
+                      type="button"
+                      onClick={() => moveOption(index, -1)}
+                      disabled={index === 0}
+                      aria-label={`Move ${option.label || "this option"} earlier`}
+                      className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                    >
+                      <ArrowUp size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveOption(index, 1)}
+                      disabled={index === options.length - 1}
+                      aria-label={`Move ${option.label || "this option"} later`}
+                      className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                    >
+                      <ArrowDown size={11} />
+                    </button>
                   </div>
                 )}
                 {option.retired ? (
@@ -432,21 +449,23 @@ const AttributeForm = ({
                 )}
               </div>
             ))}
-
-            <button
-              type="button"
-              onClick={() =>
-                setOptions((current) => [
-                  ...current,
-                  { label: "", rank: "", retired: false },
-                ])
-              }
-              className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
-            >
-              <Plus size={13} />
-              Add option
-            </button>
           </div>
+
+          {/* Outside the grid — inside it, the button would occupy a cell and jump
+              around as options are added. */}
+          <button
+            type="button"
+            onClick={() =>
+              setOptions((current) => [
+                ...current,
+                { label: "", retired: false },
+              ])
+            }
+            className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+          >
+            <Plus size={13} />
+            Add option
+          </button>
         </div>
       )}
 
@@ -513,13 +532,9 @@ const AttributeRow = ({
 
         {live.length > 0 && (
           <p className="mt-1 line-clamp-1 text-xs text-muted">
-            {live
-              .map((option) =>
-                attribute.ordered && option.rank !== null
-                  ? `${option.label} (${option.rank})`
-                  : option.label,
-              )
-              .join(" · ")}
+            {/* Listed in rank order for an ordered attribute, so the sequence
+                itself is the information — the numbers behind it are noise. */}
+            {live.map((option) => option.label).join(" · ")}
           </p>
         )}
 
