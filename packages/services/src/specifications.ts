@@ -94,12 +94,12 @@ export type DisplaySpec = {
  * order the category authored — and hiding anything a shopper must not see.
  *
  * `viewer` is what keeps a staff-only attribute (cost, supplier) off a public
- * product page. Passing "staff" is the admin view and shows everything.
+ * product page. Passing "admin" is the authoring view and shows everything.
  */
 export const getProductSpecsForDisplay = async (
   categoryUuid: string,
   values: ProductValues,
-  viewer: "user" | "partner" | "staff" = "user",
+  viewer: "user" | "partner" | "admin" = "user",
 ): Promise<DisplaySpec[]> => {
   const model = await getCatalogModel();
   const resolved = resolveFromModel(model, categoryUuid);
@@ -115,7 +115,7 @@ export const getProductSpecsForDisplay = async (
   for (const assignment of visible) {
     const audience = assignment.effectiveAudience;
     const allowed =
-      viewer === "staff" || audience === "everyone" || audience === viewer;
+      viewer === "admin" || audience === "everyone" || audience === viewer;
     if (!allowed) {
       continue;
     }

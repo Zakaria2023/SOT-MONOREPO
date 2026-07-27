@@ -88,15 +88,7 @@ const certification = definition({
   ],
 });
 
-const cost = definition({
-  uuid: "a-cost",
-  label: "Cost",
-  type: "number",
-  unit: "SAR",
-  audience: "staff",
-});
-
-const definitions = [portSpeed, poe, poeBudget, certification, cost];
+const definitions = [portSpeed, poe, poeBudget, certification];
 
 describe("resolveAssignments", () => {
   it("inherits from an ancestor and marks it inherited", () => {
@@ -451,16 +443,6 @@ describe("facetAssignments", () => {
     ).toEqual(["a-speed"]);
   });
 
-  it("never shows a staff attribute to a shopper", () => {
-    const resolved = resolveAssignments({
-      chain: CHAIN,
-      rows: [row({ specificationUuid: "a-cost", categoryUuid: SMB })],
-      definitions,
-    });
-    expect(facetAssignments(resolved, "user")).toEqual([]);
-    expect(facetAssignments(resolved, "partner")).toEqual([]);
-  });
-
   it("shows a partner attribute to a partner and not to a user", () => {
     const resolved = resolveAssignments({
       chain: CHAIN,
@@ -519,11 +501,6 @@ describe("isVisibleTo", () => {
     expect(isVisibleTo("partner", "user")).toBe(false);
     expect(isVisibleTo("everyone", "user")).toBe(true);
     expect(isVisibleTo("everyone", "partner")).toBe(true);
-  });
-
-  it("hides staff from every shopper", () => {
-    expect(isVisibleTo("staff", "user")).toBe(false);
-    expect(isVisibleTo("staff", "partner")).toBe(false);
   });
 });
 

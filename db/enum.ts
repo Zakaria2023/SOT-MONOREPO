@@ -193,13 +193,10 @@ export type AssignmentScope = (typeof assignmentScopes)[number];
 // union. A partner does not see a user-only attribute, and vice versa.
 // Audience never affects rule participation — a partner-only attribute still
 // feeds the engine for every shopper.
-// `staff` is the admin-only audience — cost, supplier, internal notes. It never
-// reaches any shopper surface, partner included.
 export const assignmentAudiences = [
   "everyone",
   "user",
   "partner",
-  "staff",
 ] as const satisfies readonly string[];
 
 export type AssignmentAudience = (typeof assignmentAudiences)[number];

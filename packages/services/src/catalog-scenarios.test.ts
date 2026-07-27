@@ -154,14 +154,6 @@ const CHANNELS = attr({
   unit: "channels",
 });
 
-const COST = attr({
-  uuid: "a-cost",
-  label: "Cost",
-  type: "number",
-  unit: "SAR",
-  audience: "staff",
-});
-
 const CERT = attr({
   uuid: "a-cert",
   label: "Installer Certification",
@@ -179,7 +171,6 @@ const LIBRARY = [
   PORTS,
   SPEED,
   CHANNELS,
-  COST,
   CERT,
 ];
 
@@ -239,7 +230,6 @@ const ASSIGNMENTS: AssignmentRow[] = [
     showIf: { op: "equals", attr: "a-poe", value: true },
   }),
   row({ specificationUuid: "a-ports", categoryUuid: SWITCHES }),
-  row({ specificationUuid: "a-cost", categoryUuid: SWITCHES, isFilter: false }),
   row({ specificationUuid: "a-cert", categoryUuid: SWITCHES }),
   // SMB narrows the inherited speed slice, literally.
   row({
@@ -325,7 +315,6 @@ const SWITCH: EngineItem = {
     "a-poe-out": ["af", "at"],
     "a-ports": 24,
     "a-speed": "1g",
-    "a-cost": 1800,
     "a-cert": "not",
   },
 };
@@ -652,25 +641,6 @@ describe("SCENARIO 2 — authoring a category, and what a product form shows", (
 
 // ===========================================================================
 describe("SCENARIO 3 — who sees what", () => {
-  it("never shows a staff attribute to any shopper, but always feeds the engine", () => {
-    const smb = resolveFor(SMB);
-
-    expect(
-      facetAssignments(smb, "user").some(
-        (entry) => entry.definition.uuid === "a-cost",
-      ),
-    ).toBe(false);
-    expect(
-      facetAssignments(smb, "partner").some(
-        (entry) => entry.definition.uuid === "a-cost",
-      ),
-    ).toBe(false);
-    // Audience gates visibility only.
-    expect(
-      ruleAssignments(smb).some((entry) => entry.definition.uuid === "a-cost"),
-    ).toBe(true);
-  });
-
   it("treats user and partner as siblings, not a ladder", () => {
     const smb = resolveFor(SMB);
     expect(

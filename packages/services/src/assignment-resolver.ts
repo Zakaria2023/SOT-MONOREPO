@@ -252,8 +252,8 @@ export const resolvedAttributeIndex = (
  * Whether this shopper sees an attribute marked for that audience.
  *
  * Set membership, not a ladder: "everyone" is the union of user and partner, a
- * partner does NOT see a user-only attribute, and "staff" is never visible on
- * any shopper surface at all.
+ * partner does NOT see a user-only attribute any more than a user sees a
+ * partner-only one.
  */
 export const isVisibleTo = (
   audience: AssignmentAudience,

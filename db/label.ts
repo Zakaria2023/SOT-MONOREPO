@@ -289,5 +289,4 @@ export const ASSIGNMENT_AUDIENCE_LABELS: Record<AssignmentAudience, string> = {
   everyone: "Everyone",
   user: "Users only",
   partner: "Partner users only",
-  staff: "Staff only (never shown to shoppers)",
 };

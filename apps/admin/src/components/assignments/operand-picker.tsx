@@ -92,7 +92,7 @@ export const OperandPicker = ({
         value={sourceOf(value)}
         onChange={changeSource}
         options={sourceOptions}
-        placeholder="Pick what this side measures…"
+        placeholder="Select…"
       />
 
       {value?.source === "spec" && (

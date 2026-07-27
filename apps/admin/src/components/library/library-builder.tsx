@@ -5,20 +5,14 @@ import {
   addGroupAction,
   deleteAttributeAction,
   deleteGroupAction,
-  moveAttributeAction,
   reorderGroupsAction,
   updateAttributeAction,
   updateGroupAction,
   type LibraryAttributeInput,
   type LibraryGroup,
 } from "@/app/(dashboard)/library/action";
-import type {
-  AssignmentAudience,
-  SpecificationDomain,
-  SpecificationType,
-} from "@/db/enum";
+import type { SpecificationDomain, SpecificationType } from "@/db/enum";
 import {
-  assignmentAudiences,
   measurementUnits,
   specificationDomains,
   specificationTypes,
@@ -50,7 +44,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import {
   Button,
   Checkbox,
@@ -89,9 +83,7 @@ const domainLabel = (domain: string | null): string => {
   if (!domain) {
     return "No domain";
   }
-  return (
-    SPECIFICATION_DOMAIN_LABELS[domain as SpecificationDomain] ?? domain
-  );
+  return SPECIFICATION_DOMAIN_LABELS[domain as SpecificationDomain] ?? domain;
 };
 
 const GroupForm = ({
@@ -113,7 +105,11 @@ const GroupForm = ({
       />
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-secondary">Domain</span>
-        <Dropdown value={domain} onChange={setDomain} options={DOMAIN_OPTIONS} />
+        <Dropdown
+          value={domain}
+          onChange={setDomain}
+          options={DOMAIN_OPTIONS}
+        />
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
@@ -121,7 +117,9 @@ const GroupForm = ({
         </Button>
         <Button
           disabled={pending || name.trim() === ""}
-          onClick={() => onSubmit({ name, domain: domain === "" ? null : domain })}
+          onClick={() =>
+            onSubmit({ name, domain: domain === "" ? null : domain })
+          }
         >
           {initial ? "Save" : "Add group"}
         </Button>
@@ -129,6 +127,26 @@ const GroupForm = ({
     </div>
   );
 };
+
+type FieldProps = {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+};
+
+// Input renders its own label as `text-sm font-semibold text-ink` with `gap-2`
+// above the control. Anything sitting beside an Input has to use exactly that or
+// the two controls land on different baselines — which is what made the Name
+// input and the Categories dropdown look misaligned.
+const Field = ({ label, hint, children }: FieldProps) => (
+  <div className="flex flex-col gap-2">
+    <span className="text-sm font-semibold text-ink">{label}</span>
+    <div className="flex flex-col gap-1">
+      {children}
+      {hint && <span className="text-[11px] text-muted">{hint}</span>}
+    </div>
+  </div>
+);
 
 type AttributeFormProps = {
   groupUuid: string | null;
@@ -158,13 +176,6 @@ const TYPE_OPTIONS: DropdownOption[] = specificationTypes.map((type) => ({
   value: type,
   label: SPECIFICATION_TYPE_LABELS[type],
 }));
-
-const AUDIENCE_OPTIONS: DropdownOption[] = assignmentAudiences.map(
-  (audience) => ({
-    value: audience,
-    label: ASSIGNMENT_AUDIENCE_LABELS[audience],
-  }),
-);
 
 // The unit picker shows what each unit MEASURES, because that is what decides
 // whether a rule may compare two attributes. W and kW convert; W and VA never
@@ -236,12 +247,11 @@ const AttributeForm = ({
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
-  const [audience, setAudience] = useState<AssignmentAudience>(
-    initial?.audience ?? "everyone",
-  );
   const [group, setGroup] = useState(initial?.groupUuid ?? groupUuid ?? "");
   const [options, setOptions] = useState<OptionDraft[]>(
-    initial ? toDrafts(initial.options) : [{ label: "", rank: "", retired: false }],
+    initial
+      ? toDrafts(initial.options)
+      : [{ label: "", rank: "", retired: false }],
   );
 
   const locked = (initial?.relationshipCount ?? 0) > 0;
@@ -264,7 +274,9 @@ const AttributeForm = ({
       categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
       ordered: isOptionType(type) ? ordered : false,
-      audience,
+      // Who sees an attribute is a per-category decision, so it is set on
+      // the assignment. The library only says what the attribute IS.
+      audience: initial?.audience ?? "everyone",
       options: isOptionType(type)
         ? options
             .filter((option) => option.label.trim() !== "" && !option.retired)
@@ -295,22 +307,23 @@ const AttributeForm = ({
             onChange={setCategories}
             options={categoryOptions}
             searchable
-            placeholder="Not used by any category yet"
+            placeholder="Select categories"
           />
-          <span className="text-[11px] text-muted">
-            Ticking a category starts using this attribute there. Unticking stops
-            it. How each category uses it — filter, options offered, what reveals
-            it — is set in Assignments, and nothing here overwrites that.
-          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">Type</span>
-          {/* A type change would turn every stored value into an unreadable one,
-              so once a rule depends on the attribute the type is shown, not
-              offered. The service refuses it too — this is only the explanation. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* A type change would turn every stored value into an unreadable one, so
+            once a rule depends on the attribute the type is shown, not offered.
+            The service refuses it too — this is only the explanation. */}
+        <Field
+          label="Type"
+          hint={
+            locked
+              ? `${initial?.relationshipCount} rule(s) use this, so the type is fixed. Create a new attribute instead.`
+              : undefined
+          }
+        >
           {locked ? (
             <div className="flex items-center gap-2 rounded-control border border-hairline bg-hover px-3 py-2 text-sm text-secondary">
               <Lock size={13} className="text-faint" />
@@ -323,27 +336,11 @@ const AttributeForm = ({
               options={TYPE_OPTIONS}
             />
           )}
-          {locked && (
-            <span className="text-[11px] text-amber-500">
-              {initial?.relationshipCount} rule(s) use this — the type is fixed.
-              Create a new attribute instead.
-            </span>
-          )}
-        </div>
+        </Field>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">Group</span>
+        <Field label="Group">
           <Dropdown value={group} onChange={setGroup} options={groupOptions} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-secondary">Shown to</span>
-          <Dropdown
-            value={audience}
-            onChange={(next) => setAudience(next as AssignmentAudience)}
-            options={AUDIENCE_OPTIONS}
-          />
-        </div>
+        </Field>
       </div>
 
       {type === "number" && (
@@ -357,8 +354,8 @@ const AttributeForm = ({
           />
           <span className="text-[11px] text-muted">
             A rule can only compare two numbers that measure the same thing. W
-            converts to kW; W and VA never convert, because 1500 VA is not
-            1500 W.
+            converts to kW; W and VA never convert, because 1500 VA is not 1500
+            W.
           </span>
         </div>
       )}
@@ -372,8 +369,8 @@ const AttributeForm = ({
           />
           <p className="-mt-1 text-[11px] text-muted">
             Turn this on for 802.3af &lt; at &lt; bt or 1G &lt; 10G. It is what
-            makes “at most” comparisons possible. Each option then needs a rank —
-            use the real magnitude where there is one (1G = 1000).
+            makes “at most” comparisons possible. Each option then needs a rank
+            — use the real magnitude where there is one (1G = 1000).
           </p>
 
           <div className="flex flex-col gap-1.5">
@@ -450,13 +447,6 @@ const AttributeForm = ({
               Add option
             </button>
           </div>
-
-          <p className="text-[11px] text-muted">
-            Options are never deleted, only retired. A product already holding a
-            retired value keeps it — deleting the option would leave that product
-            pointing at something that no longer exists, and it would quietly
-            drop out of every rule reading this attribute.
-          </p>
         </div>
       )}
 
@@ -495,7 +485,9 @@ const AttributeRow = ({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ink">{attribute.label}</span>
+          <span className="text-sm font-medium text-ink">
+            {attribute.label}
+          </span>
           <span
             className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${meta.className}`}
           >
@@ -568,11 +560,7 @@ const AttributeRow = ({
   );
 };
 
-
-export const LibraryBuilder = ({
-  groups,
-  categories,
-}: LibraryBuilderProps) => {
+export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
