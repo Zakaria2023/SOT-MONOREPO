@@ -4,7 +4,7 @@ import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
 import type { ProductValue, SpecOption } from "@/db/types";
-import { EyeOff, Hash, ListChecks, ToggleLeft, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Dropdown, Input, type DropdownOption } from "ui";
@@ -12,10 +12,13 @@ import { Dropdown, Input, type DropdownOption } from "ui";
 // ---------------------------------------------------------------------------
 // The product's specifications.
 //
-// Pick the specifications this product has from a dropdown, then fill in the
-// values. Fields grouped the way the library is, and a field whose reveal
-// condition is met appears on its own — set PoE to Yes and PoE Budget shows up
-// without being picked.
+// Pick the specifications this product has from a dropdown, then set each value.
+// A label and one control per specification, and the control follows the type:
+// one choice for a single-select, several for a multi-select, Yes/No for a
+// boolean, a number box for a number.
+//
+// A field whose reveal condition is met appears on its own — set PoE to Yes and
+// PoE Budget shows up without being picked, and goes again when PoE changes.
 //
 // No rules are defined here and none are explained here. Which specifications a
 // category offers comes from Assignments; what the values then mean to the
@@ -49,6 +52,9 @@ export type RevealCondition = {
   values: (string | number | boolean)[];
 };
 
+// Sentinel for the ungrouped section, since a dropdown option value is a string.
+const UNGROUPED = "__ungrouped__";
+
 type SpecificationComposerProps = {
   fieldsByCategory: Record<string, FormField[]>;
 };
@@ -60,16 +66,6 @@ type FieldRowProps = {
   // condition stops holding, so removing it by hand would be a dead end.
   onRemove?: () => void;
   onChange: (next: ProductValue | undefined) => void;
-};
-
-const TypeIcon = ({ type }: { type: SpecificationType }) => {
-  if (type === "number") {
-    return <Hash size={13} className="text-faint" />;
-  }
-  if (type === "boolean") {
-    return <ToggleLeft size={13} className="text-faint" />;
-  }
-  return <ListChecks size={13} className="text-faint" />;
 };
 
 const asList = (value: ProductValue | undefined): string[] => {
@@ -130,31 +126,9 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
   const selected = asList(value);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-start gap-2">
-        <div className="mt-0.5">
-          <TypeIcon type={field.type} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-ink">{field.label}</span>
-            {field.unit && (
-              <span className="text-xs text-faint">({field.unit})</span>
-            )}
-            {field.showIf && (
-              <span
-                title="Shown because another specification's value brought it in"
-                className="flex items-center gap-1 text-[10px] text-faint"
-              >
-                <EyeOff size={9} />
-                conditional
-              </span>
-            )}
-          </div>
-          {field.description && (
-            <p className="mt-0.5 text-[11px] text-muted">{field.description}</p>
-          )}
-        </div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-ink">{field.label}</span>
         {onRemove && (
           <button
             type="button"
@@ -173,7 +147,9 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
           value={value === undefined ? "" : String(value)}
           onChange={(event) =>
             onChange(
-              event.target.value === "" ? undefined : Number(event.target.value),
+              event.target.value === ""
+                ? undefined
+                : Number(event.target.value),
             )
           }
           rightSlot={
@@ -212,35 +188,18 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
       )}
 
       {field.type === "multi_select" && (
-        <div className="flex flex-wrap gap-1.5">
-          {live.length === 0 && (
-            <span className="text-[11px] text-faint">
-              This category offers no options for this specification.
-            </span>
-          )}
-          {live.map((option) => {
-            const picked = selected.includes(option.value);
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  const next = picked
-                    ? selected.filter((entry) => entry !== option.value)
-                    : [...selected, option.value];
-                  onChange(next.length === 0 ? undefined : next);
-                }}
-                className={`rounded-full px-2 py-0.5 text-[11px] ${
-                  picked
-                    ? "bg-primary/20 text-primary"
-                    : "bg-hover text-secondary hover:text-ink"
-                }`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+        <Dropdown
+          multiple
+          value={selected}
+          onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+          options={live.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+          placeholder="Not set"
+          searchable={live.length > 8}
+          emptyMessage="This category offers no options here"
+        />
       )}
     </div>
   );
@@ -251,7 +210,12 @@ export const SpecificationComposer = ({
 }: SpecificationComposerProps) => {
   const { control, setValue } = useFormContext<ProductFormValues>();
   const categoryUuid = useWatch({ control, name: "categoryUuid" });
-  const specValues = useWatch({ control, name: "specValues" }) ?? {};
+  // Memoised because the `?? {}` fallback would otherwise be a fresh object on
+  // every render, re-running every memo below it each time.
+  const watchedValues = useWatch({ control, name: "specValues" });
+  const specValues = useMemo(() => watchedValues ?? {}, [watchedValues]);
+
+  const [groupFilter, setGroupFilter] = useState<string[]>([]);
 
   // Specifications picked in this session that have no value yet. A field with a
   // value needs no separate record of being picked — the value IS the record,
@@ -303,37 +267,63 @@ export const SpecificationComposer = ({
     [shown],
   );
 
-  // The picker lists everything the category carries that is not already on the
-  // form, labelled with its group so the list stays navigable.
+  // Every group the category carries, for the filter. Built from all fields, not
+  // just the shown ones, so a group stays selectable before anything in it has
+  // been added.
+  const groupOptions = useMemo<DropdownOption[]>(() => {
+    const seen = new Map<string, number>();
+    for (const field of fields) {
+      const key = field.groupName ?? UNGROUPED;
+      seen.set(key, Math.min(seen.get(key) ?? Infinity, field.groupOrder));
+    }
+    return [...seen.entries()]
+      .sort((a, b) => a[1] - b[1])
+      .map(([key]) => ({
+        value: key,
+        label: key === UNGROUPED ? "Other" : key,
+      }));
+  }, [fields]);
+
+  // An empty filter means every group. Held as a Set so the memos below depend on
+  // a value rather than on a function that would be rebuilt every render.
+  const allowedGroups = useMemo(
+    () => (groupFilter.length === 0 ? null : new Set(groupFilter)),
+    [groupFilter],
+  );
+
+  // The picker lists what the category carries, minus what is already on the
+  // form, narrowed to the chosen groups.
   const options = useMemo<DropdownOption[]>(
     () =>
       fields
-        .filter((field) => !shownUuids.has(field.specificationUuid))
+        .filter(
+          (field) =>
+            !shownUuids.has(field.specificationUuid) &&
+            (allowedGroups === null ||
+              allowedGroups.has(field.groupName ?? UNGROUPED)),
+        )
         .map((field) => ({
           value: field.specificationUuid,
           label: field.groupName
             ? `${field.groupName} · ${field.label}`
             : field.label,
         })),
-    [fields, shownUuids],
+    [fields, shownUuids, allowedGroups],
   );
 
-  // Sections in the library's own group order; ungrouped fields trail behind.
-  const sections = useMemo(() => {
-    const byGroup = new Map<string | null, FormField[]>();
-    for (const field of shown) {
-      const list = byGroup.get(field.groupName) ?? [];
-      list.push(field);
-      byGroup.set(field.groupName, list);
-    }
-    return [...byGroup.entries()]
-      .map(([name, groupFields]) => ({
-        name,
-        fields: groupFields,
-        order: Math.min(...groupFields.map((field) => field.groupOrder)),
-      }))
-      .sort((a, b) => a.order - b.order);
-  }, [shown]);
+  // One flat list, ordered by the library's group order so related fields still
+  // sit together — without a heading or a rule line between them.
+  const rows = useMemo(
+    () =>
+      shown
+        .filter(
+          (field) =>
+            allowedGroups === null ||
+            allowedGroups.has(field.groupName ?? UNGROUPED),
+        )
+        .sort((a, b) => a.groupOrder - b.groupOrder),
+    [shown, allowedGroups],
+  );
 
   const writeValues = (next: Record<string, ProductValue>): void => {
     setValue("specValues", next, { shouldDirty: true });
@@ -402,15 +392,26 @@ export const SpecificationComposer = ({
   if (fields.length === 0) {
     return (
       <p className="rounded-card border border-dashed border-hairline px-3 py-6 text-center text-xs text-faint">
-        This category has no specifications yet. Add them in Assignments and they
-        become available here.
+        This category has no specifications yet. Add them in Assignments and
+        they become available here.
       </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="max-w-md">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Groups">
+          <Dropdown
+            multiple
+            value={groupFilter}
+            onChange={setGroupFilter}
+            options={groupOptions}
+            searchable={groupOptions.length > 8}
+            placeholder="All groups"
+          />
+        </Field>
+
         <Field label="Add specifications">
           <Dropdown
             multiple
@@ -420,7 +421,7 @@ export const SpecificationComposer = ({
             searchable
             placeholder={
               options.length === 0
-                ? "All of them are on the form"
+                ? "Nothing left to add"
                 : "Pick specifications to fill in"
             }
             emptyMessage="Nothing left to add"
@@ -428,38 +429,26 @@ export const SpecificationComposer = ({
         </Field>
       </div>
 
-      {shown.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="rounded-card border border-dashed border-hairline px-3 py-6 text-center text-xs text-faint">
           Nothing added yet. Pick a specification above to start.
         </p>
       ) : (
-        sections.map((section) => (
-          <section
-            key={section.name ?? "ungrouped"}
-            className="flex flex-col gap-3"
-          >
-            <h3 className="border-b border-hairline pb-1 text-xs font-semibold tracking-wide text-secondary uppercase">
-              {section.name ?? "Other"}
-            </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {section.fields.map((field) => (
-                <FieldRow
-                  key={field.specificationUuid}
-                  field={field}
-                  value={specValues[field.specificationUuid]}
-                  onChange={(next) => update(field.specificationUuid, next)}
-                  // A conditional field leaves on its own when its trigger
-                  // changes, so it carries no remove button.
-                  onRemove={
-                    field.showIf
-                      ? undefined
-                      : () => remove(field.specificationUuid)
-                  }
-                />
-              ))}
-            </div>
-          </section>
-        ))
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((field) => (
+            <FieldRow
+              key={field.specificationUuid}
+              field={field}
+              value={specValues[field.specificationUuid]}
+              onChange={(next) => update(field.specificationUuid, next)}
+              // A conditional field leaves on its own when its trigger changes,
+              // so it carries no remove button.
+              onRemove={
+                field.showIf ? undefined : () => remove(field.specificationUuid)
+              }
+            />
+          ))}
+        </div>
       )}
     </div>
   );
