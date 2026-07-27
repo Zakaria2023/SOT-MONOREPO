@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import type { AssignmentAudience, AssignmentScope } from "../../../db/enum";
@@ -10,11 +10,12 @@ import {
   revealProblems,
   type ResolvedAssignment,
 } from "./assignment-resolver";
-import { recordAudit } from "./catalog-audit";
+import { recordAudit, recordAuditBatch } from "./catalog-audit";
 import {
   getCatalogModel,
   invalidateCatalogModel,
   resolveCategoryAssignments,
+  resolveFromModel,
 } from "./catalog-model";
 import { ValidationError } from "./errors";
 import { validatePredicate } from "./predicate";
@@ -39,6 +40,14 @@ export type AssignmentInput = {
   enabledValues: string[] | null;
   suppressed: boolean;
   order: number;
+};
+
+export type SaveAssignmentsOptions = {
+  actor?: { uuid: string; name: string };
+  // The caller has just created the attribute, so no link to it can exist yet.
+  // A promise, not a hint: the unique constraint on (category, specification)
+  // turns a wrong one into a loud failure rather than a duplicate row.
+  noneExistYet?: boolean;
 };
 
 export type CategoryAssignments = {
@@ -93,9 +102,10 @@ export const getCategoryAssignments = async (
  *  - the reveal closes a cycle with another attribute, so neither can show and
  *    which one wins depends on evaluation order.
  */
-const assertAssignmentValid = async (input: AssignmentInput): Promise<void> => {
-  const model = await getCatalogModel();
-
+const assertAssignmentValid = (
+  input: AssignmentInput,
+  model: Awaited<ReturnType<typeof getCatalogModel>>,
+): void => {
   if (input.showIf) {
     const problems = validatePredicate(input.showIf, model.attributes);
     const first = problems[0];
@@ -136,7 +146,7 @@ export const saveAssignment = async (
   input: AssignmentInput,
   actor?: { uuid: string; name: string },
 ): Promise<void> => {
-  await assertAssignmentValid(input);
+  assertAssignmentValid(input, await getCatalogModel());
 
   const [existing] = await db
     .select({ uuid: SpecificationCategories.uuid })
@@ -183,6 +193,139 @@ export const saveAssignment = async (
     targetLabel: await describeAssignment(input),
     actor,
   });
+  invalidateCatalogModel();
+};
+
+/**
+ * Save MANY assignments as one operation.
+ *
+ * The library form links a new attribute to every category that uses it, and
+ * doing that as a loop of `saveAssignment` was costing a full catalog-model
+ * reload PER CATEGORY: each save invalidates the cache on its way out, so the
+ * next one rebuilds all five queries just to validate. Four categories measured
+ * at roughly a minute against the remote database — long enough that the form
+ * looks hung rather than slow.
+ *
+ * So: load the model ONCE, validate every row against it, write in two
+ * statements, audit in one, and invalidate at the very end. Independent
+ * categories cannot affect each other's validation, which is what makes one
+ * shared model correct here and not merely faster.
+ */
+export const saveAssignments = async (
+  inputs: AssignmentInput[],
+  options: SaveAssignmentsOptions = {},
+): Promise<void> => {
+  if (inputs.length === 0) {
+    return;
+  }
+  const { actor, noneExistYet = false } = options;
+
+  const model = await getCatalogModel();
+  for (const input of inputs) {
+    assertAssignmentValid(input, model);
+  }
+
+  // Which of these pairs already exist — one query for all of them, never one
+  // per row. Skipped entirely when the caller has just created the attribute:
+  // nothing can be linked to something that did not exist a moment ago, and on
+  // a link this slow a pointless round trip is a second of somebody's time.
+  const existingByPair = new Map<string, string>();
+  if (!noneExistYet) {
+    const existing = await db
+      .select({
+        uuid: SpecificationCategories.uuid,
+        categoryUuid: SpecificationCategories.categoryUuid,
+        specificationUuid: SpecificationCategories.specificationUuid,
+      })
+      .from(SpecificationCategories)
+      .where(
+        and(
+          inArray(SpecificationCategories.specificationUuid, [
+            ...new Set(inputs.map((input) => input.specificationUuid)),
+          ]),
+          inArray(SpecificationCategories.categoryUuid, [
+            ...new Set(inputs.map((input) => input.categoryUuid)),
+          ]),
+        ),
+      );
+    for (const row of existing) {
+      existingByPair.set(
+        `${row.categoryUuid}:${row.specificationUuid}`,
+        row.uuid,
+      );
+    }
+  }
+
+  const toValues = (input: AssignmentInput) => ({
+    isFilter: input.isFilter,
+    isRule: input.isRule,
+    scope: input.scope,
+    showIf: input.showIf,
+    audience: input.audience,
+    enabledValues:
+      input.enabledValues && input.enabledValues.length > 0
+        ? input.enabledValues
+        : null,
+    suppressed: input.suppressed,
+    order: input.order,
+  });
+
+  const inserts = inputs.filter(
+    (input) =>
+      !existingByPair.has(`${input.categoryUuid}:${input.specificationUuid}`),
+  );
+  if (inserts.length > 0) {
+    await db.insert(SpecificationCategories).values(
+      inserts.map((input) => ({
+        uuid: generateUuid(),
+        categoryUuid: input.categoryUuid,
+        specificationUuid: input.specificationUuid,
+        ...toValues(input),
+      })),
+    );
+  }
+
+  // Updates cannot be batched into one statement — each row gets different
+  // values — but they run together rather than one after another.
+  await Promise.all(
+    inputs
+      .filter((input) =>
+        existingByPair.has(`${input.categoryUuid}:${input.specificationUuid}`),
+      )
+      .map((input) =>
+        db
+          .update(SpecificationCategories)
+          .set(toValues(input))
+          .where(
+            eq(
+              SpecificationCategories.uuid,
+              existingByPair.get(
+                `${input.categoryUuid}:${input.specificationUuid}`,
+              ) ?? "",
+            ),
+          ),
+      ),
+  );
+
+  await recordAuditBatch(
+    inputs.map((input) => ({
+      target: "assignment" as const,
+      action: existingByPair.has(
+        `${input.categoryUuid}:${input.specificationUuid}`,
+      )
+        ? ("update" as const)
+        : ("create" as const),
+      targetUuid: `${input.categoryUuid}:${input.specificationUuid}`,
+      // The label comes from the model already in hand — the per-row version
+      // fetched it again for every single entry.
+      targetLabel: `${
+        model.attributes.get(input.specificationUuid)?.label ??
+        input.specificationUuid
+      } on ${input.categoryUuid}`,
+      actor,
+    })),
+  );
+
   invalidateCatalogModel();
 };
 
@@ -241,6 +384,73 @@ export const removeAssignment = async (
       )?.definition.label ?? specificationUuid,
     actor,
   });
+  invalidateCatalogModel();
+};
+
+/**
+ * Unlink one attribute from MANY categories at once.
+ *
+ * Same shape and the same reason as `saveAssignments`: one model load, one
+ * delete, one audit batch, one invalidation — rather than all of that per
+ * category. The reveal-dependency guard is unchanged and still runs per
+ * category, because a dependent field on ONE of them has to stop the whole
+ * operation with a message naming it.
+ */
+export const removeAssignments = async (
+  specificationUuid: string,
+  categoryUuids: string[],
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  if (categoryUuids.length === 0) {
+    return;
+  }
+
+  // ONE attribute across MANY categories, deliberately — not arbitrary pairs.
+  // A pair-shaped signature would have to be expressed as `categoryUuid IN (…)
+  // AND specificationUuid IN (…)`, which is a cross product: unlinking (A, X)
+  // and (B, Y) would also delete (A, Y) and (B, X). This shape cannot say that.
+  const model = await getCatalogModel();
+  let label = specificationUuid;
+
+  for (const categoryUuid of categoryUuids) {
+    const resolved = resolveFromModel(model, categoryUuid);
+    const dependents = resolved.filter(
+      (assignment) =>
+        assignment.definition.uuid !== specificationUuid &&
+        predicateAttributes(assignment.showIf).includes(specificationUuid),
+    );
+    if (dependents.length > 0) {
+      const names = dependents
+        .map((assignment) => assignment.definition.label)
+        .join(", ");
+      throw new ValidationError(
+        `This attribute reveals ${names} on one of those categories. Change ${dependents.length > 1 ? "those reveals" : "that reveal"} first, or ${names} would be permanently hidden.`,
+      );
+    }
+    label =
+      resolved.find(
+        (assignment) => assignment.definition.uuid === specificationUuid,
+      )?.definition.label ?? label;
+  }
+
+  await db
+    .delete(SpecificationCategories)
+    .where(
+      and(
+        eq(SpecificationCategories.specificationUuid, specificationUuid),
+        inArray(SpecificationCategories.categoryUuid, categoryUuids),
+      ),
+    );
+
+  await recordAuditBatch(
+    categoryUuids.map((categoryUuid) => ({
+      target: "assignment" as const,
+      action: "delete" as const,
+      targetUuid: `${categoryUuid}:${specificationUuid}`,
+      targetLabel: label,
+      actor,
+    })),
+  );
   invalidateCatalogModel();
 };
 
