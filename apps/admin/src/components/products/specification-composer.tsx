@@ -6,6 +6,7 @@ import type { ProductValue, SpecOption } from "@/db/types";
 import { AlertCircle, EyeOff, Hash, ListChecks, ToggleLeft } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
+import { Field } from "@/components/shared/field";
 import { Dropdown, Input } from "ui";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,9 @@ export type RevealCondition = {
   op: "equals" | "in" | "exists" | "gte" | "lte" | "gt" | "lt";
   values: (string | number | boolean)[];
 };
+
+// Sentinel for the ungrouped section, since a dropdown option value is a string.
+const UNGROUPED = "__ungrouped__";
 
 type SpecificationComposerProps = {
   fieldsByCategory: Record<string, FormField[]>;
@@ -237,7 +241,7 @@ const FieldRow = ({ field, value, onChange, missing }: FieldRowProps) => {
 export const SpecificationComposer = ({
   fieldsByCategory,
 }: SpecificationComposerProps) => {
-  const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const [groupFilter, setGroupFilter] = useState<string[]>([]);
   const { control, setValue } = useFormContext<ProductFormValues>();
   const categoryUuid = useWatch({ control, name: "categoryUuid" });
   const specValues = useWatch({ control, name: "specValues" }) ?? {};
@@ -308,10 +312,27 @@ export const SpecificationComposer = ({
       .sort((a, b) => a.order - b.order);
   }, [visible, missing]);
 
+  // Group options for the picker. The key has to be a string, so an ungrouped
+  // section gets a sentinel rather than being dropped.
+  const groupOptions = useMemo(
+    () =>
+      sections.map((section) => ({
+        value: section.name ?? UNGROUPED,
+        label:
+          (section.name ?? "Other") +
+          (section.missing > 0 ? ` · ${section.missing} needed` : ""),
+      })),
+    [sections],
+  );
+
+  // Nothing selected shows everything, which is the useful default — an author
+  // opening a product wants to see the whole form, not an empty one.
   const shownSections =
-    groupFilter === null
+    groupFilter.length === 0
       ? sections
-      : sections.filter((section) => section.name === groupFilter);
+      : sections.filter((section) =>
+          groupFilter.includes(section.name ?? UNGROUPED),
+        );
 
   // Values still needed that the filter is currently hiding. Without this, an
   // author could filter to one group, see no warnings, and save an incomplete
@@ -391,43 +412,24 @@ export const SpecificationComposer = ({
         </p>
       )}
 
-      {/* A filter, not a picker. It narrows what is ON SCREEN; the category still
-          decides which fields exist, so nothing here changes the product. */}
-      {sections.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setGroupFilter(null)}
-            className={`rounded-full px-2 py-0.5 text-[11px] ${
-              groupFilter === null
-                ? "bg-primary/20 text-primary"
-                : "bg-hover text-secondary hover:text-ink"
-            }`}
-          >
-            All
-          </button>
-          {sections.map((section) => {
-            const short = section.missing > 0;
-            return (
-              <button
-                key={section.name ?? "ungrouped"}
-                type="button"
-                onClick={() => setGroupFilter(section.name)}
-                className={`rounded-full px-2 py-0.5 text-[11px] ${
-                  groupFilter === section.name
-                    ? "bg-primary/20 text-primary"
-                    : "bg-hover text-secondary hover:text-ink"
-                }`}
-              >
-                {section.name ?? "Other"}
-                {short && (
-                  <span className="ml-1 text-amber-500">{section.missing}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* Pick one or more groups to work through. A FILTER, not a picker: it
+          narrows what is on screen, and the category still decides which fields
+          exist — so nothing here changes what the product carries. */}
+      <div className="max-w-md">
+        <Field
+          label="Groups"
+          hint="Leave empty to see every group. Pick one or more to work through them a section at a time."
+        >
+          <Dropdown
+            multiple
+            value={groupFilter}
+            onChange={setGroupFilter}
+            options={groupOptions}
+            searchable={groupOptions.length > 8}
+            placeholder="All groups"
+          />
+        </Field>
+      </div>
 
       {shownSections.map((section) => (
         <section
