@@ -2,9 +2,7 @@
 
 import {
   addRelationAction,
-  archiveRelationAction,
   deleteRelationAction,
-  publishRelationAction,
   updateRelationAction,
   validateRelationAction,
   type RelationshipInput,
@@ -36,25 +34,17 @@ import {
 } from "@/db/label";
 import type { LookupTable, Operand, Predicate, PresenceSpec } from "@/db/types";
 import {
-  Archive,
   Check,
   FlaskConical,
   Pencil,
   Plus,
-  Send,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import type { SelectRelationships } from "@/db/schema/relationships";
-import {
-  Button,
-  ConfirmDialog,
-  Dropdown,
-  Input,
-  type DropdownOption,
-} from "ui";
+import { Button, Dropdown, Input, type DropdownOption } from "ui";
 
 export type RelationVariable = {
   uuid: string;
@@ -687,7 +677,7 @@ const RelationForm = ({
           onClick={submit}
           disabled={pending || checking || form.name.trim() === ""}
         >
-          {initial ? "Save draft" : "Create draft"}
+          {initial ? "Save" : "Create"}
         </Button>
       </div>
     </div>
@@ -712,9 +702,6 @@ export const RelationBuilder = ({
   const [editing, setEditing] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [confirming, setConfirming] = useState<SelectRelationships | null>(
-    null,
-  );
 
   const run = (action: () => Promise<{ error?: string }>): void => {
     setError(undefined);
@@ -726,7 +713,6 @@ export const RelationBuilder = ({
       }
       setAdding(false);
       setEditing(null);
-      setConfirming(null);
       router.refresh();
     });
   };
@@ -826,11 +812,18 @@ export const RelationBuilder = ({
                   <span className="text-sm font-medium text-ink">
                     {row.name}
                   </span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${STATUS_STYLE[row.status]}`}
-                  >
-                    {RELATIONSHIP_STATUS_LABELS[row.status]}
-                  </span>
+                  {/* Every rule authored here is live, so a badge saying so on
+                      every row is noise. It appears only for a row left over
+                      from the old draft/publish lifecycle, which is off and has
+                      no button to turn it back on — silence would make it look
+                      like it was working. */}
+                  {row.status !== "published" && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${STATUS_STYLE[row.status]}`}
+                    >
+                      {RELATIONSHIP_STATUS_LABELS[row.status]} — not applied
+                    </span>
+                  )}
                   <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
                     {RELATIONSHIP_FAMILY_LABELS[row.family].split(" — ")[0]}
                   </span>
@@ -878,18 +871,6 @@ export const RelationBuilder = ({
                   <FlaskConical size={12} />
                   Try it
                 </button>
-                {row.status === "draft" && (
-                  <button
-                    type="button"
-                    onClick={() => run(() => publishRelationAction(row.uuid))}
-                    disabled={pending}
-                    aria-label={`Publish ${row.name}`}
-                    className="flex items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-emerald-400 hover:bg-hover"
-                  >
-                    <Send size={12} />
-                    Publish
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setEditing(row.uuid)}
@@ -898,26 +879,15 @@ export const RelationBuilder = ({
                 >
                   <Pencil size={14} />
                 </button>
-                {row.status === "published" ? (
-                  <button
-                    type="button"
-                    onClick={() => run(() => archiveRelationAction(row.uuid))}
-                    disabled={pending}
-                    aria-label={`Archive ${row.name}`}
-                    className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-amber-500"
-                  >
-                    <Archive size={14} />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirming(row)}
-                    aria-label={`Delete ${row.name}`}
-                    className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => run(() => deleteRelationAction(row.uuid))}
+                  disabled={pending}
+                  aria-label={`Delete ${row.name}`}
+                  className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
 
@@ -931,33 +901,6 @@ export const RelationBuilder = ({
           </div>
         ),
       )}
-
-      {relationships.some((row) => row.status === "draft") && (
-        <p className="flex items-start gap-1.5 text-[11px] text-amber-500">
-          <TriangleAlert size={12} className="mt-0.5 shrink-0" />
-          Drafts are not applied to any cart. Publishing re-checks the rule
-          against the library first, so a rule pointing at a deleted attribute
-          cannot go live.
-        </p>
-      )}
-
-      <ConfirmDialog
-        open={confirming !== null}
-        title={`Delete “${confirming?.name ?? ""}”?`}
-        description="This rule has never been published, so nothing depends on it. Published rules are archived instead."
-        confirmLabel="Delete"
-        isConfirming={pending}
-        error={error}
-        onConfirm={() => {
-          if (confirming) {
-            run(() => deleteRelationAction(confirming.uuid));
-          }
-        }}
-        onCancel={() => {
-          setConfirming(null);
-          setError(undefined);
-        }}
-      />
     </div>
   );
 };

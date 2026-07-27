@@ -394,7 +394,16 @@ const toRow = (input: RelationshipInput) => ({
   scope: input.scope,
 });
 
-/** Create a rule. Always as a DRAFT — nothing reaches a buyer unreviewed. */
+/**
+ * Create a rule. LIVE immediately.
+ *
+ * There used to be a draft state here, on the reasoning that nothing should
+ * reach a buyer unreviewed. In practice the review was a button nobody had a
+ * reason to press: the rule is already validated on save, and a rule sitting in
+ * draft is a gate somebody believes is protecting them while it protects
+ * nothing. "Try it" is how a rule gets reviewed now, and it works on a live rule
+ * just as well as on a draft.
+ */
 export const createRelationship = async (
   input: RelationshipInput,
   actor?: { uuid: string; name: string },
@@ -408,7 +417,7 @@ export const createRelationship = async (
   const uuid = generateUuid();
   await db.insert(Relationships).values({
     uuid,
-    status: "draft",
+    status: "published",
     ...toRow(input),
   });
 
@@ -463,91 +472,6 @@ export const updateRelationship = async (
   invalidateCatalogModel();
 };
 
-/**
- * Publish a rule, so it starts gating real carts.
- *
- * Re-validated at this moment rather than trusting the draft: the library may
- * have changed underneath it since it was written, and a rule pointing at a
- * deleted attribute must not go live.
- */
-export const publishRelationship = async (
-  uuid: string,
-  actor?: { uuid: string; name: string },
-): Promise<void> => {
-  const current = await getRelationship(uuid);
-  if (!current) {
-    throw new ValidationError("That rule no longer exists.");
-  }
-
-  const problems = await validateRelationship({
-    name: current.name,
-    description: current.description,
-    family: current.family,
-    gate: current.gate,
-    comparator: current.comparator,
-    matchMode: current.matchMode,
-    headroomPercent: current.headroomPercent,
-    ratioLimit: current.ratioLimit === null ? null : Number(current.ratioLimit),
-    allocation: current.allocation,
-    perItem: current.perItem,
-    consumer: current.consumer ?? null,
-    provider: current.provider ?? null,
-    consumerWhen: current.consumerWhen ?? null,
-    providerWhen: current.providerWhen ?? null,
-    lookup: current.lookup ?? null,
-    presence: current.presence ?? null,
-    scope: current.scope ?? null,
-  });
-  const first = problems[0];
-  if (first) {
-    throw new ValidationError(
-      `"${current.name}" cannot be published: ${first.message}`,
-    );
-  }
-
-  await db
-    .update(Relationships)
-    .set({ status: "published" })
-    .where(eq(Relationships.uuid, uuid));
-
-  await recordAudit({
-    target: "relationship",
-    action: "publish",
-    targetUuid: uuid,
-    targetLabel: current.name,
-    actor,
-  });
-  invalidateCatalogModel();
-};
-
-/**
- * Archive rather than delete. A rule that has ever gated an order is part of why
- * that order looks the way it does, so the row stays and stops being applied.
- */
-export const archiveRelationship = async (
-  uuid: string,
-  actor?: { uuid: string; name: string },
-): Promise<void> => {
-  const current = await getRelationship(uuid);
-  if (!current) {
-    return;
-  }
-  await db
-    .update(Relationships)
-    .set({ status: "archived" })
-    .where(eq(Relationships.uuid, uuid));
-
-  await recordAudit({
-    target: "relationship",
-    action: "update",
-    targetUuid: uuid,
-    targetLabel: current.name,
-    actor,
-    changes: [{ field: "status", from: current.status, to: "archived" }],
-  });
-  invalidateCatalogModel();
-};
-
 /** Hard delete, allowed only for a rule that was never published. */
 export const deleteRelationship = async (
   uuid: string,
@@ -557,11 +481,11 @@ export const deleteRelationship = async (
   if (!current) {
     return;
   }
-  if (current.status !== "draft") {
-    throw new ValidationError(
-      `"${current.name}" has been published, so it can only be archived — deleting it would erase why past orders were validated the way they were.`,
-    );
-  }
+  // Deleted outright, whatever state it is in. The reason a published rule used
+  // to be undeletable was to keep the record of why past orders were validated
+  // as they were — but that record does not live here. Every order snapshots the
+  // findings it was judged against at the moment it was placed, so deleting the
+  // rule now cannot rewrite what any order was told.
   await db.delete(Relationships).where(eq(Relationships.uuid, uuid));
   await recordAudit({
     target: "relationship",

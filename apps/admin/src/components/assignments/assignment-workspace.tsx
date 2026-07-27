@@ -47,8 +47,6 @@ export const AssignmentWorkspace = ({
         : "text-muted hover:bg-hover hover:text-ink"
     }`;
 
-  const drafts = relationships.filter((row) => row.status === "draft").length;
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -76,11 +74,6 @@ export const AssignmentWorkspace = ({
           <span className="ml-1.5 text-xs text-faint">
             {relationships.length}
           </span>
-          {drafts > 0 && (
-            <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500">
-              {drafts} draft
-            </span>
-          )}
         </button>
       </div>
 

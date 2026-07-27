@@ -3,11 +3,9 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
-  archiveRelationship,
   createRelationship,
   deleteRelationship,
   previewRelationship,
-  publishRelationship,
   removeAssignment,
   saveAssignment,
   searchProductsForPicker,
@@ -128,36 +126,6 @@ export const updateRelationAction = async (
   return { success: true };
 };
 
-/**
- * Publish a draft, so it starts gating real carts. Re-validated at this moment
- * rather than trusting the draft — the library may have changed underneath it.
- */
-export const publishRelationAction = async (
-  uuid: string,
-): Promise<ActionResult> => {
-  await requireAdmin();
-  try {
-    await publishRelationship(uuid);
-  } catch (error) {
-    return fail(error, "Failed to publish the relation");
-  }
-  refreshCatalog();
-  return { success: true };
-};
-
-export const archiveRelationAction = async (
-  uuid: string,
-): Promise<ActionResult> => {
-  await requireAdmin();
-  try {
-    await archiveRelationship(uuid);
-  } catch (error) {
-    return fail(error, "Failed to archive the relation");
-  }
-  refreshCatalog();
-  return { success: true };
-};
-
 export const deleteRelationAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
@@ -194,8 +162,9 @@ export const searchProductsAction = async (
 /**
  * Run a rule against a real selection before anyone is blocked by it.
  *
- * This is what makes the draft state worth having: the author reads the finding
- * their rule produces, in the buyer's words, while it is still a draft.
+ * The author reads the finding their rule produces, in the buyer's own words,
+ * against a basket they choose — which is how a rule gets reviewed now that
+ * there is no draft state to sit in.
  */
 export const previewRelationAction = async (
   uuid: string,

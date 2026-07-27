@@ -112,6 +112,12 @@ export const SubjectPicker = ({
       onChange({ op: "exists", attr: uuid });
       return;
     }
+    // A typed number is stored as a NUMBER. `in` would compare "12" against 12
+    // by way of String() — which works, right up until somebody types 12.0.
+    if (attribute.type === "number") {
+      onChange({ op: "equals", attr: uuid, value: Number(raw) });
+      return;
+    }
     onChange({ op: "in", attr: uuid, values: [raw], mode: "any" });
   };
 

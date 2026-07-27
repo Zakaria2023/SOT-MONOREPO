@@ -27,6 +27,7 @@ export * from "./relationships";
 export * from "./spec-values";
 export * from "./specification-assignments";
 export * from "./specification-groups";
+export * from "./library-options";
 export * from "./specification-library";
 export * from "./specifications";
 export * from "./stats";
