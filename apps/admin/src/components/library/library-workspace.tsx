@@ -3,12 +3,14 @@
 import type { LibraryGroup } from "@/app/(dashboard)/library/action";
 import { LibraryBuilder } from "@/components/library/library-builder";
 import { ProjectInputs } from "@/components/library/project-inputs";
+import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProjectVariables } from "@/db/schema/project-variables";
 import { useState } from "react";
 
 type LibraryWorkspaceProps = {
   groups: LibraryGroup[];
   variables: SelectProjectVariables[];
+  categories: SelectCategories[];
 };
 
 type Tab = "attributes" | "inputs";
@@ -16,6 +18,7 @@ type Tab = "attributes" | "inputs";
 export const LibraryWorkspace = ({
   groups,
   variables,
+  categories,
 }: LibraryWorkspaceProps) => {
   const [tab, setTab] = useState<Tab>("attributes");
 
@@ -53,7 +56,7 @@ export const LibraryWorkspace = ({
       </div>
 
       {tab === "attributes" ? (
-        <LibraryBuilder groups={groups} />
+        <LibraryBuilder groups={groups} categories={categories} />
       ) : (
         <ProjectInputs variables={variables} />
       )}

@@ -68,8 +68,11 @@ export type LibraryAttribute = {
   audience: AssignmentAudience;
   options: SpecOption[];
   order: number;
-  // How many relationships and categories reference it — the "you cannot delete
-  // this yet" badge, shown before the author tries.
+  // The categories that carry it directly. Drives the picker on the library
+  // form; the assignments screen still owns every switch on those rows.
+  categoryUuids: string[];
+  // How many relationships reference it — the "you cannot delete this yet" badge,
+  // shown before the author tries.
   relationshipCount: number;
   categoryCount: number;
 };
@@ -177,7 +180,10 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
     db.select().from(Specifications).orderBy(asc(Specifications.order)),
     db.select().from(Relationships),
     db
-      .select({ specificationUuid: SpecificationCategories.specificationUuid })
+      .select({
+        specificationUuid: SpecificationCategories.specificationUuid,
+        categoryUuid: SpecificationCategories.categoryUuid,
+      })
       .from(SpecificationCategories),
   ]);
 
@@ -188,12 +194,11 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
     }
   }
 
-  const categoryCount = new Map<string, number>();
+  const categoriesBySpec = new Map<string, string[]>();
   for (const link of links) {
-    categoryCount.set(
-      link.specificationUuid,
-      (categoryCount.get(link.specificationUuid) ?? 0) + 1,
-    );
+    const list = categoriesBySpec.get(link.specificationUuid) ?? [];
+    list.push(link.categoryUuid);
+    categoriesBySpec.set(link.specificationUuid, list);
   }
 
   const toAttribute = (spec: SelectSpecifications): LibraryAttribute => ({
@@ -209,8 +214,9 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
     audience: spec.audience,
     options: spec.options ?? [],
     order: spec.order,
+    categoryUuids: categoriesBySpec.get(spec.uuid) ?? [],
     relationshipCount: relationshipCount.get(spec.uuid) ?? 0,
-    categoryCount: categoryCount.get(spec.uuid) ?? 0,
+    categoryCount: (categoriesBySpec.get(spec.uuid) ?? []).length,
   });
 
   const byGroup = new Map<string, LibraryAttribute[]>();
@@ -286,6 +292,24 @@ export const referencedAttributeUuids = (
     }
   }
   return [...found];
+};
+
+/**
+ * The categories that carry an attribute directly — its own rows, not the
+ * descendants that inherit them.
+ *
+ * Read-only here. Writing a category link is the assignment service's job, and
+ * keeping the write in one place is what stops two screens disagreeing about what
+ * a link means.
+ */
+export const getAttributeCategories = async (
+  specificationUuid: string,
+): Promise<string[]> => {
+  const rows = await db
+    .select({ categoryUuid: SpecificationCategories.categoryUuid })
+    .from(SpecificationCategories)
+    .where(eq(SpecificationCategories.specificationUuid, specificationUuid));
+  return rows.map((row) => row.categoryUuid);
 };
 
 export const createLibraryAttribute = async (

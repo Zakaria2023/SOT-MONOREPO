@@ -9,8 +9,11 @@ import {
   deleteLibraryAttribute,
   deleteProjectVariable,
   deleteSpecificationGroup,
+  getAttributeCategories,
   getLibrary,
   getProjectVariables,
+  removeAssignment,
+  saveAssignment,
   moveLibraryAttribute,
   reorderLibraryAttributes,
   reorderSpecificationGroups,
@@ -25,7 +28,13 @@ import {
 
 // Types re-declared as local aliases — a "use server" file may only export
 // async functions.
-export type LibraryAttributeInput = ServiceLibraryAttributeInput;
+// The service input plus the categories the form lets an author tick. Kept as an
+// ADMIN type on purpose: `createLibraryAttribute` still refuses to write category
+// links, so the two writes stay separate and the assignment service remains the
+// only thing that touches those rows.
+export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
+  categoryUuids: string[];
+};
 export type LibraryGroup = ServiceLibraryGroup;
 export type ProjectVariableInput = ServiceProjectVariableInput;
 export type SpecificationGroupFields = ServiceSpecificationGroupFields;
@@ -53,8 +62,12 @@ export const addAttributeAction = async (
   input: LibraryAttributeInput,
 ): Promise<ActionResult> => {
   await requireAdmin();
+  const { categoryUuids, ...definition } = input;
   try {
-    await createLibraryAttribute(input);
+    const uuid = await createLibraryAttribute(definition);
+    if (categoryUuids.length > 0) {
+      await applyAttributeCategories(uuid, categoryUuids);
+    }
   } catch (error) {
     return fail(error, "Failed to create the attribute");
   }
@@ -68,8 +81,10 @@ export const updateAttributeAction = async (
   input: LibraryAttributeInput,
 ): Promise<ActionResult> => {
   await requireAdmin();
+  const { categoryUuids, ...definition } = input;
   try {
-    await updateLibraryAttribute(uuid, input);
+    await updateLibraryAttribute(uuid, definition);
+    await applyAttributeCategories(uuid, categoryUuids);
   } catch (error) {
     return fail(error, "Failed to update the attribute");
   }
@@ -121,6 +136,79 @@ export const reorderAttributesAction = async (
     return fail(error, "Failed to reorder");
   }
   revalidatePath("/library");
+  return { success: true };
+};
+
+/**
+ * Apply a category selection by touching ONLY the difference.
+ *
+ * Not exported — a "use server" file may only export async functions, and this is
+ * shared internal machinery rather than a server action.
+ */
+const applyAttributeCategories = async (
+  specificationUuid: string,
+  categoryUuids: string[],
+): Promise<void> => {
+  const existing = await getAttributeCategories(specificationUuid);
+  const wanted = new Set(categoryUuids.filter((uuid) => uuid.length > 0));
+  const current = new Set(existing);
+
+  for (const categoryUuid of wanted) {
+    if (current.has(categoryUuid)) {
+      continue;
+    }
+    await saveAssignment({
+      categoryUuid,
+      specificationUuid,
+      // The engine reads it; the shopper does not filter on it until somebody
+      // decides that deliberately on the assignments screen.
+      isFilter: false,
+      isRule: true,
+      scope: "branch",
+      showIf: null,
+      audience: "everyone",
+      enabledValues: null,
+      suppressed: false,
+      order: 0,
+    });
+  }
+
+  for (const categoryUuid of current) {
+    if (!wanted.has(categoryUuid)) {
+      await removeAssignment(categoryUuid, specificationUuid);
+    }
+  }
+};
+
+/**
+ * Set which categories use an attribute, from the library screen.
+ *
+ * ADDITIVE AND GUARDED, deliberately. The old version of this rewrote every
+ * category link for the attribute — delete, then re-insert — which silently reset
+ * whatever switches an author had set on the assignments screen. Renaming an
+ * attribute could quietly change how a dozen categories used it.
+ *
+ * So this only ever touches the difference:
+ *   - a newly ticked category gets a fresh assignment with sensible defaults
+ *   - an unticked one is removed through the SAME guard the assignments screen
+ *     uses, which refuses when another attribute's reveal depends on it
+ *   - a category that was already ticked is left completely alone
+ *
+ * Everything else about an assignment — the filter switch, the slice, the reveal,
+ * the audience — still has exactly one owner: the assignments screen.
+ */
+export const setAttributeCategoriesAction = async (
+  specificationUuid: string,
+  categoryUuids: string[],
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await applyAttributeCategories(specificationUuid, categoryUuids);
+  } catch (error) {
+    return fail(error, "Failed to update the categories");
+  }
+  revalidatePath("/library");
+  revalidatePath("/assignments");
   return { success: true };
 };
 

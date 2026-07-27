@@ -29,7 +29,9 @@ import {
   SPECIFICATION_DOMAIN_LABELS,
   SPECIFICATION_TYPE_LABELS,
 } from "@/db/label";
+import type { SelectCategories } from "@/db/schema/categories";
 import type { SpecOption } from "@/db/types";
+import { buildCategoryTreeOptions } from "@/lib/categories";
 import {
   ArrowDown,
   ArrowUp,
@@ -56,7 +58,6 @@ import {
   ConfirmDialog,
   Dropdown,
   Input,
-  Textarea,
   type DropdownOption,
 } from "ui";
 
@@ -64,6 +65,7 @@ type LibraryAttribute = LibraryGroup["attributes"][number];
 
 type LibraryBuilderProps = {
   groups: LibraryGroup[];
+  categories: SelectCategories[];
 };
 
 type GroupFormProps = {
@@ -131,6 +133,8 @@ const GroupForm = ({
 type AttributeFormProps = {
   groupUuid: string | null;
   groupOptions: DropdownOption[];
+  // Depth-ordered so the tree reads as a tree in the picker.
+  categoryOptions: DropdownOption[];
   initial?: LibraryAttribute;
   onSubmit: (input: LibraryAttributeInput) => void;
   onCancel: () => void;
@@ -216,6 +220,7 @@ const toDrafts = (options: SpecOption[]): OptionDraft[] =>
 const AttributeForm = ({
   groupUuid,
   groupOptions,
+  categoryOptions,
   initial,
   onSubmit,
   onCancel,
@@ -223,8 +228,9 @@ const AttributeForm = ({
   error,
 }: AttributeFormProps) => {
   const [label, setLabel] = useState(initial?.label ?? "");
-  const [internalName, setInternalName] = useState(initial?.internalName ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+  const [categories, setCategories] = useState<string[]>(
+    initial?.categoryUuids ?? [],
+  );
   const [type, setType] = useState<SpecificationType>(
     initial?.type ?? "single_select",
   );
@@ -252,9 +258,10 @@ const AttributeForm = ({
     onSubmit({
       groupUuid: group === "" ? null : group,
       label,
-      internalName: internalName.trim() === "" ? null : internalName,
-      description: description.trim() === "" ? null : description,
+      internalName: null,
+      description: null,
       type,
+      categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
       ordered: isOptionType(type) ? ordered : false,
       audience,
@@ -279,21 +286,24 @@ const AttributeForm = ({
           value={label}
           onChange={(event) => setLabel(event.target.value)}
         />
-        <Input
-          label="Internal name (optional)"
-          placeholder="How staff tell it apart from another “Type”"
-          value={internalName}
-          onChange={(event) => setInternalName(event.target.value)}
-        />
-      </div>
 
-      <Textarea
-        label="Description (optional)"
-        rows={2}
-        placeholder="What this measures, in one line."
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-      />
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-secondary">Categories</span>
+          <Dropdown
+            multiple
+            value={categories}
+            onChange={setCategories}
+            options={categoryOptions}
+            searchable
+            placeholder="Not used by any category yet"
+          />
+          <span className="text-[11px] text-muted">
+            Ticking a category starts using this attribute there. Unticking stops
+            it. How each category uses it — filter, options offered, what reveals
+            it — is set in Assignments, and nothing here overwrites that.
+          </span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex flex-col gap-1">
@@ -486,11 +496,6 @@ const AttributeRow = ({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-ink">{attribute.label}</span>
-          {attribute.internalName && (
-            <span className="text-[11px] text-faint">
-              ({attribute.internalName})
-            </span>
-          )}
           <span
             className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${meta.className}`}
           >
@@ -564,7 +569,10 @@ const AttributeRow = ({
 };
 
 
-export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
+export const LibraryBuilder = ({
+  groups,
+  categories,
+}: LibraryBuilderProps) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -579,6 +587,12 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
   const [confirming, setConfirming] = useState<LibraryAttribute | null>(null);
   const [confirmingGroup, setConfirmingGroup] = useState<LibraryGroup | null>(
     null,
+  );
+
+  // Depth-ordered so the picker reads as the tree it is.
+  const categoryOptions = useMemo<DropdownOption[]>(
+    () => buildCategoryTreeOptions(categories),
+    [categories],
   );
 
   const groupOptions = useMemo<DropdownOption[]>(
@@ -603,7 +617,6 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
         .filter(
           (attribute) =>
             attribute.label.toLowerCase().includes(term) ||
-            attribute.internalName?.toLowerCase().includes(term) ||
             attribute.options.some((option) =>
               option.label.toLowerCase().includes(term),
             ),
@@ -660,6 +673,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
       key={attribute.uuid}
       groupUuid={attribute.groupUuid}
       groupOptions={groupOptions}
+      categoryOptions={categoryOptions}
       initial={attribute}
       pending={pending}
       error={error}
@@ -874,6 +888,7 @@ export const LibraryBuilder = ({ groups }: LibraryBuilderProps) => {
               <AttributeForm
                 groupUuid={active && active.uuid !== "" ? active.uuid : null}
                 groupOptions={groupOptions}
+                categoryOptions={categoryOptions}
                 pending={pending}
                 error={error}
                 onCancel={() => {
