@@ -385,14 +385,10 @@ export const moveCategoryToParent = async (
   const index = Math.max(0, Math.min(targetIndex, ordered.length));
   ordered.splice(index, 0, uuid);
 
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < ordered.length; i++) {
-      await tx
-        .update(Categories)
-        .set({ order: i })
-        .where(eq(Categories.uuid, ordered[i]));
-    }
-  });
+  await db
+    .update(Categories)
+    .set({ order: orderCase(Categories.uuid, ordered) })
+    .where(inArray(Categories.uuid, ordered));
 };
 
 export const getCategory = async (
