@@ -327,14 +327,10 @@ export const reorderCategoryChildren = async (
   const safeStart = Math.max(0, Math.min(pageStart, full.length));
   full.splice(safeStart, orderedPageUuids.length, ...orderedPageUuids);
 
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < full.length; index++) {
-      await tx
-        .update(Categories)
-        .set({ order: index })
-        .where(eq(Categories.uuid, full[index]));
-    }
-  });
+  await db
+    .update(Categories)
+    .set({ order: orderCase(Categories.uuid, full) })
+    .where(inArray(Categories.uuid, full));
 };
 
 /**
