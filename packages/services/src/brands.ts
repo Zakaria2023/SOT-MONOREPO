@@ -4,6 +4,7 @@ import {
   countDistinct,
   eq,
   getTableColumns,
+  inArray,
   isNull,
   like,
   or,
@@ -21,6 +22,7 @@ import {
 import { db } from "../../../db";
 import { Brands, InsertBrands, SelectBrands } from "../../../db/schema/brands";
 import { Products } from "../../../db/schema/products";
+import { orderCase } from "./reorder";
 
 export type { SelectBrands };
 
@@ -396,12 +398,8 @@ export const reorderBrands = async (orderedUuids: string[]): Promise<void> => {
   if (orderedUuids.length === 0) {
     return;
   }
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < orderedUuids.length; index++) {
-      await tx
-        .update(Brands)
-        .set({ order: index })
-        .where(eq(Brands.uuid, orderedUuids[index]));
-    }
-  });
+  await db
+    .update(Brands)
+    .set({ order: orderCase(Brands.uuid, orderedUuids) })
+    .where(inArray(Brands.uuid, orderedUuids));
 };
