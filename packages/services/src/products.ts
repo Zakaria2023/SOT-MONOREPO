@@ -280,22 +280,27 @@ export const createProduct = async (
   fields: ProductClientFields,
 ): Promise<string> => {
   const uuid = generateUuid();
-  const [{ total }] = await db.select({ total: count() }).from(Products);
-  const sku = await generateProductSku({
-    brandUuid: fields.brandUuid,
-    categoryUuid: fields.categoryUuid,
-    seriesCode: fields.seriesCode,
-  });
-  await db.insert(Products).values({
-    ...fields,
+
+  // The row count, the SKU and the normalized values are independent of one
+  // another — only the insert needs all three — so they go out together
+  // instead of in three serial waits.
+  const [[{ total }], sku, specValues] = await Promise.all([
+    db.select({ total: count() }).from(Products),
+    generateProductSku({
+      brandUuid: fields.brandUuid,
+      categoryUuid: fields.categoryUuid,
+      seriesCode: fields.seriesCode,
+    }),
     // The form's values are convenience, never the authority: the server coerces
     // each one to the type its attribute declares and drops anything the reveal
     // conditions now hide. A leftover value on a hidden field would still feed
     // the engine, and nobody could see the number doing it.
-    specValues: await normalizeProductValues(
-      fields.categoryUuid,
-      fields.specValues ?? {},
-    ),
+    normalizeProductValues(fields.categoryUuid, fields.specValues ?? {}),
+  ]);
+
+  await db.insert(Products).values({
+    ...fields,
+    specValues,
     sku,
     uuid,
     order: total,
