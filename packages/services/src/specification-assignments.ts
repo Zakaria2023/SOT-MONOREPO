@@ -488,21 +488,25 @@ export const reorderAssignments = async (
   categoryUuid: string,
   order: { specificationUuid: string; order: number }[],
 ): Promise<void> => {
-  await Promise.all(
-    order.map((entry) =>
-      db
-        .update(SpecificationCategories)
-        .set({ order: entry.order })
-        .where(
-          and(
-            eq(SpecificationCategories.categoryUuid, categoryUuid),
-            eq(
-              SpecificationCategories.specificationUuid,
-              entry.specificationUuid,
-            ),
-          ),
-        ),
-    ),
-  );
+  if (order.length === 0) {
+    return;
+  }
+  // One statement, scoped to the category: a CASE maps each attribute to its
+  // position instead of issuing an update per attribute.
+  const specificationUuids = order.map((entry) => entry.specificationUuid);
+  await db
+    .update(SpecificationCategories)
+    .set({
+      order: sql`case ${SpecificationCategories.specificationUuid} ${sql.join(
+        order.map((entry) => sql`when ${entry.specificationUuid} then ${entry.order}`),
+        sql` `,
+      )} end`,
+    })
+    .where(
+      and(
+        eq(SpecificationCategories.categoryUuid, categoryUuid),
+        inArray(SpecificationCategories.specificationUuid, specificationUuids),
+      ),
+    );
   invalidateCatalogModel();
 };
