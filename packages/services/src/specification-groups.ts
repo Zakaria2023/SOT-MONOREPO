@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { asc, count, eq } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import {
   SelectSpecificationGroups,
   SpecificationGroups,
 } from "../../../db/schema/specification-groups";
+import { orderCase } from "./reorder";
 
 export type { SelectSpecificationGroups };
 
@@ -68,12 +69,8 @@ export const reorderSpecificationGroups = async (
   if (orderedUuids.length === 0) {
     return;
   }
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < orderedUuids.length; index++) {
-      await tx
-        .update(SpecificationGroups)
-        .set({ order: index })
-        .where(eq(SpecificationGroups.uuid, orderedUuids[index]));
-    }
-  });
+  await db
+    .update(SpecificationGroups)
+    .set({ order: orderCase(SpecificationGroups.uuid, orderedUuids) })
+    .where(inArray(SpecificationGroups.uuid, orderedUuids));
 };

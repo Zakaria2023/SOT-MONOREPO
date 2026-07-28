@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import type { AssignmentAudience, AssignmentScope } from "../../../db/enum";
@@ -270,42 +270,42 @@ export const saveAssignments = async (
     order: input.order,
   });
 
-  const inserts = inputs.filter(
-    (input) =>
-      !existingByPair.has(`${input.categoryUuid}:${input.specificationUuid}`),
-  );
-  if (inserts.length > 0) {
-    await db.insert(SpecificationCategories).values(
-      inserts.map((input) => ({
-        uuid: generateUuid(),
+  // One statement covers both paths. The (specification_uuid, category_uuid)
+  // unique key turns an already-linked pair into an update and a new pair into
+  // an insert, so there is no need to split the two or to issue a statement per
+  // row. Rows that already exist carry their own uuid in and the update branch
+  // never writes it, so the identity of an existing assignment is preserved.
+  //
+  // The previous shape ran the updates concurrently, which is not the same as
+  // batching them: the pool is deliberately capped at four connections, so a
+  // wide save still queued in fours while occupying every connection the app
+  // had. Linking one attribute across a few hundred categories was enough to
+  // starve every other request for the duration.
+  await db
+    .insert(SpecificationCategories)
+    .values(
+      inputs.map((input) => ({
+        uuid:
+          existingByPair.get(
+            `${input.categoryUuid}:${input.specificationUuid}`,
+          ) ?? generateUuid(),
         categoryUuid: input.categoryUuid,
         specificationUuid: input.specificationUuid,
         ...toValues(input),
       })),
-    );
-  }
-
-  // Updates cannot be batched into one statement — each row gets different
-  // values — but they run together rather than one after another.
-  await Promise.all(
-    inputs
-      .filter((input) =>
-        existingByPair.has(`${input.categoryUuid}:${input.specificationUuid}`),
-      )
-      .map((input) =>
-        db
-          .update(SpecificationCategories)
-          .set(toValues(input))
-          .where(
-            eq(
-              SpecificationCategories.uuid,
-              existingByPair.get(
-                `${input.categoryUuid}:${input.specificationUuid}`,
-              ) ?? "",
-            ),
-          ),
-      ),
-  );
+    )
+    .onDuplicateKeyUpdate({
+      set: {
+        isFilter: sql`values(${SpecificationCategories.isFilter})`,
+        isRule: sql`values(${SpecificationCategories.isRule})`,
+        scope: sql`values(${SpecificationCategories.scope})`,
+        showIf: sql`values(${SpecificationCategories.showIf})`,
+        audience: sql`values(${SpecificationCategories.audience})`,
+        enabledValues: sql`values(${SpecificationCategories.enabledValues})`,
+        suppressed: sql`values(${SpecificationCategories.suppressed})`,
+        order: sql`values(${SpecificationCategories.order})`,
+      },
+    });
 
   await recordAuditBatch(
     inputs.map((input) => ({
@@ -488,21 +488,25 @@ export const reorderAssignments = async (
   categoryUuid: string,
   order: { specificationUuid: string; order: number }[],
 ): Promise<void> => {
-  await Promise.all(
-    order.map((entry) =>
-      db
-        .update(SpecificationCategories)
-        .set({ order: entry.order })
-        .where(
-          and(
-            eq(SpecificationCategories.categoryUuid, categoryUuid),
-            eq(
-              SpecificationCategories.specificationUuid,
-              entry.specificationUuid,
-            ),
-          ),
-        ),
-    ),
-  );
+  if (order.length === 0) {
+    return;
+  }
+  // One statement, scoped to the category: a CASE maps each attribute to its
+  // position instead of issuing an update per attribute.
+  const specificationUuids = order.map((entry) => entry.specificationUuid);
+  await db
+    .update(SpecificationCategories)
+    .set({
+      order: sql`case ${SpecificationCategories.specificationUuid} ${sql.join(
+        order.map((entry) => sql`when ${entry.specificationUuid} then ${entry.order}`),
+        sql` `,
+      )} end`,
+    })
+    .where(
+      and(
+        eq(SpecificationCategories.categoryUuid, categoryUuid),
+        inArray(SpecificationCategories.specificationUuid, specificationUuids),
+      ),
+    );
   invalidateCatalogModel();
 };

@@ -250,20 +250,20 @@ export const addCategoryToCart = async (
 
   const cartUuid = await getOrCreateCartUuid(userUuid);
 
-  await db.transaction(async (tx) => {
-    for (const product of products) {
-      await tx
-        .insert(CartItems)
-        .values({
-          uuid: randomUUID(),
-          cartUuid,
-          productUuid: product.uuid,
-          quantity: 1,
-          kind: "solution",
-        })
-        .onDuplicateKeyUpdate({
-          set: { quantity: sql`${CartItems.quantity} + 1` },
-        });
-    }
-  });
+  // One multi-row upsert. MySQL applies the ON DUPLICATE KEY branch per
+  // conflicting row, so rows already in the cart are still bumped individually.
+  await db
+    .insert(CartItems)
+    .values(
+      products.map((product) => ({
+        uuid: randomUUID(),
+        cartUuid,
+        productUuid: product.uuid,
+        quantity: 1,
+        kind: "solution" as const,
+      })),
+    )
+    .onDuplicateKeyUpdate({
+      set: { quantity: sql`${CartItems.quantity} + 1` },
+    });
 };

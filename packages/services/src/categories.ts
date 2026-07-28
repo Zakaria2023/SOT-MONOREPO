@@ -4,6 +4,7 @@ import {
   countDistinct,
   eq,
   getTableColumns,
+  inArray,
   isNull,
   like,
   or,
@@ -29,6 +30,7 @@ import {
   SelectClassifications,
 } from "../../../db/schema/classifications";
 import { Products } from "../../../db/schema/products";
+import { orderCase } from "./reorder";
 
 export type { SelectCategories };
 
@@ -325,14 +327,10 @@ export const reorderCategoryChildren = async (
   const safeStart = Math.max(0, Math.min(pageStart, full.length));
   full.splice(safeStart, orderedPageUuids.length, ...orderedPageUuids);
 
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < full.length; index++) {
-      await tx
-        .update(Categories)
-        .set({ order: index })
-        .where(eq(Categories.uuid, full[index]));
-    }
-  });
+  await db
+    .update(Categories)
+    .set({ order: orderCase(Categories.uuid, full) })
+    .where(inArray(Categories.uuid, full));
 };
 
 /**
@@ -387,14 +385,10 @@ export const moveCategoryToParent = async (
   const index = Math.max(0, Math.min(targetIndex, ordered.length));
   ordered.splice(index, 0, uuid);
 
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < ordered.length; i++) {
-      await tx
-        .update(Categories)
-        .set({ order: i })
-        .where(eq(Categories.uuid, ordered[i]));
-    }
-  });
+  await db
+    .update(Categories)
+    .set({ order: orderCase(Categories.uuid, ordered) })
+    .where(inArray(Categories.uuid, ordered));
 };
 
 export const getCategory = async (
@@ -484,12 +478,8 @@ export const reorderCategories = async (
   if (orderedUuids.length === 0) {
     return;
   }
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < orderedUuids.length; index++) {
-      await tx
-        .update(Categories)
-        .set({ order: index })
-        .where(eq(Categories.uuid, orderedUuids[index]));
-    }
-  });
+  await db
+    .update(Categories)
+    .set({ order: orderCase(Categories.uuid, orderedUuids) })
+    .where(inArray(Categories.uuid, orderedUuids));
 };

@@ -1,4 +1,4 @@
-import { asc, count, eq } from "drizzle-orm";
+import { asc, count, eq, inArray, sql } from "drizzle-orm";
 import { generateUuid, slugify } from "utils";
 import { db } from "../../../db";
 import type { AssignmentAudience, SpecificationType } from "../../../db/enum";
@@ -475,14 +475,25 @@ export const moveLibraryAttribute = async (
 export const reorderLibraryAttributes = async (
   order: { uuid: string; order: number }[],
 ): Promise<void> => {
-  await Promise.all(
-    order.map((entry) =>
-      db
-        .update(Specifications)
-        .set({ order: entry.order })
-        .where(eq(Specifications.uuid, entry.uuid)),
-    ),
-  );
+  if (order.length === 0) {
+    return;
+  }
+  // One statement: a CASE maps each attribute to its position, rather than an
+  // UPDATE per attribute fanned out across the four-connection pool.
+  await db
+    .update(Specifications)
+    .set({
+      order: sql`case ${Specifications.uuid} ${sql.join(
+        order.map((entry) => sql`when ${entry.uuid} then ${entry.order}`),
+        sql` `,
+      )} end`,
+    })
+    .where(
+      inArray(
+        Specifications.uuid,
+        order.map((entry) => entry.uuid),
+      ),
+    );
   invalidateCatalogModel();
 };
 

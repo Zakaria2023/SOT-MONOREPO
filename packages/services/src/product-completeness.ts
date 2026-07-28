@@ -164,30 +164,27 @@ export const getProductCompleteness = async (
 export const getCatalogCompleteness = async (
   productUuids?: string[],
 ): Promise<ProductCompleteness[]> => {
-  const model = await getCatalogModel();
-
-  const rows = await (productUuids && productUuids.length > 0
-    ? db
-        .select({
-          uuid: Products.uuid,
-          name: Products.name,
-          categoryUuid: Products.categoryUuid,
-          categoryName: Categories.name,
-          specValues: Products.specValues,
-        })
-        .from(Products)
-        .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
-        .where(inArray(Products.uuid, productUuids))
-    : db
-        .select({
-          uuid: Products.uuid,
-          name: Products.name,
-          categoryUuid: Products.categoryUuid,
-          categoryName: Categories.name,
-          specValues: Products.specValues,
-        })
-        .from(Products)
-        .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid)));
+  // The model and the product rows do not depend on each other, so they go out
+  // together. Only matters on a cold model cache, but that is exactly the load
+  // where the dashboard is slowest.
+  const [model, rows] = await Promise.all([
+    getCatalogModel(),
+    db
+      .select({
+        uuid: Products.uuid,
+        name: Products.name,
+        categoryUuid: Products.categoryUuid,
+        categoryName: Categories.name,
+        specValues: Products.specValues,
+      })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .where(
+        productUuids && productUuids.length > 0
+          ? inArray(Products.uuid, productUuids)
+          : undefined,
+      ),
+  ]);
 
   // Resolution is per CATEGORY, not per product — dozens of switches in one
   // category resolve their assignment chain exactly once.

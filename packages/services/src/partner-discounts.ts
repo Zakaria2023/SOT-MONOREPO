@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import { partnerCapabilities, type PartnerCapability } from "../../../db/enum";
@@ -34,19 +34,30 @@ export const getPartnerDiscounts = async (): Promise<PartnerDiscountMap> => {
   }
 };
 
-/** Upsert every capability's percentage in one transaction. */
+/** Upsert every capability's percentage in a single statement. */
 export const setPartnerDiscounts = async (
   map: PartnerDiscountMap,
 ): Promise<void> => {
-  await db.transaction(async (tx) => {
-    for (const capability of partnerCapabilities) {
-      const percent = clampPercent(map[capability] ?? 0);
-      await tx
-        .insert(PartnerDiscounts)
-        .values({ uuid: generateUuid(), capability, percent })
-        .onDuplicateKeyUpdate({ set: { percent } });
-    }
-  });
+  const rows = partnerCapabilities.map((capability) => ({
+    uuid: generateUuid(),
+    capability,
+    percent: clampPercent(map[capability] ?? 0),
+  }));
+
+  // Each row needs its own percent on conflict, so the update branch is a CASE
+  // over the capability rather than a single shared value. Spelling it out this
+  // way also avoids MySQL's deprecated VALUES() function.
+  await db
+    .insert(PartnerDiscounts)
+    .values(rows)
+    .onDuplicateKeyUpdate({
+      set: {
+        percent: sql`case ${PartnerDiscounts.capability} ${sql.join(
+          rows.map((row) => sql`when ${row.capability} then ${row.percent}`),
+          sql` `,
+        )} end`,
+      },
+    });
 };
 
 /**

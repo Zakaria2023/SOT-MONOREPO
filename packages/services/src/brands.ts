@@ -4,6 +4,7 @@ import {
   countDistinct,
   eq,
   getTableColumns,
+  inArray,
   isNull,
   like,
   or,
@@ -21,6 +22,7 @@ import {
 import { db } from "../../../db";
 import { Brands, InsertBrands, SelectBrands } from "../../../db/schema/brands";
 import { Products } from "../../../db/schema/products";
+import { orderCase } from "./reorder";
 
 export type { SelectBrands };
 
@@ -281,14 +283,10 @@ export const reorderBrandChildren = async (
   const safeStart = Math.max(0, Math.min(pageStart, full.length));
   full.splice(safeStart, orderedPageUuids.length, ...orderedPageUuids);
 
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < full.length; index++) {
-      await tx
-        .update(Brands)
-        .set({ order: index })
-        .where(eq(Brands.uuid, full[index]));
-    }
-  });
+  await db
+    .update(Brands)
+    .set({ order: orderCase(Brands.uuid, full) })
+    .where(inArray(Brands.uuid, full));
 };
 
 /**
@@ -339,14 +337,10 @@ export const moveBrandToParent = async (
   const index = Math.max(0, Math.min(targetIndex, ordered.length));
   ordered.splice(index, 0, uuid);
 
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < ordered.length; i++) {
-      await tx
-        .update(Brands)
-        .set({ order: i })
-        .where(eq(Brands.uuid, ordered[i]));
-    }
-  });
+  await db
+    .update(Brands)
+    .set({ order: orderCase(Brands.uuid, ordered) })
+    .where(inArray(Brands.uuid, ordered));
 };
 
 export const getBrand = async (uuid: string): Promise<SelectBrands | null> => {
@@ -396,12 +390,8 @@ export const reorderBrands = async (orderedUuids: string[]): Promise<void> => {
   if (orderedUuids.length === 0) {
     return;
   }
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < orderedUuids.length; index++) {
-      await tx
-        .update(Brands)
-        .set({ order: index })
-        .where(eq(Brands.uuid, orderedUuids[index]));
-    }
-  });
+  await db
+    .update(Brands)
+    .set({ order: orderCase(Brands.uuid, orderedUuids) })
+    .where(inArray(Brands.uuid, orderedUuids));
 };
