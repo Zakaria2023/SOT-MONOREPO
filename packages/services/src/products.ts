@@ -313,21 +313,23 @@ export const updateProduct = async (
   uuid: string,
   fields: ProductClientFields,
 ): Promise<void> => {
-  // Regenerate the SKU (stable when brand/category/series are unchanged).
-  const sku = await generateProductSku({
-    brandUuid: fields.brandUuid,
-    categoryUuid: fields.categoryUuid,
-    seriesCode: fields.seriesCode,
-    productUuid: uuid,
-  });
+  // Regenerating the SKU (stable when brand/category/series are unchanged) and
+  // normalizing the values are independent — only the update needs both.
+  const [sku, specValues] = await Promise.all([
+    generateProductSku({
+      brandUuid: fields.brandUuid,
+      categoryUuid: fields.categoryUuid,
+      seriesCode: fields.seriesCode,
+      productUuid: uuid,
+    }),
+    normalizeProductValues(fields.categoryUuid, fields.specValues ?? {}),
+  ]);
+
   await db
     .update(Products)
     .set({
       ...fields,
-      specValues: await normalizeProductValues(
-        fields.categoryUuid,
-        fields.specValues ?? {},
-      ),
+      specValues,
       sku,
       slug: slugify(fields.name),
     })
