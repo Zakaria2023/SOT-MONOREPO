@@ -283,14 +283,10 @@ export const reorderBrandChildren = async (
   const safeStart = Math.max(0, Math.min(pageStart, full.length));
   full.splice(safeStart, orderedPageUuids.length, ...orderedPageUuids);
 
-  await db.transaction(async (tx) => {
-    for (let index = 0; index < full.length; index++) {
-      await tx
-        .update(Brands)
-        .set({ order: index })
-        .where(eq(Brands.uuid, full[index]));
-    }
-  });
+  await db
+    .update(Brands)
+    .set({ order: orderCase(Brands.uuid, full) })
+    .where(inArray(Brands.uuid, full));
 };
 
 /**
