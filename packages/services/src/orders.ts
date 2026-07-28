@@ -209,8 +209,10 @@ export const createOrderFromCart = async ({
       designOverrideReason: gate.overridden ? (override?.reason ?? null) : null,
     });
 
-    for (const line of lines) {
-      await tx.insert(OrderItems).values({
+    // One multi-row INSERT: checkout latency should track the order, not the
+    // number of lines in it.
+    await tx.insert(OrderItems).values(
+      lines.map((line) => ({
         uuid: randomUUID(),
         orderUuid: uuid,
         productUuid: line.productUuid,
@@ -218,8 +220,8 @@ export const createOrderFromCart = async ({
         unitPrice: line.unitPrice.toFixed(2),
         quantity: line.quantity,
         lineTotal: line.lineTotal.toFixed(2),
-      });
-    }
+      })),
+    );
 
     // Clear the ordered product items; leave solution items for the BOQ path.
     const [cart] = await tx
