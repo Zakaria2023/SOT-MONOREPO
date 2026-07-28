@@ -12,8 +12,6 @@
   "dependencies": {
     "@clerk/nextjs": "^7.5.10",
     "@hookform/resolvers": "^5.4.0",
-    "@splinetool/react-spline": "^4.1.0",
-    "@splinetool/runtime": "^1.12.98",
     "clsx": "^2.1.1",
     "country-flag-emoji-polyfill": "^0.1.8",
     "country-state-city": "^3.2.1",
