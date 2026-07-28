@@ -337,14 +337,10 @@ export const moveBrandToParent = async (
   const index = Math.max(0, Math.min(targetIndex, ordered.length));
   ordered.splice(index, 0, uuid);
 
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < ordered.length; i++) {
-      await tx
-        .update(Brands)
-        .set({ order: i })
-        .where(eq(Brands.uuid, ordered[i]));
-    }
-  });
+  await db
+    .update(Brands)
+    .set({ order: orderCase(Brands.uuid, ordered) })
+    .where(inArray(Brands.uuid, ordered));
 };
 
 export const getBrand = async (uuid: string): Promise<SelectBrands | null> => {
