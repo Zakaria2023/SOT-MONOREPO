@@ -12,6 +12,7 @@ import {
 import { assignmentAudiences, specificationTypes } from "../enum";
 import { SpecGroupField, SpecOption } from "../types";
 import { SpecificationGroups } from "./specification-groups";
+import { SpecificationOptionSets } from "./specification-option-sets";
 
 // THE LIBRARY — where an attribute is born, exactly once.
 //
@@ -68,6 +69,11 @@ export const Specifications = mysqlTable("Specifications", {
   //
   // Definition-level, never per-category — whether a list is a scale is a
   // property of the attribute itself, not of where it is used.
+  //
+  // IGNORED when `optionSetUuid` is set: a shared vocabulary carries its own
+  // `ordered`, because whether 1G is smaller than 10G belongs to the words and
+  // not to whoever borrowed them. Two attributes sharing a list must not be able
+  // to disagree about that.
   ordered: boolean("ordered").default(false).notNull(),
 
   // Only meaningful for `number`. Whether a product answers this with a SPAN
@@ -87,7 +93,30 @@ export const Specifications = mysqlTable("Specifications", {
   // across categories. Options are append-only; removal is the `retired` flag,
   // so a product holding a value never ends up holding one that no longer
   // exists.
+  //
+  // EMPTY when `optionSetUuid` is set: the two are never both populated, because
+  // two lists for one attribute is two answers to "what may a product hold" and
+  // nothing would know which is true.
   options: json("options").$type<SpecOption[]>(),
+
+  // Points at a SHARED vocabulary instead of owning a list (see
+  // SpecificationOptionSets). Null is the normal case — an attribute nobody
+  // needs to compare against keeps its list to itself.
+  //
+  // This is what makes "cage speed >= module speed" askable: two attributes
+  // pointing here spell 1G identically, so their stored values are comparable.
+  // Not a boundary-rule violation — a set is a dictionary, not an attribute.
+  //
+  // Changing it is REFUSED once any product holds a value for the attribute (see
+  // specification-library): re-pointing reinterprets every stored value at once,
+  // silently, which is the exact class of failure this model exists to stop.
+  optionSetUuid: char("option_set_uuid", { length: 36 }).references(
+    () => SpecificationOptionSets.uuid,
+    // Deliberately NOT a cascade. Deleting a set that attributes still use would
+    // leave them with no vocabulary and every product value unreadable, so the
+    // service refuses the delete instead and names what is in the way.
+    { onDelete: "restrict" },
+  ),
 
   // Only meaningful for `group`. The sub-fields one authored row carries, in
   // column order — {count, family, max speed} for network ports, {outlet type,

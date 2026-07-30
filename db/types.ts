@@ -9,6 +9,12 @@
 // lives on a relationship. Neither can migrate into the library, which is why
 // `Specifications` carries no condition type at all.
 //
+// A shared OPTION SET is the one thing a library entry may point at, and it does
+// not bend the rule: a set holds words, not behaviour. Two attributes naming the
+// same set agree on how to spell "1G" and on nothing else — no type, no unit, no
+// condition, no rule crosses between them. That is what makes their stored values
+// comparable without either one knowing the other exists.
+//
 // Every `attr` in this file is a Specifications.uuid — never a label, never a
 // slug. Labels are renameable and slugs are derived from labels, so pointing at
 // either means a rename silently orphans stored values and breaks every rule
@@ -57,12 +63,20 @@ export type SpecOption = {
 // nested groups or ranges here would make the row a document, and a document is
 // something no comparator can read.
 //
-// `options` is INLINE rather than a pointer at another Specifications row: the
-// boundary rule at the top of this file forbids a library entry from naming
-// another attribute. The cost is real and worth stating — a speed list inside
-// this group and a speed list on a standalone transceiver attribute are separate
-// vocabularies, so their `value`s cannot be compared until shared option sets
-// exist as a thing of their own.
+// A sub-field's picks come from ONE of two places, never both:
+//
+//   - `options` inline, when the list means something only inside this group;
+//   - `optionSetUuid`, a SHARED vocabulary (see SpecificationOptionSets).
+//
+// The shared case is what makes "does this cage take that module" answerable. An
+// inline speed list inside this group and an inline speed list on a standalone
+// transceiver attribute are separate vocabularies: both spell "1G", and their
+// stored values are unrelated, so no comparator can line them up. Pointing both
+// at one set makes the two spellings the same fact.
+//
+// A set is still not another attribute, so the boundary rule at the top of this
+// file holds exactly as written — the sub-field names a dictionary, and nothing
+// about the transceiver attribute reaches this group.
 export type SpecGroupField = {
   // Stable identity. A row keys on this, so it is fixed at creation and a label
   // rename never touches it — the same reason SpecOption carries `value`.
@@ -72,11 +86,22 @@ export type SpecGroupField = {
   kind: "number" | "select";
   // `number` only. Same dimension discipline as Specifications.unit.
   unit: string | null;
-  // `select` only. Whether `options` is a scale, so a comparator can read rank —
+  // `select` only. Whether the picks are a scale, so a comparator can read rank —
   // 1G < 10G < 25G is what makes "does this cage take that module" answerable.
+  //
+  // IGNORED when `optionSetUuid` is set, for the same reason it is on the
+  // attribute: the set owns that fact about its own words.
   ordered: boolean;
-  // `select` only.
+  // `select` only, and EMPTY when `optionSetUuid` is set. The resolved list is
+  // written back into this field on the way out (see resolveGroupFields), so
+  // every reader below the library sees one shape and never has to know where the
+  // options came from.
   options: SpecOption[];
+  // `select` only. When set, the picks are the named set's, not `options`.
+  //
+  // Optional so every row stored before sets existed still parses — an absent
+  // pointer and a null one both mean "this list is my own".
+  optionSetUuid?: string | null;
 };
 
 // One authored row of a `group` attribute: sub-field key → value.

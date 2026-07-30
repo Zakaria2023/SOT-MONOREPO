@@ -9,8 +9,13 @@ import {
   SpecificationGroups,
 } from "../../../db/schema/specification-groups";
 import type { ProductValues, SpecOption } from "../../../db/types";
-import { getCatalogModel, resolveFromModel } from "./catalog-model";
+import {
+  getCatalogModel,
+  loadOptionSetIndex,
+  resolveFromModel,
+} from "./catalog-model";
 import { visibleAssignments } from "./assignment-resolver";
+import { resolveVocabulary } from "./library-options";
 import { describeValue, readValue } from "./spec-values";
 
 export type { SelectSpecifications };
@@ -44,22 +49,26 @@ export const getSpecificationsForUuids = async (
   if (uuids.length === 0) {
     return [];
   }
-  const rows = await db
-    .select({
-      uuid: Specifications.uuid,
-      label: Specifications.label,
-      type: Specifications.type,
-      ordered: Specifications.ordered,
-      unit: Specifications.unit,
-      options: Specifications.options,
-      groupName: SpecificationGroups.name,
-    })
-    .from(Specifications)
-    .leftJoin(
-      SpecificationGroups,
-      eq(Specifications.groupUuid, SpecificationGroups.uuid),
-    )
-    .where(inArray(Specifications.uuid, uuids));
+  const [rows, sets] = await Promise.all([
+    db
+      .select({
+        uuid: Specifications.uuid,
+        label: Specifications.label,
+        type: Specifications.type,
+        ordered: Specifications.ordered,
+        unit: Specifications.unit,
+        options: Specifications.options,
+        optionSetUuid: Specifications.optionSetUuid,
+        groupName: SpecificationGroups.name,
+      })
+      .from(Specifications)
+      .leftJoin(
+        SpecificationGroups,
+        eq(Specifications.groupUuid, SpecificationGroups.uuid),
+      )
+      .where(inArray(Specifications.uuid, uuids)),
+    loadOptionSetIndex(),
+  ]);
 
   const byUuid = new Map(rows.map((row) => [row.uuid, row]));
   return uuids.flatMap((uuid) => {
@@ -67,14 +76,17 @@ export const getSpecificationsForUuids = async (
     if (!row) {
       return [];
     }
+    // Resolved here too, so a spec table and a design finding never describe the
+    // same borrowed option two different ways.
+    const vocabulary = resolveVocabulary(row, sets);
     return [
       {
         uuid: row.uuid,
         label: row.label,
         type: row.type,
-        ordered: row.ordered,
+        ordered: vocabulary.ordered,
         unit: row.unit,
-        options: row.options ?? [],
+        options: vocabulary.options,
         groupName: row.groupName,
       },
     ];
@@ -140,30 +152,37 @@ export const getProductSpecsForDisplay = async (
 export const getAllSpecifications = async (): Promise<
   ResolvedSpecification[]
 > => {
-  const rows = await db
-    .select({
-      uuid: Specifications.uuid,
-      label: Specifications.label,
-      type: Specifications.type,
-      ordered: Specifications.ordered,
-      unit: Specifications.unit,
-      options: Specifications.options,
-      groupName: SpecificationGroups.name,
-    })
-    .from(Specifications)
-    .leftJoin(
-      SpecificationGroups,
-      eq(Specifications.groupUuid, SpecificationGroups.uuid),
-    )
-    .orderBy(asc(Specifications.order));
+  const [rows, sets] = await Promise.all([
+    db
+      .select({
+        uuid: Specifications.uuid,
+        label: Specifications.label,
+        type: Specifications.type,
+        ordered: Specifications.ordered,
+        unit: Specifications.unit,
+        options: Specifications.options,
+        optionSetUuid: Specifications.optionSetUuid,
+        groupName: SpecificationGroups.name,
+      })
+      .from(Specifications)
+      .leftJoin(
+        SpecificationGroups,
+        eq(Specifications.groupUuid, SpecificationGroups.uuid),
+      )
+      .orderBy(asc(Specifications.order)),
+    loadOptionSetIndex(),
+  ]);
 
-  return rows.map((row) => ({
-    uuid: row.uuid,
-    label: row.label,
-    type: row.type,
-    ordered: row.ordered,
-    unit: row.unit,
-    options: row.options ?? [],
-    groupName: row.groupName,
-  }));
+  return rows.map((row) => {
+    const vocabulary = resolveVocabulary(row, sets);
+    return {
+      uuid: row.uuid,
+      label: row.label,
+      type: row.type,
+      ordered: vocabulary.ordered,
+      unit: row.unit,
+      options: vocabulary.options,
+      groupName: row.groupName,
+    };
+  });
 };
