@@ -29,6 +29,7 @@ export * from "./specification-assignments";
 export * from "./specification-groups";
 export * from "./library-options";
 export * from "./option-sets";
+export * from "./attribute-options";
 export * from "./specification-library";
 export * from "./display-specs";
 export * from "./specifications";

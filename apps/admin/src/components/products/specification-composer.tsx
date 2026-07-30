@@ -1,6 +1,7 @@
 "use client";
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
+import { AddOption } from "@/components/products/add-option";
 import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
 import {
@@ -73,6 +74,9 @@ type SpecificationComposerProps = {
 type FieldRowProps = {
   field: FormField;
   value: ProductValue | undefined;
+  // The category being authored. Passed only so a value added here can widen a
+  // slice that would otherwise not offer it.
+  categoryUuid?: string;
   // Absent for a field the reveal brought in — it disappears on its own when the
   // condition stops holding, so removing it by hand would be a dead end.
   onRemove?: () => void;
@@ -365,8 +369,47 @@ const GroupRowsEditor = ({ fields, rows, onChange }: GroupRowsEditorProps) => (
   </div>
 );
 
-const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
-  const live = field.options.filter((option) => !option.retired);
+/**
+ * Options an author added from this form, merged into the list the server sent.
+ *
+ * Kept in component state rather than revalidating the route: the form is
+ * half-filled, and reloading it to pick up one new option would throw away
+ * everything else typed so far.
+ *
+ * A deliberately reused RETIRED option is copied in as live. The author chose it
+ * from the near-duplicate prompt, so it has to be selectable — and the copy is
+ * local to this render, so the library row keeps saying what it says.
+ */
+const withAdded = (
+  options: SpecOption[],
+  added: SpecOption[],
+): SpecOption[] => [
+  ...options.filter((option) => !option.retired),
+  ...added
+    .filter(
+      (entry) =>
+        !options.some((option) => option.value === entry.value && !option.retired),
+    )
+    .map((entry) => ({ ...entry, retired: false })),
+];
+
+const FieldRow = ({
+  field,
+  value,
+  categoryUuid,
+  onChange,
+  onRemove,
+}: FieldRowProps) => {
+  // Keyed by column for a group, and by "" for the attribute's own list.
+  const [added, setAdded] = useState<Record<string, SpecOption[]>>({});
+  const record = (key: string, option: SpecOption): void => {
+    setAdded((current) => ({
+      ...current,
+      [key]: [...(current[key] ?? []), option],
+    }));
+  };
+
+  const live = withAdded(field.options, added[""] ?? []);
   const selected = asList(value);
 
   return (
@@ -449,31 +492,56 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
       )}
 
       {field.type === "single_select" && (
-        <Dropdown
-          value={selected[0] ?? ""}
-          onChange={(next) => onChange(next === "" ? undefined : next)}
-          options={live.map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          placeholder="Not set"
-          searchable={live.length > 8}
-        />
+        <>
+          <Dropdown
+            value={selected[0] ?? ""}
+            onChange={(next) => onChange(next === "" ? undefined : next)}
+            options={live.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            placeholder="Not set"
+            searchable={live.length > 8}
+          />
+          <AddOption
+            specificationUuid={field.specificationUuid}
+            categoryUuid={categoryUuid}
+            label={field.label}
+            onAdded={(option) => {
+              record("", option);
+              onChange(option.value);
+            }}
+          />
+        </>
       )}
 
       {field.type === "multi_select" && (
-        <Dropdown
-          multiple
-          value={selected}
-          onChange={(next) => onChange(next.length === 0 ? undefined : next)}
-          options={live.map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          placeholder="Not set"
-          searchable={live.length > 8}
-          emptyMessage="This category offers no options here"
-        />
+        <>
+          <Dropdown
+            multiple
+            value={selected}
+            onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+            options={live.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            placeholder="Not set"
+            searchable={live.length > 8}
+            emptyMessage="This category offers no options here"
+          />
+          <AddOption
+            specificationUuid={field.specificationUuid}
+            categoryUuid={categoryUuid}
+            label={field.label}
+            onAdded={(option) => {
+              record("", option);
+              // Added, then ticked. An author who adds a value on a multi-select
+              // means to use it — leaving it added but unticked would read as the
+              // add having failed.
+              onChange([...selected, option.value]);
+            }}
+          />
+        </>
       )}
 
       {field.type === "group" &&
@@ -485,13 +553,34 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
             This specification has no sub-fields yet. Add them in the Library.
           </p>
         ) : (
-          <GroupRowsEditor
-            fields={field.groupFields}
-            rows={asRows(value)}
-            // An empty list is not a value — the readers treat a group with no
-            // rows as unanswered, so the form has to store nothing rather than [].
-            onChange={(next) => onChange(next.length === 0 ? undefined : next)}
-          />
+          <>
+            <GroupRowsEditor
+              fields={field.groupFields.map((subField) => ({
+                ...subField,
+                options: withAdded(subField.options, added[subField.key] ?? []),
+              }))}
+              rows={asRows(value)}
+              // An empty list is not a value — the readers treat a group with no
+              // rows as unanswered, so the form has to store nothing rather than [].
+              onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+            />
+            {/* Per COLUMN and below the rows, not inside one. A value belongs to
+                the column; offering it on a row would suggest it were local to
+                that row, and repeating the control per row would put the same
+                button on screen five times. */}
+            {field.groupFields
+              .filter((subField) => subField.kind === "select")
+              .map((subField) => (
+                <AddOption
+                  key={subField.key}
+                  specificationUuid={field.specificationUuid}
+                  groupFieldKey={subField.key}
+                  categoryUuid={categoryUuid}
+                  label={subField.label}
+                  onAdded={(option) => record(subField.key, option)}
+                />
+              ))}
+          </>
         ))}
     </div>
   );
@@ -730,6 +819,7 @@ export const SpecificationComposer = ({
               key={field.specificationUuid}
               field={field}
               value={specValues[field.specificationUuid]}
+              categoryUuid={categoryUuid}
               onChange={(next) => update(field.specificationUuid, next)}
               // A conditional field leaves on its own when its trigger changes,
               // so it carries no remove button.

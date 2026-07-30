@@ -116,6 +116,81 @@ export const mergeOptions = (
 };
 
 // ---------------------------------------------------------------------------
+// Near-duplicate options — the collision `mergeOptions` cannot see
+//
+// `mergeOptions` guards VALUE identity: two options can never end up sharing the
+// stored string a product holds. That is the mechanical half. The other half is
+// semantic and it is the one that actually happens: an author who cannot find
+// "802.3at" adds "PoE+ (802.3at)". Both survive, both are valid, and from then on
+// half the catalog says one and half says the other — so every rule keyed on the
+// first silently stops matching the products holding the second. Nothing errors,
+// and a rule that stops matching looks exactly like a rule nothing violated.
+//
+// There is no way to be certain two labels mean the same thing, so this never
+// refuses. It SURFACES, and the author decides — which is the same call the model
+// already makes for a value outside a category's slice.
+// ---------------------------------------------------------------------------
+
+// Letters and digits only, lowercased, so punctuation and spacing stop mattering:
+// "802.3at", "802-3AT" and "802 3 at" all reduce to the same thing.
+const squash = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// The alphanumeric runs of a label, which is what makes "PoE+ (802.3at)" and
+// "802.3at" comparable: one's tokens contain the other's.
+const tokens = (text: string): string[] =>
+  text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+/**
+ * Whether two option labels are close enough to be worth a second look.
+ *
+ * Containment rather than edit distance, deliberately. The real cases are a
+ * shorter name inside a longer one — "802.3at" inside "PoE+ (802.3at)", "10G"
+ * inside "10 Gbps" — and edit distance rates those as far apart while rating
+ * "802.3at" and "802.3af" (genuinely different standards, one character apart) as
+ * nearly identical. That is backwards, and being wrong in that direction merges
+ * two real values.
+ */
+export const looksLikeSameOption = (a: string, b: string): boolean => {
+  const left = squash(a);
+  const right = squash(b);
+  if (left === "" || right === "") {
+    return false;
+  }
+  if (left === right) {
+    return true;
+  }
+  // One label's alphanumeric core sits inside the other's. Bounded below so a
+  // one- or two-character label does not match half the list: "A" is inside
+  // "802.3at" as a substring and means nothing of the sort.
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  if (shorter.length >= 3 && longer.includes(shorter)) {
+    return true;
+  }
+  // Or they share a distinctive token — "802" alone is not distinctive, "8023at"
+  // is. This is what catches "PoE+ (802.3at)" against "802.3at" once punctuation
+  // splits them into separate tokens rather than one run.
+  const rightTokens = tokens(b);
+  return tokens(a).some(
+    (token) => token.length >= 4 && rightTokens.includes(token),
+  );
+};
+
+/**
+ * Existing options an author's new label might be a second name for.
+ *
+ * Retired options are INCLUDED. A retired option still owns its value and
+ * products still hold it, so re-adding it under a new name is the worst version
+ * of this mistake: the catalog ends up with two live spellings of one thing and
+ * the older products are the ones that fall out of every rule.
+ */
+export const similarOptions = (
+  label: string,
+  existing: SpecOption[],
+): SpecOption[] =>
+  existing.filter((option) => looksLikeSameOption(label, option.label));
+
+// ---------------------------------------------------------------------------
 // Shared vocabularies
 //
 // An attribute, or one sub-field of a group, either owns its option list or
