@@ -260,9 +260,7 @@ describe("describeValue on a group", () => {
           kind: "select",
           unit: null,
           ordered: false,
-          options: [
-            { value: "c13", label: "C13", rank: null, retired: false },
-          ],
+          options: [{ value: "c13", label: "C13", rank: null, retired: false }],
         },
         {
           key: "count",
@@ -310,9 +308,14 @@ describe("mergeGroupFields", () => {
   });
 
   it("derives a stable key from the label", () => {
-    const merged = mergeGroupFields([], [input("Max speed", "select", {
-      options: [{ label: "1G", rank: 1 }],
-    })]);
+    const merged = mergeGroupFields(
+      [],
+      [
+        input("Max speed", "select", {
+          options: [{ label: "1G", rank: 1 }],
+        }),
+      ],
+    );
     expect(merged[0]?.key).toBe("max-speed");
   });
 
@@ -323,10 +326,9 @@ describe("mergeGroupFields", () => {
       [],
       [input("Ports", "number", { unit: "ports" })],
     );
-    const renamed = mergeGroupFields(
-      existing,
-      [input("Port count", "number", { key: existing[0]?.key, unit: "ports" })],
-    );
+    const renamed = mergeGroupFields(existing, [
+      input("Port count", "number", { key: existing[0]?.key, unit: "ports" }),
+    ]);
     expect(renamed[0]?.key).toBe("ports");
     expect(renamed[0]?.label).toBe("Port count");
   });
@@ -345,13 +347,16 @@ describe("mergeGroupFields", () => {
   });
 
   it("normalises a number sub-field to its own kind", () => {
-    const merged = mergeGroupFields([], [
-      input("Ports", "number", {
-        unit: "ports",
-        ordered: true,
-        options: [{ label: "Nonsense", rank: null }],
-      }),
-    ]);
+    const merged = mergeGroupFields(
+      [],
+      [
+        input("Ports", "number", {
+          unit: "ports",
+          ordered: true,
+          options: [{ label: "Nonsense", rank: null }],
+        }),
+      ],
+    );
     expect(merged[0]).toMatchObject({
       kind: "number",
       unit: "ports",
@@ -361,12 +366,15 @@ describe("mergeGroupFields", () => {
   });
 
   it("normalises a select sub-field to its own kind", () => {
-    const merged = mergeGroupFields([], [
-      input("Family", "select", {
-        unit: "should-be-dropped",
-        options: [{ label: "SFP", rank: null }],
-      }),
-    ]);
+    const merged = mergeGroupFields(
+      [],
+      [
+        input("Family", "select", {
+          unit: "should-be-dropped",
+          options: [{ label: "SFP", rank: null }],
+        }),
+      ],
+    );
     expect(merged[0]?.unit).toBeNull();
     expect(merged[0]?.options).toHaveLength(1);
   });
@@ -374,14 +382,17 @@ describe("mergeGroupFields", () => {
   it("retires a removed option rather than deleting it", () => {
     // The append-only guarantee has to reach INSIDE a group, or a product's row
     // ends up pointing at a pick that no longer exists.
-    const existing = mergeGroupFields([], [
-      input("Family", "select", {
-        options: [
-          { label: "SFP", rank: null },
-          { label: "QSFP", rank: null },
-        ],
-      }),
-    ]);
+    const existing = mergeGroupFields(
+      [],
+      [
+        input("Family", "select", {
+          options: [
+            { label: "SFP", rank: null },
+            { label: "QSFP", rank: null },
+          ],
+        }),
+      ],
+    );
     const merged = mergeGroupFields(existing, [
       input("Family", "select", {
         key: "family",
@@ -395,15 +406,18 @@ describe("mergeGroupFields", () => {
   });
 
   it("ranks every option on an ordered sub-field", () => {
-    const merged = mergeGroupFields([], [
-      input("Max speed", "select", {
-        ordered: true,
-        options: [
-          { label: "1G", rank: 1000 },
-          { label: "10G", rank: null },
-        ],
-      }),
-    ]);
+    const merged = mergeGroupFields(
+      [],
+      [
+        input("Max speed", "select", {
+          ordered: true,
+          options: [
+            { label: "1G", rank: 1000 },
+            { label: "10G", rank: null },
+          ],
+        }),
+      ],
+    );
     // An ordered scale with a null rank has nothing for `lte` to compare, so the
     // position stands in rather than leaving a hole.
     expect(merged[0]?.options.map((option) => option.rank)).toEqual([1000, 2]);

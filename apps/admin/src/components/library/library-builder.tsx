@@ -25,7 +25,7 @@ import {
 } from "@/db/label";
 import { Field } from "@/components/shared/field";
 import type { SelectCategories } from "@/db/schema/categories";
-import type { SpecOption } from "@/db/types";
+import type { SpecGroupField, SpecOption } from "@/db/types";
 import { buildCategoryTreeOptions } from "@/lib/categories";
 import {
   ArrowDown,
@@ -38,6 +38,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  Rows3,
   Search,
   ToggleLeft,
   Trash2,
@@ -149,19 +150,40 @@ type OptionDraft = {
   retired: boolean;
 };
 
+// One row of the sub-field editor, for a `group` attribute. `key` is present on a
+// sub-field that already exists, and carrying it through is what keeps a
+// product's stored rows readable when its label is edited — a row is an object
+// keyed by these, so a re-derived key orphans every row at once.
+type GroupFieldDraft = {
+  key?: string;
+  label: string;
+  kind: "number" | "select";
+  unit: string;
+  ordered: boolean;
+  options: OptionDraft[];
+};
+
+type OptionListEditorProps = {
+  options: OptionDraft[];
+  // Position is the rank, so the arrows only appear when position means something.
+  ordered: boolean;
+  onChange: (next: OptionDraft[]) => void;
+  addLabel: string;
+};
+
 type SearchHit = LibraryAttribute & { groupLabel: string };
 
-// `group` is deliberately absent until this form can author a row's sub-fields.
-// The type, the storage and the readers all exist, but an attribute saved as a
-// group with no sub-field schema is a value nothing can decode — and the service
-// rightly refuses it, which would leave an author stuck on an error this screen
-// gives them no way to satisfy.
-const TYPE_OPTIONS: DropdownOption[] = specificationTypes
-  .filter((type) => type !== "group")
-  .map((type) => ({
-    value: type,
-    label: SPECIFICATION_TYPE_LABELS[type],
-  }));
+const TYPE_OPTIONS: DropdownOption[] = specificationTypes.map((type) => ({
+  value: type,
+  label: SPECIFICATION_TYPE_LABELS[type],
+}));
+
+// The two things a sub-field can be. Named for what an author sees rather than
+// for the stored kind: a count is a number box, a pick is a dropdown.
+const GROUP_FIELD_KIND_OPTIONS: DropdownOption[] = [
+  { value: "number", label: "A count" },
+  { value: "select", label: "A pick from a list" },
+];
 
 // The unit picker shows what each unit MEASURES, because that is what decides
 // whether a rule may compare two attributes. W and kW convert; W and VA never
@@ -204,6 +226,9 @@ const TypeIcon = ({ type }: { type: SpecificationType }) => {
   if (type === "multi_select") {
     return <ListChecks size={15} className="text-faint" />;
   }
+  if (type === "group") {
+    return <Rows3 size={15} className="text-faint" />;
+  }
   return <ArrowUpDown size={15} className="text-faint" />;
 };
 
@@ -213,6 +238,161 @@ const toDrafts = (options: SpecOption[]): OptionDraft[] =>
     label: option.label,
     retired: option.retired,
   }));
+
+const toFieldDrafts = (fields: SpecGroupField[]): GroupFieldDraft[] =>
+  fields.map((field) => ({
+    key: field.key,
+    label: field.label,
+    kind: field.kind,
+    unit: field.unit ?? "",
+    ordered: field.ordered,
+    options: toDrafts(field.options),
+  }));
+
+// The live options of a select, in the shape the service wants. Retired ones are
+// dropped because `mergeOptions` reads its input as the CURRENT list — passing a
+// retired option back would un-retire it.
+const liveOptions = (options: OptionDraft[], ordered: boolean) =>
+  options
+    .filter((option) => option.label.trim() !== "" && !option.retired)
+    // The rank is the option's POSITION, so the author orders by moving options
+    // rather than by inventing numbers. The service falls back to position too,
+    // so the two agree.
+    .map((option, index) => ({
+      value: option.value,
+      label: option.label,
+      rank: ordered ? index + 1 : null,
+    }));
+
+/**
+ * The option list editor, used for a select attribute's master list AND for a
+ * group sub-field's picks.
+ *
+ * Shared rather than written twice: retiring instead of deleting, and taking the
+ * rank from position, are subtle enough that two copies would drift — and a
+ * drifted copy inside a group would silently orphan a product's rows.
+ */
+const OptionListEditor = ({
+  options,
+  ordered,
+  onChange,
+  addLabel,
+}: OptionListEditorProps) => {
+  const setOption = (index: number, patch: Partial<OptionDraft>): void => {
+    onChange(
+      options.map((option, at) =>
+        at === index ? { ...option, ...patch } : option,
+      ),
+    );
+  };
+
+  // Swap with the neighbour. On an ordered attribute the position IS the rank, so
+  // this is the whole ordering mechanism — no numbers for the author to invent.
+  const moveOption = (index: number, direction: -1 | 1): void => {
+    const target = index + direction;
+    if (target < 0 || target >= options.length) {
+      return;
+    }
+    const next = [...options];
+    const a = next[index];
+    const b = next[target];
+    if (!a || !b) {
+      return;
+    }
+    next[index] = b;
+    next[target] = a;
+    onChange(next);
+  };
+
+  return (
+    <>
+      {/* Wrapping flow, not a fixed grid. A grid stretches every box to an
+          equal share of the row, so three short options ate the full width;
+          a fixed-width box lets as many fit per row as the screen allows —
+          six or seven on a wide monitor. */}
+      <div className="flex flex-wrap gap-2">
+        {options.map((option, index) => (
+          <div
+            key={option.value ?? `new-${index}`}
+            className="flex shrink-0 items-center gap-1"
+          >
+            <div className="w-40">
+              <Input
+                placeholder="Option label"
+                value={option.label}
+                disabled={option.retired}
+                onChange={(event) =>
+                  setOption(index, { label: event.target.value })
+                }
+              />
+            </div>
+            {/* Position is the rank, so ordering is done by moving options
+                rather than by typing a number nobody wants to think about. */}
+            {ordered && !option.retired && (
+              <div className="flex shrink-0 flex-col">
+                <button
+                  type="button"
+                  onClick={() => moveOption(index, -1)}
+                  disabled={index === 0}
+                  aria-label={`Move ${option.label || "this option"} earlier`}
+                  className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                >
+                  <ArrowUp size={11} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveOption(index, 1)}
+                  disabled={index === options.length - 1}
+                  aria-label={`Move ${option.label || "this option"} later`}
+                  className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                >
+                  <ArrowDown size={11} />
+                </button>
+              </div>
+            )}
+            {option.retired ? (
+              <button
+                type="button"
+                onClick={() => setOption(index, { retired: false })}
+                className="flex shrink-0 items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
+                aria-label={`Bring back ${option.label}`}
+              >
+                <Undo2 size={12} />
+                retired
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  option.value
+                    ? setOption(index, { retired: true })
+                    : onChange(options.filter((_, at) => at !== index))
+                }
+                className="shrink-0 rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+                aria-label={
+                  option.value ? `Retire ${option.label}` : "Remove this option"
+                }
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Outside the grid — inside it, the button would occupy a cell and jump
+          around as options are added. */}
+      <button
+        type="button"
+        onClick={() => onChange([...options, { label: "", retired: false }])}
+        className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+      >
+        <Plus size={13} />
+        {addLabel}
+      </button>
+    </>
+  );
+};
 
 const AttributeForm = ({
   groupUuid,
@@ -238,21 +418,27 @@ const AttributeForm = ({
   const [options, setOptions] = useState<OptionDraft[]>(
     initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
   );
+  const [groupFields, setGroupFields] = useState<GroupFieldDraft[]>(
+    initial ? toFieldDrafts(initial.groupFields) : [],
+  );
 
   const locked = (initial?.relationshipCount ?? 0) > 0;
 
-  const setOption = (index: number, patch: Partial<OptionDraft>): void => {
-    setOptions((current) =>
-      current.map((option, at) =>
-        at === index ? { ...option, ...patch } : option,
+  const setGroupField = (
+    index: number,
+    patch: Partial<GroupFieldDraft>,
+  ): void => {
+    setGroupFields((current) =>
+      current.map((field, at) =>
+        at === index ? { ...field, ...patch } : field,
       ),
     );
   };
 
-  // Swap with the neighbour. On an ordered attribute the position IS the rank, so
-  // this is the whole ordering mechanism — no numbers for the author to invent.
-  const moveOption = (index: number, direction: -1 | 1): void => {
-    setOptions((current) => {
+  // Sub-field order is the column order of every stored row, so this is how the
+  // author decides whether a port group reads "24 · 1G" or "1G · 24".
+  const moveGroupField = (index: number, direction: -1 | 1): void => {
+    setGroupFields((current) => {
       const target = index + direction;
       if (target < 0 || target >= current.length) {
         return current;
@@ -269,6 +455,21 @@ const AttributeForm = ({
     });
   };
 
+  const namedGroupFields = groupFields.filter(
+    (field) => field.label.trim() !== "",
+  );
+
+  // Mirrors what the service refuses, so the author is stopped here rather than
+  // by an error after a save they thought would work.
+  const groupIncomplete =
+    type === "group" &&
+    (namedGroupFields.length === 0 ||
+      namedGroupFields.some(
+        (field) =>
+          field.kind === "select" &&
+          liveOptions(field.options, field.ordered).length === 0,
+      ));
+
   const submit = (): void => {
     onSubmit({
       groupUuid: group === "" ? null : group,
@@ -283,37 +484,26 @@ const AttributeForm = ({
       // Who sees an attribute is a per-category decision, so it is set on
       // the assignment. The library only says what the attribute IS.
       audience: initial?.audience ?? "everyone",
-      options: isOptionType(type)
-        ? options
-            .filter((option) => option.label.trim() !== "" && !option.retired)
-            // The rank is the option's POSITION, so the author orders by moving
-            // options rather than by inventing numbers. The service falls back to
-            // position too, so the two agree.
-            .map((option, index) => ({
-              value: option.value,
-              label: option.label,
-              rank: ordered ? index + 1 : null,
+      options: isOptionType(type) ? liveOptions(options, ordered) : [],
+      groupFields:
+        type === "group"
+          ? namedGroupFields.map((field) => ({
+              // Carried through so a renamed sub-field keeps the key every
+              // stored row is filed under.
+              key: field.key,
+              label: field.label,
+              kind: field.kind,
+              // Each normalised to its own kind, matching what the service does:
+              // a pick carrying a unit, or a count carrying options, would leave
+              // the row editor with no honest control to render.
+              unit: field.kind === "number" ? field.unit || null : null,
+              ordered: field.kind === "select" ? field.ordered : false,
+              options:
+                field.kind === "select"
+                  ? liveOptions(field.options, field.ordered)
+                  : [],
             }))
-        : [],
-      // Carried through UNCHANGED, not rebuilt from the form: this screen cannot
-      // show a sub-field schema yet, and sending [] would wipe the schema of a
-      // group attribute edited for some unrelated reason. Retired options are
-      // dropped for the same reason they are above — `mergeOptions` reads the
-      // input as the live list, so passing them back would un-retire them.
-      groupFields: (initial?.groupFields ?? []).map((field) => ({
-        key: field.key,
-        label: field.label,
-        kind: field.kind,
-        unit: field.unit,
-        ordered: field.ordered,
-        options: field.options
-          .filter((option) => !option.retired)
-          .map((option) => ({
-            value: option.value,
-            label: option.label,
-            rank: option.rank,
-          })),
-      })),
+          : [],
     });
   };
 
@@ -424,99 +614,150 @@ const AttributeForm = ({
               : "Leave this off for a plain list like Black / White, where no option is bigger than another."}
           </p>
 
-          {/* Wrapping flow, not a fixed grid. A grid stretches every box to an
-              equal share of the row, so three short options ate the full width;
-              a fixed-width box lets as many fit per row as the screen allows —
-              six or seven on a wide monitor. */}
-          <div className="flex flex-wrap gap-2">
-            {options.map((option, index) => (
-              <div
-                key={option.value ?? `new-${index}`}
-                className="flex shrink-0 items-center gap-1"
-              >
-                <div className="w-40">
-                  <Input
-                    placeholder="Option label"
-                    value={option.label}
-                    disabled={option.retired}
-                    onChange={(event) =>
-                      setOption(index, { label: event.target.value })
-                    }
-                  />
-                </div>
-                {/* Position is the rank, so ordering is done by moving options
-                    rather than by typing a number nobody wants to think about. */}
-                {ordered && !option.retired && (
-                  <div className="flex shrink-0 flex-col">
-                    <button
-                      type="button"
-                      onClick={() => moveOption(index, -1)}
-                      disabled={index === 0}
-                      aria-label={`Move ${option.label || "this option"} earlier`}
-                      className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowUp size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveOption(index, 1)}
-                      disabled={index === options.length - 1}
-                      aria-label={`Move ${option.label || "this option"} later`}
-                      className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowDown size={11} />
-                    </button>
-                  </div>
-                )}
-                {option.retired ? (
-                  <button
-                    type="button"
-                    onClick={() => setOption(index, { retired: false })}
-                    className="flex shrink-0 items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
-                    aria-label={`Bring back ${option.label}`}
-                  >
-                    <Undo2 size={12} />
-                    retired
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      option.value
-                        ? setOption(index, { retired: true })
-                        : setOptions((current) =>
-                            current.filter((_, at) => at !== index),
-                          )
-                    }
-                    className="shrink-0 rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
-                    aria-label={
-                      option.value
-                        ? `Retire ${option.label}`
-                        : "Remove this option"
-                    }
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
+          <OptionListEditor
+            options={options}
+            ordered={ordered}
+            onChange={setOptions}
+            addLabel="Add option"
+          />
+        </div>
+      )}
+
+      {type === "group" && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-sm text-ink">What one row holds</p>
+            <p className="text-[11px] text-muted">
+              A product answers this with as many rows as it needs — four port
+              groups on a switch, three outlet types on a UPS. Each row is
+              filled in with the sub-fields below, in this order.
+            </p>
           </div>
 
-          {/* Outside the grid — inside it, the button would occupy a cell and jump
-              around as options are added. */}
+          {groupFields.map((field, index) => (
+            <div
+              key={field.key ?? `new-field-${index}`}
+              className="flex flex-col gap-3 rounded-card border border-hairline bg-hover/40 p-3"
+            >
+              <div className="flex items-start gap-2">
+                <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Input
+                    placeholder="Sub-field name"
+                    value={field.label}
+                    onChange={(event) =>
+                      setGroupField(index, { label: event.target.value })
+                    }
+                  />
+                  <Dropdown
+                    value={field.kind}
+                    onChange={(next) =>
+                      setGroupField(index, {
+                        kind: next === "number" ? "number" : "select",
+                      })
+                    }
+                    options={GROUP_FIELD_KIND_OPTIONS}
+                  />
+                </div>
+
+                {/* Sub-field order is the COLUMN order of every row, so it is
+                    always reorderable — unlike option order, which only matters
+                    on a scale. */}
+                <div className="flex shrink-0 flex-col">
+                  <button
+                    type="button"
+                    onClick={() => moveGroupField(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Move ${field.label || "this sub-field"} earlier`}
+                    className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                  >
+                    <ArrowUp size={11} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveGroupField(index, 1)}
+                    disabled={index === groupFields.length - 1}
+                    aria-label={`Move ${field.label || "this sub-field"} later`}
+                    className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                  >
+                    <ArrowDown size={11} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGroupFields((current) =>
+                      current.filter((_, at) => at !== index),
+                    )
+                  }
+                  className="shrink-0 rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+                  aria-label={`Remove ${field.label || "this sub-field"}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {field.kind === "number" ? (
+                <Field
+                  label="Unit"
+                  hint="What the count measures. Leave blank when the sub-field is a plain tally, like how many ports."
+                >
+                  <Combobox
+                    value={field.unit}
+                    onChange={(next) => setGroupField(index, { unit: next })}
+                    options={UNIT_OPTIONS}
+                    placeholder="Search units…"
+                  />
+                </Field>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Checkbox
+                    label="These options go from smallest to largest"
+                    checked={field.ordered}
+                    onChange={(event) =>
+                      setGroupField(index, { ordered: event.target.checked })
+                    }
+                  />
+                  <OptionListEditor
+                    options={field.options}
+                    ordered={field.ordered}
+                    onChange={(next) => setGroupField(index, { options: next })}
+                    addLabel="Add option"
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+
           <button
             type="button"
             onClick={() =>
-              setOptions((current) => [
+              setGroupFields((current) => [
                 ...current,
-                { label: "", retired: false },
+                {
+                  label: "",
+                  kind: "number",
+                  unit: "",
+                  ordered: false,
+                  options: [],
+                },
               ])
             }
             className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
           >
             <Plus size={13} />
-            Add option
+            Add sub-field
           </button>
+
+          {/* The same two things the service refuses, said before the author
+              tries to save rather than after. */}
+          {groupIncomplete && (
+            <p className="text-[11px] text-amber-500">
+              {namedGroupFields.length === 0
+                ? "A row needs at least one sub-field — otherwise there is nothing in it to read."
+                : "Every sub-field that is a pick needs at least one option."}
+            </p>
+          )}
         </div>
       )}
 
@@ -526,7 +767,10 @@ const AttributeForm = ({
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
-        <Button onClick={submit} disabled={pending || label.trim() === ""}>
+        <Button
+          onClick={submit}
+          disabled={pending || label.trim() === "" || groupIncomplete}
+        >
           {initial ? "Save" : "Add attribute"}
         </Button>
       </div>
@@ -591,6 +835,15 @@ const AttributeRow = ({
             {/* Listed in rank order for an ordered attribute, so the sequence
                 itself is the information — the numbers behind it are noise. */}
             {live.map((option) => option.label).join(" · ")}
+          </p>
+        )}
+
+        {/* A group has no master option list, so the line above is always empty
+            for one. Its sub-fields in column order are the equivalent summary —
+            they are what one stored row actually looks like. */}
+        {attribute.groupFields.length > 0 && (
+          <p className="mt-1 line-clamp-1 text-xs text-muted">
+            {attribute.groupFields.map((field) => field.label).join(" · ")}
           </p>
         )}
 

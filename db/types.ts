@@ -264,12 +264,7 @@ export const isSpecRange = (value: unknown): value is SpecRange =>
 // disjoint, and `isSpecGroupRows` is how every reader tells them apart before
 // coercing. No reader may branch on `Array.isArray` alone.
 export type ProductValue =
-  | number
-  | boolean
-  | string
-  | string[]
-  | SpecRange
-  | SpecGroupRow[];
+  number | boolean | string | string[] | SpecRange | SpecGroupRow[];
 
 export type ProductValues = Record<string, ProductValue>;
 
