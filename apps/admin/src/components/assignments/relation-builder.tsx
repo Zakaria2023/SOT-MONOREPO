@@ -272,6 +272,22 @@ const RelationForm = ({
     [attributes, groups, variables],
   );
 
+  // Groups that offer nothing to total, so the picker above can say why they are
+  // missing instead of simply omitting them.
+  const uncountableGroups = useMemo<string[]>(
+    () =>
+      attributes
+        .filter(
+          (attribute) =>
+            attribute.type === "group" &&
+            (groups.length === 0 ||
+              groups.includes(attribute.groupName ?? UNGROUPED)) &&
+            !attribute.groupFields.some((field) => field.kind === "number"),
+        )
+        .map((attribute) => `"${attribute.label}"`),
+    [attributes, groups],
+  );
+
   // Which kind of operand a picked value is. Variables are few and attributes
   // many, so asking the short list is the cheap question.
   const toOperand = (picked: string): Operand => {
@@ -477,6 +493,18 @@ const RelationForm = ({
             searchable={groupOptions.length > 8}
           />
         </Field>
+      )}
+
+      {/* A group with no count sub-field cannot be totalled, so it is absent from
+          every side picker below. Said here rather than left as a gap: an author
+          hunting for "Network Ports" and not finding it has no way to guess that
+          the reason is a missing count column. */}
+      {uncountableGroups.length > 0 && (
+        <p className="text-[11px] text-muted">
+          {uncountableGroups.join(", ")} hold rows but no count, so there is
+          nothing to add up and they are not listed below. Add a count sub-field
+          in the library to use one in a rule.
+        </p>
       )}
 
       {form.family === "presence" && (

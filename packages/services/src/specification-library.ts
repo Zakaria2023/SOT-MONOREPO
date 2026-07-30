@@ -392,6 +392,10 @@ export const createLibraryAttribute = async (
   return uuid;
 };
 
+// Stands in when no source moved, so `plannedRepoints` is never handed a real
+// index it had no reason to load.
+const emptyOptionSets: OptionSetIndex = new Map();
+
 // One option source that is about to change. `subFieldKey` is absent for the
 // attribute's own list and set for one column of a group's rows.
 type Repoint = {
@@ -507,14 +511,6 @@ const checkValueImpact = async (
   nextOptions: SpecOption[],
   nextGroupFields: SpecGroupField[],
 ): Promise<string[]> => {
-  const sets = await loadOptionSetIndex();
-  const repoints = plannedRepoints(
-    current,
-    nextSet,
-    nextOptions,
-    nextGroupFields,
-    sets,
-  );
   const beforeKeys = new Set(
     (current.groupFields ?? []).map((field) => field.key),
   );
@@ -522,11 +518,38 @@ const checkValueImpact = async (
     beforeKeys.size > 0 &&
     nextGroupFields.some((field) => !beforeKeys.has(field.key));
 
-  if (repoints.length === 0 && !addsSubField) {
+  // WHETHER a source moved is answerable from the two schemas alone. Only the
+  // question of what the destination now spells needs the shared lists loaded — so
+  // the common save, which moves nothing, reads nothing at all. This used to fetch
+  // the index on every rename.
+  const storedFieldSets = new Map(
+    (current.groupFields ?? []).map((field) => [
+      field.key,
+      field.optionSetUuid ?? null,
+    ]),
+  );
+  const movesSource =
+    (current.optionSetUuid ?? null) !== nextSet ||
+    nextGroupFields.some(
+      (field) =>
+        storedFieldSets.has(field.key) &&
+        storedFieldSets.get(field.key) !== (field.optionSetUuid ?? null),
+    );
+
+  if (!movesSource && !addsSubField) {
     return [];
   }
 
-  const held = await readHeldValues(uuid);
+  // Independent reads, so they go together rather than one after the other — this
+  // sits directly in the path of an author pressing Save.
+  const [sets, held] = await Promise.all([
+    movesSource ? loadOptionSetIndex() : Promise.resolve(emptyOptionSets),
+    readHeldValues(uuid),
+  ]);
+  const repoints = movesSource
+    ? plannedRepoints(current, nextSet, nextOptions, nextGroupFields, sets)
+    : [];
+
   if (held.values.length === 0) {
     // Nothing to reinterpret and nothing to invalidate. This is the path an author
     // takes while still building the library, and it must stay frictionless.

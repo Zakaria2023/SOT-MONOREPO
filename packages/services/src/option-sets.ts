@@ -287,27 +287,67 @@ export type HeldValues = {
  * `usedOptionValues` / `valuesOutsideVocabulary`), and that needs the values
  * themselves, not a count.
  *
- * ONE query, and only the products that actually hold the attribute: the uuid is
- * matched as a JSON path in the WHERE clause rather than by loading the catalog
- * and filtering in memory. The path is bound as a parameter, never interpolated.
- * It runs only when an author changes an option source, which is rare — so
- * reading whole value maps for those few rows is the right trade against the
- * per-row extraction that would return JSON as an untyped string.
+ * ONE query, and it carries only what it needs. Two things keep it cheap on a
+ * catalog of any size:
+ *
+ *   The uuid is matched as a JSON path in the WHERE clause, so only the products
+ *   that actually hold this attribute come back — not the catalog, filtered in
+ *   memory afterwards.
+ *
+ *   `json_extract` returns just that one attribute's value per row. Selecting
+ *   `spec_values` would drag every OTHER attribute of every matching product
+ *   across the wire — dozens of unrelated values per row, to read one.
+ *
+ * The path is bound as a parameter, never interpolated. There is deliberately no
+ * LIMIT: the caller checks whether the destination vocabulary spells every value
+ * held, and a truncated scan would approve a re-point that strands a value on the
+ * row it never read.
  */
 export const readHeldValues = async (
   specificationUuid: string,
 ): Promise<HeldValues> => {
   const path = `$.${JSON.stringify(specificationUuid)}`;
   const rows = await db
-    .select({ name: Products.name, specValues: Products.specValues })
+    .select({
+      name: Products.name,
+      // Aliased, because the expression is what is selected rather than a column.
+      held: sql<unknown>`json_extract(${Products.specValues}, ${path})`.as(
+        "held",
+      ),
+    })
     .from(Products)
     .where(sql`json_contains_path(${Products.specValues}, 'one', ${path})`);
 
   return {
     productNames: rows.map((row) => row.name),
     values: rows.flatMap((row) => {
-      const value = row.specValues?.[specificationUuid];
+      const value = decodeHeld(row.held);
       return value === undefined ? [] : [value];
     }),
   };
+};
+
+/**
+ * A `json_extract` result as a ProductValue.
+ *
+ * mysql2 hands back a computed JSON expression as a STRING, unlike a declared
+ * `json` column which it parses for us. Parsing here rather than trusting the
+ * driver is what keeps this working if that ever changes: an already-parsed value
+ * passes straight through, and a string is parsed once.
+ */
+const decodeHeld = (held: unknown): ProductValue | undefined => {
+  if (held === null || held === undefined) {
+    return undefined;
+  }
+  if (typeof held !== "string") {
+    return held as ProductValue;
+  }
+  try {
+    return JSON.parse(held) as ProductValue;
+  } catch {
+    // Not JSON at all. Returning the raw string is right rather than dropping it:
+    // it is still a value some product holds, and the caller's job is to decide
+    // whether the destination vocabulary spells it.
+    return held;
+  }
 };

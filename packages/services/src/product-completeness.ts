@@ -364,6 +364,19 @@ const toFormReveal = (
   if (!predicate) {
     return null;
   }
+  // A condition about one COLUMN of a group's rows takes the same escape hatch as
+  // a composite one: it crosses as `null`, the field shows, and the server decides
+  // on save.
+  //
+  // Not carried across on purpose. `FormRevealCondition` has no room for it, and
+  // adding one would mean the browser reducing rows to picks and ranks — a second
+  // implementation of the group semantics, which is exactly what this narrow mirror
+  // exists to avoid. Sending it WITHOUT the column would be worse than either:
+  // the browser would test the whole attribute, find nothing, and hide a field
+  // that should be visible.
+  if ("field" in predicate && predicate.field) {
+    return null;
+  }
   if (predicate.op === "equals") {
     return { attr: predicate.attr, op: "equals", values: [predicate.value] };
   }

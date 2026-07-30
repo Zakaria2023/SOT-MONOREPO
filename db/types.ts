@@ -150,27 +150,62 @@ export const isSpecGroupRows = (value: unknown): value is SpecGroupRow[] =>
 // what this model exists to prevent.
 export type PredicateScalar = string | number | boolean;
 
+// One column of a `group` attribute, when a condition is about the rows rather
+// than the attribute as a whole — "has any SFP cage" is a question about the
+// family column of Network Ports, not about Network Ports.
+//
+// Optional on every attribute operator, so nothing authored before this existed
+// changes meaning. Absent means the attribute itself, exactly as before.
+//
+// WHAT IT MEANS, because each reading has a wrong twin that would fail silently.
+// None of these is invented here; each matches a rule the model already follows:
+//
+//   Set operators (equals / in / not_in) read the DISTINCT PICKS across rows, so
+//   they are existential: "any row's family is SFP". This is the same reading a
+//   multi-select already gets, where the ticked set is compared as a whole.
+//
+//   Numeric operators on a PICK column read the HIGHEST rank across rows — the
+//   fastest cage, not the slowest. Identical to what `asNumber` already does for
+//   a multi-select ("a device that accepts af/at/bt supplies bt").
+//
+//   Numeric operators on a COUNT column read the TOTAL across rows, the same
+//   figure an operand totals. "at least 24 ports" means 24 in total, not 24 in
+//   some single row.
+//
+//   `exists` means at least one row is READABLE — complete against the current
+//   schema. A group whose rows all became unreadable must not answer yes.
+export type PredicateField = { field?: string };
+
 export type Predicate =
   // Scalar comparison. On a multi-select attribute, `equals` holds when the
   // ticked set is exactly [value].
-  | { op: "equals"; attr: string; value: PredicateScalar }
-  | { op: "not_equals"; attr: string; value: PredicateScalar }
+  | ({ op: "equals"; attr: string; value: PredicateScalar } & PredicateField)
+  | ({
+      op: "not_equals";
+      attr: string;
+      value: PredicateScalar;
+    } & PredicateField)
   // Set membership. `mode` decides what "matches" means when the attribute
   // being tested is multi-select and holds several values at once:
   //   any → the item's values overlap `values` (the common case)
   //   all → the item's values are a subset of `values` ("only PoE, nothing
   //         else"), which `any` cannot express.
-  | { op: "in"; attr: string; values: PredicateScalar[]; mode: MatchMode }
-  | { op: "not_in"; attr: string; values: PredicateScalar[] }
+  | ({
+      op: "in";
+      attr: string;
+      values: PredicateScalar[];
+      mode: MatchMode;
+    } & PredicateField)
+  | ({ op: "not_in"; attr: string; values: PredicateScalar[] } & PredicateField)
   // Numeric comparison. On an ORDERED select these compare the option's `rank`,
   // so "PoE input at most 802.3at" works on a dropdown, not just on a number.
-  | { op: "gt"; attr: string; value: number }
-  | { op: "gte"; attr: string; value: number }
-  | { op: "lt"; attr: string; value: number }
-  | { op: "lte"; attr: string; value: number }
-  | { op: "between"; attr: string; min: number; max: number }
+  | ({ op: "gt"; attr: string; value: number } & PredicateField)
+  | ({ op: "gte"; attr: string; value: number } & PredicateField)
+  | ({ op: "lt"; attr: string; value: number } & PredicateField)
+  | ({ op: "lte"; attr: string; value: number } & PredicateField)
+  | ({ op: "between"; attr: string; min: number; max: number } & PredicateField)
   // Has any value at all — the "is this filled in" test.
-  | { op: "exists"; attr: string }
+  | ({ op: "exists"; attr: string } & PredicateField)
   // A PRODUCT GROUP: is this item in that category, or anywhere beneath it?
   //
   // The one operator that does not name an attribute. It exists because some

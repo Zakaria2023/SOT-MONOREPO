@@ -169,6 +169,13 @@ type GroupFieldDraft = {
   optionSetUuid: string;
 };
 
+type SharedListNoteProps = {
+  list: OptionSet;
+  // The attribute being edited, so it is not counted among the "others" that a
+  // change to the list would also affect.
+  exceptLabel?: string;
+};
+
 type SearchHit = LibraryAttribute & { groupLabel: string };
 
 const TYPE_OPTIONS: DropdownOption[] = specificationTypes.map((type) => ({
@@ -251,6 +258,73 @@ const sourceOptions = (sharedLists: OptionSet[]): DropdownOption[] => [
     label: `${list.name}${list.ordered ? " (a scale)" : ""}`,
   })),
 ];
+
+/**
+ * What a borrowed list holds and who else holds it.
+ *
+ * Shown wherever a shared list is chosen — the attribute's own source and each
+ * group sub-field's — so the two read identically. A sub-field previously showed a
+ * bare line of option text with no name and no scale badge, which left an author
+ * unable to tell a shared list from one typed in place.
+ */
+const SharedListNote = ({ list, exceptLabel }: SharedListNoteProps) => {
+  const live = list.options.filter((option) => !option.retired);
+  // Everything pointing at the list except the attribute being edited, so the
+  // count answers "who ELSE does this change affect".
+  const others = [...list.attributeLabels, ...list.groupFieldLabels].filter(
+    (label) => label !== exceptLabel,
+  );
+
+  return (
+    <div className="flex flex-col gap-1 rounded-card border border-hairline bg-hover/40 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Library size={13} className="shrink-0 text-faint" />
+        <span className="text-xs font-medium text-ink">{list.name}</span>
+        {list.ordered && (
+          <span className="flex items-center gap-1 rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+            <ArrowUpDown size={9} />
+            scale
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] text-muted">
+        {live.map((option) => option.label).join(" · ") ||
+          "This shared list has no options yet."}
+      </p>
+      {/* Editing is deliberately elsewhere. A change made from here would land on
+          every attribute pointing at the list, and an author editing one attribute
+          has no reason to expect that. */}
+      <p className="text-[11px] text-faint">
+        {others.length === 0
+          ? "Nothing else uses this list yet. Edit it on the Shared lists tab."
+          : `Also used by ${others.slice(0, 3).join(", ")}${others.length > 3 ? ` and ${others.length - 3} more` : ""}. Edit it on the Shared lists tab.`}
+      </p>
+    </div>
+  );
+};
+
+/**
+ * A sub-field's borrowed list, or a plain warning when the pointer dangles.
+ *
+ * A missing list is said out loud rather than rendered as an empty line: the rows
+ * stored under that sub-field will offer nothing to pick, and an author staring at
+ * a blank space has no way to know why.
+ */
+const SubFieldSharedList = ({
+  list,
+  exceptLabel,
+}: {
+  list?: OptionSet;
+  exceptLabel?: string;
+}) =>
+  list ? (
+    <SharedListNote list={list} exceptLabel={exceptLabel} />
+  ) : (
+    <p className="text-[11px] text-amber-500">
+      This sub-field points at a shared list that no longer exists. Pick another
+      one, or give it its own options.
+    </p>
+  );
 
 const AttributeForm = ({
   groupUuid,
@@ -498,35 +572,14 @@ const AttributeForm = ({
           </Field>
 
           {chosenList ? (
-            <div className="flex flex-col gap-1 rounded-card border border-hairline bg-hover/40 p-3">
-              <div className="flex items-center gap-2">
-                <Library size={13} className="shrink-0 text-faint" />
-                <span className="text-xs font-medium text-ink">
-                  {chosenList.name}
-                </span>
-                {chosenList.ordered && (
-                  <span className="flex items-center gap-1 rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
-                    <ArrowUpDown size={9} />
-                    scale
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-muted">
-                {chosenList.options
-                  .filter((option) => !option.retired)
-                  .map((option) => option.label)
-                  .join(" · ") || "This shared list has no options yet."}
-              </p>
-              {/* Editing is deliberately elsewhere. A change made from here would
-                  land on every attribute pointing at the list, and an author
-                  editing one attribute has no reason to expect that. */}
-              <p className="text-[11px] text-faint">
-                Shared with{" "}
-                {chosenList.attributeLabels.length +
-                  chosenList.groupFieldLabels.length}{" "}
-                other place(s). Edit it on the Shared lists tab.
-              </p>
-            </div>
+            <SharedListNote
+              list={chosenList}
+              // Excluded from its own "shared with" count. Without this the note
+              // read "shared with 0 other places" on an attribute that was clearly
+              // linked, and "1 other place" once saved — the one place being
+              // itself.
+              exceptLabel={initial?.label}
+            />
           ) : (
             <div className="flex flex-col gap-2">
               {/* One plain question instead of the jargon it replaces. The author
@@ -689,13 +742,16 @@ const AttributeForm = ({
                       />
                     </div>
                   ) : (
-                    <p className="text-[11px] text-muted">
-                      {sharedLists
-                        .find((list) => list.uuid === field.optionSetUuid)
-                        ?.options.filter((option) => !option.retired)
-                        .map((option) => option.label)
-                        .join(" · ") ?? ""}
-                    </p>
+                    <SubFieldSharedList
+                      list={sharedLists.find(
+                        (list) => list.uuid === field.optionSetUuid,
+                      )}
+                      exceptLabel={
+                        initial
+                          ? `${initial.label} · ${field.label}`
+                          : undefined
+                      }
+                    />
                   )}
                 </div>
               )}

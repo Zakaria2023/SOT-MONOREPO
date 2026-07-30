@@ -6,7 +6,7 @@ import {
   type AssignmentDefinition,
   type ResolvedAssignment,
 } from "./assignment-resolver";
-import { evaluatePredicate } from "./predicate";
+import { evaluatePredicate, validatePredicate } from "./predicate";
 import {
   groupRowIssues,
   groupSubField,
@@ -312,6 +312,203 @@ describe("a stored value the definition does not know", () => {
     );
     expect(result.matched).toBe(true);
     expect(result.missing).toEqual([]);
+  });
+});
+
+describe("a predicate that names a group sub-field", () => {
+  const attributes = indexAttributes([ports]);
+  // A switch: 24 × 1G and 8 × 10G. 32 ports in total.
+  const switchValues: ProductValues = {
+    [PORTS]: [
+      { count: 24, "max-speed": "1g" },
+      { count: 8, "max-speed": "10g" },
+    ],
+  };
+
+  const check = (predicate: Parameters<typeof evaluatePredicate>[0]) =>
+    evaluatePredicate(predicate, switchValues, attributes);
+
+  it("reads a pick column EXISTENTIALLY — has any row this speed", () => {
+    expect(
+      check({
+        op: "in",
+        attr: PORTS,
+        field: "max-speed",
+        values: ["10g"],
+        mode: "any",
+      }).matched,
+    ).toBe(true);
+    expect(
+      check({
+        op: "in",
+        attr: PORTS,
+        field: "max-speed",
+        values: ["25g"],
+        mode: "any",
+      }).matched,
+    ).toBe(false);
+  });
+
+  it("keeps `all` meaning every pick is within the named set", () => {
+    expect(
+      check({
+        op: "in",
+        attr: PORTS,
+        field: "max-speed",
+        values: ["1g", "10g"],
+        mode: "all",
+      }).matched,
+    ).toBe(true);
+    // 10G is held and is not in the set, so the subset test fails.
+    expect(
+      check({
+        op: "in",
+        attr: PORTS,
+        field: "max-speed",
+        values: ["1g"],
+        mode: "all",
+      }).matched,
+    ).toBe(false);
+  });
+
+  it("reads `equals` on a column as ONLY this pick, not has-this-pick", () => {
+    // The switch has two speeds, so "only 1G" is false even though it has 1G.
+    // Collapsing these two operators would make the distinction unreachable.
+    expect(
+      check({ op: "equals", attr: PORTS, field: "max-speed", value: "1g" })
+        .matched,
+    ).toBe(false);
+  });
+
+  it("compares a pick column on its HIGHEST rank — the fastest cage", () => {
+    // 10G is present, so "at least 10G" holds. The slowest cage is 1G; reading
+    // the minimum instead would answer no, and nothing would say why.
+    expect(
+      check({ op: "gte", attr: PORTS, field: "max-speed", value: 10000 })
+        .matched,
+    ).toBe(true);
+    expect(
+      check({ op: "gte", attr: PORTS, field: "max-speed", value: 25000 })
+        .matched,
+    ).toBe(false);
+  });
+
+  it("TOTALS a count column — 32 ports, not 2 rows", () => {
+    expect(
+      check({ op: "gte", attr: PORTS, field: "count", value: 32 }).matched,
+    ).toBe(true);
+    expect(
+      check({ op: "gte", attr: PORTS, field: "count", value: 33 }).matched,
+    ).toBe(false);
+    // The wrong reading — row count — would have made "at least 2" the boundary.
+    expect(
+      check({ op: "gte", attr: PORTS, field: "count", value: 3 }).matched,
+    ).toBe(true);
+  });
+
+  it("reports a column that no longer exists as missing, not as false", () => {
+    const result = check({
+      op: "in",
+      attr: PORTS,
+      field: "gone",
+      values: ["1g"],
+      mode: "any",
+    });
+    expect(result.matched).toBe(false);
+    expect(result.missing).toEqual([PORTS]);
+  });
+
+  it("reports a group whose rows all became unreadable as missing", () => {
+    // The schema grew a Family column; every stored row is now incomplete. The
+    // condition is unanswerable, and must not read as "has no SFP".
+    const grown: AttributeMeta = {
+      ...ports,
+      groupFields: [
+        ...portFields,
+        {
+          key: "family",
+          label: "Family",
+          kind: "select",
+          unit: null,
+          ordered: false,
+          options: [{ value: "sfp", label: "SFP", rank: null, retired: false }],
+        },
+      ],
+    };
+    const result = evaluatePredicate(
+      {
+        op: "in",
+        attr: PORTS,
+        field: "max-speed",
+        values: ["1g"],
+        mode: "any",
+      },
+      switchValues,
+      indexAttributes([grown]),
+    );
+    expect(result.matched).toBe(false);
+    expect(result.missing).toEqual([PORTS]);
+  });
+
+  it("leaves a condition with no column alone, so nothing authored before changes", () => {
+    // A group read as a whole still has no option list, so this is unanswerable
+    // exactly as it was before sub-field conditions existed.
+    const result = check({
+      op: "in",
+      attr: PORTS,
+      values: ["1g"],
+      mode: "any",
+    });
+    expect(result.matched).toBe(false);
+  });
+});
+
+describe("validatePredicate on a group", () => {
+  const attributes = indexAttributes([ports, speed]);
+
+  it("refuses a group condition that names no column", () => {
+    const problems = validatePredicate(
+      { op: "in", attr: PORTS, values: ["1g"], mode: "any" },
+      attributes,
+    );
+    expect(problems[0]?.code).toBe("missing_sub_field");
+  });
+
+  it("refuses a column that is not there", () => {
+    const problems = validatePredicate(
+      { op: "in", attr: PORTS, field: "gone", values: ["1g"], mode: "any" },
+      attributes,
+    );
+    expect(problems[0]?.code).toBe("unknown_sub_field");
+  });
+
+  it("refuses a column on an attribute that holds no rows", () => {
+    const problems = validatePredicate(
+      { op: "in", attr: SPEED, field: "count", values: ["1g"], mode: "any" },
+      attributes,
+    );
+    expect(problems[0]?.code).toBe("unknown_sub_field");
+  });
+
+  it("accepts a well-formed column condition", () => {
+    expect(
+      validatePredicate(
+        {
+          op: "in",
+          attr: PORTS,
+          field: "max-speed",
+          values: ["1g"],
+          mode: "any",
+        },
+        attributes,
+      ),
+    ).toEqual([]);
+    expect(
+      validatePredicate(
+        { op: "gte", attr: PORTS, field: "count", value: 24 },
+        attributes,
+      ),
+    ).toEqual([]);
   });
 });
 

@@ -1,9 +1,6 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { db } from "../../../db";
-import {
-  SelectSpecifications,
-  Specifications,
-} from "../../../db/schema/specifications";
+import { SelectSpecifications } from "../../../db/schema/specifications";
 import {
   SelectSpecificationGroups,
   SpecificationGroups,
@@ -13,13 +10,8 @@ import type {
   SpecGroupField,
   SpecOption,
 } from "../../../db/types";
-import {
-  getCatalogModel,
-  loadOptionSetIndex,
-  resolveFromModel,
-} from "./catalog-model";
+import { getCatalogModel, resolveFromModel } from "./catalog-model";
 import { visibleAssignments } from "./assignment-resolver";
-import { resolveGroupFields, resolveVocabulary } from "./library-options";
 import { describeValue, readValue } from "./spec-values";
 
 export type { SelectSpecifications };
@@ -50,6 +42,49 @@ export type ResolvedSpecification = {
   groupName: SelectSpecificationGroups["name"] | null;
 };
 
+/**
+ * Every definition, already resolved, with its library group's name.
+ *
+ * Reads the CACHED catalog model rather than querying the definitions again. Two
+ * reasons, and the second is the important one:
+ *
+ *   Cost — warm, this is a single query for the group names instead of a join
+ *   across the definitions plus a second read of the shared lists.
+ *
+ *   Truth — the model has already resolved every borrowed option list. Resolving
+ *   them a second time here meant two code paths both claiming to produce "the
+ *   resolved definition", and the day one of them learned something the other did
+ *   not, a spec table and a design finding would describe the same value
+ *   differently. There is now one resolver, and everything reads its output.
+ */
+const resolvedFromModel = async (): Promise<
+  Map<string, ResolvedSpecification>
+> => {
+  const [model, groupRows] = await Promise.all([
+    getCatalogModel(),
+    db.select().from(SpecificationGroups),
+  ]);
+  const groupName = new Map(groupRows.map((group) => [group.uuid, group.name]));
+
+  return new Map(
+    model.definitions.map((definition) => [
+      definition.uuid,
+      {
+        uuid: definition.uuid,
+        label: definition.label,
+        type: definition.type,
+        ordered: definition.ordered,
+        unit: definition.unit,
+        options: definition.options,
+        groupFields: definition.groupFields ?? [],
+        groupName: definition.groupUuid
+          ? (groupName.get(definition.groupUuid) ?? null)
+          : null,
+      },
+    ]),
+  );
+};
+
 /** Definitions for a set of uuids, in the order given. */
 export const getSpecificationsForUuids = async (
   uuids: string[],
@@ -57,49 +92,10 @@ export const getSpecificationsForUuids = async (
   if (uuids.length === 0) {
     return [];
   }
-  const [rows, sets] = await Promise.all([
-    db
-      .select({
-        uuid: Specifications.uuid,
-        label: Specifications.label,
-        type: Specifications.type,
-        ordered: Specifications.ordered,
-        unit: Specifications.unit,
-        options: Specifications.options,
-        optionSetUuid: Specifications.optionSetUuid,
-        groupFields: Specifications.groupFields,
-        groupName: SpecificationGroups.name,
-      })
-      .from(Specifications)
-      .leftJoin(
-        SpecificationGroups,
-        eq(Specifications.groupUuid, SpecificationGroups.uuid),
-      )
-      .where(inArray(Specifications.uuid, uuids)),
-    loadOptionSetIndex(),
-  ]);
-
-  const byUuid = new Map(rows.map((row) => [row.uuid, row]));
+  const byUuid = await resolvedFromModel();
   return uuids.flatMap((uuid) => {
-    const row = byUuid.get(uuid);
-    if (!row) {
-      return [];
-    }
-    // Resolved here too, so a spec table and a design finding never describe the
-    // same borrowed option two different ways.
-    const vocabulary = resolveVocabulary(row, sets);
-    return [
-      {
-        uuid: row.uuid,
-        label: row.label,
-        type: row.type,
-        ordered: vocabulary.ordered,
-        unit: row.unit,
-        options: vocabulary.options,
-        groupFields: resolveGroupFields(row.groupFields ?? [], sets),
-        groupName: row.groupName,
-      },
-    ];
+    const resolved = byUuid.get(uuid);
+    return resolved ? [resolved] : [];
   });
 };
 
@@ -158,43 +154,12 @@ export const getProductSpecsForDisplay = async (
   return specs;
 };
 
-/** Every definition, for pickers and the AI read model. */
+/**
+ * Every definition, for pickers and the AI read model.
+ *
+ * Order comes from the model, which is already sorted by the library's `order` —
+ * so this keeps the sequence an author arranged without re-sorting it.
+ */
 export const getAllSpecifications = async (): Promise<
   ResolvedSpecification[]
-> => {
-  const [rows, sets] = await Promise.all([
-    db
-      .select({
-        uuid: Specifications.uuid,
-        label: Specifications.label,
-        type: Specifications.type,
-        ordered: Specifications.ordered,
-        unit: Specifications.unit,
-        options: Specifications.options,
-        optionSetUuid: Specifications.optionSetUuid,
-        groupFields: Specifications.groupFields,
-        groupName: SpecificationGroups.name,
-      })
-      .from(Specifications)
-      .leftJoin(
-        SpecificationGroups,
-        eq(Specifications.groupUuid, SpecificationGroups.uuid),
-      )
-      .orderBy(asc(Specifications.order)),
-    loadOptionSetIndex(),
-  ]);
-
-  return rows.map((row) => {
-    const vocabulary = resolveVocabulary(row, sets);
-    return {
-      uuid: row.uuid,
-      label: row.label,
-      type: row.type,
-      ordered: vocabulary.ordered,
-      unit: row.unit,
-      options: vocabulary.options,
-      groupFields: resolveGroupFields(row.groupFields ?? [], sets),
-      groupName: row.groupName,
-    };
-  });
-};
+> => [...(await resolvedFromModel()).values()];
