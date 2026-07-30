@@ -241,6 +241,19 @@ export const asGroupRows = (raw: ProductValue | undefined): SpecGroupRow[] =>
   isSpecGroupRows(raw) ? raw : [];
 
 /**
+ * One named sub-field of a group, or null.
+ *
+ * The single lookup every caller that names a sub-field goes through — the engine
+ * for an operand's unit and label, the authoring validation for whether the
+ * sub-field can be summed at all.
+ */
+export const groupSubField = (
+  meta: AttributeMeta,
+  fieldKey: string,
+): SpecGroupField | null =>
+  schemaOf(meta).find((field) => field.key === fieldKey) ?? null;
+
+/**
  * The sub-field an author must fill for a row to mean anything.
  *
  * A row missing any of its schema's sub-fields is DROPPED by the readers below
@@ -257,8 +270,87 @@ export const isCompleteGroupRow = (
     if (field.kind === "number") {
       return typeof entry === "number" && Number.isFinite(entry);
     }
-    return typeof entry === "string" && entry.trim().length > 0;
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      return false;
+    }
+    // A pick the sub-field's list does not contain cannot be ranked, matched or
+    // rendered as anything but itself — it is unreadable in exactly the way a
+    // blank is, so it is treated the same.
+    //
+    // An EMPTY list is the exception and is deliberately permissive: a sub-field
+    // whose shared vocabulary has gone missing resolves to no options, and
+    // dropping every row then would make a switch read as having no ports. The
+    // count in those rows is still perfectly readable; only the pick is not, and
+    // `groupFieldRank` already returns null for it.
+    if (field.options.length === 0) {
+      return true;
+    }
+    return field.options.some((option) => option.value === entry);
   });
+
+// Why one authored row is not readable. Enough to name the row, the column and
+// the value, because "this product's ports are unreadable" is not actionable and
+// "row 2's speed says 40g, which is not on the list" is.
+export type GroupRowIssue = {
+  // 1-based, as an author counts rows on the form.
+  row: number;
+  fieldKey: string;
+  fieldLabel: string;
+  problem: "missing" | "unknown_value";
+  // Only on unknown_value.
+  value?: string;
+};
+
+/**
+ * Every reason a group's stored rows fall short of the CURRENT schema.
+ *
+ * This is what stops the most dangerous edit in the model from being silent.
+ * Adding a sub-field to a group that already holds rows makes every one of those
+ * rows incomplete — and the readers DROP incomplete rows, so a switch with four
+ * port groups quietly starts reading as having no ports at all, which looks
+ * exactly like a switch that passed its port check.
+ *
+ * `hasValue` cannot see this: it only knows the rows are well-formed objects, not
+ * whether they answer the schema the attribute has today. So completeness asks
+ * here instead.
+ */
+export const groupRowIssues = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+): GroupRowIssue[] => {
+  const fields = schemaOf(meta);
+  if (fields.length === 0) {
+    return [];
+  }
+  const issues: GroupRowIssue[] = [];
+  asGroupRows(raw).forEach((row, index) => {
+    for (const field of fields) {
+      const entry = row[field.key];
+      const shared = {
+        row: index + 1,
+        fieldKey: field.key,
+        fieldLabel: field.label,
+      };
+      if (field.kind === "number") {
+        if (typeof entry !== "number" || !Number.isFinite(entry)) {
+          issues.push({ ...shared, problem: "missing" });
+        }
+        continue;
+      }
+      if (typeof entry !== "string" || entry.trim().length === 0) {
+        issues.push({ ...shared, problem: "missing" });
+        continue;
+      }
+      if (
+        field.options.length > 0 &&
+        !field.options.some((option) => option.value === entry)
+      ) {
+        issues.push({ ...shared, problem: "unknown_value", value: entry });
+      }
+    }
+  });
+  return issues;
+};
 
 /** Only the rows a comparator can actually read. */
 export const completeGroupRows = (
@@ -334,6 +426,10 @@ export const groupPicks = (
  *  - Each entry is coerced to its sub-field's kind, so a count arriving as the
  *    string "24" becomes 24 — every reader above does arithmetic on it without
  *    re-parsing.
+ *  - A pick the sub-field's list does not contain is REFUSED, so a row can never
+ *    be stored holding a value no comparator could read. This is the same check
+ *    `isCompleteGroupRow` applies on the way out; doing it in both directions is
+ *    what stops the two from disagreeing about which rows exist.
  *  - An INCOMPLETE row is dropped rather than half-stored, exactly as a
  *    half-filled span is. The readers ignore it either way, so storing one would
  *    show the author an answer that no rule can see.
@@ -371,6 +467,16 @@ export const normalizeGroupRows = (
       }
       const text = typeof entry === "string" ? entry.trim() : "";
       if (text === "") {
+        complete = false;
+        break;
+      }
+      // Membership, on the same terms as `isCompleteGroupRow` — including its
+      // exception for a list that resolved to nothing, so a missing shared
+      // vocabulary does not erase rows an author entered correctly.
+      if (
+        field.options.length > 0 &&
+        !field.options.some((option) => option.value === text)
+      ) {
         complete = false;
         break;
       }

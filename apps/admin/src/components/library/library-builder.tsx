@@ -50,6 +50,7 @@ import {
   Search,
   ToggleLeft,
   Trash2,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -887,6 +888,7 @@ export const LibraryBuilder = ({
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string>();
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [confirming, setConfirming] = useState<LibraryAttribute | null>(null);
   const [confirmingGroup, setConfirmingGroup] = useState<LibraryGroup | null>(
     null,
@@ -932,14 +934,20 @@ export const LibraryBuilder = ({
   const active =
     groups.find((group) => group.uuid === selectedGroup) ?? groups[0];
 
-  const run = (action: () => Promise<{ error?: string }>): void => {
+  const run = (
+    action: () => Promise<{ error?: string; warnings?: string[] }>,
+  ): void => {
     setError(undefined);
+    setWarnings([]);
     startTransition(async () => {
       const result = await action();
       if (result.error) {
         setError(result.error);
         return;
       }
+      // Survives the form closing on purpose — the whole point is that the author
+      // reads it after the save, not while they are still editing.
+      setWarnings(result.warnings ?? []);
       setAddingAttribute(false);
       setAddingGroup(false);
       setEditingGroup(null);
@@ -1015,6 +1023,29 @@ export const LibraryBuilder = ({
             {error}
           </p>
         )}
+
+      {/* Amber and dismissible, not red: the save DID happen. What is left is work
+          on the products, and the author is the only one who can do it. */}
+      {warnings.length > 0 && (
+        <div className="flex items-start gap-2 rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <TriangleAlert size={14} className="mt-0.5 shrink-0 text-amber-500" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {warnings.map((warning) => (
+              <p key={warning} className="text-xs text-amber-500">
+                {warning}
+              </p>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setWarnings([])}
+            aria-label="Dismiss"
+            className="shrink-0 rounded-control p-1 text-amber-500/70 hover:bg-hover hover:text-amber-500"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       {searching ? (
         <div className="flex flex-col gap-2">

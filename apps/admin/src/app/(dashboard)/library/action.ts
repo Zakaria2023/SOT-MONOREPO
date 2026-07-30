@@ -50,6 +50,11 @@ export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 export type ActionResult = {
   error?: string;
   success?: boolean;
+  // The save went through, and there is something about it the author needs to
+  // know — adding a sub-field to a group whose rows are already entered is the
+  // case this exists for. Not an error: refusing would leave a group unable to
+  // grow once one product used it.
+  warnings?: string[];
 };
 
 const fail = (error: unknown, fallback: string): ActionResult => ({
@@ -95,15 +100,18 @@ export const updateAttributeAction = async (
 ): Promise<ActionResult> => {
   await requireAdmin();
   const { categoryUuids, ...definition } = input;
+  let warnings: string[] = [];
   try {
-    await updateLibraryAttribute(uuid, definition);
+    const result = await updateLibraryAttribute(uuid, definition);
+    warnings = result.warnings;
     await applyAttributeCategories(uuid, categoryUuids);
   } catch (error) {
     return fail(error, "Failed to update the attribute");
   }
   revalidatePath("/library");
   revalidatePath("/assignments");
-  return { success: true };
+  revalidatePath("/products");
+  return { success: true, warnings };
 };
 
 /**

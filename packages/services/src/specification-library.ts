@@ -12,6 +12,7 @@ import {
 } from "../../../db/schema/specifications";
 import { SpecificationGroups } from "../../../db/schema/specification-groups";
 import {
+  isSpecGroupRows,
   operandSpecUuid,
   predicateAttributes,
   type SpecGroupField,
@@ -33,7 +34,7 @@ import {
   type LibraryOptionInput,
   type OptionSetIndex,
 } from "./library-options";
-import { readHeldValues } from "./option-sets";
+import { readHeldValues, type HeldValues } from "./option-sets";
 
 // ---------------------------------------------------------------------------
 // THE LIBRARY SERVICE — authoring attribute definitions.
@@ -452,18 +453,60 @@ const plannedRepoints = (
 };
 
 /**
- * Refuse a re-point that would strand a value some product is already holding.
+ * The consequences of this save that an author has to be told about but that must
+ * not block them.
  *
- * Nothing is read from the database unless a source is actually changing: this is
- * a JSON lookup across products, and it has no business running on every rename.
+ * ADDING A SUB-FIELD to a group is the case this exists for, and it is the most
+ * quietly destructive edit in the model. Every row already entered answers the old
+ * schema, so every one of them becomes incomplete — and the readers DROP
+ * incomplete rows, which means a switch with four port groups silently starts
+ * reading as having no ports at all. That looks exactly like a switch that passed
+ * its port check.
+ *
+ * Not refused, though. Refusing would leave a group unable to grow once a single
+ * product used it, and the precedent in this codebase is already settled the other
+ * way — `outOfSliceValues` allows, records and surfaces rather than blocking,
+ * because blocking makes the catalog unable to describe what it sells. So the edit
+ * goes through and the author is told which products now owe a value.
  */
-const assertRepointsKeepMeaning = async (
+const addedSubFieldWarning = (
+  current: SelectSpecifications,
+  nextGroupFields: SpecGroupField[],
+  held: HeldValues,
+): string | null => {
+  const before = new Set((current.groupFields ?? []).map((field) => field.key));
+  const added = nextGroupFields.filter((field) => !before.has(field.key));
+  // No prior schema means the group is being defined for the first time, so there
+  // is nothing to invalidate.
+  if (added.length === 0 || before.size === 0) {
+    return null;
+  }
+  const withRows = held.values.filter(isSpecGroupRows).length;
+  if (withRows === 0) {
+    return null;
+  }
+  return `${withRows} product(s) already have rows for "${current.label}". Adding ${added
+    .map((field) => `"${field.label}"`)
+    .join(
+      ", ",
+    )} leaves those rows incomplete, and an incomplete row is ignored by every rule until it is filled in — so ${held.productNames.slice(0, 3).join(", ")}${held.productNames.length > 3 ? " and others" : ""} will read as having none.`;
+};
+
+/**
+ * Refuse a re-point that would strand a value some product is already holding,
+ * and collect the warnings for edits that are allowed but consequential.
+ *
+ * Nothing is read from the database unless something actually changed that needs
+ * it: this is a JSON lookup across products, and it has no business running on
+ * every rename.
+ */
+const checkValueImpact = async (
   uuid: string,
   current: SelectSpecifications,
   nextSet: string | null,
   nextOptions: SpecOption[],
   nextGroupFields: SpecGroupField[],
-): Promise<void> => {
+): Promise<string[]> => {
   const sets = await loadOptionSetIndex();
   const repoints = plannedRepoints(
     current,
@@ -472,15 +515,22 @@ const assertRepointsKeepMeaning = async (
     nextGroupFields,
     sets,
   );
-  if (repoints.length === 0) {
-    return;
+  const beforeKeys = new Set(
+    (current.groupFields ?? []).map((field) => field.key),
+  );
+  const addsSubField =
+    beforeKeys.size > 0 &&
+    nextGroupFields.some((field) => !beforeKeys.has(field.key));
+
+  if (repoints.length === 0 && !addsSubField) {
+    return [];
   }
 
   const held = await readHeldValues(uuid);
   if (held.values.length === 0) {
-    // Nothing to reinterpret, so nothing to protect. This is the path an author
+    // Nothing to reinterpret and nothing to invalidate. This is the path an author
     // takes while still building the library, and it must stay frictionless.
-    return;
+    return [];
   }
 
   for (const repoint of repoints) {
@@ -495,6 +545,9 @@ const assertRepointsKeepMeaning = async (
       `${held.values.length} product(s) hold a value for ${repoint.what} that the new list does not have — ${stranded.slice(0, 5).join(", ")}. Add those to the shared list first (spelled exactly this way), or clear them from ${held.productNames.slice(0, 3).join(", ")} before switching.`,
     );
   }
+
+  const warning = addedSubFieldWarning(current, nextGroupFields, held);
+  return warning ? [warning] : [];
 };
 
 /**
@@ -522,7 +575,8 @@ export const updateLibraryAttribute = async (
   uuid: string,
   input: LibraryAttributeInput,
   actor?: { uuid: string; name: string },
-): Promise<void> => {
+  // Consequences the author must be told about but that do not block the save.
+): Promise<{ warnings: string[] }> => {
   assertValidInput(input);
 
   const [current] = await db
@@ -558,7 +612,7 @@ export const updateLibraryAttribute = async (
       ? mergeGroupFields(current.groupFields ?? [], input.groupFields)
       : [];
 
-  await assertRepointsKeepMeaning(
+  const warnings = await checkValueImpact(
     uuid,
     current,
     nextSet,
@@ -596,6 +650,7 @@ export const updateLibraryAttribute = async (
     changes: diffAttribute(current, input),
   });
   invalidateCatalogModel();
+  return { warnings };
 };
 
 const diffAttribute = (

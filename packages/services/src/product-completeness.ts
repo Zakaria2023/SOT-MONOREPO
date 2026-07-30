@@ -61,13 +61,37 @@ const toRange = (value: ProductValue): SpecRange | null => {
 };
 
 /**
+ * Whether an attribute's MASTER list contains a value.
+ *
+ * The master list and not the category's offered slice, and the distinction is the
+ * whole point. A slice is a narrowing an author chose, and a real switch may do
+ * 40G in a category whose slice stops at 10G — refusing that would leave the
+ * catalog unable to describe a product it sells, so it is stored and surfaced as a
+ * conflict instead (see `outOfSliceValues`).
+ *
+ * A value outside the master list is not a narrowing at all. No option carries it,
+ * so nothing can rank it, match it or render it as anything but the raw string. It
+ * is unreadable, and storing it only creates a product that looks answered.
+ *
+ * Retired options still count: a product holding a retired value means exactly
+ * what it always meant.
+ */
+const knows = (
+  definition: ResolvedAssignment["definition"],
+  value: string,
+): boolean =>
+  definition.options.length === 0 ||
+  definition.options.some((option) => option.value === value);
+
+/**
  * Normalise a product's values before they are stored.
  *
- * Two jobs, both of which have to happen on the SERVER and not merely in the
+ * Three jobs, all of which have to happen on the SERVER and not merely in the
  * form: drop the values of fields the reveal conditions now hide (a leftover PoE
  * budget on a product whose PoE is "No" would let the engine size a switch off a
- * number that no longer applies), and coerce each value to the type its
- * attribute declares, so nothing downstream has to parse.
+ * number that no longer applies), coerce each value to the type its attribute
+ * declares so nothing downstream has to parse, and refuse an option value the
+ * library does not know.
  */
 export const normalizeProductValues = async (
   categoryUuid: string,
@@ -109,7 +133,9 @@ export const normalizeProductValues = async (
     }
     if (definition.type === "multi_select") {
       const list = Array.isArray(value) ? value.map(String) : [String(value)];
-      const cleaned = list.filter((entry) => entry.trim() !== "");
+      const cleaned = list
+        .filter((entry) => entry.trim() !== "")
+        .filter((entry) => knows(definition, entry));
       if (cleaned.length > 0) {
         typed[definition.uuid] = cleaned;
       }
@@ -132,7 +158,11 @@ export const normalizeProductValues = async (
       }
       continue;
     }
-    typed[definition.uuid] = String(Array.isArray(value) ? value[0] : value);
+    // A single-select.
+    const chosen = String(Array.isArray(value) ? value[0] : value);
+    if (knows(definition, chosen)) {
+      typed[definition.uuid] = chosen;
+    }
   }
 
   return clearHiddenValues(resolved, typed);
