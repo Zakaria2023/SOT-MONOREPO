@@ -1,17 +1,23 @@
 "use server";
 
+import type { ProductValues } from "@/db/types";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  addAttributeOption as addAttributeOptionRecord,
   createProduct as createProductRecord,
   deleteProduct as deleteProductRecord,
   getProduct as getProductRecord,
   getProductDetailByUuid as getProductDetailByUuidRecord,
+  getProductSpecsForDisplay as getProductSpecsForDisplayRecord,
   getProductsPage as getProductsPageList,
   updateProduct as updateProductRecord,
 } from "services";
 import type {
+  AddOptionRequest as ServiceAddOptionRequest,
+  AddOptionResult as ServiceAddOptionResult,
+  DisplaySpec as ServiceDisplaySpec,
   ProductClientFields as ServiceProductClientFields,
   ProductDetail as ServiceProductDetail,
   ProductFields as ServiceProductFields,
@@ -30,6 +36,9 @@ export type ProductListItem = ServiceProductListItem;
 export type ProductListParams = ServiceProductListParams;
 export type ProductDetail = ServiceProductDetail;
 export type SelectProducts = ServiceSelectProducts;
+export type DisplaySpec = ServiceDisplaySpec;
+export type AddOptionRequest = ServiceAddOptionRequest;
+export type AddOptionResult = ServiceAddOptionResult;
 
 export type ProductActionResult = {
   productUuid?: string;
@@ -50,6 +59,39 @@ export const getProduct = async (
 export const getProductDetail = async (
   uuid: string,
 ): Promise<ProductDetail | null> => getProductDetailByUuidRecord(uuid);
+
+// "admin" so the panel shows partner-only and staff-only attributes: this is
+// where the catalog is authored, and an attribute an author cannot see is one they
+// cannot notice is wrong.
+/**
+ * Add one value to a library list, from the product form.
+ *
+ * Thin, like every action here: the service owns whether it is a near-duplicate,
+ * which of the four possible lists it belongs to, and whether the category's
+ * slice has to be widened for it to appear.
+ *
+ * No `revalidatePath` — the form is half-filled and a revalidation would throw
+ * away everything the author has typed so far. The caller splices the returned
+ * option into the field it is standing on.
+ */
+export const addSpecOption = async (
+  request: AddOptionRequest,
+): Promise<AddOptionResult | { error: string }> => {
+  const { actor } = await requireAdmin();
+  try {
+    return await addAttributeOptionRecord(request, actor);
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Failed to add the value",
+    };
+  }
+};
+
+export const getProductSpecs = async (
+  categoryUuid: string,
+  values: ProductValues,
+): Promise<DisplaySpec[]> =>
+  getProductSpecsForDisplayRecord(categoryUuid, values, "admin");
 
 export const createProduct = async (
   _prevState: ProductActionResult,

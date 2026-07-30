@@ -9,6 +9,12 @@
 // lives on a relationship. Neither can migrate into the library, which is why
 // `Specifications` carries no condition type at all.
 //
+// A shared OPTION SET is the one thing a library entry may point at, and it does
+// not bend the rule: a set holds words, not behaviour. Two attributes naming the
+// same set agree on how to spell "1G" and on nothing else — no type, no unit, no
+// condition, no rule crosses between them. That is what makes their stored values
+// comparable without either one knowing the other exists.
+//
 // Every `attr` in this file is a Specifications.uuid — never a label, never a
 // slug. Labels are renameable and slugs are derived from labels, so pointing at
 // either means a rename silently orphans stored values and breaks every rule
@@ -44,6 +50,94 @@ export type SpecOption = {
 };
 
 // ---------------------------------------------------------------------------
+// Group schema — the sub-fields of a repeatable row
+// ---------------------------------------------------------------------------
+
+// One column of a `group` attribute. Authored in the library beside the
+// attribute, because the shape of a port group is a property of "Network Ports"
+// itself and not of any category that asks for it.
+//
+// Two kinds, and no more. Every repeatable fact in the catalogue is counts and
+// picks — {count, family, max speed} for ports, {count, outlet type} for
+// outlets, {name, mode, used, total, expandable for} for slot systems. Adding
+// nested groups or ranges here would make the row a document, and a document is
+// something no comparator can read.
+//
+// A sub-field's picks come from ONE of two places, never both:
+//
+//   - `options` inline, when the list means something only inside this group;
+//   - `optionSetUuid`, a SHARED vocabulary (see SpecificationOptionSets).
+//
+// The shared case is what makes "does this cage take that module" answerable. An
+// inline speed list inside this group and an inline speed list on a standalone
+// transceiver attribute are separate vocabularies: both spell "1G", and their
+// stored values are unrelated, so no comparator can line them up. Pointing both
+// at one set makes the two spellings the same fact.
+//
+// A set is still not another attribute, so the boundary rule at the top of this
+// file holds exactly as written — the sub-field names a dictionary, and nothing
+// about the transceiver attribute reaches this group.
+export type SpecGroupField = {
+  // Stable identity. A row keys on this, so it is fixed at creation and a label
+  // rename never touches it — the same reason SpecOption carries `value`.
+  key: string;
+  label: string;
+  // `number` for a quantity, `select` for a pick from `options`.
+  kind: "number" | "select";
+  // `number` only. Same dimension discipline as Specifications.unit.
+  unit: string | null;
+  // `select` only. Whether the picks are a scale, so a comparator can read rank —
+  // 1G < 10G < 25G is what makes "does this cage take that module" answerable.
+  //
+  // IGNORED when `optionSetUuid` is set, for the same reason it is on the
+  // attribute: the set owns that fact about its own words.
+  ordered: boolean;
+  // `select` only, and EMPTY when `optionSetUuid` is set. The resolved list is
+  // written back into this field on the way out (see resolveGroupFields), so
+  // every reader below the library sees one shape and never has to know where the
+  // options came from.
+  options: SpecOption[];
+  // `select` only. When set, the picks are the named set's, not `options`.
+  //
+  // Optional so every row stored before sets existed still parses — an absent
+  // pointer and a null one both mean "this list is my own".
+  optionSetUuid?: string | null;
+};
+
+// One authored row of a `group` attribute: sub-field key → value.
+//
+// Numbers stay numbers and picks stay option `value`s, for the same reason
+// ProductValue is typed rather than stringly — a parse that can silently produce
+// NaN has no place between an author and a budget check.
+export type SpecGroupRow = Record<string, number | string>;
+
+/**
+ * Whether a value is a well-formed list of group rows.
+ *
+ * Needed because `string[]` (a multi-select) and `SpecGroupRow[]` (a group) are
+ * both arrays, and the readers have to tell them apart before coercing. The two
+ * are disjoint by element type, so the check is total rather than a heuristic.
+ *
+ * An EMPTY list is not a value — a group with no rows is an unanswered
+ * attribute, and reading it as answered would let a switch with no ports
+ * declared pass a port check.
+ */
+export const isSpecGroupRows = (value: unknown): value is SpecGroupRow[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (row) =>
+      typeof row === "object" &&
+      row !== null &&
+      !Array.isArray(row) &&
+      Object.values(row).every(
+        (entry) =>
+          typeof entry === "string" ||
+          (typeof entry === "number" && Number.isFinite(entry)),
+      ),
+  );
+
+// ---------------------------------------------------------------------------
 // The predicate language — ONE condition shape for the whole system
 // ---------------------------------------------------------------------------
 
@@ -56,27 +150,74 @@ export type SpecOption = {
 // what this model exists to prevent.
 export type PredicateScalar = string | number | boolean;
 
+// One column of a `group` attribute, when a condition is about the rows rather
+// than the attribute as a whole — "has any SFP cage" is a question about the
+// family column of Network Ports, not about Network Ports.
+//
+// Optional on every attribute operator, so nothing authored before this existed
+// changes meaning. Absent means the attribute itself, exactly as before.
+//
+// WHAT IT MEANS, because each reading has a wrong twin that would fail silently.
+// None of these is invented here; each matches a rule the model already follows:
+//
+//   Set operators (equals / in / not_in) read the DISTINCT PICKS across rows, so
+//   they are existential: "any row's family is SFP". This is the same reading a
+//   multi-select already gets, where the ticked set is compared as a whole.
+//
+//   Numeric operators on a PICK column read the HIGHEST rank across rows — the
+//   fastest cage, not the slowest. Identical to what `asNumber` already does for
+//   a multi-select ("a device that accepts af/at/bt supplies bt").
+//
+//   Numeric operators on a COUNT column read the TOTAL across rows, the same
+//   figure an operand totals. "at least 24 ports" means 24 in total, not 24 in
+//   some single row.
+//
+//   `exists` means at least one row is READABLE — complete against the current
+//   schema. A group whose rows all became unreadable must not answer yes.
+//
+// `where` narrows WHICH ROWS the reduction above runs over, and it is what lets a
+// condition ask "how many 10G ports" rather than only "how many ports" or "is any
+// port 10G". Its `attr`s name this group's own SUB-FIELD KEYS — never library
+// attribute uuids — because a row is a world of its own with no access to the
+// product around it. That is also why `predicateAttributes` must not descend into
+// it: a sub-field key is not an attribute the reveal graph can chase.
+//
+// Ticking two columns without it is not the same question. "family is SFP" and
+// "speed is 10G" as two conditions ask whether SOME row is SFP and SOME row is
+// 10G, which a switch with an SFP 1G cage and an RJ45 10G port answers yes to.
+// `where` is what makes it one row that is both.
+export type PredicateField = { field?: string; where?: Predicate };
+
 export type Predicate =
   // Scalar comparison. On a multi-select attribute, `equals` holds when the
   // ticked set is exactly [value].
-  | { op: "equals"; attr: string; value: PredicateScalar }
-  | { op: "not_equals"; attr: string; value: PredicateScalar }
+  | ({ op: "equals"; attr: string; value: PredicateScalar } & PredicateField)
+  | ({
+      op: "not_equals";
+      attr: string;
+      value: PredicateScalar;
+    } & PredicateField)
   // Set membership. `mode` decides what "matches" means when the attribute
   // being tested is multi-select and holds several values at once:
   //   any → the item's values overlap `values` (the common case)
   //   all → the item's values are a subset of `values` ("only PoE, nothing
   //         else"), which `any` cannot express.
-  | { op: "in"; attr: string; values: PredicateScalar[]; mode: MatchMode }
-  | { op: "not_in"; attr: string; values: PredicateScalar[] }
+  | ({
+      op: "in";
+      attr: string;
+      values: PredicateScalar[];
+      mode: MatchMode;
+    } & PredicateField)
+  | ({ op: "not_in"; attr: string; values: PredicateScalar[] } & PredicateField)
   // Numeric comparison. On an ORDERED select these compare the option's `rank`,
   // so "PoE input at most 802.3at" works on a dropdown, not just on a number.
-  | { op: "gt"; attr: string; value: number }
-  | { op: "gte"; attr: string; value: number }
-  | { op: "lt"; attr: string; value: number }
-  | { op: "lte"; attr: string; value: number }
-  | { op: "between"; attr: string; min: number; max: number }
+  | ({ op: "gt"; attr: string; value: number } & PredicateField)
+  | ({ op: "gte"; attr: string; value: number } & PredicateField)
+  | ({ op: "lt"; attr: string; value: number } & PredicateField)
+  | ({ op: "lte"; attr: string; value: number } & PredicateField)
+  | ({ op: "between"; attr: string; min: number; max: number } & PredicateField)
   // Has any value at all — the "is this filled in" test.
-  | { op: "exists"; attr: string }
+  | ({ op: "exists"; attr: string } & PredicateField)
   // A PRODUCT GROUP: is this item in that category, or anywhere beneath it?
   //
   // The one operator that does not name an attribute. It exists because some
@@ -190,7 +331,12 @@ export const isSpecRange = (value: unknown): value is SpecRange =>
 // TYPED, not stringly. A number is a number so the engine can sum it without a
 // parse that can silently produce NaN; a multi-select is an array so an option
 // containing a comma cannot corrupt the row the way a comma-joined string does.
-export type ProductValue = number | boolean | string | string[] | SpecRange;
+//
+// `SpecGroupRow[]` overlaps `string[]` in shape only — the element types are
+// disjoint, and `isSpecGroupRows` is how every reader tells them apart before
+// coercing. No reader may branch on `Array.isArray` alone.
+export type ProductValue =
+  number | boolean | string | string[] | SpecRange | SpecGroupRow[];
 
 export type ProductValues = Record<string, ProductValue>;
 
@@ -207,7 +353,34 @@ export type ProductValues = Record<string, ProductValue>;
 // a single evaluator instead of a special case per family.
 export type Operand =
   // A product attribute. `perUnit` values are multiplied by the line quantity.
-  | { source: "spec"; specUuid: string }
+  //
+  // `groupField` names one numeric sub-field of a `group` attribute, and the
+  // operand then reads the SUM of that column across the rows — "how many ports
+  // does this switch have" is Σ(count) over its port groups, not the number of
+  // groups. Without it a group has no single magnitude and the operand reads
+  // nothing at all, which is why every rule about ports needs it.
+  //
+  // An optional field on the existing `spec` source rather than a source of its
+  // own, deliberately: `operandSpecUuid` keeps working, so the deletion guard
+  // still sees the reference, and every `source === "spec"` branch in the engine
+  // and the authoring layer stays correct without being touched.
+  //
+  // `where` narrows which ROWS are totalled, so "how many 10G uplinks" is finally
+  // expressible: Σ(count) over the rows whose speed column says 10G. Its `attr`s
+  // name this group's sub-field keys, never library attributes.
+  //
+  // The distinction that makes it safe: a product with NO readable rows still
+  // measures nothing (null, and the rule skips it, as before), but a product with
+  // readable rows and none matching measures ZERO. Those must not collapse — a
+  // switch whose ports are all 1G has to FAIL a "needs two 10G uplinks" rule, and
+  // returning null there would make it skip the check instead, which is the exact
+  // silent pass this model exists to prevent.
+  | {
+      source: "spec";
+      specUuid: string;
+      groupField?: string;
+      where?: Predicate;
+    }
   // A project input the buyer supplied (see ProjectVariables).
   | { source: "variable"; variableUuid: string }
   // The number of physical units in the selection that matched the side's

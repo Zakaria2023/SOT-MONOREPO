@@ -4,13 +4,16 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
   createLibraryAttribute,
+  createOptionSet,
   createProjectVariable,
   createSpecificationGroup,
   deleteLibraryAttribute,
+  deleteOptionSet,
   deleteProjectVariable,
   deleteSpecificationGroup,
   getAttributeCategories,
   getLibrary,
+  getOptionSets,
   getProjectVariables,
   removeAssignments,
   saveAssignments,
@@ -18,10 +21,13 @@ import {
   reorderLibraryAttributes,
   reorderSpecificationGroups,
   updateLibraryAttribute,
+  updateOptionSet,
   updateProjectVariable,
   updateSpecificationGroup,
   type LibraryAttributeInput as ServiceLibraryAttributeInput,
   type LibraryGroup as ServiceLibraryGroup,
+  type OptionSet as ServiceOptionSet,
+  type OptionSetInput as ServiceOptionSetInput,
   type ProjectVariableInput as ServiceProjectVariableInput,
   type SpecificationGroupFields as ServiceSpecificationGroupFields,
 } from "services";
@@ -36,12 +42,19 @@ export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
   categoryUuids: string[];
 };
 export type LibraryGroup = ServiceLibraryGroup;
+export type OptionSet = ServiceOptionSet;
+export type OptionSetInput = ServiceOptionSetInput;
 export type ProjectVariableInput = ServiceProjectVariableInput;
 export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 
 export type ActionResult = {
   error?: string;
   success?: boolean;
+  // The save went through, and there is something about it the author needs to
+  // know — adding a sub-field to a group whose rows are already entered is the
+  // case this exists for. Not an error: refusing would leave a group unable to
+  // grow once one product used it.
+  warnings?: string[];
 };
 
 const fail = (error: unknown, fallback: string): ActionResult => ({
@@ -58,15 +71,20 @@ export const getVariables = async () => {
   return getProjectVariables();
 };
 
+export const getSharedLists = async (): Promise<OptionSet[]> => {
+  await requireAdmin();
+  return getOptionSets();
+};
+
 export const addAttributeAction = async (
   input: LibraryAttributeInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   const { categoryUuids, ...definition } = input;
   try {
-    const uuid = await createLibraryAttribute(definition);
+    const uuid = await createLibraryAttribute(definition, actor);
     if (categoryUuids.length > 0) {
-      await applyAttributeCategories(uuid, categoryUuids, true);
+      await applyAttributeCategories(uuid, categoryUuids, actor, true);
     }
   } catch (error) {
     return fail(error, "Failed to create the attribute");
@@ -80,17 +98,20 @@ export const updateAttributeAction = async (
   uuid: string,
   input: LibraryAttributeInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   const { categoryUuids, ...definition } = input;
+  let warnings: string[] = [];
   try {
-    await updateLibraryAttribute(uuid, definition);
-    await applyAttributeCategories(uuid, categoryUuids);
+    const result = await updateLibraryAttribute(uuid, definition, actor);
+    warnings = result.warnings;
+    await applyAttributeCategories(uuid, categoryUuids, actor);
   } catch (error) {
     return fail(error, "Failed to update the attribute");
   }
   revalidatePath("/library");
   revalidatePath("/assignments");
-  return { success: true };
+  revalidatePath("/products");
+  return { success: true, warnings };
 };
 
 /**
@@ -101,9 +122,9 @@ export const updateAttributeAction = async (
 export const deleteAttributeAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteLibraryAttribute(uuid);
+    await deleteLibraryAttribute(uuid, actor);
   } catch (error) {
     return fail(error, "Failed to delete the attribute");
   }
@@ -148,6 +169,7 @@ export const reorderAttributesAction = async (
 const applyAttributeCategories = async (
   specificationUuid: string,
   categoryUuids: string[],
+  actor: { uuid: string; name: string },
   // Set when the attribute was created moments ago. Skips reading back links
   // that cannot exist, and the diff that would be against an empty set.
   justCreated = false,
@@ -168,7 +190,7 @@ const applyAttributeCategories = async (
           suppressed: false,
           order: 0,
         })),
-      { noneExistYet: true },
+      { actor, noneExistYet: true },
     );
     return;
   }
@@ -198,11 +220,13 @@ const applyAttributeCategories = async (
         suppressed: false,
         order: 0,
       })),
+    { actor },
   );
 
   await removeAssignments(
     specificationUuid,
     [...current].filter((categoryUuid) => !wanted.has(categoryUuid)),
+    actor,
   );
 };
 
@@ -227,9 +251,9 @@ export const setAttributeCategoriesAction = async (
   specificationUuid: string,
   categoryUuids: string[],
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await applyAttributeCategories(specificationUuid, categoryUuids);
+    await applyAttributeCategories(specificationUuid, categoryUuids, actor);
   } catch (error) {
     return fail(error, "Failed to update the categories");
   }
@@ -305,12 +329,68 @@ export const reorderGroupsAction = async (
   return { success: true };
 };
 
+// ---------------------------------------------------------------------------
+// Shared lists — the vocabularies more than one attribute spells the same way.
+//
+// Every path revalidates /products as well as /library: a shared list is what a
+// product form's dropdown is filled from, so an option added here has to be
+// offered on the very next product entered.
+// ---------------------------------------------------------------------------
+
+export const addSharedListAction = async (
+  input: OptionSetInput,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await createOptionSet(input, actor);
+  } catch (error) {
+    return fail(error, "Failed to create the shared list");
+  }
+  revalidatePath("/library");
+  revalidatePath("/products");
+  return { success: true };
+};
+
+export const updateSharedListAction = async (
+  uuid: string,
+  input: OptionSetInput,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await updateOptionSet(uuid, input, actor);
+  } catch (error) {
+    return fail(error, "Failed to update the shared list");
+  }
+  revalidatePath("/library");
+  revalidatePath("/products");
+  revalidatePath("/assignments");
+  return { success: true };
+};
+
+/**
+ * Delete a shared list. The service REFUSES while any attribute or group
+ * sub-field points at it, and names what is in the way — so this surfaces that
+ * message rather than a generic failure.
+ */
+export const deleteSharedListAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await deleteOptionSet(uuid, actor);
+  } catch (error) {
+    return fail(error, "Failed to delete the shared list");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
 export const addVariableAction = async (
   input: ProjectVariableInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await createProjectVariable(input);
+    await createProjectVariable(input, actor);
   } catch (error) {
     return fail(error, "Failed to create the project input");
   }
@@ -322,9 +402,9 @@ export const updateVariableAction = async (
   uuid: string,
   input: ProjectVariableInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await updateProjectVariable(uuid, input);
+    await updateProjectVariable(uuid, input, actor);
   } catch (error) {
     return fail(error, "Failed to update the project input");
   }
@@ -335,9 +415,9 @@ export const updateVariableAction = async (
 export const deleteVariableAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteProjectVariable(uuid);
+    await deleteProjectVariable(uuid, actor);
   } catch (error) {
     return fail(error, "Failed to delete the project input");
   }

@@ -1,8 +1,9 @@
 "use client";
 
-import type { LibraryGroup } from "@/app/(dashboard)/library/action";
+import type { LibraryGroup, OptionSet } from "@/app/(dashboard)/library/action";
 import { LibraryBuilder } from "@/components/library/library-builder";
 import { ProjectInputs } from "@/components/library/project-inputs";
+import { SharedLists } from "@/components/library/shared-lists";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProjectVariables } from "@/db/schema/project-variables";
 import { useState } from "react";
@@ -11,14 +12,16 @@ type LibraryWorkspaceProps = {
   groups: LibraryGroup[];
   variables: SelectProjectVariables[];
   categories: SelectCategories[];
+  sharedLists: OptionSet[];
 };
 
-type Tab = "attributes" | "inputs";
+type Tab = "attributes" | "lists" | "inputs";
 
 export const LibraryWorkspace = ({
   groups,
   variables,
   categories,
+  sharedLists,
 }: LibraryWorkspaceProps) => {
   const [tab, setTab] = useState<Tab>("attributes");
 
@@ -45,6 +48,18 @@ export const LibraryWorkspace = ({
         >
           Attributes
         </button>
+        {/* Next to Attributes rather than tucked away, because an author choosing
+            where a select's options come from needs to know this tab exists. */}
+        <button
+          type="button"
+          onClick={() => setTab("lists")}
+          className={tabClass(tab === "lists")}
+        >
+          Shared lists
+          <span className="ml-1.5 text-xs text-faint">
+            {sharedLists.length}
+          </span>
+        </button>
         <button
           type="button"
           onClick={() => setTab("inputs")}
@@ -55,11 +70,15 @@ export const LibraryWorkspace = ({
         </button>
       </div>
 
-      {tab === "attributes" ? (
-        <LibraryBuilder groups={groups} categories={categories} />
-      ) : (
-        <ProjectInputs variables={variables} />
+      {tab === "attributes" && (
+        <LibraryBuilder
+          groups={groups}
+          categories={categories}
+          sharedLists={sharedLists}
+        />
       )}
+      {tab === "lists" && <SharedLists lists={sharedLists} />}
+      {tab === "inputs" && <ProjectInputs variables={variables} />}
     </div>
   );
 };

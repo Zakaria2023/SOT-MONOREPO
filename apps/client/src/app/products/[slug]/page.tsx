@@ -7,9 +7,11 @@ import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { notFound } from "next/navigation";
 import {
   getComparableProducts,
+  getComparisonSpecs,
   getProductDetailBySlug,
   getRelatedProducts,
   getProductSpecsForDisplay,
+  sectionSpecs,
 } from "services";
 
 type Props = {
@@ -51,25 +53,31 @@ const ProductPage = async ({ params }: Props) => {
     value: spec.value,
   }));
 
-  // Sectioned by library group, groups in first-seen order so the table reads
-  // the way the library is organised. Ungrouped attributes trail behind.
-  const specGroups = attributes.reduce<
-    { name: string | null; attributes: typeof attributes }[]
-  >((groups, attribute) => {
-    const existing = groups.find((group) => group.name === attribute.group);
-    if (existing) {
-      existing.attributes.push(attribute);
-    } else {
-      groups.push({ name: attribute.group, attributes: [attribute] });
-    }
-    return groups;
-  }, []);
-
-  const specFields = specs.map((spec) => ({
-    key: spec.uuid,
-    label: spec.label,
-    unit: null,
+  // Sectioned by library group, groups in first-seen order so the table reads the
+  // way the library is organised. Shared with the admin detail panel, so the two
+  // cannot section the same product differently.
+  const specGroups = sectionSpecs(specs).map((section) => ({
+    name: section.name,
+    attributes: section.specs.map((spec) => ({
+      label: spec.label,
+      group: spec.groupName,
+      value: spec.value,
+    })),
   }));
+
+  // Has to follow the comparables — it needs their values. One small read on top
+  // of the batch above, not one per column.
+  const comparisonRows =
+    comparables.length > 0
+      ? await getComparisonSpecs(
+          product.categoryUuid,
+          [product, ...comparables].map((entry) => ({
+            uuid: entry.uuid,
+            values: entry.specValues ?? {},
+          })),
+          viewerPricing.isPartner ? "partner" : "user",
+        )
+      : [];
 
   return (
     <main className="min-h-screen bg-page pb-16">
@@ -83,7 +91,7 @@ const ProductPage = async ({ params }: Props) => {
       <ProductCompare
         current={product}
         others={comparables}
-        specFields={specFields}
+        rows={comparisonRows}
       />
       <ProductRelated products={related} />
     </main>

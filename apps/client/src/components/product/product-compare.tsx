@@ -2,43 +2,27 @@ import { documentDownloadUrl } from "@/lib/documents";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import type { ProductDetail, ProductListItem } from "services";
-import { formatSpecValue } from "utils";
-
-type SpecField = {
-  key: string;
-  label: string;
-  unit: string | null;
-};
+import type { ComparisonRow, ProductDetail, ProductListItem } from "services";
 
 type ProductCompareProps = {
   current: ProductDetail;
   others: ProductListItem[];
-  specFields: SpecField[];
+  // Already rendered server-side, keyed by product uuid — the same formatter the
+  // spec table and the engine's findings use, so one product never reads two ways
+  // in two places on the same page. A row only reaches here if someone answers it.
+  rows: ComparisonRow[];
 };
 
 export const ProductCompare = ({
   current,
   others,
-  specFields,
+  rows,
 }: ProductCompareProps) => {
-  if (others.length === 0) {
+  if (others.length === 0 || rows.length === 0) {
     return null;
   }
 
   const products = [current, ...others];
-
-  const valueFor = (product: ProductListItem, field: SpecField): string =>
-    formatSpecValue(product.technicalAttributes?.[field.key], field.unit) ||
-    "—";
-
-  // Only show rows where at least one product has a value to compare.
-  const rows = specFields.filter((field) =>
-    products.some((product) => product.technicalAttributes?.[field.key]),
-  );
-  if (rows.length === 0) {
-    return null;
-  }
 
   return (
     <section className="mx-auto px-6 pt-16 lg:px-12 xl:px-20">
@@ -92,11 +76,9 @@ export const ProductCompare = ({
             </tr>
           </thead>
           <tbody>
-            {rows.map((field) => (
-              <tr key={field.key} className="border-t border-hairline">
-                <td className="py-3.5 pr-4 text-sm text-faint">
-                  {field.label}
-                </td>
+            {rows.map((row) => (
+              <tr key={row.uuid} className="border-t border-hairline">
+                <td className="py-3.5 pr-4 text-sm text-faint">{row.label}</td>
                 {products.map((product) => {
                   const isCurrent = product.uuid === current.uuid;
                   return (
@@ -104,7 +86,7 @@ export const ProductCompare = ({
                       key={product.uuid}
                       className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary-tint/30 font-semibold text-ink" : "text-muted"}`}
                     >
-                      {valueFor(product, field)}
+                      {row.values[product.uuid] ?? "—"}
                     </td>
                   );
                 })}

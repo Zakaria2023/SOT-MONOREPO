@@ -1,10 +1,18 @@
 "use client";
 
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
+import { AddOption } from "@/components/products/add-option";
 import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
-import { isSpecRange, type ProductValue, type SpecOption } from "@/db/types";
-import { X } from "lucide-react";
+import {
+  isSpecGroupRows,
+  isSpecRange,
+  type ProductValue,
+  type SpecGroupField,
+  type SpecGroupRow,
+  type SpecOption,
+} from "@/db/types";
+import { Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Dropdown, Input, type DropdownOption } from "ui";
@@ -36,6 +44,8 @@ export type FormField = {
   allowRange: boolean;
   // The slice this category offers — not the whole master list.
   options: SpecOption[];
+  // Only on `group`. The sub-fields one repeatable row carries, in column order.
+  groupFields: SpecGroupField[];
   isRule: boolean;
   isFilter: boolean;
   inherited: boolean;
@@ -64,10 +74,19 @@ type SpecificationComposerProps = {
 type FieldRowProps = {
   field: FormField;
   value: ProductValue | undefined;
+  // The category being authored. Passed only so a value added here can widen a
+  // slice that would otherwise not offer it.
+  categoryUuid?: string;
   // Absent for a field the reveal brought in — it disappears on its own when the
   // condition stops holding, so removing it by hand would be a dead end.
   onRemove?: () => void;
   onChange: (next: ProductValue | undefined) => void;
+};
+
+type GroupRowsEditorProps = {
+  fields: SpecGroupField[];
+  rows: SpecGroupRow[];
+  onChange: (next: SpecGroupRow[]) => void;
 };
 
 const asList = (value: ProductValue | undefined): string[] => {
@@ -75,8 +94,10 @@ const asList = (value: ProductValue | undefined): string[] => {
     return [];
   }
   // A span is a quantity, never a set membership — stringifying it would give
-  // the equals/in branches "[object Object]" to compare against.
-  if (isSpecRange(value)) {
+  // the equals/in branches "[object Object]" to compare against. A group's rows
+  // are the same hazard and they ARE an array, so they have to be caught before
+  // the `map(String)` below can reach them.
+  if (isSpecRange(value) || isSpecGroupRows(value)) {
     return [];
   }
   return Array.isArray(value) ? value.map(String) : [String(value)];
@@ -118,8 +139,66 @@ const hasValue = (value: ProductValue | undefined): boolean => {
   if (typeof value === "object" && !Array.isArray(value)) {
     return isSpecRange(value);
   }
+  // Same reasoning one level out: a row list the server cannot decode must not
+  // read as answered here, or the author sees a filled field that saves empty.
+  if (
+    Array.isArray(value) &&
+    value.some((entry) => typeof entry === "object" && entry !== null)
+  ) {
+    return isSpecGroupRows(value);
+  }
   return !(Array.isArray(value) && value.length === 0);
 };
+
+// ---------------------------------------------------------------------------
+// Group rows
+// ---------------------------------------------------------------------------
+
+const asRows = (value: ProductValue | undefined): SpecGroupRow[] =>
+  isSpecGroupRows(value) ? value : [];
+
+/** A row is only an answer once every sub-field is filled — see the server. */
+const isRowComplete = (row: SpecGroupRow, fields: SpecGroupField[]): boolean =>
+  fields.every((field) => {
+    const entry = row[field.key];
+    if (field.kind === "number") {
+      return typeof entry === "number" && Number.isFinite(entry);
+    }
+    return typeof entry === "string" && entry.trim().length > 0;
+  });
+
+/**
+ * A blank row, with every sub-field absent rather than zeroed.
+ *
+ * A count seeded with 0 is a real answer the author never gave, and it would make
+ * the row look complete while contributing nothing to a total.
+ */
+const blankRow = (): SpecGroupRow => ({});
+
+/**
+ * One sub-field of one row, replaced.
+ *
+ * Clearing a control DELETES the key rather than storing "" or NaN, so an
+ * incomplete row stays visibly incomplete instead of holding a value the readers
+ * would drop without saying why.
+ */
+const patchRow = (
+  rows: SpecGroupRow[],
+  index: number,
+  key: string,
+  entry: number | string | undefined,
+): SpecGroupRow[] =>
+  rows.map((row, at) => {
+    if (at !== index) {
+      return row;
+    }
+    if (entry === undefined) {
+      const rest = { ...row };
+      delete rest[key];
+      return rest;
+    }
+    return { ...row, [key]: entry };
+  });
 
 const satisfied = (
   condition: RevealCondition | null,
@@ -185,8 +264,152 @@ const satisfied = (
   return numeric < target;
 };
 
-const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
-  const live = field.options.filter((option) => !option.retired);
+/**
+ * The repeatable-row control: one row per line, one input per sub-field.
+ *
+ * This is what replaces "GE RJ45 24 (1G/100M/10M)" typed into a text box. The
+ * count is a number, the family and the speed are picks from lists the library
+ * owns, and a switch adds as many rows as it has distinct port groups — so
+ * nothing here is free text and every part stays comparable.
+ */
+const GroupRowsEditor = ({ fields, rows, onChange }: GroupRowsEditorProps) => (
+  <div className="flex flex-col gap-2">
+    {rows.map((row, index) => {
+      const complete = isRowComplete(row, fields);
+      return (
+        <div
+          key={index}
+          className="flex flex-wrap items-start gap-2 rounded-card border border-hairline bg-hover/40 p-2"
+        >
+          {fields.map((subField) => {
+            const entry = row[subField.key];
+            const live = subField.options.filter((option) => !option.retired);
+            return (
+              <div key={subField.key} className="min-w-28 flex-1">
+                {subField.kind === "number" ? (
+                  <Input
+                    type="number"
+                    placeholder={subField.label}
+                    aria-label={subField.label}
+                    value={typeof entry === "number" ? String(entry) : ""}
+                    onChange={(event) =>
+                      onChange(
+                        patchRow(
+                          rows,
+                          index,
+                          subField.key,
+                          event.target.value === ""
+                            ? undefined
+                            : Number(event.target.value),
+                        ),
+                      )
+                    }
+                    rightSlot={
+                      subField.unit ? (
+                        <span className="text-xs text-faint">
+                          {subField.unit}
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <Dropdown
+                    value={typeof entry === "string" ? entry : ""}
+                    onChange={(next) =>
+                      onChange(
+                        patchRow(
+                          rows,
+                          index,
+                          subField.key,
+                          next === "" ? undefined : next,
+                        ),
+                      )
+                    }
+                    options={live.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    placeholder={subField.label}
+                    searchable={live.length > 8}
+                  />
+                )}
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => onChange(rows.filter((_, at) => at !== index))}
+            aria-label={`Remove row ${index + 1}`}
+            className="mt-2 shrink-0 rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+          >
+            <X size={13} />
+          </button>
+
+          {/* Said on the row itself, because the readers DROP an incomplete row
+              rather than partly counting it — so a half-filled port group would
+              otherwise look entered and contribute nothing. */}
+          {!complete && (
+            <p className="w-full text-xs text-amber-500">
+              Fill every box, or this row is ignored.
+            </p>
+          )}
+        </div>
+      );
+    })}
+
+    <button
+      type="button"
+      onClick={() => onChange([...rows, blankRow()])}
+      className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+    >
+      <Plus size={13} />
+      Add row
+    </button>
+  </div>
+);
+
+/**
+ * Options an author added from this form, merged into the list the server sent.
+ *
+ * Kept in component state rather than revalidating the route: the form is
+ * half-filled, and reloading it to pick up one new option would throw away
+ * everything else typed so far.
+ *
+ * A deliberately reused RETIRED option is copied in as live. The author chose it
+ * from the near-duplicate prompt, so it has to be selectable — and the copy is
+ * local to this render, so the library row keeps saying what it says.
+ */
+const withAdded = (
+  options: SpecOption[],
+  added: SpecOption[],
+): SpecOption[] => [
+  ...options.filter((option) => !option.retired),
+  ...added
+    .filter(
+      (entry) =>
+        !options.some((option) => option.value === entry.value && !option.retired),
+    )
+    .map((entry) => ({ ...entry, retired: false })),
+];
+
+const FieldRow = ({
+  field,
+  value,
+  categoryUuid,
+  onChange,
+  onRemove,
+}: FieldRowProps) => {
+  // Keyed by column for a group, and by "" for the attribute's own list.
+  const [added, setAdded] = useState<Record<string, SpecOption[]>>({});
+  const record = (key: string, option: SpecOption): void => {
+    setAdded((current) => ({
+      ...current,
+      [key]: [...(current[key] ?? []), option],
+    }));
+  };
+
+  const live = withAdded(field.options, added[""] ?? []);
   const selected = asList(value);
 
   return (
@@ -269,32 +492,96 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
       )}
 
       {field.type === "single_select" && (
-        <Dropdown
-          value={selected[0] ?? ""}
-          onChange={(next) => onChange(next === "" ? undefined : next)}
-          options={live.map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          placeholder="Not set"
-          searchable={live.length > 8}
-        />
+        <>
+          <Dropdown
+            value={selected[0] ?? ""}
+            onChange={(next) => onChange(next === "" ? undefined : next)}
+            options={live.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            placeholder="Not set"
+            searchable={live.length > 8}
+          />
+          <AddOption
+            specificationUuid={field.specificationUuid}
+            categoryUuid={categoryUuid}
+            label={field.label}
+            onAdded={(option) => {
+              record("", option);
+              onChange(option.value);
+            }}
+          />
+        </>
       )}
 
       {field.type === "multi_select" && (
-        <Dropdown
-          multiple
-          value={selected}
-          onChange={(next) => onChange(next.length === 0 ? undefined : next)}
-          options={live.map((option) => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          placeholder="Not set"
-          searchable={live.length > 8}
-          emptyMessage="This category offers no options here"
-        />
+        <>
+          <Dropdown
+            multiple
+            value={selected}
+            onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+            options={live.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+            placeholder="Not set"
+            searchable={live.length > 8}
+            emptyMessage="This category offers no options here"
+          />
+          <AddOption
+            specificationUuid={field.specificationUuid}
+            categoryUuid={categoryUuid}
+            label={field.label}
+            onAdded={(option) => {
+              record("", option);
+              // Added, then ticked. An author who adds a value on a multi-select
+              // means to use it — leaving it added but unticked would read as the
+              // add having failed.
+              onChange([...selected, option.value]);
+            }}
+          />
+        </>
       )}
+
+      {field.type === "group" &&
+        (field.groupFields.length === 0 ? (
+          // The library refuses to save a group without sub-fields, so this only
+          // shows for a row written before that guard existed. Better than
+          // rendering an "Add row" button that produces rows nothing can read.
+          <p className="rounded-card border border-dashed border-hairline px-3 py-4 text-center text-xs text-faint">
+            This specification has no sub-fields yet. Add them in the Library.
+          </p>
+        ) : (
+          <>
+            <GroupRowsEditor
+              fields={field.groupFields.map((subField) => ({
+                ...subField,
+                options: withAdded(subField.options, added[subField.key] ?? []),
+              }))}
+              rows={asRows(value)}
+              // An empty list is not a value — the readers treat a group with no
+              // rows as unanswered, so the form has to store nothing rather than [].
+              onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+            />
+            {/* Per COLUMN and below the rows, not inside one. A value belongs to
+                the column; offering it on a row would suggest it were local to
+                that row, and repeating the control per row would put the same
+                button on screen five times. */}
+            {field.groupFields
+              .filter((subField) => subField.kind === "select")
+              .map((subField) => (
+                <AddOption
+                  key={subField.key}
+                  specificationUuid={field.specificationUuid}
+                  groupFieldKey={subField.key}
+                  categoryUuid={categoryUuid}
+                  label={subField.label}
+                  onAdded={(option) => record(subField.key, option)}
+                />
+              ))}
+          </>
+        ))}
     </div>
   );
 };
@@ -532,6 +819,7 @@ export const SpecificationComposer = ({
               key={field.specificationUuid}
               field={field}
               value={specValues[field.specificationUuid]}
+              categoryUuid={categoryUuid}
               onChange={(next) => update(field.specificationUuid, next)}
               // A conditional field leaves on its own when its trigger changes,
               // so it carries no remove button.

@@ -7,6 +7,8 @@ import {
   isSpecRange,
   type ProductValue,
   type ProductValues,
+  type SpecGroupField,
+  type SpecGroupRow,
   type SpecRange,
 } from "../../../db/types";
 import {
@@ -17,6 +19,7 @@ import {
   type ResolvedAssignment,
 } from "./assignment-resolver";
 import { getCatalogModel, resolveFromModel } from "./catalog-model";
+import { normalizeGroupRows } from "./spec-values";
 
 // ---------------------------------------------------------------------------
 // CATALOG COMPLETENESS.
@@ -58,13 +61,37 @@ const toRange = (value: ProductValue): SpecRange | null => {
 };
 
 /**
+ * Whether an attribute's MASTER list contains a value.
+ *
+ * The master list and not the category's offered slice, and the distinction is the
+ * whole point. A slice is a narrowing an author chose, and a real switch may do
+ * 40G in a category whose slice stops at 10G — refusing that would leave the
+ * catalog unable to describe a product it sells, so it is stored and surfaced as a
+ * conflict instead (see `outOfSliceValues`).
+ *
+ * A value outside the master list is not a narrowing at all. No option carries it,
+ * so nothing can rank it, match it or render it as anything but the raw string. It
+ * is unreadable, and storing it only creates a product that looks answered.
+ *
+ * Retired options still count: a product holding a retired value means exactly
+ * what it always meant.
+ */
+const knows = (
+  definition: ResolvedAssignment["definition"],
+  value: string,
+): boolean =>
+  definition.options.length === 0 ||
+  definition.options.some((option) => option.value === value);
+
+/**
  * Normalise a product's values before they are stored.
  *
- * Two jobs, both of which have to happen on the SERVER and not merely in the
+ * Three jobs, all of which have to happen on the SERVER and not merely in the
  * form: drop the values of fields the reveal conditions now hide (a leftover PoE
  * budget on a product whose PoE is "No" would let the engine size a switch off a
- * number that no longer applies), and coerce each value to the type its
- * attribute declares, so nothing downstream has to parse.
+ * number that no longer applies), coerce each value to the type its attribute
+ * declares so nothing downstream has to parse, and refuse an option value the
+ * library does not know.
  */
 export const normalizeProductValues = async (
   categoryUuid: string,
@@ -106,13 +133,36 @@ export const normalizeProductValues = async (
     }
     if (definition.type === "multi_select") {
       const list = Array.isArray(value) ? value.map(String) : [String(value)];
-      const cleaned = list.filter((entry) => entry.trim() !== "");
+      const cleaned = list
+        .filter((entry) => entry.trim() !== "")
+        .filter((entry) => knows(definition, entry));
       if (cleaned.length > 0) {
         typed[definition.uuid] = cleaned;
       }
       continue;
     }
-    typed[definition.uuid] = String(Array.isArray(value) ? value[0] : value);
+    if (definition.type === "group") {
+      // Repeatable rows, keyed by sub-field.
+      //
+      // Without this branch the single-select fallthrough below would store
+      // `String(value[0])` — the literal "[object Object]" — and the product
+      // would look answered while carrying nothing any rule can read.
+      //
+      // Anything the schema does not name is DROPPED, and each remaining entry is
+      // coerced to its sub-field's kind: a count arriving as the string "24"
+      // becomes 24, because every reader above does arithmetic on it without
+      // re-parsing.
+      const cleaned = normalizeGroupRows(value, definition.groupFields ?? []);
+      if (cleaned.length > 0) {
+        typed[definition.uuid] = cleaned;
+      }
+      continue;
+    }
+    // A single-select.
+    const chosen = String(Array.isArray(value) ? value[0] : value);
+    if (knows(definition, chosen)) {
+      typed[definition.uuid] = chosen;
+    }
   }
 
   return clearHiddenValues(resolved, typed);
@@ -142,6 +192,9 @@ export const getProductCompleteness = async (
   const problems = completenessProblems(
     resolved,
     (product.specValues ?? {}) as ProductValues,
+    // The whole library, not this category's slice — naming an attribute the
+    // category does NOT carry is the entire point of that check.
+    model.attributes,
   );
 
   return {
@@ -204,6 +257,7 @@ export const getCatalogCompleteness = async (
     const problems = completenessProblems(
       resolved,
       (row.specValues ?? {}) as ProductValues,
+      model.attributes,
     );
     return {
       productUuid: row.uuid,
@@ -288,6 +342,13 @@ export type ProductFormField = {
   // AssignmentDefinition.
   allowRange: boolean;
   options: ResolvedAssignment["offeredOptions"];
+  // Only on `group`. The sub-fields one repeatable row carries, in column order.
+  //
+  // Passed straight through from the definition and NOT narrowed per category, the
+  // way `options` is: a category may offer fewer options, but it may not offer a
+  // differently-shaped row — two shapes stored under one uuid is a value nothing
+  // can read back.
+  groupFields: SpecGroupField[];
   isRule: boolean;
   isFilter: boolean;
   inherited: boolean;
@@ -305,6 +366,19 @@ const toFormReveal = (
   predicate: ResolvedAssignment["showIf"],
 ): FormRevealCondition | null => {
   if (!predicate) {
+    return null;
+  }
+  // A condition about one COLUMN of a group's rows takes the same escape hatch as
+  // a composite one: it crosses as `null`, the field shows, and the server decides
+  // on save.
+  //
+  // Not carried across on purpose. `FormRevealCondition` has no room for it, and
+  // adding one would mean the browser reducing rows to picks and ranks — a second
+  // implementation of the group semantics, which is exactly what this narrow mirror
+  // exists to avoid. Sending it WITHOUT the column would be worse than either:
+  // the browser would test the whole attribute, find nothing, and hide a field
+  // that should be visible.
+  if ("field" in predicate && predicate.field) {
     return null;
   }
   if (predicate.op === "equals") {
@@ -346,6 +420,7 @@ const toFormField = (
   allowRange: assignment.definition.allowRange,
   // The slice this category offers, never the whole master list.
   options: assignment.offeredOptions,
+  groupFields: assignment.definition.groupFields ?? [],
   isRule: assignment.isRule,
   isFilter: assignment.isFilter,
   inherited: assignment.inherited,

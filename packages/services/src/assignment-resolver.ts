@@ -7,6 +7,11 @@ import {
 } from "../../../db/types";
 import { evaluatePredicate } from "./predicate";
 import {
+  asGroupRows,
+  asOptionList,
+  completeGroupRows,
+  describeValue,
+  groupRowIssues,
   hasValue,
   indexAttributes,
   optionRank,
@@ -401,11 +406,38 @@ export type CompletenessProblem = {
   label: string;
   // revealed = the value is required because a condition brought the field into
   // view; assigned = it is required because the category assigns it as a rule
-  // input at all times.
-  reason: "revealed" | "assigned";
-  // outside_slice is not a missing value but a value this category does not
-  // offer — the author entered 40G where the category stops at 10G.
-  kind: "missing" | "outside_slice";
+  // input at all times; held = nothing requires it — the product simply carries
+  // it, and that is the problem.
+  reason: "revealed" | "assigned" | "held";
+  // Five different failures, deliberately not collapsed into "invalid":
+  //
+  //   missing        — no value at all.
+  //   outside_slice  — a real value the LIBRARY knows and this category does not
+  //                    offer. Allowed on purpose (a switch may do 40G in a
+  //                    category that stops at 10G); the conflict belongs to
+  //                    whoever owns the assignment.
+  //   unknown_value  — a value the library does not know AT ALL. Nothing can rank
+  //                    it, match it or render it, so it is not a slice conflict —
+  //                    it is unreadable data.
+  //   incomplete_rows — a group's rows do not answer the schema the attribute has
+  //                    today, almost always because a sub-field was added after
+  //                    the rows were entered. The readers drop those rows, so the
+  //                    product reads as having none.
+  //   unassigned     — an answered value for an attribute this category does not
+  //                    carry. The mirror image of `missing` and easy to miss
+  //                    precisely because the data LOOKS present: no rule reads it,
+  //                    no spec table shows it, and an author told only that eight
+  //                    attributes are missing will re-enter answers already
+  //                    sitting on the row.
+  kind:
+    | "missing"
+    | "outside_slice"
+    | "unknown_value"
+    | "incomplete_rows"
+    | "unassigned";
+  // What is wrong, in the author's words. Only set for the kinds where naming the
+  // offending value or row is what makes the problem fixable.
+  detail?: string;
 };
 
 /**
@@ -423,6 +455,10 @@ export type CompletenessProblem = {
 export const completenessProblems = (
   resolved: ResolvedAssignment[],
   values: ProductValues,
+  // Every definition the LIBRARY holds, so a value whose attribute this category
+  // does not carry can be named and rendered rather than reported as a bare uuid.
+  // Optional: without it those values are still reported, just less legibly.
+  known?: AttributeIndex,
 ): CompletenessProblem[] => {
   const visible = visibleAssignments(resolved, values);
   const problems: CompletenessProblem[] = [];
@@ -431,13 +467,39 @@ export const completenessProblems = (
     if (!assignment.isRule) {
       continue;
     }
-    const raw = readValue(values, assignment.definition.uuid);
+    const { definition } = assignment;
+    const raw = readValue(values, definition.uuid);
     if (!hasValue(raw)) {
       problems.push({
-        specificationUuid: assignment.definition.uuid,
-        label: assignment.definition.label,
+        specificationUuid: definition.uuid,
+        label: definition.label,
         reason: assignment.showIf ? "revealed" : "assigned",
         kind: "missing",
+      });
+      continue;
+    }
+
+    // A group can hold well-formed rows that no longer answer its schema, and
+    // `hasValue` reports it as answered because the rows ARE well-formed. Left
+    // here, a switch whose ports all became unreadable would show as complete
+    // and pass every port check — the exact failure this module exists to catch.
+    const issues = groupRowIssues(raw, definition);
+    if (issues.length > 0) {
+      const readable = completeGroupRows(raw, definition).length;
+      const total = asGroupRows(raw).length;
+      problems.push({
+        specificationUuid: definition.uuid,
+        label: definition.label,
+        reason: assignment.showIf ? "revealed" : "assigned",
+        kind: "incomplete_rows",
+        detail: `${total - readable} of ${total} row(s) cannot be read — ${issues
+          .slice(0, 3)
+          .map((issue) =>
+            issue.problem === "missing"
+              ? `row ${issue.row} has no ${issue.fieldLabel}`
+              : `row ${issue.row}'s ${issue.fieldLabel} is "${issue.value}", which is not on the list`,
+          )
+          .join("; ")}.`,
       });
     }
   }
@@ -447,31 +509,79 @@ export const completenessProblems = (
       specificationUuid: entry.specificationUuid,
       label: entry.label,
       reason: "assigned",
-      kind: "outside_slice",
+      // A value the library itself does not know is a different problem from one
+      // this category merely does not offer, and they want different fixes: add
+      // the option, versus widen the slice.
+      kind:
+        entry.unknownToLibrary.length > 0 ? "unknown_value" : "outside_slice",
+      detail:
+        entry.unknownToLibrary.length > 0
+          ? `${entry.unknownToLibrary.join(", ")} — not in the library's list for this attribute, so nothing can read it.`
+          : `${entry.values.join(", ")} — the library has these, this category does not offer them.`,
+    });
+  }
+
+  // Values with nowhere to be read. Checked against the RESOLVED set rather than
+  // the visible one: an attribute hidden by a reveal is still carried by the
+  // category, and `clearHiddenValues` owns that case on save. What is reported
+  // here is an attribute the category does not carry at all — because it was never
+  // assigned, because the assignment suppresses it, or because the product changed
+  // category after it was answered.
+  const carried = new Set(
+    resolved.map((assignment) => assignment.definition.uuid),
+  );
+  for (const [specificationUuid, value] of Object.entries(values)) {
+    if (carried.has(specificationUuid) || !hasValue(value)) {
+      continue;
+    }
+    const meta = known?.get(specificationUuid);
+    problems.push({
+      specificationUuid,
+      label: meta?.label ?? specificationUuid,
+      reason: "held",
+      kind: "unassigned",
+      detail: meta
+        ? `Answered "${describeValue(value, meta)}", but this category does not carry ${meta.label} — so nothing reads it and no spec table shows it.`
+        : "The library no longer has this attribute, so the value can never be read again.",
     });
   }
 
   return problems;
 };
 
+export type OutOfSliceValue = {
+  specificationUuid: string;
+  label: string;
+  // Held values this category does not offer, whether or not the library knows
+  // them.
+  values: string[];
+  // The subset the LIBRARY does not know either. Those are not a slice conflict
+  // at all — no option carries that value, so no rule can compare it, no rank can
+  // order it and no label can render it. They need the option adding, not the
+  // slice widening.
+  unknownToLibrary: string[];
+};
+
 /**
- * Values a product holds that its category does not offer.
+ * Values a product holds that its category does not offer, split by whether the
+ * library knows them.
  *
  * A real switch may support 40G in a category whose slice stops at 10G. Blocking
  * the entry would make the catalog unable to describe a product it sells;
  * silently allowing it would let the facet and the data disagree with nobody
  * noticing. So it is allowed, recorded, and surfaced — the conflict becomes a
  * task for whoever owns the assignment.
+ *
+ * A value the library has never heard of is a different matter and is separated
+ * out here: `sliceOptions` narrows the MASTER list, so anything outside the master
+ * list is outside every slice by definition and would otherwise be reported as a
+ * slice problem it can never be fixed as.
  */
 export const outOfSliceValues = (
   resolved: ResolvedAssignment[],
   values: ProductValues,
-): { specificationUuid: string; label: string; values: string[] }[] => {
-  const found: {
-    specificationUuid: string;
-    label: string;
-    values: string[];
-  }[] = [];
+): OutOfSliceValue[] => {
+  const found: OutOfSliceValue[] = [];
 
   for (const assignment of resolved) {
     const { definition } = assignment;
@@ -488,13 +598,18 @@ export const outOfSliceValues = (
     const offered = new Set(
       assignment.offeredOptions.map((option) => option.value),
     );
-    const chosen = Array.isArray(raw) ? raw.map(String) : [String(raw)];
+    // The MASTER list, retired options included: a product holding a retired
+    // value still means what it always meant, so it is known — just no longer
+    // offered.
+    const known = new Set(definition.options.map((option) => option.value));
+    const chosen = asOptionList(raw);
     const outside = chosen.filter((value) => !offered.has(value));
     if (outside.length > 0) {
       found.push({
         specificationUuid: definition.uuid,
         label: definition.label,
         values: outside,
+        unknownToLibrary: outside.filter((value) => !known.has(value)),
       });
     }
   }

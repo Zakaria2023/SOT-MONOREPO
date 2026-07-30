@@ -6,10 +6,15 @@ import { ArrowLeft, FileText, ImageOff, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { formatPrice, humanizeSlug } from "utils";
+import { sectionSpecs, type DisplaySpec } from "services";
+import { formatPrice } from "utils";
 
 type ProductDetailProps = {
   product: ProductDetailData;
+  // Resolved and rendered server-side: only the attributes this category carries,
+  // only those the reveal currently shows, in the order the category authored.
+  // Staff see every audience, which is why the page asks as "admin".
+  specs: DisplaySpec[];
 };
 
 type FieldProps = {
@@ -54,10 +59,10 @@ const Section = ({ title, children }: SectionProps) => (
   </div>
 );
 
-export const ProductDetail = ({ product }: ProductDetailProps) => {
+export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
   const status = product.status ?? "in_stock";
   const gallery = product.images ?? [];
-  const attributes = Object.entries(product.technicalAttributes ?? {});
+  const sections = sectionSpecs(specs);
 
   return (
     <div className="flex flex-col gap-5">
@@ -137,22 +142,43 @@ export const ProductDetail = ({ product }: ProductDetailProps) => {
           </Section>
 
           <Section title="Technical specifications">
-            {attributes.length === 0 ? (
+            {sections.length === 0 ? (
               <p className="text-sm text-faint">
-                No technical attributes set for this product.
+                No specifications answered for this product yet.{" "}
+                <Link
+                  href={`/products/${product.uuid}/edit`}
+                  className="text-primary hover:underline"
+                >
+                  Fill them in
+                </Link>
+                .
               </p>
             ) : (
-              <dl className="divide-y divide-hairline">
-                {attributes.map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
-                  >
-                    <dt className="text-sm text-muted">{humanizeSlug(key)}</dt>
-                    <dd className="text-sm font-medium text-ink">{value}</dd>
-                  </div>
-                ))}
-              </dl>
+              sections.map((section) => (
+                <div
+                  key={section.name ?? "ungrouped"}
+                  className="flex flex-col gap-1.5"
+                >
+                  {section.name && (
+                    <span className="text-xs font-semibold tracking-wide text-faint uppercase">
+                      {section.name}
+                    </span>
+                  )}
+                  <dl className="divide-y divide-hairline">
+                    {section.specs.map((spec) => (
+                      <div
+                        key={spec.uuid}
+                        className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
+                      >
+                        <dt className="text-sm text-muted">{spec.label}</dt>
+                        <dd className="text-sm font-medium text-ink">
+                          {spec.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ))
             )}
           </Section>
         </div>

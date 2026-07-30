@@ -1,4 +1,7 @@
-import { getProductDetail } from "@/app/(dashboard)/products/action";
+import {
+  getProductDetail,
+  getProductSpecs,
+} from "@/app/(dashboard)/products/action";
 import { ProductDetail } from "@/components/products/product-detail";
 import { notFound } from "next/navigation";
 
@@ -14,7 +17,14 @@ const ProductDetailPage = async ({ params }: Props) => {
     notFound();
   }
 
-  return <ProductDetail product={product} />;
+  // Needs the product's category and values, so it cannot join the read above.
+  // Costs one small query on a warm model cache.
+  const specs = await getProductSpecs(
+    product.categoryUuid,
+    product.specValues ?? {},
+  );
+
+  return <ProductDetail product={product} specs={specs} />;
 };
 
 export default ProductDetailPage;

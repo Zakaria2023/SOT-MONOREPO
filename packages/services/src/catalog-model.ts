@@ -5,6 +5,7 @@ import { Products } from "../../../db/schema/products";
 import { ProjectVariables } from "../../../db/schema/project-variables";
 import { Relationships } from "../../../db/schema/relationships";
 import { SpecificationCategories } from "../../../db/schema/specification-categories";
+import { SpecificationOptionSets } from "../../../db/schema/specification-option-sets";
 import { Specifications } from "../../../db/schema/specifications";
 import type { ProductValues } from "../../../db/types";
 import {
@@ -13,6 +14,12 @@ import {
   type AssignmentRow,
   type ResolvedAssignment,
 } from "./assignment-resolver";
+import {
+  indexOptionSets,
+  resolveGroupFields,
+  resolveVocabulary,
+  type OptionSetIndex,
+} from "./library-options";
 import type {
   EngineItem,
   EngineRelationship,
@@ -56,23 +63,52 @@ export const invalidateCatalogModel = (): void => {
   cached = null;
 };
 
+/**
+ * The shared-vocabulary index, in ONE query.
+ *
+ * Lives here with the other loaders rather than beside the option-set service,
+ * which imports `invalidateCatalogModel` from this module — putting a loader
+ * there and importing it back would be a cycle. Deliberately the cheapest
+ * possible shape: no counts, no joins, no ordering, because every read path that
+ * turns a `Specifications` row into an option list needs it.
+ */
+export const loadOptionSetIndex = async (): Promise<OptionSetIndex> => {
+  const rows = await db
+    .select({
+      uuid: SpecificationOptionSets.uuid,
+      ordered: SpecificationOptionSets.ordered,
+      options: SpecificationOptionSets.options,
+    })
+    .from(SpecificationOptionSets);
+  return indexOptionSets(rows);
+};
+
+// Shared vocabularies are resolved HERE, on the way in, so `definition.options`
+// means the same thing whether the list is the attribute's own or one it borrows.
+// Every consumer below — the resolver's enabled slice, the facets, the
+// comparators, the product form — stays unaware that sets exist at all.
 const toDefinition = (
   row: typeof Specifications.$inferSelect,
-): AssignmentDefinition => ({
-  uuid: row.uuid,
-  label: row.label,
-  type: row.type,
-  unit: row.unit,
-  ordered: row.ordered,
-  options: row.options ?? [],
-  key: row.key,
-  internalName: row.internalName,
-  description: row.description,
-  audience: row.audience,
-  allowRange: row.allowRange,
-  order: row.order,
-  groupUuid: row.groupUuid,
-});
+  sets: OptionSetIndex,
+): AssignmentDefinition => {
+  const vocabulary = resolveVocabulary(row, sets);
+  return {
+    uuid: row.uuid,
+    label: row.label,
+    type: row.type,
+    unit: row.unit,
+    ordered: vocabulary.ordered,
+    options: vocabulary.options,
+    groupFields: resolveGroupFields(row.groupFields ?? [], sets),
+    key: row.key,
+    internalName: row.internalName,
+    description: row.description,
+    audience: row.audience,
+    allowRange: row.allowRange,
+    order: row.order,
+    groupUuid: row.groupUuid,
+  };
+};
 
 const toRelationship = (
   row: typeof Relationships.$inferSelect,
@@ -98,7 +134,7 @@ const toRelationship = (
 });
 
 /**
- * The whole catalog model in FOUR queries, cached.
+ * The whole catalog model in SIX queries, cached.
  *
  * Only PUBLISHED relationships are loaded: a draft rule must never gate a
  * buyer, which is the entire point of having a draft state.
@@ -108,20 +144,25 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
     return cached;
   }
 
-  const [specs, assignments, rules, variables, categories] = await Promise.all([
-    db.select().from(Specifications).orderBy(asc(Specifications.order)),
-    db.select().from(SpecificationCategories),
-    db
-      .select()
-      .from(Relationships)
-      .where(eq(Relationships.status, "published")),
-    db.select().from(ProjectVariables).orderBy(asc(ProjectVariables.order)),
-    db
-      .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
-      .from(Categories),
-  ]);
+  const [specs, assignments, rules, variables, categories, sets] =
+    await Promise.all([
+      db.select().from(Specifications).orderBy(asc(Specifications.order)),
+      db.select().from(SpecificationCategories),
+      db
+        .select()
+        .from(Relationships)
+        .where(eq(Relationships.status, "published")),
+      db.select().from(ProjectVariables).orderBy(asc(ProjectVariables.order)),
+      db
+        .select({ uuid: Categories.uuid, parentUuid: Categories.parentUuid })
+        .from(Categories),
+      // Alongside the others rather than after them: the model is one round trip
+      // wide by design, and a sequential read here would add its full latency to
+      // every cold cart check.
+      loadOptionSetIndex(),
+    ]);
 
-  const definitions = specs.map(toDefinition);
+  const definitions = specs.map((spec) => toDefinition(spec, sets));
   const model: CatalogModel = {
     definitions,
     attributes: indexAttributes(definitions),

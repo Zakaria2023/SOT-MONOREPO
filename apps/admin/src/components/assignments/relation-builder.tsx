@@ -9,10 +9,12 @@ import {
   type RelationshipProblem,
 } from "@/app/(dashboard)/assignments/actions";
 import { RelationPreview } from "@/components/assignments/relation-preview";
+import { RowFilter } from "@/components/assignments/row-filter";
 import { Field } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
   describePredicate,
+  describeRowFilter,
   type PredicateAttribute,
 } from "@/components/assignments/condition-picker";
 import {
@@ -125,11 +127,18 @@ const countedPatch = (
   };
 };
 
+// A group's sub-field is picked as one dropdown value, so the picker stays a flat
+// list rather than growing a second control that is meaningless for every other
+// attribute. A uuid cannot contain this character, so splitting is unambiguous.
+const FIELD_SEPARATOR = "::";
+
 /** What a side points at, or "" when it points at neither an attribute nor an
  * input — item_count and a constant have no uuid to show in a picker. */
 const operandUuid = (operand: Operand | null): string => {
   if (operand?.source === "spec") {
-    return operand.specUuid;
+    return operand.groupField
+      ? `${operand.specUuid}${FIELD_SEPARATOR}${operand.groupField}`
+      : operand.specUuid;
   }
   if (operand?.source === "variable") {
     return operand.variableUuid;
@@ -143,7 +152,10 @@ const comparatorsFor = (
   family: RelationshipFamily,
 ): RelationshipComparator[] => {
   if (family === "match") {
-    return ["in", "intersects", "eq", "lte", "gte"];
+    // "within" is the only one that reads a span, which is what a voltage or a
+    // frequency window actually is — a PSU supplying 48 V against a device
+    // accepting 36–57 V needs both ends, and a lone ceiling passes 12 V in silence.
+    return ["in", "intersects", "eq", "lte", "gte", "within"];
   }
   if (family === "budget" || family === "count" || family === "conditional") {
     return ["lte", "gte", "eq"];
@@ -232,12 +244,29 @@ const RelationForm = ({
             groups.length === 0 ||
             groups.includes(attribute.groupName ?? UNGROUPED),
         )
-        .map((attribute) => ({
-          value: attribute.uuid,
-          label: attribute.unit
-            ? `${attribute.label} (${attribute.unit})`
-            : attribute.label,
-        })),
+        // A group is not offered as itself. It holds rows, so it has no single
+        // number to compare — each COUNT inside it is offered instead, which is
+        // what the rule actually totals. Offering the attribute alone would let an
+        // author build a rule that silently reads nothing.
+        .flatMap((attribute) =>
+          attribute.type === "group"
+            ? attribute.groupFields
+                .filter((field) => field.kind === "number")
+                .map((field) => ({
+                  value: `${attribute.uuid}${FIELD_SEPARATOR}${field.key}`,
+                  label: field.unit
+                    ? `${attribute.label} · ${field.label} (${field.unit}, totalled)`
+                    : `${attribute.label} · ${field.label} (totalled)`,
+                }))
+            : [
+                {
+                  value: attribute.uuid,
+                  label: attribute.unit
+                    ? `${attribute.label} (${attribute.unit})`
+                    : attribute.label,
+                },
+              ],
+        ),
       ...variables.map((variable) => ({
         value: variable.uuid,
         label: variable.unit
@@ -248,12 +277,33 @@ const RelationForm = ({
     [attributes, groups, variables],
   );
 
-  // Which kind of operand a picked uuid is. Variables are few and attributes
+  // Groups that offer nothing to total, so the picker above can say why they are
+  // missing instead of simply omitting them.
+  const uncountableGroups = useMemo<string[]>(
+    () =>
+      attributes
+        .filter(
+          (attribute) =>
+            attribute.type === "group" &&
+            (groups.length === 0 ||
+              groups.includes(attribute.groupName ?? UNGROUPED)) &&
+            !attribute.groupFields.some((field) => field.kind === "number"),
+        )
+        .map((attribute) => `"${attribute.label}"`),
+    [attributes, groups],
+  );
+
+  // Which kind of operand a picked value is. Variables are few and attributes
   // many, so asking the short list is the cheap question.
-  const toOperand = (uuid: string): Operand =>
-    variables.some((variable) => variable.uuid === uuid)
-      ? { source: "variable", variableUuid: uuid }
-      : { source: "spec", specUuid: uuid };
+  const toOperand = (picked: string): Operand => {
+    const [specUuid, groupField] = picked.split(FIELD_SEPARATOR);
+    if (specUuid && groupField) {
+      return { source: "spec", specUuid, groupField };
+    }
+    return variables.some((variable) => variable.uuid === picked)
+      ? { source: "variable", variableUuid: picked }
+      : { source: "spec", specUuid: picked };
+  };
 
   // Any edit invalidates the last verdict — a stale "nothing wrong" beside a
   // rule that has since changed is worse than no verdict at all.
@@ -450,6 +500,18 @@ const RelationForm = ({
         </Field>
       )}
 
+      {/* A group with no count sub-field cannot be totalled, so it is absent from
+          every side picker below. Said here rather than left as a gap: an author
+          hunting for "Network Ports" and not finding it has no way to guess that
+          the reason is a missing count column. */}
+      {uncountableGroups.length > 0 && (
+        <p className="text-[11px] text-muted">
+          {uncountableGroups.join(", ")} hold rows but no count, so there is
+          nothing to add up and they are not listed below. Add a count sub-field
+          in the library to use one in a rule.
+        </p>
+      )}
+
       {form.family === "presence" && (
         <PresenceEditor
           value={
@@ -478,6 +540,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
           <Field label="Consumer attribute (summed × qty)">
             <Dropdown
               value={operandUuid(form.consumer)}
@@ -487,6 +554,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.consumer}
+            attributes={attributes}
+            onChange={(next) => patch({ consumer: next })}
+          />
           <Input
             label="Headroom %"
             type="number"
@@ -513,6 +585,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
           <Field label="Counted source — a product group or a project variable">
             <Dropdown
               value={countedSource(form)}
@@ -537,6 +614,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.consumer}
+            attributes={attributes}
+            onChange={(next) => patch({ consumer: next })}
+          />
           <Field label="Compatible via">
             <Dropdown
               value={form.comparator}
@@ -555,6 +637,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
         </>
       )}
 
@@ -571,6 +658,11 @@ const RelationForm = ({
               placeholder="— source —"
             />
           </Field>
+          <RowFilter
+            operand={form.consumer}
+            attributes={attributes}
+            onChange={(next) => patch({ consumer: next })}
+          />
           <Field label="Supply — attribute or project variable">
             <Dropdown
               value={operandUuid(form.provider)}
@@ -580,6 +672,11 @@ const RelationForm = ({
               placeholder="— source —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
           <Input
             label="Target ratio (n : 1)"
             type="number"
@@ -723,10 +820,27 @@ export const RelationBuilder = ({
         return "—";
       }
       if (operand.source === "spec") {
-        return (
-          attributes.find((entry) => entry.uuid === operand.specUuid)?.label ??
-          "a deleted attribute"
+        const attribute = attributes.find(
+          (entry) => entry.uuid === operand.specUuid,
         );
+        if (!attribute) {
+          return "a deleted attribute";
+        }
+        if (!operand.groupField) {
+          return attribute.label;
+        }
+        // The column, not just the attribute — "Network Ports" alone would not
+        // say whether the rule counts ports or the wattage beside them.
+        const field = attribute.groupFields.find(
+          (entry) => entry.key === operand.groupField,
+        );
+        const column = `${attribute.label} · ${field?.label ?? "a removed sub-field"}`;
+        // And that only some rows were counted. A rule totalling the 10G ports
+        // and one totalling every port read identically without this, which is
+        // the difference between a rule an author trusts and one they re-check.
+        return operand.where
+          ? `${column} (${describeRowFilter(operand.where, attribute)})`
+          : column;
       }
       if (operand.source === "variable") {
         return (

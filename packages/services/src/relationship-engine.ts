@@ -12,15 +12,20 @@ import type {
   Operand,
   Predicate,
   PresenceSpec,
+  ProductValue,
   ProductValues,
   RelationshipScope,
+  SpecGroupField,
+  SpecRange,
 } from "../../../db/types";
-import { evaluatePredicate } from "./predicate";
+import { evaluatePredicate, filteredGroupTotal } from "./predicate";
 import {
   asNumber,
   asOptionList,
+  asRange,
   describeValue,
   formatValue,
+  groupSubField,
   hasValue,
   optionLabel,
   optionRank,
@@ -204,6 +209,19 @@ const operandMeta = (
   return context.attributes.get(operand.specUuid) ?? null;
 };
 
+// The sub-field an operand names, when it names one and the attribute really is a
+// group. Null for every other operand, so the callers below stay one-line.
+const operandSubField = (
+  operand: Operand | null,
+  context: EngineContext,
+): SpecGroupField | null => {
+  if (!operand || operand.source !== "spec" || !operand.groupField) {
+    return null;
+  }
+  const meta = operandMeta(operand, context);
+  return meta ? groupSubField(meta, operand.groupField) : null;
+};
+
 const operandUnit = (
   operand: Operand | null,
   context: EngineContext,
@@ -212,6 +230,14 @@ const operandUnit = (
     return null;
   }
   if (operand.source === "spec") {
+    // The SUB-FIELD's unit when one is named, never the attribute's. A group
+    // carries no unit of its own — the count of ports and a per-port wattage are
+    // different dimensions living in the same attribute, and reading the wrong one
+    // is how a comparison passes a check it should have failed.
+    const subField = operandSubField(operand, context);
+    if (subField) {
+      return subField.unit;
+    }
     return operandMeta(operand, context)?.unit ?? null;
   }
   if (operand.source === "variable") {
@@ -228,7 +254,23 @@ const operandLabel = (
     return "—";
   }
   if (operand.source === "spec") {
-    return operandMeta(operand, context)?.label ?? "a deleted attribute";
+    const label = operandMeta(operand, context)?.label;
+    if (!label) {
+      return "a deleted attribute";
+    }
+    // "Network Ports · Ports", so a finding names the column it actually counted
+    // rather than the attribute it came from.
+    const subField = operandSubField(operand, context);
+    if (!subField) {
+      return label;
+    }
+    // And "(matching rows only)" when a filter narrowed them, because otherwise a
+    // finding reading "8 of 24 ports" against a rule that only ever counted the
+    // 10G ones is a number the author cannot reconcile with the product in front
+    // of them.
+    const narrowed =
+      operand.source === "spec" && operand.where ? " (matching rows only)" : "";
+    return `${label} · ${subField.label}${narrowed}`;
   }
   if (operand.source === "variable") {
     return (
@@ -263,7 +305,24 @@ const itemOperandValue = (
   if (!meta) {
     return null;
   }
-  return asNumber(readValue(item.values, operand.specUuid), meta, bound);
+  const raw = readValue(item.values, operand.specUuid);
+  // A group has no single magnitude, so `asNumber` returns null for one on
+  // purpose. The operand has to name which column to total — Σ(count) over the
+  // port groups, not the number of groups, which is the plausible wrong answer
+  // (4 instead of 50) that nothing would have reported.
+  //
+  // Rows that do not answer the current schema are excluded there, so a
+  // switch whose ports became unreadable reads as null here and is reported as a
+  // gap rather than counted short. Completeness names the same rows.
+  if (operand.groupField) {
+    return filteredGroupTotal(
+      raw,
+      meta,
+      operand.groupField,
+      operand.where,
+    );
+  }
+  return asNumber(raw, meta, bound);
 };
 
 // ---------------------------------------------------------------------------
@@ -439,11 +498,14 @@ const suggestProviders = (
       // A suggested replacement is a PROVIDER, so it may only be credited with
       // the capacity it always has — suggesting a 20–30 W part to cover 25 W
       // would be recommending something that might not fit.
-      const capacity = asNumber(
-        readValue(product.values, operand.specUuid),
-        meta,
-        "min",
-      );
+      //
+      // A group's capacity is the total of the named column, read the same way the
+      // participants were. Reading it any other way here would suggest products
+      // the rule would then reject.
+      const raw = readValue(product.values, operand.specUuid);
+      const capacity = operand.groupField
+        ? filteredGroupTotal(raw, meta, operand.groupField, operand.where)
+        : asNumber(raw, meta, "min");
       if (capacity === null) {
         return [];
       }
@@ -825,6 +887,36 @@ const scaleRank = (
 };
 
 /**
+ * One side as a numeric span, or null when it has no magnitude.
+ *
+ * A single number is the degenerate span [v, v], which is what lets `within` read
+ * the same whether the side holds one value or two. An ORDERED select becomes its
+ * rank span, so "the module's speed must fall within the cage's supported range"
+ * works on a dropdown as well as on a number.
+ */
+const asSpan = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta | null,
+): SpecRange | null => {
+  const span = asRange(raw);
+  if (span) {
+    return span;
+  }
+  if (typeof raw === "number") {
+    return { min: raw, max: raw };
+  }
+  if (meta?.ordered) {
+    const ranks = asOptionList(raw)
+      .map((value) => optionRank(meta, value))
+      .filter((rank): rank is number => rank !== null);
+    if (ranks.length > 0) {
+      return { min: Math.min(...ranks), max: Math.max(...ranks) };
+    }
+  }
+  return null;
+};
+
+/**
  * Whether a consumer's value(s) fit a provider's.
  *
  *   in         — consumer ⊆ provider  (an impedance the amp supports)
@@ -832,14 +924,31 @@ const scaleRank = (
  *   lte / gte  — position on the scale (an af device fits an at switch, but not
  *                the reverse)
  *   eq         — the two sets are identical
+ *   within     — the consumer's whole span sits inside the provider's
  */
 const matchSatisfied = (
-  consumerValues: string[],
-  providerValues: string[],
+  consumerRaw: ProductValue | undefined,
+  providerRaw: ProductValue | undefined,
   rule: EngineRelationship,
   consumerMeta: AttributeMeta | null,
   providerMeta: AttributeMeta | null,
 ): boolean => {
+  // `within` is about magnitude, not membership, so it is answered before the
+  // values are flattened into option lists — a span flattens to nothing (see
+  // `asOptionList`), which is exactly why the set comparators cannot express it.
+  if (rule.comparator === "within") {
+    const consumerSpan = asSpan(consumerRaw, consumerMeta);
+    const providerSpan = asSpan(providerRaw, providerMeta);
+    if (!consumerSpan || !providerSpan) {
+      return false;
+    }
+    return (
+      consumerSpan.min >= providerSpan.min && consumerSpan.max <= providerSpan.max
+    );
+  }
+
+  const consumerValues = asOptionList(consumerRaw);
+  const providerValues = asOptionList(providerRaw);
   const provider = new Set(providerValues);
 
   if (rule.comparator === "intersects") {
@@ -967,12 +1076,40 @@ const evaluateMatch = (
     };
   }
 
+  // A SPAN under a set comparator is unreadable, not unsatisfied.
+  //
+  // `asOptionList` flattens a span to nothing on purpose — stringifying it would
+  // hand the set operators "[object Object]" to match against. That left every
+  // comparator except `within` returning false for a span, so a match rule with a
+  // range on either side reported EVERY item as failing: one authoring slip and
+  // the rule blocked every cart in the catalog, while reading like a real finding.
+  // Reported as unknown instead, which is what an unanswerable comparison is.
+  const spanSide =
+    rule.comparator !== "within" &&
+    [...consumers, ...providers].some((item) =>
+      asRange(
+        readValue(
+          item.values,
+          consumers.includes(item)
+            ? consumerOperand.specUuid
+            : providerOperand.specUuid,
+        ),
+      ),
+    );
+  if (spanSide) {
+    return {
+      ...withSides,
+      status: "unknown",
+      message: `"${rule.name}" compares values as sets, but something in the selection answers "${consumerMeta.label}" or "${providerMeta.label}" as a range. Use "must fall within" to compare a value against a span.`,
+    };
+  }
+
   const failing = consumers.filter(
     (item) =>
       !providers.some((provider) =>
         matchSatisfied(
-          asOptionList(readValue(item.values, consumerOperand.specUuid)),
-          asOptionList(readValue(provider.values, providerOperand.specUuid)),
+          readValue(item.values, consumerOperand.specUuid),
+          readValue(provider.values, providerOperand.specUuid),
           rule,
           consumerMeta,
           providerMeta,

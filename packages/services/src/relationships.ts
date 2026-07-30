@@ -29,14 +29,14 @@ import {
   type SelectionLine,
 } from "./catalog-model";
 import { ValidationError } from "./errors";
-import { validatePredicate } from "./predicate";
+import { groupRowAttributes, validatePredicate } from "./predicate";
 import {
   evaluateRelationship,
   type EngineRelationship,
   type EngineVariable,
   type Finding,
 } from "./relationship-engine";
-import { unitFactor } from "./spec-values";
+import { groupSubField, unitFactor } from "./spec-values";
 
 // ---------------------------------------------------------------------------
 // THE RELATIONSHIP SERVICE — authoring compatibility rules.
@@ -218,7 +218,58 @@ export const validateRelationship = async (
     }
     if (operand.source === "spec") {
       const meta = model.attributes.get(operand.specUuid);
-      if (meta && meta.type !== "number" && !meta.ordered) {
+      if (!meta) {
+        return;
+      }
+      // A GROUP holds rows, so it has no magnitude until the rule names which
+      // column to total. Every one of these three cases reads as nothing at
+      // runtime and reports the item as missing a value — a rule that never fires
+      // looks exactly like a rule nothing violated, so all three are caught here
+      // where an author can still fix them.
+      if (meta.type === "group") {
+        if (!operand.groupField) {
+          problems.push({
+            field,
+            message: `"${meta.label}" holds rows, so a rule has to say which count to add up — how many ports, how many outlets. Pick one of its sub-fields.`,
+          });
+          return;
+        }
+        const subField = groupSubField(meta, operand.groupField);
+        if (!subField) {
+          problems.push({
+            field,
+            message: `"${meta.label}" no longer has the sub-field this rule adds up. Pick another one.`,
+          });
+          return;
+        }
+        if (subField.kind !== "number") {
+          problems.push({
+            field,
+            message: `"${subField.label}" is a pick, not a count, so it cannot be added up. Choose a sub-field that holds a number.`,
+          });
+        }
+        // The row filter, checked against this group's OWN columns. A filter
+        // naming a column that no longer exists keeps no rows, and the side then
+        // measures a confident zero rather than reporting anything — the one
+        // failure in this feature that would look like a real answer.
+        for (const problem of validatePredicate(
+          operand.where ?? null,
+          groupRowAttributes(meta),
+        )) {
+          problems.push({
+            field,
+            message: `Only some rows of "${meta.label}": ${problem.message}`,
+          });
+        }
+        return;
+      }
+      if (operand.where) {
+        problems.push({
+          field,
+          message: `"${meta.label}" does not hold rows, so there are no rows for a filter to narrow.`,
+        });
+      }
+      if (meta.type !== "number" && !meta.ordered) {
         problems.push({
           field,
           message: `"${meta.label}" has no magnitude, so it cannot be added up or compared. Use a number attribute, or mark its options as an ordered scale.`,
@@ -269,6 +320,42 @@ export const validateRelationship = async (
           field: "comparator",
           message: `"at most" and "at least" only mean something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
         });
+      }
+
+      // A side answered as a SPAN has no set of values to compare. Every
+      // comparator except "must fall within" then reads it as nothing and the rule
+      // reports every item as failing — one authoring slip blocking every cart in
+      // the catalog while reading like a real finding. Caught here instead.
+      //
+      // Read from `definitions` rather than `attributes`: `AttributeMeta` leaves
+      // `allowRange` out deliberately, because every READER judges a span by its
+      // shape. This is an authoring question, and authoring is where the flag lives.
+      const spanUuids = new Set(
+        model.definitions
+          .filter((definition) => definition.allowRange)
+          .map((definition) => definition.uuid),
+      );
+      const spanSide = [consumerMeta, providerMeta].find(
+        (meta) => meta && spanUuids.has(meta.uuid),
+      );
+      if (input.comparator !== "within" && spanSide) {
+        problems.push({
+          field: "comparator",
+          message: `"${spanSide.label}" is answered as a range, and this comparator compares sets of values. Use "must fall within" — it is the one that reads both ends of a span.`,
+        });
+      }
+      if (input.comparator === "within") {
+        // Both sides need a magnitude. A plain list has no inside, so "within"
+        // would silently answer no for every item.
+        const flat = [consumerMeta, providerMeta].find(
+          (meta) => meta && meta.type !== "number" && !meta.ordered,
+        );
+        if (flat) {
+          problems.push({
+            field: "comparator",
+            message: `"${flat.label}" has no magnitude, so nothing can fall within it. Use a number attribute, or mark its options as an ordered scale.`,
+          });
+        }
       }
     }
   }
@@ -359,7 +446,17 @@ const operandUnitFor = (
     return null;
   }
   if (operand.source === "spec") {
-    return model.attributes.get(operand.specUuid)?.unit ?? null;
+    const meta = model.attributes.get(operand.specUuid);
+    if (!meta) {
+      return null;
+    }
+    // The SUB-FIELD's unit when one is named. A group carries no unit of its own,
+    // so falling back to the attribute's would compare a port count against watts
+    // and find them both unitless — which `unitFactor` reads as compatible.
+    if (operand.groupField) {
+      return groupSubField(meta, operand.groupField)?.unit ?? null;
+    }
+    return meta.unit;
   }
   if (operand.source === "variable") {
     return (

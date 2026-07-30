@@ -49,9 +49,9 @@ const refreshCatalog = (): void => {
 export const saveAssignmentAction = async (
   input: AssignmentInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await saveAssignment(input);
+    await saveAssignment(input, actor);
   } catch (error) {
     return fail(error, "Failed to save the assignment");
   }
@@ -63,9 +63,9 @@ export const removeAssignmentAction = async (
   categoryUuid: string,
   specificationUuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await removeAssignment(categoryUuid, specificationUuid);
+    await removeAssignment(categoryUuid, specificationUuid, actor);
   } catch (error) {
     return fail(error, "Failed to remove the assignment");
   }
@@ -78,9 +78,9 @@ export const suppressAssignmentAction = async (
   categoryUuid: string,
   specificationUuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await suppressInherited(categoryUuid, specificationUuid);
+    await suppressInherited(categoryUuid, specificationUuid, actor);
   } catch (error) {
     return fail(error, "Failed to suppress the attribute");
   }
@@ -102,9 +102,9 @@ export const validateRelationAction = async (
 export const addRelationAction = async (
   input: RelationshipInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await createRelationship(input);
+    await createRelationship(input, actor);
   } catch (error) {
     return fail(error, "Failed to create the relation");
   }
@@ -116,9 +116,9 @@ export const updateRelationAction = async (
   uuid: string,
   input: RelationshipInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await updateRelationship(uuid, input);
+    await updateRelationship(uuid, input, actor);
   } catch (error) {
     return fail(error, "Failed to update the relation");
   }
@@ -129,9 +129,9 @@ export const updateRelationAction = async (
 export const deleteRelationAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteRelationship(uuid);
+    await deleteRelationship(uuid, actor);
   } catch (error) {
     return fail(error, "Failed to delete the relation");
   }

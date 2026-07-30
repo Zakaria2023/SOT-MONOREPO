@@ -4,6 +4,8 @@ import {
   AssignmentScope,
   BusinessLine,
   BoqItemRole,
+  CatalogAuditAction,
+  CatalogAuditTarget,
   BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
@@ -76,6 +78,7 @@ export const RELATIONSHIP_COMPARATOR_LABELS: Record<
   eq: "must equal",
   in: "must be one of",
   intersects: "must overlap",
+  within: "must fall within",
 };
 
 export const RELATIONSHIP_GATE_LABELS: Record<RelationshipGate, string> = {
@@ -280,6 +283,7 @@ export const SPECIFICATION_TYPE_LABELS: Record<SpecificationType, string> = {
   single_select: "Single-select",
   multi_select: "Multi-select",
   boolean: "Yes / No",
+  group: "Repeatable rows",
 };
 
 export const ASSIGNMENT_SCOPE_LABELS: Record<AssignmentScope, string> = {
@@ -291,4 +295,18 @@ export const ASSIGNMENT_AUDIENCE_LABELS: Record<AssignmentAudience, string> = {
   everyone: "Everyone",
   user: "Users only",
   partner: "Partner users only",
+};
+
+export const CATALOG_AUDIT_TARGET_LABELS: Record<CatalogAuditTarget, string> = {
+  specification: "Library attribute",
+  assignment: "Assignment",
+  relationship: "Rule",
+  project_variable: "Project input",
+};
+
+export const CATALOG_AUDIT_ACTION_LABELS: Record<CatalogAuditAction, string> = {
+  create: "Created",
+  update: "Changed",
+  delete: "Deleted",
+  publish: "Published",
 };

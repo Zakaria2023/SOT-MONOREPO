@@ -62,6 +62,7 @@ const Workspace = async ({ categoryUuid, categoryOptions }: WorkspaceProps) => {
         ordered: spec.ordered,
         unit: spec.unit,
         options: spec.options,
+        groupFields: spec.groupFields,
         groupName: spec.groupName,
       }))}
       relationships={relationships}

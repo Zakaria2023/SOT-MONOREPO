@@ -10,6 +10,7 @@ import {
   updateGroupAction,
   type LibraryAttributeInput,
   type LibraryGroup,
+  type OptionSet,
 } from "@/app/(dashboard)/library/action";
 import type { SpecificationDomain, SpecificationType } from "@/db/enum";
 import {
@@ -24,8 +25,14 @@ import {
   SPECIFICATION_TYPE_LABELS,
 } from "@/db/label";
 import { Field } from "@/components/shared/field";
+import {
+  liveOptions,
+  OptionListEditor,
+  toDrafts,
+  type OptionDraft,
+} from "@/components/library/option-list-editor";
 import type { SelectCategories } from "@/db/schema/categories";
-import type { SpecOption } from "@/db/types";
+import type { SpecGroupField } from "@/db/types";
 import { buildCategoryTreeOptions } from "@/lib/categories";
 import {
   ArrowDown,
@@ -33,15 +40,17 @@ import {
   ArrowUpDown,
   FolderPlus,
   Hash,
+  Library,
   Link2,
   ListChecks,
   Lock,
   Pencil,
   Plus,
+  Rows3,
   Search,
   ToggleLeft,
   Trash2,
-  Undo2,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -61,6 +70,9 @@ type LibraryAttribute = LibraryGroup["attributes"][number];
 type LibraryBuilderProps = {
   groups: LibraryGroup[];
   categories: SelectCategories[];
+  // The shared vocabularies an attribute or a sub-field may point at instead of
+  // owning its own list.
+  sharedLists: OptionSet[];
 };
 
 type GroupFormProps = {
@@ -133,6 +145,7 @@ type AttributeFormProps = {
   groupOptions: DropdownOption[];
   // Depth-ordered so the tree reads as a tree in the picker.
   categoryOptions: DropdownOption[];
+  sharedLists: OptionSet[];
   initial?: LibraryAttribute;
   onSubmit: (input: LibraryAttributeInput) => void;
   onCancel: () => void;
@@ -140,13 +153,27 @@ type AttributeFormProps = {
   error?: string;
 };
 
-// One row of the option editor. `value` is present on an option that already
-// exists — carrying it through is what keeps its identity stable when its label
-// is edited, so no product's stored value is orphaned by a rename.
-type OptionDraft = {
-  value?: string;
+// One row of the sub-field editor, for a `group` attribute. `key` is present on a
+// sub-field that already exists, and carrying it through is what keeps a
+// product's stored rows readable when its label is edited — a row is an object
+// keyed by these, so a re-derived key orphans every row at once.
+type GroupFieldDraft = {
+  key?: string;
   label: string;
-  retired: boolean;
+  kind: "number" | "select";
+  unit: string;
+  ordered: boolean;
+  options: OptionDraft[];
+  // "" = this sub-field owns its picks. Anything else is a shared list's uuid,
+  // and then `options`/`ordered` above are not shown and not sent.
+  optionSetUuid: string;
+};
+
+type SharedListNoteProps = {
+  list: OptionSet;
+  // The attribute being edited, so it is not counted among the "others" that a
+  // change to the list would also affect.
+  exceptLabel?: string;
 };
 
 type SearchHit = LibraryAttribute & { groupLabel: string };
@@ -155,6 +182,13 @@ const TYPE_OPTIONS: DropdownOption[] = specificationTypes.map((type) => ({
   value: type,
   label: SPECIFICATION_TYPE_LABELS[type],
 }));
+
+// The two things a sub-field can be. Named for what an author sees rather than
+// for the stored kind: a count is a number box, a pick is a dropdown.
+const GROUP_FIELD_KIND_OPTIONS: DropdownOption[] = [
+  { value: "number", label: "A count" },
+  { value: "select", label: "A pick from a list" },
+];
 
 // The unit picker shows what each unit MEASURES, because that is what decides
 // whether a rule may compare two attributes. W and kW convert; W and VA never
@@ -181,6 +215,7 @@ const TYPE_META: Record<
     className: "bg-emerald-500/15 text-emerald-400",
   },
   boolean: { badge: "yes / no", className: "bg-amber-500/15 text-amber-500" },
+  group: { badge: "rows", className: "bg-sky-500/15 text-sky-400" },
 };
 
 const isOptionType = (type: SpecificationType): boolean =>
@@ -196,20 +231,106 @@ const TypeIcon = ({ type }: { type: SpecificationType }) => {
   if (type === "multi_select") {
     return <ListChecks size={15} className="text-faint" />;
   }
+  if (type === "group") {
+    return <Rows3 size={15} className="text-faint" />;
+  }
   return <ArrowUpDown size={15} className="text-faint" />;
 };
 
-const toDrafts = (options: SpecOption[]): OptionDraft[] =>
-  options.map((option) => ({
-    value: option.value,
-    label: option.label,
-    retired: option.retired,
+const toFieldDrafts = (fields: SpecGroupField[]): GroupFieldDraft[] =>
+  fields.map((field) => ({
+    key: field.key,
+    label: field.label,
+    kind: field.kind,
+    unit: field.unit ?? "",
+    ordered: field.ordered,
+    options: toDrafts(field.options),
+    optionSetUuid: field.optionSetUuid ?? "",
   }));
+
+// Where a select's options come from. "" is the default and the common case —
+// most attributes have no reason to share a vocabulary, and pointing at one is
+// how an author says "these two must be comparable".
+const sourceOptions = (sharedLists: OptionSet[]): DropdownOption[] => [
+  { value: "", label: "This attribute's own list" },
+  ...sharedLists.map((list) => ({
+    value: list.uuid,
+    label: `${list.name}${list.ordered ? " (a scale)" : ""}`,
+  })),
+];
+
+/**
+ * What a borrowed list holds and who else holds it.
+ *
+ * Shown wherever a shared list is chosen — the attribute's own source and each
+ * group sub-field's — so the two read identically. A sub-field previously showed a
+ * bare line of option text with no name and no scale badge, which left an author
+ * unable to tell a shared list from one typed in place.
+ */
+const SharedListNote = ({ list, exceptLabel }: SharedListNoteProps) => {
+  const live = list.options.filter((option) => !option.retired);
+  // Everything pointing at the list except the attribute being edited, so the
+  // count answers "who ELSE does this change affect".
+  const others = [...list.attributeLabels, ...list.groupFieldLabels].filter(
+    (label) => label !== exceptLabel,
+  );
+
+  return (
+    <div className="flex flex-col gap-1 rounded-card border border-hairline bg-hover/40 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Library size={13} className="shrink-0 text-faint" />
+        <span className="text-xs font-medium text-ink">{list.name}</span>
+        {list.ordered && (
+          <span className="flex items-center gap-1 rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+            <ArrowUpDown size={9} />
+            scale
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] text-muted">
+        {live.map((option) => option.label).join(" · ") ||
+          "This shared list has no options yet."}
+      </p>
+      {/* Editing is deliberately elsewhere. A change made from here would land on
+          every attribute pointing at the list, and an author editing one attribute
+          has no reason to expect that. */}
+      <p className="text-[11px] text-faint">
+        {others.length === 0
+          ? "Nothing else uses this list yet. Edit it on the Shared lists tab."
+          : `Also used by ${others.slice(0, 3).join(", ")}${others.length > 3 ? ` and ${others.length - 3} more` : ""}. Edit it on the Shared lists tab.`}
+      </p>
+    </div>
+  );
+};
+
+/**
+ * A sub-field's borrowed list, or a plain warning when the pointer dangles.
+ *
+ * A missing list is said out loud rather than rendered as an empty line: the rows
+ * stored under that sub-field will offer nothing to pick, and an author staring at
+ * a blank space has no way to know why.
+ */
+const SubFieldSharedList = ({
+  list,
+  exceptLabel,
+}: {
+  list?: OptionSet;
+  exceptLabel?: string;
+}) =>
+  list ? (
+    <SharedListNote list={list} exceptLabel={exceptLabel} />
+  ) : (
+    <p className="text-[11px] text-amber-500">
+      This sub-field points at a shared list that no longer exists. Pick another
+      one, or give it its own options.
+    </p>
+  );
 
 const AttributeForm = ({
   groupUuid,
   groupOptions,
   categoryOptions,
+  sharedLists,
   initial,
   onSubmit,
   onCancel,
@@ -230,21 +351,32 @@ const AttributeForm = ({
   const [options, setOptions] = useState<OptionDraft[]>(
     initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
   );
+  const [optionSetUuid, setOptionSetUuid] = useState(
+    initial?.optionSetUuid ?? "",
+  );
+  const [groupFields, setGroupFields] = useState<GroupFieldDraft[]>(
+    initial ? toFieldDrafts(initial.groupFields) : [],
+  );
 
   const locked = (initial?.relationshipCount ?? 0) > 0;
+  const sources = sourceOptions(sharedLists);
+  const chosenList = sharedLists.find((list) => list.uuid === optionSetUuid);
 
-  const setOption = (index: number, patch: Partial<OptionDraft>): void => {
-    setOptions((current) =>
-      current.map((option, at) =>
-        at === index ? { ...option, ...patch } : option,
+  const setGroupField = (
+    index: number,
+    patch: Partial<GroupFieldDraft>,
+  ): void => {
+    setGroupFields((current) =>
+      current.map((field, at) =>
+        at === index ? { ...field, ...patch } : field,
       ),
     );
   };
 
-  // Swap with the neighbour. On an ordered attribute the position IS the rank, so
-  // this is the whole ordering mechanism — no numbers for the author to invent.
-  const moveOption = (index: number, direction: -1 | 1): void => {
-    setOptions((current) => {
+  // Sub-field order is the column order of every stored row, so this is how the
+  // author decides whether a port group reads "24 · 1G" or "1G · 24".
+  const moveGroupField = (index: number, direction: -1 | 1): void => {
+    setGroupFields((current) => {
       const target = index + direction;
       if (target < 0 || target >= current.length) {
         return current;
@@ -261,6 +393,29 @@ const AttributeForm = ({
     });
   };
 
+  const namedGroupFields = groupFields.filter(
+    (field) => field.label.trim() !== "",
+  );
+
+  // Mirrors what the service refuses, so the author is stopped here rather than
+  // by an error after a save they thought would work.
+  const groupIncomplete =
+    type === "group" &&
+    (namedGroupFields.length === 0 ||
+      namedGroupFields.some(
+        (field) =>
+          field.kind === "select" &&
+          field.optionSetUuid === "" &&
+          liveOptions(field.options, field.ordered).length === 0,
+      ));
+
+  // A select with no vocabulary from either source saves happily and then offers
+  // an empty dropdown on the product form, with nothing to say why.
+  const selectIncomplete =
+    isOptionType(type) &&
+    optionSetUuid === "" &&
+    liveOptions(options, ordered).length === 0;
+
   const submit = (): void => {
     onSubmit({
       groupUuid: group === "" ? null : group,
@@ -275,18 +430,38 @@ const AttributeForm = ({
       // Who sees an attribute is a per-category decision, so it is set on
       // the assignment. The library only says what the attribute IS.
       audience: initial?.audience ?? "everyone",
-      options: isOptionType(type)
-        ? options
-            .filter((option) => option.label.trim() !== "" && !option.retired)
-            // The rank is the option's POSITION, so the author orders by moving
-            // options rather than by inventing numbers. The service falls back to
-            // position too, so the two agree.
-            .map((option, index) => ({
-              value: option.value,
-              label: option.label,
-              rank: ordered ? index + 1 : null,
+      // A shared list means the attribute sends NO list of its own. Sending both
+      // would leave two lists for one attribute, and the service would have to
+      // guess which the author meant.
+      options:
+        isOptionType(type) && optionSetUuid === ""
+          ? liveOptions(options, ordered)
+          : [],
+      optionSetUuid: isOptionType(type) ? optionSetUuid || null : null,
+      groupFields:
+        type === "group"
+          ? namedGroupFields.map((field) => ({
+              // Carried through so a renamed sub-field keeps the key every
+              // stored row is filed under.
+              key: field.key,
+              label: field.label,
+              kind: field.kind,
+              // Each normalised to its own kind, matching what the service does:
+              // a pick carrying a unit, or a count carrying options, would leave
+              // the row editor with no honest control to render.
+              unit: field.kind === "number" ? field.unit || null : null,
+              ordered:
+                field.kind === "select" && field.optionSetUuid === ""
+                  ? field.ordered
+                  : false,
+              options:
+                field.kind === "select" && field.optionSetUuid === ""
+                  ? liveOptions(field.options, field.ordered)
+                  : [],
+              optionSetUuid:
+                field.kind === "select" ? field.optionSetUuid || null : null,
             }))
-        : [],
+          : [],
     });
   };
 
@@ -381,115 +556,238 @@ const AttributeForm = ({
       )}
 
       {isOptionType(type) && (
-        <div className="flex flex-col gap-2">
-          {/* One plain question instead of the jargon it replaces. The author is
-              not told about ranks or comparators — the rank is derived from the
-              order the options are listed in, which is the thing they can
-              actually see. */}
-          <Checkbox
-            label="These options go from smallest to largest"
-            checked={ordered}
-            onChange={(event) => setOrdered(event.target.checked)}
-          />
-          <p className="-mt-1 text-[11px] text-muted">
-            {ordered
-              ? "Listed smallest first. Use the arrows to reorder — a device needing the 2nd option will accept the 3rd, but not the other way round."
-              : "Leave this off for a plain list like Black / White, where no option is bigger than another."}
-          </p>
+        <div className="flex flex-col gap-3">
+          {/* The source comes FIRST, before the list itself. An author who is
+              about to point at a shared vocabulary should not have typed a list
+              out only to watch it disappear. */}
+          <Field
+            label="Where the options come from"
+            hint="Point at a shared list when this attribute's values have to be comparable with another one's — a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
+          >
+            <Dropdown
+              value={optionSetUuid}
+              onChange={setOptionSetUuid}
+              options={sources}
+            />
+          </Field>
 
-          {/* Wrapping flow, not a fixed grid. A grid stretches every box to an
-              equal share of the row, so three short options ate the full width;
-              a fixed-width box lets as many fit per row as the screen allows —
-              six or seven on a wide monitor. */}
-          <div className="flex flex-wrap gap-2">
-            {options.map((option, index) => (
-              <div
-                key={option.value ?? `new-${index}`}
-                className="flex shrink-0 items-center gap-1"
-              >
-                <div className="w-40">
-                  <Input
-                    placeholder="Option label"
-                    value={option.label}
-                    disabled={option.retired}
-                    onChange={(event) =>
-                      setOption(index, { label: event.target.value })
-                    }
-                  />
-                </div>
-                {/* Position is the rank, so ordering is done by moving options
-                    rather than by typing a number nobody wants to think about. */}
-                {ordered && !option.retired && (
-                  <div className="flex shrink-0 flex-col">
-                    <button
-                      type="button"
-                      onClick={() => moveOption(index, -1)}
-                      disabled={index === 0}
-                      aria-label={`Move ${option.label || "this option"} earlier`}
-                      className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowUp size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveOption(index, 1)}
-                      disabled={index === options.length - 1}
-                      aria-label={`Move ${option.label || "this option"} later`}
-                      className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowDown size={11} />
-                    </button>
-                  </div>
-                )}
-                {option.retired ? (
-                  <button
-                    type="button"
-                    onClick={() => setOption(index, { retired: false })}
-                    className="flex shrink-0 items-center gap-1 rounded-control px-2 py-1.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
-                    aria-label={`Bring back ${option.label}`}
-                  >
-                    <Undo2 size={12} />
-                    retired
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      option.value
-                        ? setOption(index, { retired: true })
-                        : setOptions((current) =>
-                            current.filter((_, at) => at !== index),
-                          )
-                    }
-                    className="shrink-0 rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
-                    aria-label={
-                      option.value
-                        ? `Retire ${option.label}`
-                        : "Remove this option"
-                    }
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
+          {chosenList ? (
+            <SharedListNote
+              list={chosenList}
+              // Excluded from its own "shared with" count. Without this the note
+              // read "shared with 0 other places" on an attribute that was clearly
+              // linked, and "1 other place" once saved — the one place being
+              // itself.
+              exceptLabel={initial?.label}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {/* One plain question instead of the jargon it replaces. The author
+                  is not told about ranks or comparators — the rank is derived from
+                  the order the options are listed in, which is the thing they can
+                  actually see. */}
+              <Checkbox
+                label="These options go from smallest to largest"
+                checked={ordered}
+                onChange={(event) => setOrdered(event.target.checked)}
+              />
+              <p className="-mt-1 text-[11px] text-muted">
+                {ordered
+                  ? "Listed smallest first. Use the arrows to reorder — a device needing the 2nd option will accept the 3rd, but not the other way round."
+                  : "Leave this off for a plain list like Black / White, where no option is bigger than another."}
+              </p>
+
+              <OptionListEditor
+                options={options}
+                ordered={ordered}
+                onChange={setOptions}
+                addLabel="Add option"
+              />
+
+              {selectIncomplete && (
+                <p className="text-[11px] text-amber-500">
+                  Add at least one option, or take them from a shared list —
+                  otherwise the product form offers an empty dropdown.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {type === "group" && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-sm text-ink">What one row holds</p>
+            <p className="text-[11px] text-muted">
+              A product answers this with as many rows as it needs — four port
+              groups on a switch, three outlet types on a UPS. Each row is
+              filled in with the sub-fields below, in this order.
+            </p>
           </div>
 
-          {/* Outside the grid — inside it, the button would occupy a cell and jump
-              around as options are added. */}
+          {groupFields.map((field, index) => (
+            <div
+              key={field.key ?? `new-field-${index}`}
+              className="flex flex-col gap-3 rounded-card border border-hairline bg-hover/40 p-3"
+            >
+              <div className="flex items-start gap-2">
+                <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Input
+                    placeholder="Sub-field name"
+                    value={field.label}
+                    onChange={(event) =>
+                      setGroupField(index, { label: event.target.value })
+                    }
+                  />
+                  <Dropdown
+                    value={field.kind}
+                    onChange={(next) =>
+                      setGroupField(index, {
+                        kind: next === "number" ? "number" : "select",
+                      })
+                    }
+                    options={GROUP_FIELD_KIND_OPTIONS}
+                  />
+                </div>
+
+                {/* Sub-field order is the COLUMN order of every row, so it is
+                    always reorderable — unlike option order, which only matters
+                    on a scale. */}
+                <div className="flex shrink-0 flex-col">
+                  <button
+                    type="button"
+                    onClick={() => moveGroupField(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Move ${field.label || "this sub-field"} earlier`}
+                    className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                  >
+                    <ArrowUp size={11} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveGroupField(index, 1)}
+                    disabled={index === groupFields.length - 1}
+                    aria-label={`Move ${field.label || "this sub-field"} later`}
+                    className="rounded-control px-1 text-faint hover:bg-hover hover:text-ink disabled:opacity-30"
+                  >
+                    <ArrowDown size={11} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGroupFields((current) =>
+                      current.filter((_, at) => at !== index),
+                    )
+                  }
+                  className="shrink-0 rounded-control p-1.5 text-faint hover:bg-hover hover:text-red-400"
+                  aria-label={`Remove ${field.label || "this sub-field"}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {field.kind === "number" ? (
+                <Field
+                  label="Unit"
+                  hint="What the count measures. Leave blank when the sub-field is a plain tally, like how many ports."
+                >
+                  <Combobox
+                    value={field.unit}
+                    onChange={(next) => setGroupField(index, { unit: next })}
+                    options={UNIT_OPTIONS}
+                    placeholder="Search units…"
+                  />
+                </Field>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {/* THE reason shared lists exist. A speed list typed inside this
+                      group and a speed list on a standalone transceiver attribute
+                      spell "1G" identically and store unrelated values, so no rule
+                      can ask whether a module fits a cage. Pointing both at one
+                      list is what makes that question answerable. */}
+                  <Field
+                    label="Where the picks come from"
+                    hint="Point at a shared list when this sub-field has to be comparable with another attribute — a cage's speed against a module's."
+                  >
+                    <Dropdown
+                      value={field.optionSetUuid}
+                      onChange={(next) =>
+                        setGroupField(index, { optionSetUuid: next })
+                      }
+                      options={sources}
+                    />
+                  </Field>
+
+                  {field.optionSetUuid === "" ? (
+                    <div className="flex flex-col gap-2">
+                      <Checkbox
+                        label="These options go from smallest to largest"
+                        checked={field.ordered}
+                        onChange={(event) =>
+                          setGroupField(index, {
+                            ordered: event.target.checked,
+                          })
+                        }
+                      />
+                      <OptionListEditor
+                        options={field.options}
+                        ordered={field.ordered}
+                        onChange={(next) =>
+                          setGroupField(index, { options: next })
+                        }
+                        addLabel="Add option"
+                      />
+                    </div>
+                  ) : (
+                    <SubFieldSharedList
+                      list={sharedLists.find(
+                        (list) => list.uuid === field.optionSetUuid,
+                      )}
+                      exceptLabel={
+                        initial
+                          ? `${initial.label} · ${field.label}`
+                          : undefined
+                      }
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
           <button
             type="button"
             onClick={() =>
-              setOptions((current) => [
+              setGroupFields((current) => [
                 ...current,
-                { label: "", retired: false },
+                {
+                  label: "",
+                  kind: "number",
+                  unit: "",
+                  ordered: false,
+                  options: [],
+                  optionSetUuid: "",
+                },
               ])
             }
             className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
           >
             <Plus size={13} />
-            Add option
+            Add sub-field
           </button>
+
+          {/* The same two things the service refuses, said before the author
+              tries to save rather than after. */}
+          {groupIncomplete && (
+            <p className="text-[11px] text-amber-500">
+              {namedGroupFields.length === 0
+                ? "A row needs at least one sub-field — otherwise there is nothing in it to read."
+                : "Every sub-field that is a pick needs at least one option, or a shared list to take them from."}
+            </p>
+          )}
         </div>
       )}
 
@@ -499,7 +797,15 @@ const AttributeForm = ({
         <Button variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
-        <Button onClick={submit} disabled={pending || label.trim() === ""}>
+        <Button
+          onClick={submit}
+          disabled={
+            pending ||
+            label.trim() === "" ||
+            groupIncomplete ||
+            selectIncomplete
+          }
+        >
           {initial ? "Save" : "Add attribute"}
         </Button>
       </div>
@@ -547,6 +853,15 @@ const AttributeRow = ({
               scale
             </span>
           )}
+          {/* Worth its own badge: the options below are borrowed, so editing them
+              is not done here, and this attribute's values are comparable with
+              every other attribute carrying the same badge. */}
+          {attribute.optionSetUuid && (
+            <span className="flex items-center gap-1 rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
+              <Library size={9} />
+              shared list
+            </span>
+          )}
           {attribute.allowRange && (
             <span className="rounded-full bg-hover px-1.5 py-0.5 text-[10px] text-secondary">
               range
@@ -564,6 +879,15 @@ const AttributeRow = ({
             {/* Listed in rank order for an ordered attribute, so the sequence
                 itself is the information — the numbers behind it are noise. */}
             {live.map((option) => option.label).join(" · ")}
+          </p>
+        )}
+
+        {/* A group has no master option list, so the line above is always empty
+            for one. Its sub-fields in column order are the equivalent summary —
+            they are what one stored row actually looks like. */}
+        {attribute.groupFields.length > 0 && (
+          <p className="mt-1 line-clamp-1 text-xs text-muted">
+            {attribute.groupFields.map((field) => field.label).join(" · ")}
           </p>
         )}
 
@@ -604,7 +928,11 @@ const AttributeRow = ({
   );
 };
 
-export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
+export const LibraryBuilder = ({
+  groups,
+  categories,
+  sharedLists,
+}: LibraryBuilderProps) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -616,6 +944,7 @@ export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string>();
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [confirming, setConfirming] = useState<LibraryAttribute | null>(null);
   const [confirmingGroup, setConfirmingGroup] = useState<LibraryGroup | null>(
     null,
@@ -661,14 +990,20 @@ export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
   const active =
     groups.find((group) => group.uuid === selectedGroup) ?? groups[0];
 
-  const run = (action: () => Promise<{ error?: string }>): void => {
+  const run = (
+    action: () => Promise<{ error?: string; warnings?: string[] }>,
+  ): void => {
     setError(undefined);
+    setWarnings([]);
     startTransition(async () => {
       const result = await action();
       if (result.error) {
         setError(result.error);
         return;
       }
+      // Survives the form closing on purpose — the whole point is that the author
+      // reads it after the save, not while they are still editing.
+      setWarnings(result.warnings ?? []);
       setAddingAttribute(false);
       setAddingGroup(false);
       setEditingGroup(null);
@@ -706,6 +1041,7 @@ export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
       groupUuid={attribute.groupUuid}
       groupOptions={groupOptions}
       categoryOptions={categoryOptions}
+      sharedLists={sharedLists}
       initial={attribute}
       pending={pending}
       error={error}
@@ -743,6 +1079,29 @@ export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
             {error}
           </p>
         )}
+
+      {/* Amber and dismissible, not red: the save DID happen. What is left is work
+          on the products, and the author is the only one who can do it. */}
+      {warnings.length > 0 && (
+        <div className="flex items-start gap-2 rounded-card border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <TriangleAlert size={14} className="mt-0.5 shrink-0 text-amber-500" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {warnings.map((warning) => (
+              <p key={warning} className="text-xs text-amber-500">
+                {warning}
+              </p>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setWarnings([])}
+            aria-label="Dismiss"
+            className="shrink-0 rounded-control p-1 text-amber-500/70 hover:bg-hover hover:text-amber-500"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       {searching ? (
         <div className="flex flex-col gap-2">
@@ -921,6 +1280,7 @@ export const LibraryBuilder = ({ groups, categories }: LibraryBuilderProps) => {
                 groupUuid={active && active.uuid !== "" ? active.uuid : null}
                 groupOptions={groupOptions}
                 categoryOptions={categoryOptions}
+                sharedLists={sharedLists}
                 pending={pending}
                 error={error}
                 onCancel={() => {

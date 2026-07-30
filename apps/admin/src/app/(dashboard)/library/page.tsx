@@ -1,12 +1,13 @@
 import { LibraryWorkspace } from "@/components/library/library-workspace";
 import { getCategories } from "services";
-import { getLibraryData, getVariables } from "./action";
+import { getLibraryData, getSharedLists, getVariables } from "./action";
 
 const LibraryPage = async () => {
-  const [groups, variables, categories] = await Promise.all([
+  const [groups, variables, categories, sharedLists] = await Promise.all([
     getLibraryData(),
     getVariables(),
     getCategories(),
+    getSharedLists(),
   ]);
 
   return (
@@ -14,6 +15,7 @@ const LibraryPage = async () => {
       groups={groups}
       variables={variables}
       categories={categories}
+      sharedLists={sharedLists}
     />
   );
 };
