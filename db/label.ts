@@ -280,6 +280,7 @@ export const SPECIFICATION_TYPE_LABELS: Record<SpecificationType, string> = {
   single_select: "Single-select",
   multi_select: "Multi-select",
   boolean: "Yes / No",
+  group: "Repeatable rows",
 };
 
 export const ASSIGNMENT_SCOPE_LABELS: Record<AssignmentScope, string> = {

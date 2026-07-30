@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { assignmentAudiences, specificationTypes } from "../enum";
-import { SpecOption } from "../types";
+import { SpecGroupField, SpecOption } from "../types";
 import { SpecificationGroups } from "./specification-groups";
 
 // THE LIBRARY — where an attribute is born, exactly once.
@@ -88,6 +88,16 @@ export const Specifications = mysqlTable("Specifications", {
   // so a product holding a value never ends up holding one that no longer
   // exists.
   options: json("options").$type<SpecOption[]>(),
+
+  // Only meaningful for `group`. The sub-fields one authored row carries, in
+  // column order — {count, family, max speed} for network ports, {outlet type,
+  // count} for outlets.
+  //
+  // Definition-level, like `options` and for the same reason: the shape of a port
+  // group is a property of "Network Ports" itself. A per-category shape would fork
+  // the attribute, and two categories storing differently-shaped rows under one
+  // uuid is a value nothing can read back.
+  groupFields: json("group_fields").$type<SpecGroupField[]>(),
 
   // Who this attribute is FOR. Set once, where it is born: an installer
   // certification is a partner concern wherever it is used, not something every

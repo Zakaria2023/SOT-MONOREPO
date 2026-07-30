@@ -39,6 +39,12 @@ export const productFormSchema = z.object({
       // A span. Both ends required — a half-filled one is not a value, and the
       // server drops it rather than storing something it cannot read back.
       z.object({ min: z.number(), max: z.number() }),
+      // A group's repeatable rows: sub-field key → count or pick. Listed AFTER
+      // `array(string)` so a multi-select still matches the narrower branch
+      // first, and every row value is required for the same reason both ends of
+      // a span are — the readers drop an incomplete row, so storing one would
+      // show the author a filled field that no rule can see.
+      z.array(z.record(z.string(), z.union([z.number(), z.string()]))),
     ]),
   ),
   status: z.enum(productStatuses),

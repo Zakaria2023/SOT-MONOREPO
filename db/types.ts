@@ -44,6 +44,75 @@ export type SpecOption = {
 };
 
 // ---------------------------------------------------------------------------
+// Group schema — the sub-fields of a repeatable row
+// ---------------------------------------------------------------------------
+
+// One column of a `group` attribute. Authored in the library beside the
+// attribute, because the shape of a port group is a property of "Network Ports"
+// itself and not of any category that asks for it.
+//
+// Two kinds, and no more. Every repeatable fact in the catalogue is counts and
+// picks — {count, family, max speed} for ports, {count, outlet type} for
+// outlets, {name, mode, used, total, expandable for} for slot systems. Adding
+// nested groups or ranges here would make the row a document, and a document is
+// something no comparator can read.
+//
+// `options` is INLINE rather than a pointer at another Specifications row: the
+// boundary rule at the top of this file forbids a library entry from naming
+// another attribute. The cost is real and worth stating — a speed list inside
+// this group and a speed list on a standalone transceiver attribute are separate
+// vocabularies, so their `value`s cannot be compared until shared option sets
+// exist as a thing of their own.
+export type SpecGroupField = {
+  // Stable identity. A row keys on this, so it is fixed at creation and a label
+  // rename never touches it — the same reason SpecOption carries `value`.
+  key: string;
+  label: string;
+  // `number` for a quantity, `select` for a pick from `options`.
+  kind: "number" | "select";
+  // `number` only. Same dimension discipline as Specifications.unit.
+  unit: string | null;
+  // `select` only. Whether `options` is a scale, so a comparator can read rank —
+  // 1G < 10G < 25G is what makes "does this cage take that module" answerable.
+  ordered: boolean;
+  // `select` only.
+  options: SpecOption[];
+};
+
+// One authored row of a `group` attribute: sub-field key → value.
+//
+// Numbers stay numbers and picks stay option `value`s, for the same reason
+// ProductValue is typed rather than stringly — a parse that can silently produce
+// NaN has no place between an author and a budget check.
+export type SpecGroupRow = Record<string, number | string>;
+
+/**
+ * Whether a value is a well-formed list of group rows.
+ *
+ * Needed because `string[]` (a multi-select) and `SpecGroupRow[]` (a group) are
+ * both arrays, and the readers have to tell them apart before coercing. The two
+ * are disjoint by element type, so the check is total rather than a heuristic.
+ *
+ * An EMPTY list is not a value — a group with no rows is an unanswered
+ * attribute, and reading it as answered would let a switch with no ports
+ * declared pass a port check.
+ */
+export const isSpecGroupRows = (value: unknown): value is SpecGroupRow[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (row) =>
+      typeof row === "object" &&
+      row !== null &&
+      !Array.isArray(row) &&
+      Object.values(row).every(
+        (entry) =>
+          typeof entry === "string" ||
+          (typeof entry === "number" && Number.isFinite(entry)),
+      ),
+  );
+
+// ---------------------------------------------------------------------------
 // The predicate language — ONE condition shape for the whole system
 // ---------------------------------------------------------------------------
 
@@ -190,7 +259,17 @@ export const isSpecRange = (value: unknown): value is SpecRange =>
 // TYPED, not stringly. A number is a number so the engine can sum it without a
 // parse that can silently produce NaN; a multi-select is an array so an option
 // containing a comma cannot corrupt the row the way a comma-joined string does.
-export type ProductValue = number | boolean | string | string[] | SpecRange;
+//
+// `SpecGroupRow[]` overlaps `string[]` in shape only — the element types are
+// disjoint, and `isSpecGroupRows` is how every reader tells them apart before
+// coercing. No reader may branch on `Array.isArray` alone.
+export type ProductValue =
+  | number
+  | boolean
+  | string
+  | string[]
+  | SpecRange
+  | SpecGroupRow[];
 
 export type ProductValues = Record<string, ProductValue>;
 

@@ -1,5 +1,5 @@
 import { slugify } from "utils";
-import type { SpecOption } from "../../../db/types";
+import type { SpecGroupField, SpecOption } from "../../../db/types";
 
 // ---------------------------------------------------------------------------
 // Option identity. Pure — no database, so it is testable on its own.
@@ -107,5 +107,109 @@ export const mergeOptions = (
       merged.push({ ...option, retired: true });
     }
   }
+  return merged;
+};
+
+// ---------------------------------------------------------------------------
+// Group sub-fields
+// ---------------------------------------------------------------------------
+
+export type LibraryGroupFieldInput = {
+  // Present on a sub-field that already exists, absent on one just added — the
+  // same signal `LibraryOptionInput.value` carries.
+  key?: string;
+  label: string;
+  kind: "number" | "select";
+  unit: string | null;
+  ordered: boolean;
+  options: LibraryOptionInput[];
+};
+
+/**
+ * Normalise a group's sub-field schema against what is already stored.
+ *
+ * Keys are stable for the same reason option values are: a product's rows are
+ * objects keyed by them, so re-deriving a key from a renamed label would orphan
+ * every stored row at once. Each sub-field's option list goes through
+ * `mergeOptions`, so a group's picks get the same append-only guarantees as a
+ * top-level select.
+ *
+ * TWO HAZARDS this function cannot fix on its own, both belonging to the caller:
+ *
+ *  - ADDING a sub-field to a group that already holds rows makes every existing
+ *    row incomplete, and the readers DROP incomplete rows — so a switch silently
+ *    reads as having no ports. Existing rows have to be backfilled, or the edit
+ *    refused, before this is safe.
+ *  - REMOVING a sub-field is not retirement: unlike an option there is nowhere to
+ *    hang a `retired` flag, so the stored rows keep a key nothing reads. Harmless
+ *    to read, but it is data the schema no longer describes.
+ */
+export const mergeGroupFields = (
+  existing: SpecGroupField[],
+  input: LibraryGroupFieldInput[],
+): SpecGroupField[] => {
+  const usable = input.filter((entry) => entry.label.trim() !== "");
+  const storedByKey = new Map(existing.map((field) => [field.key, field]));
+
+  // Same two-pass claim as `mergeOptions`, and for the same reason: a new
+  // sub-field must never take a key an existing one already owns, whatever order
+  // the author listed them in.
+  const taken = new Set<string>();
+  for (const entry of usable) {
+    const stored = entry.key?.trim();
+    if (stored) {
+      taken.add(stored);
+    }
+  }
+  for (const field of existing) {
+    taken.add(field.key);
+  }
+
+  const uniqueKey = (base: string): string => {
+    if (!taken.has(base)) {
+      return base;
+    }
+    let suffix = 2;
+    while (taken.has(`${base}-${suffix}`)) {
+      suffix += 1;
+    }
+    return `${base}-${suffix}`;
+  };
+
+  const seen = new Set<string>();
+  const merged: SpecGroupField[] = [];
+
+  usable.forEach((entry, index) => {
+    const stored = entry.key?.trim();
+    if (stored && seen.has(stored)) {
+      // The same sub-field listed twice. The duplicate is the mistake, so the
+      // first one wins rather than the second silently claiming a new key.
+      return;
+    }
+    const key =
+      stored || uniqueKey(slugify(entry.label) || `field-${index + 1}`);
+    seen.add(key);
+    taken.add(key);
+
+    const isSelect = entry.kind === "select";
+    merged.push({
+      key,
+      label: entry.label.trim(),
+      kind: entry.kind,
+      // Each normalised to its own kind, exactly as the attribute-level
+      // `ordered`/`allowRange` are: a select carrying a unit, or a count carrying
+      // an option list, leaves the row editor with no honest control to render.
+      unit: isSelect ? null : entry.unit?.trim() || null,
+      ordered: isSelect ? entry.ordered : false,
+      options: isSelect
+        ? mergeOptions(
+            storedByKey.get(key)?.options ?? [],
+            entry.options,
+            entry.ordered,
+          )
+        : [],
+    });
+  });
+
   return merged;
 };

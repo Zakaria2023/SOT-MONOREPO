@@ -65,6 +65,7 @@ const toDefinition = (
   unit: row.unit,
   ordered: row.ordered,
   options: row.options ?? [],
+  groupFields: row.groupFields ?? [],
   key: row.key,
   internalName: row.internalName,
   description: row.description,

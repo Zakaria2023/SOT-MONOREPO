@@ -149,6 +149,15 @@ export type SpecificationDomain = (typeof specificationDomains)[number];
 //                   the strings "Yes"/"No": a rule that compares the string
 //                   "Yes" breaks the moment someone relabels the option, and
 //                   every such bug looks like a passing check.
+//   group         — a REPEATABLE row of counts and picks, defined by the
+//                   attribute's own `groupFields` schema.
+//
+// `group` exists because some facts are a list, not a value. "24 × 1G BASE-T,
+// 16 × 10G SFP" is four port groups on one switch, and no single option can hold
+// it: crammed into one select the list forks into a new option per switch and
+// stops being comparable, which is the failure that produced free-typed specs in
+// the first place. One type covers every such fact we have — network ports,
+// power outlets, and slot systems are all {how many, of which kind}.
 //
 // There is no `text` type. Free text can never feed a rule, and an attribute
 // that cannot feed a rule or a filter is marketing copy — it belongs on the
@@ -158,11 +167,19 @@ export const specificationTypes = [
   "single_select",
   "multi_select",
   "boolean",
+  "group",
 ] as const satisfies readonly string[];
 
 export type SpecificationType = (typeof specificationTypes)[number];
 
-/** The types whose values come from the master option list. */
+/**
+ * The types whose values come from the master option list.
+ *
+ * `group` is NOT one of them, even though its rows contain picks: those lists
+ * belong to the sub-fields inside `groupFields`, not to the attribute. Treating a
+ * group as option-backed would point the option editor and every enabled-slice
+ * narrowing at an empty master list.
+ */
 export const optionBackedTypes = [
   "single_select",
   "multi_select",

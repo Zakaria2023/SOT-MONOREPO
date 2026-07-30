@@ -1,8 +1,11 @@
 import { UNIT_DIMENSIONS, type SpecificationType } from "../../../db/enum";
 import {
+  isSpecGroupRows,
   isSpecRange,
   type ProductValue,
   type ProductValues,
+  type SpecGroupField,
+  type SpecGroupRow,
   type SpecOption,
   type SpecRange,
 } from "../../../db/types";
@@ -26,7 +29,20 @@ export type AttributeMeta = {
   unit: string | null;
   ordered: boolean;
   options: SpecOption[];
+  // Only populated for `group`, absent on every other type.
+  //
+  // Optional deliberately. Requiring it would force ~20 call sites to type
+  // `groupFields: []`, which is exactly as wrong for a group attribute as
+  // omitting it — so the ceremony buys nothing. The real guarantee is that a
+  // `group` attribute cannot be SAVED without sub-fields (see
+  // specification-library), backed by readers here that return null or an empty
+  // list rather than a plausible 0.
+  groupFields?: SpecGroupField[];
 };
+
+/** A meta's group schema, treating absent and empty as the same thing. */
+const schemaOf = (meta: AttributeMeta): SpecGroupField[] =>
+  meta.groupFields ?? [];
 
 // Deliberately NOT here: `allowRange`. Every reader below decides a value is a
 // span by its SHAPE, so nothing in a computation needs the flag — and a value
@@ -66,6 +82,13 @@ export const hasValue = (raw: ProductValue | undefined): boolean => {
     return false;
   }
   if (Array.isArray(raw)) {
+    // A group's rows are objects, a multi-select's entries are strings. A list
+    // holding any object has to be a WELL-FORMED row list to count as answered:
+    // a malformed row is unreadable, not absent, and the two must not collapse
+    // into each other — the same distinction `isSpecRange` draws for a span.
+    if (raw.some((entry) => typeof entry === "object" && entry !== null)) {
+      return isSpecGroupRows(raw);
+    }
     return raw.length > 0;
   }
   if (typeof raw === "string") {
@@ -108,6 +131,13 @@ export const asOptionList = (raw: ProductValue | undefined): string[] => {
   if (!hasValue(raw) || raw === undefined) {
     return [];
   }
+  // Group rows are checked BEFORE the array branch: they are an array too, and
+  // `map(String)` would hand the set operators "[object Object]" to match on.
+  // Which sub-field a caller means is a question only it can answer — see
+  // `groupPicks`.
+  if (isSpecGroupRows(raw)) {
+    return [];
+  }
   if (Array.isArray(raw)) {
     return raw.map(String);
   }
@@ -145,6 +175,14 @@ export const asNumber = (
   const range = asRange(raw);
   if (range) {
     return bound === "min" ? range.min : range.max;
+  }
+  // A group is a LIST of rows, so it has no single magnitude. WHICH sub-field to
+  // total is a decision only the caller can make, so it has to name one — see
+  // `groupTotal`. Collapsing to something plausible here is the dangerous move:
+  // a row count would make "how many ports" read 4 (the number of groups) rather
+  // than 50 (the sum of their counts), and nothing would report the difference.
+  if (isSpecGroupRows(raw)) {
+    return null;
   }
   if (meta.type === "number") {
     const parsed = typeof raw === "number" ? raw : Number(raw);
@@ -192,6 +230,108 @@ export const asBoolean = (raw: ProductValue | undefined): boolean | null => {
     return false;
   }
   return null;
+};
+
+// ---------------------------------------------------------------------------
+// Group values
+// ---------------------------------------------------------------------------
+
+/** A value as a list of group rows, or an empty list when it is not one. */
+export const asGroupRows = (raw: ProductValue | undefined): SpecGroupRow[] =>
+  isSpecGroupRows(raw) ? raw : [];
+
+/**
+ * The sub-field an author must fill for a row to mean anything.
+ *
+ * A row missing any of its schema's sub-fields is DROPPED by the readers below
+ * rather than treated as a zero. Half a port group — a count with no speed — is
+ * the same failure as a half-filled span: it reads as an answer, and then no
+ * comparator can act on it.
+ */
+export const isCompleteGroupRow = (
+  row: SpecGroupRow,
+  fields: SpecGroupField[],
+): boolean =>
+  fields.every((field) => {
+    const entry = row[field.key];
+    if (field.kind === "number") {
+      return typeof entry === "number" && Number.isFinite(entry);
+    }
+    return typeof entry === "string" && entry.trim().length > 0;
+  });
+
+/** Only the rows a comparator can actually read. */
+export const completeGroupRows = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+): SpecGroupRow[] =>
+  asGroupRows(raw).filter((row) => isCompleteGroupRow(row, schemaOf(meta)));
+
+/**
+ * Total a numeric sub-field across every complete row.
+ *
+ * This is what "how many 10G ports does this switch have" reduces to once the
+ * caller has narrowed the rows. Returns null when the attribute has no such
+ * numeric sub-field, because 0 would be indistinguishable from a real total of
+ * zero and one of those two is a configuration error.
+ */
+export const groupTotal = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+  fieldKey: string,
+): number | null => {
+  const field = schemaOf(meta).find((entry) => entry.key === fieldKey);
+  if (!field || field.kind !== "number") {
+    return null;
+  }
+  const rows = completeGroupRows(raw, meta);
+  if (rows.length === 0) {
+    return null;
+  }
+  return round2(
+    rows.reduce((sum, row) => {
+      const entry = row[fieldKey];
+      return sum + (typeof entry === "number" ? entry : 0);
+    }, 0),
+  );
+};
+
+/**
+ * Every distinct option a select sub-field holds across the rows.
+ *
+ * The set-membership reading of a group: "does this switch have any SFP cage at
+ * all" is `groupPicks(...).includes("sfp")`. Deduplicated and in row order, so
+ * the answer does not change when an author reorders rows.
+ */
+export const groupPicks = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+  fieldKey: string,
+): string[] => {
+  const field = schemaOf(meta).find((entry) => entry.key === fieldKey);
+  if (!field || field.kind !== "select") {
+    return [];
+  }
+  const seen = new Set<string>();
+  for (const row of completeGroupRows(raw, meta)) {
+    const entry = row[fieldKey];
+    if (typeof entry === "string") {
+      seen.add(entry);
+    }
+  }
+  return [...seen];
+};
+
+/** A group sub-field's option rank, for the ordered comparators. */
+export const groupFieldRank = (
+  field: SpecGroupField,
+  value: string,
+): number | null => {
+  if (!field.ordered) {
+    return null;
+  }
+  const option = field.options.find((entry) => entry.value === value);
+  return option && option.rank !== null ? option.rank : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -285,6 +425,32 @@ export const describeValue = (
   if (range) {
     // One unit, at the end — "4 to 12 W", not "4 W to 12 W".
     return `${round2(range.min)} to ${formatValue(range.max, meta.unit)}`;
+  }
+  // Rows in schema order, so "24 × 1G BASE-T" reads the way the author entered
+  // it. Option LABELS, not stored values, for the same reason the select branch
+  // below resolves them — a finding that says "base-t" helps nobody.
+  if (isSpecGroupRows(raw)) {
+    return (
+      asGroupRows(raw)
+        .map((row) =>
+          schemaOf(meta)
+            .map((field) => {
+              const entry = row[field.key];
+              if (entry === undefined) {
+                return "—";
+              }
+              if (field.kind === "number") {
+                return formatValue(Number(entry), field.unit);
+              }
+              const option = field.options.find(
+                (candidate) => candidate.value === entry,
+              );
+              return option?.label ?? String(entry);
+            })
+            .join(" · "),
+        )
+        .join(", ") || "—"
+    );
   }
   if (meta.type === "number") {
     return formatValue(Number(raw), meta.unit);

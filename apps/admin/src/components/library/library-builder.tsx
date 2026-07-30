@@ -151,10 +151,17 @@ type OptionDraft = {
 
 type SearchHit = LibraryAttribute & { groupLabel: string };
 
-const TYPE_OPTIONS: DropdownOption[] = specificationTypes.map((type) => ({
-  value: type,
-  label: SPECIFICATION_TYPE_LABELS[type],
-}));
+// `group` is deliberately absent until this form can author a row's sub-fields.
+// The type, the storage and the readers all exist, but an attribute saved as a
+// group with no sub-field schema is a value nothing can decode — and the service
+// rightly refuses it, which would leave an author stuck on an error this screen
+// gives them no way to satisfy.
+const TYPE_OPTIONS: DropdownOption[] = specificationTypes
+  .filter((type) => type !== "group")
+  .map((type) => ({
+    value: type,
+    label: SPECIFICATION_TYPE_LABELS[type],
+  }));
 
 // The unit picker shows what each unit MEASURES, because that is what decides
 // whether a rule may compare two attributes. W and kW convert; W and VA never
@@ -181,6 +188,7 @@ const TYPE_META: Record<
     className: "bg-emerald-500/15 text-emerald-400",
   },
   boolean: { badge: "yes / no", className: "bg-amber-500/15 text-amber-500" },
+  group: { badge: "rows", className: "bg-sky-500/15 text-sky-400" },
 };
 
 const isOptionType = (type: SpecificationType): boolean =>
@@ -287,6 +295,25 @@ const AttributeForm = ({
               rank: ordered ? index + 1 : null,
             }))
         : [],
+      // Carried through UNCHANGED, not rebuilt from the form: this screen cannot
+      // show a sub-field schema yet, and sending [] would wipe the schema of a
+      // group attribute edited for some unrelated reason. Retired options are
+      // dropped for the same reason they are above — `mergeOptions` reads the
+      // input as the live list, so passing them back would un-retire them.
+      groupFields: (initial?.groupFields ?? []).map((field) => ({
+        key: field.key,
+        label: field.label,
+        kind: field.kind,
+        unit: field.unit,
+        ordered: field.ordered,
+        options: field.options
+          .filter((option) => !option.retired)
+          .map((option) => ({
+            value: option.value,
+            label: option.label,
+            rank: option.rank,
+          })),
+      })),
     });
   };
 

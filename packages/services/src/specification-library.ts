@@ -14,6 +14,7 @@ import { SpecificationGroups } from "../../../db/schema/specification-groups";
 import {
   operandSpecUuid,
   predicateAttributes,
+  type SpecGroupField,
   type SpecOption,
 } from "../../../db/types";
 import { recordAudit } from "./catalog-audit";
@@ -21,7 +22,12 @@ import { invalidateCatalogModel } from "./catalog-model";
 import { ValidationError } from "./errors";
 // Option identity lives in its own module because this one opens a database
 // connection on import, and that logic has to be testable on its own.
-import { mergeOptions, type LibraryOptionInput } from "./library-options";
+import {
+  mergeGroupFields,
+  mergeOptions,
+  type LibraryGroupFieldInput,
+  type LibraryOptionInput,
+} from "./library-options";
 
 // ---------------------------------------------------------------------------
 // THE LIBRARY SERVICE — authoring attribute definitions.
@@ -52,6 +58,8 @@ export type LibraryAttributeInput = {
   allowRange: boolean;
   audience: AssignmentAudience;
   options: LibraryOptionInput[];
+  // Only meaningful on `group`. The sub-fields one repeatable row carries.
+  groupFields: LibraryGroupFieldInput[];
 };
 
 export type LibraryAttribute = {
@@ -67,6 +75,8 @@ export type LibraryAttribute = {
   allowRange: SelectSpecifications["allowRange"];
   audience: AssignmentAudience;
   options: SpecOption[];
+  // Only populated on `group`. Empty for every other type.
+  groupFields: SpecGroupField[];
   order: number;
   // The categories that carry it directly. Drives the picker on the library
   // form; the assignments screen still owns every switch on those rows.
@@ -117,6 +127,28 @@ const assertValidInput = (input: LibraryAttributeInput): void => {
       "Only single-select and multi-select attributes can be marked as an ordered scale.",
     );
   }
+  if (input.type === "group") {
+    // THE guarantee that lets AttributeMeta.groupFields stay optional: a group
+    // with no schema is a value nothing can decode, and the readers would report
+    // it as empty rather than as broken — a switch with no readable ports passing
+    // a port check looks exactly like a switch that passed.
+    const named = input.groupFields.filter(
+      (field) => field.label.trim() !== "",
+    );
+    if (named.length === 0) {
+      throw new ValidationError(
+        `"${input.label}" holds repeatable rows, so it needs at least one sub-field — otherwise a row has nothing in it to read.`,
+      );
+    }
+    const bare = named.find(
+      (field) => field.kind === "select" && field.options.length === 0,
+    );
+    if (bare) {
+      throw new ValidationError(
+        `The "${bare.label}" sub-field is a pick, so it needs at least one option.`,
+      );
+    }
+  }
 };
 
 /** Groups in order, each with its attributes and reference counts. */
@@ -163,6 +195,7 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
     allowRange: spec.allowRange,
     audience: spec.audience,
     options: spec.options ?? [],
+    groupFields: spec.groupFields ?? [],
     order: spec.order,
     categoryUuids: categoriesBySpec.get(spec.uuid) ?? [],
     relationshipCount: relationshipCount.get(spec.uuid) ?? 0,
@@ -291,6 +324,8 @@ export const createLibraryAttribute = async (
     options: isOptionBacked(input.type)
       ? mergeOptions([], input.options, input.ordered)
       : [],
+    groupFields:
+      input.type === "group" ? mergeGroupFields([], input.groupFields) : [],
     order: Number(total?.value ?? 0),
   });
 
@@ -354,6 +389,10 @@ export const updateLibraryAttribute = async (
       options: isOptionBacked(input.type)
         ? mergeOptions(current.options ?? [], input.options, nextOrdered)
         : [],
+      groupFields:
+        input.type === "group"
+          ? mergeGroupFields(current.groupFields ?? [], input.groupFields)
+          : [],
     })
     .where(eq(Specifications.uuid, uuid));
 
@@ -384,6 +423,16 @@ const diffAttribute = (
   compare("ordered", before.ordered, after.ordered);
   compare("audience", before.audience, after.audience);
   compare("groupUuid", before.groupUuid, after.groupUuid);
+  // Sub-field COUNT, not the whole schema. Adding a sub-field is the edit that
+  // makes every stored row incomplete — and the readers drop incomplete rows — so
+  // it is the one change worth a record here. A deep diff of the schema or of the
+  // option list belongs in a dedicated history, not in a scalar change log, which
+  // is why `options` is not audited either.
+  compare(
+    "groupFieldCount",
+    (before.groupFields ?? []).length,
+    after.groupFields.filter((field) => field.label.trim() !== "").length,
+  );
   return changes;
 };
 
