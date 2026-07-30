@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Award,
   FileText,
+  History,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -52,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Spec Completeness",
         href: "/completeness",
       },
+      { icon: History, label: "Activity", href: "/activity" },
     ],
   },
   {

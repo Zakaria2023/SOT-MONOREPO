@@ -79,12 +79,12 @@ export const getSharedLists = async (): Promise<OptionSet[]> => {
 export const addAttributeAction = async (
   input: LibraryAttributeInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   const { categoryUuids, ...definition } = input;
   try {
-    const uuid = await createLibraryAttribute(definition);
+    const uuid = await createLibraryAttribute(definition, actor);
     if (categoryUuids.length > 0) {
-      await applyAttributeCategories(uuid, categoryUuids, true);
+      await applyAttributeCategories(uuid, categoryUuids, actor, true);
     }
   } catch (error) {
     return fail(error, "Failed to create the attribute");
@@ -98,13 +98,13 @@ export const updateAttributeAction = async (
   uuid: string,
   input: LibraryAttributeInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   const { categoryUuids, ...definition } = input;
   let warnings: string[] = [];
   try {
-    const result = await updateLibraryAttribute(uuid, definition);
+    const result = await updateLibraryAttribute(uuid, definition, actor);
     warnings = result.warnings;
-    await applyAttributeCategories(uuid, categoryUuids);
+    await applyAttributeCategories(uuid, categoryUuids, actor);
   } catch (error) {
     return fail(error, "Failed to update the attribute");
   }
@@ -122,9 +122,9 @@ export const updateAttributeAction = async (
 export const deleteAttributeAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteLibraryAttribute(uuid);
+    await deleteLibraryAttribute(uuid, actor);
   } catch (error) {
     return fail(error, "Failed to delete the attribute");
   }
@@ -169,6 +169,7 @@ export const reorderAttributesAction = async (
 const applyAttributeCategories = async (
   specificationUuid: string,
   categoryUuids: string[],
+  actor: { uuid: string; name: string },
   // Set when the attribute was created moments ago. Skips reading back links
   // that cannot exist, and the diff that would be against an empty set.
   justCreated = false,
@@ -189,7 +190,7 @@ const applyAttributeCategories = async (
           suppressed: false,
           order: 0,
         })),
-      { noneExistYet: true },
+      { actor, noneExistYet: true },
     );
     return;
   }
@@ -219,11 +220,13 @@ const applyAttributeCategories = async (
         suppressed: false,
         order: 0,
       })),
+    { actor },
   );
 
   await removeAssignments(
     specificationUuid,
     [...current].filter((categoryUuid) => !wanted.has(categoryUuid)),
+    actor,
   );
 };
 
@@ -248,9 +251,9 @@ export const setAttributeCategoriesAction = async (
   specificationUuid: string,
   categoryUuids: string[],
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await applyAttributeCategories(specificationUuid, categoryUuids);
+    await applyAttributeCategories(specificationUuid, categoryUuids, actor);
   } catch (error) {
     return fail(error, "Failed to update the categories");
   }
@@ -337,9 +340,9 @@ export const reorderGroupsAction = async (
 export const addSharedListAction = async (
   input: OptionSetInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await createOptionSet(input);
+    await createOptionSet(input, actor);
   } catch (error) {
     return fail(error, "Failed to create the shared list");
   }
@@ -352,9 +355,9 @@ export const updateSharedListAction = async (
   uuid: string,
   input: OptionSetInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await updateOptionSet(uuid, input);
+    await updateOptionSet(uuid, input, actor);
   } catch (error) {
     return fail(error, "Failed to update the shared list");
   }
@@ -372,9 +375,9 @@ export const updateSharedListAction = async (
 export const deleteSharedListAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteOptionSet(uuid);
+    await deleteOptionSet(uuid, actor);
   } catch (error) {
     return fail(error, "Failed to delete the shared list");
   }
@@ -385,9 +388,9 @@ export const deleteSharedListAction = async (
 export const addVariableAction = async (
   input: ProjectVariableInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await createProjectVariable(input);
+    await createProjectVariable(input, actor);
   } catch (error) {
     return fail(error, "Failed to create the project input");
   }
@@ -399,9 +402,9 @@ export const updateVariableAction = async (
   uuid: string,
   input: ProjectVariableInput,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await updateProjectVariable(uuid, input);
+    await updateProjectVariable(uuid, input, actor);
   } catch (error) {
     return fail(error, "Failed to update the project input");
   }
@@ -412,9 +415,9 @@ export const updateVariableAction = async (
 export const deleteVariableAction = async (
   uuid: string,
 ): Promise<ActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteProjectVariable(uuid);
+    await deleteProjectVariable(uuid, actor);
   } catch (error) {
     return fail(error, "Failed to delete the project input");
   }

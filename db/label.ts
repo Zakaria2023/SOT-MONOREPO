@@ -4,6 +4,8 @@ import {
   AssignmentScope,
   BusinessLine,
   BoqItemRole,
+  CatalogAuditAction,
+  CatalogAuditTarget,
   BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
@@ -292,4 +294,18 @@ export const ASSIGNMENT_AUDIENCE_LABELS: Record<AssignmentAudience, string> = {
   everyone: "Everyone",
   user: "Users only",
   partner: "Partner users only",
+};
+
+export const CATALOG_AUDIT_TARGET_LABELS: Record<CatalogAuditTarget, string> = {
+  specification: "Library attribute",
+  assignment: "Assignment",
+  relationship: "Rule",
+  project_variable: "Project input",
+};
+
+export const CATALOG_AUDIT_ACTION_LABELS: Record<CatalogAuditAction, string> = {
+  create: "Created",
+  update: "Changed",
+  delete: "Deleted",
+  publish: "Published",
 };
