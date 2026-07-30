@@ -4,13 +4,16 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
   createLibraryAttribute,
+  createOptionSet,
   createProjectVariable,
   createSpecificationGroup,
   deleteLibraryAttribute,
+  deleteOptionSet,
   deleteProjectVariable,
   deleteSpecificationGroup,
   getAttributeCategories,
   getLibrary,
+  getOptionSets,
   getProjectVariables,
   removeAssignments,
   saveAssignments,
@@ -18,10 +21,13 @@ import {
   reorderLibraryAttributes,
   reorderSpecificationGroups,
   updateLibraryAttribute,
+  updateOptionSet,
   updateProjectVariable,
   updateSpecificationGroup,
   type LibraryAttributeInput as ServiceLibraryAttributeInput,
   type LibraryGroup as ServiceLibraryGroup,
+  type OptionSet as ServiceOptionSet,
+  type OptionSetInput as ServiceOptionSetInput,
   type ProjectVariableInput as ServiceProjectVariableInput,
   type SpecificationGroupFields as ServiceSpecificationGroupFields,
 } from "services";
@@ -36,6 +42,8 @@ export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
   categoryUuids: string[];
 };
 export type LibraryGroup = ServiceLibraryGroup;
+export type OptionSet = ServiceOptionSet;
+export type OptionSetInput = ServiceOptionSetInput;
 export type ProjectVariableInput = ServiceProjectVariableInput;
 export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 
@@ -56,6 +64,11 @@ export const getLibraryData = async (): Promise<LibraryGroup[]> => {
 export const getVariables = async () => {
   await requireAdmin();
   return getProjectVariables();
+};
+
+export const getSharedLists = async (): Promise<OptionSet[]> => {
+  await requireAdmin();
+  return getOptionSets();
 };
 
 export const addAttributeAction = async (
@@ -300,6 +313,62 @@ export const reorderGroupsAction = async (
     await reorderSpecificationGroups(orderedUuids);
   } catch (error) {
     return fail(error, "Failed to reorder the groups");
+  }
+  revalidatePath("/library");
+  return { success: true };
+};
+
+// ---------------------------------------------------------------------------
+// Shared lists — the vocabularies more than one attribute spells the same way.
+//
+// Every path revalidates /products as well as /library: a shared list is what a
+// product form's dropdown is filled from, so an option added here has to be
+// offered on the very next product entered.
+// ---------------------------------------------------------------------------
+
+export const addSharedListAction = async (
+  input: OptionSetInput,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await createOptionSet(input);
+  } catch (error) {
+    return fail(error, "Failed to create the shared list");
+  }
+  revalidatePath("/library");
+  revalidatePath("/products");
+  return { success: true };
+};
+
+export const updateSharedListAction = async (
+  uuid: string,
+  input: OptionSetInput,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await updateOptionSet(uuid, input);
+  } catch (error) {
+    return fail(error, "Failed to update the shared list");
+  }
+  revalidatePath("/library");
+  revalidatePath("/products");
+  revalidatePath("/assignments");
+  return { success: true };
+};
+
+/**
+ * Delete a shared list. The service REFUSES while any attribute or group
+ * sub-field points at it, and names what is in the way — so this surfaces that
+ * message rather than a generic failure.
+ */
+export const deleteSharedListAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteOptionSet(uuid);
+  } catch (error) {
+    return fail(error, "Failed to delete the shared list");
   }
   revalidatePath("/library");
   return { success: true };
