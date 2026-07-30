@@ -1,5 +1,6 @@
 "use server";
 
+import type { ProductValues } from "@/db/types";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -8,10 +9,12 @@ import {
   deleteProduct as deleteProductRecord,
   getProduct as getProductRecord,
   getProductDetailByUuid as getProductDetailByUuidRecord,
+  getProductSpecsForDisplay as getProductSpecsForDisplayRecord,
   getProductsPage as getProductsPageList,
   updateProduct as updateProductRecord,
 } from "services";
 import type {
+  DisplaySpec as ServiceDisplaySpec,
   ProductClientFields as ServiceProductClientFields,
   ProductDetail as ServiceProductDetail,
   ProductFields as ServiceProductFields,
@@ -30,6 +33,7 @@ export type ProductListItem = ServiceProductListItem;
 export type ProductListParams = ServiceProductListParams;
 export type ProductDetail = ServiceProductDetail;
 export type SelectProducts = ServiceSelectProducts;
+export type DisplaySpec = ServiceDisplaySpec;
 
 export type ProductActionResult = {
   productUuid?: string;
@@ -50,6 +54,15 @@ export const getProduct = async (
 export const getProductDetail = async (
   uuid: string,
 ): Promise<ProductDetail | null> => getProductDetailByUuidRecord(uuid);
+
+// "admin" so the panel shows partner-only and staff-only attributes: this is
+// where the catalog is authored, and an attribute an author cannot see is one they
+// cannot notice is wrong.
+export const getProductSpecs = async (
+  categoryUuid: string,
+  values: ProductValues,
+): Promise<DisplaySpec[]> =>
+  getProductSpecsForDisplayRecord(categoryUuid, values, "admin");
 
 export const createProduct = async (
   _prevState: ProductActionResult,

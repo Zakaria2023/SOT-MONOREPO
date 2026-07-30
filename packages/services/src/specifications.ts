@@ -12,6 +12,7 @@ import type {
 } from "../../../db/types";
 import { getCatalogModel, resolveFromModel } from "./catalog-model";
 import { visibleAssignments } from "./assignment-resolver";
+import type { DisplaySpec } from "./display-specs";
 import { describeValue, readValue } from "./spec-values";
 
 export type { SelectSpecifications };
@@ -99,13 +100,6 @@ export const getSpecificationsForUuids = async (
   });
 };
 
-export type DisplaySpec = {
-  uuid: string;
-  label: string;
-  value: string;
-  groupName: string | null;
-};
-
 /**
  * A product's specs, ready to render: only the attributes its category actually
  * carries, only the ones currently revealed, only the ones with a value, in the
@@ -152,6 +146,101 @@ export const getProductSpecsForDisplay = async (
     });
   }
   return specs;
+};
+
+export type ComparisonProduct = {
+  uuid: string;
+  values: ProductValues;
+};
+
+export type ComparisonRow = {
+  uuid: string;
+  label: string;
+  groupName: string | null;
+  // productUuid → rendered value. A product with nothing to say for this row is
+  // absent from the map rather than holding a dash, so the caller decides how a
+  // gap looks. A row every product is silent on is not returned at all.
+  values: Record<string, string>;
+};
+
+/**
+ * One spec table across several products of the SAME category — the compare view.
+ *
+ * Batched on purpose: `getProductSpecsForDisplay` per product would repeat the
+ * group-name read once per column. This is a FIXED two reads (the cached model
+ * plus the groups) however many products are compared.
+ *
+ * The reveal is evaluated per product, because that is what it means: a switch
+ * with PoE off has no PoE Budget row of its own, while the switch beside it does.
+ * Row ORDER comes from the resolved assignments, so the table reads in the order
+ * the category authored regardless of which product happens to answer first.
+ */
+export const getComparisonSpecs = async (
+  categoryUuid: string,
+  products: ComparisonProduct[],
+  viewer: "user" | "partner" | "admin" = "user",
+): Promise<ComparisonRow[]> => {
+  if (products.length === 0) {
+    return [];
+  }
+
+  const model = await getCatalogModel();
+  const resolved = resolveFromModel(model, categoryUuid);
+  const groups = await db
+    .select()
+    .from(SpecificationGroups)
+    .orderBy(asc(SpecificationGroups.order));
+  const groupName = new Map(groups.map((group) => [group.uuid, group.name]));
+
+  const columns = products.map((product) => ({
+    uuid: product.uuid,
+    values: product.values,
+    visible: new Set(
+      visibleAssignments(resolved, product.values).map(
+        (assignment) => assignment.definition.uuid,
+      ),
+    ),
+  }));
+
+  const rows: ComparisonRow[] = [];
+  for (const assignment of resolved) {
+    const audience = assignment.effectiveAudience;
+    const allowed =
+      viewer === "admin" || audience === "everyone" || audience === viewer;
+    if (!allowed) {
+      continue;
+    }
+    const { definition } = assignment;
+
+    const values: Record<string, string> = {};
+    for (const column of columns) {
+      if (!column.visible.has(definition.uuid)) {
+        continue;
+      }
+      const rendered = describeValue(
+        readValue(column.values, definition.uuid),
+        definition,
+      );
+      if (rendered === "—") {
+        continue;
+      }
+      values[column.uuid] = rendered;
+    }
+    // Nothing to compare: every product is either silent or hiding this row.
+    if (Object.keys(values).length === 0) {
+      continue;
+    }
+
+    rows.push({
+      uuid: definition.uuid,
+      label: definition.label,
+      groupName: definition.groupUuid
+        ? (groupName.get(definition.groupUuid) ?? null)
+        : null,
+      values,
+    });
+  }
+  return rows;
 };
 
 /**

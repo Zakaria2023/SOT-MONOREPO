@@ -30,5 +30,6 @@ export * from "./specification-groups";
 export * from "./library-options";
 export * from "./option-sets";
 export * from "./specification-library";
+export * from "./display-specs";
 export * from "./specifications";
 export * from "./stats";

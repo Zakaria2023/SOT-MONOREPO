@@ -14,10 +14,10 @@ export const GET = async (request: Request, { params }: Params) => {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  // Audience gates reading, not just filtering. Returning technicalAttributes
-  // as stored would hand every partner-only value to any caller, and the app
-  // has no way of knowing which ones it was never meant to see — so the
-  // filtering happens here, not in the client.
+  // Audience gates reading, not just filtering. Returning the stored values as-is
+  // would hand every partner-only one to any caller, and the app has no way of
+  // knowing which it was never meant to see — so the filtering happens here, not
+  // in the client.
   const viewer = await getViewerFromRequest(request);
   // Already resolved, revealed, audience-filtered and FORMATTED — the app gets a
   // spec table it can render without carrying its own copy of the library, and
@@ -37,6 +37,11 @@ export const GET = async (request: Request, { params }: Params) => {
 
   return NextResponse.json({
     ...product,
+    // The retired slug-keyed column never reaches a caller. Nothing resolves it
+    // any more, so it is not audience-filtered, and spreading it would walk every
+    // value it holds straight past the gate directly above. JSON omits an
+    // undefined key, so this removes the field rather than nulling it.
+    technicalAttributes: undefined,
     specValues,
     specs,
   });
