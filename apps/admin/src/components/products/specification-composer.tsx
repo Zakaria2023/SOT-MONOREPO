@@ -189,7 +189,8 @@ const patchRow = (
       return row;
     }
     if (entry === undefined) {
-      const { [key]: _dropped, ...rest } = row;
+      const rest = { ...row };
+      delete rest[key];
       return rest;
     }
     return { ...row, [key]: entry };
