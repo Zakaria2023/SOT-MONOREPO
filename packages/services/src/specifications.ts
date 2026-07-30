@@ -8,14 +8,18 @@ import {
   SelectSpecificationGroups,
   SpecificationGroups,
 } from "../../../db/schema/specification-groups";
-import type { ProductValues, SpecOption } from "../../../db/types";
+import type {
+  ProductValues,
+  SpecGroupField,
+  SpecOption,
+} from "../../../db/types";
 import {
   getCatalogModel,
   loadOptionSetIndex,
   resolveFromModel,
 } from "./catalog-model";
 import { visibleAssignments } from "./assignment-resolver";
-import { resolveVocabulary } from "./library-options";
+import { resolveGroupFields, resolveVocabulary } from "./library-options";
 import { describeValue, readValue } from "./spec-values";
 
 export type { SelectSpecifications };
@@ -37,6 +41,10 @@ export type ResolvedSpecification = {
   ordered: boolean;
   unit: SelectSpecifications["unit"];
   options: SpecOption[];
+  // Only on `group`. Carried because a RULE has to name which column it totals —
+  // a rule builder that cannot see the sub-fields cannot offer them, and a group
+  // operand without one reads nothing at all.
+  groupFields: SpecGroupField[];
   // The library group, so the storefront can section a spec table the same way
   // the library is organised. Null for ungrouped.
   groupName: SelectSpecificationGroups["name"] | null;
@@ -59,6 +67,7 @@ export const getSpecificationsForUuids = async (
         unit: Specifications.unit,
         options: Specifications.options,
         optionSetUuid: Specifications.optionSetUuid,
+        groupFields: Specifications.groupFields,
         groupName: SpecificationGroups.name,
       })
       .from(Specifications)
@@ -87,6 +96,7 @@ export const getSpecificationsForUuids = async (
         ordered: vocabulary.ordered,
         unit: row.unit,
         options: vocabulary.options,
+        groupFields: resolveGroupFields(row.groupFields ?? [], sets),
         groupName: row.groupName,
       },
     ];
@@ -162,6 +172,7 @@ export const getAllSpecifications = async (): Promise<
         unit: Specifications.unit,
         options: Specifications.options,
         optionSetUuid: Specifications.optionSetUuid,
+        groupFields: Specifications.groupFields,
         groupName: SpecificationGroups.name,
       })
       .from(Specifications)
@@ -182,6 +193,7 @@ export const getAllSpecifications = async (): Promise<
       ordered: vocabulary.ordered,
       unit: row.unit,
       options: vocabulary.options,
+      groupFields: resolveGroupFields(row.groupFields ?? [], sets),
       groupName: row.groupName,
     };
   });

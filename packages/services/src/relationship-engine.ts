@@ -14,6 +14,7 @@ import type {
   PresenceSpec,
   ProductValues,
   RelationshipScope,
+  SpecGroupField,
 } from "../../../db/types";
 import { evaluatePredicate } from "./predicate";
 import {
@@ -21,6 +22,8 @@ import {
   asOptionList,
   describeValue,
   formatValue,
+  groupSubField,
+  groupTotal,
   hasValue,
   optionLabel,
   optionRank,
@@ -204,6 +207,19 @@ const operandMeta = (
   return context.attributes.get(operand.specUuid) ?? null;
 };
 
+// The sub-field an operand names, when it names one and the attribute really is a
+// group. Null for every other operand, so the callers below stay one-line.
+const operandSubField = (
+  operand: Operand | null,
+  context: EngineContext,
+): SpecGroupField | null => {
+  if (!operand || operand.source !== "spec" || !operand.groupField) {
+    return null;
+  }
+  const meta = operandMeta(operand, context);
+  return meta ? groupSubField(meta, operand.groupField) : null;
+};
+
 const operandUnit = (
   operand: Operand | null,
   context: EngineContext,
@@ -212,6 +228,14 @@ const operandUnit = (
     return null;
   }
   if (operand.source === "spec") {
+    // The SUB-FIELD's unit when one is named, never the attribute's. A group
+    // carries no unit of its own — the count of ports and a per-port wattage are
+    // different dimensions living in the same attribute, and reading the wrong one
+    // is how a comparison passes a check it should have failed.
+    const subField = operandSubField(operand, context);
+    if (subField) {
+      return subField.unit;
+    }
     return operandMeta(operand, context)?.unit ?? null;
   }
   if (operand.source === "variable") {
@@ -228,7 +252,14 @@ const operandLabel = (
     return "—";
   }
   if (operand.source === "spec") {
-    return operandMeta(operand, context)?.label ?? "a deleted attribute";
+    const label = operandMeta(operand, context)?.label;
+    if (!label) {
+      return "a deleted attribute";
+    }
+    // "Network Ports · Ports", so a finding names the column it actually counted
+    // rather than the attribute it came from.
+    const subField = operandSubField(operand, context);
+    return subField ? `${label} · ${subField.label}` : label;
   }
   if (operand.source === "variable") {
     return (
@@ -263,7 +294,19 @@ const itemOperandValue = (
   if (!meta) {
     return null;
   }
-  return asNumber(readValue(item.values, operand.specUuid), meta, bound);
+  const raw = readValue(item.values, operand.specUuid);
+  // A group has no single magnitude, so `asNumber` returns null for one on
+  // purpose. The operand has to name which column to total — Σ(count) over the
+  // port groups, not the number of groups, which is the plausible wrong answer
+  // (4 instead of 50) that nothing would have reported.
+  //
+  // Rows that do not answer the current schema are excluded by `groupTotal`, so a
+  // switch whose ports became unreadable reads as null here and is reported as a
+  // gap rather than counted short. Completeness names the same rows.
+  if (operand.groupField) {
+    return groupTotal(raw, meta, operand.groupField);
+  }
+  return asNumber(raw, meta, bound);
 };
 
 // ---------------------------------------------------------------------------
@@ -439,11 +482,14 @@ const suggestProviders = (
       // A suggested replacement is a PROVIDER, so it may only be credited with
       // the capacity it always has — suggesting a 20–30 W part to cover 25 W
       // would be recommending something that might not fit.
-      const capacity = asNumber(
-        readValue(product.values, operand.specUuid),
-        meta,
-        "min",
-      );
+      //
+      // A group's capacity is the total of the named column, read the same way the
+      // participants were. Reading it any other way here would suggest products
+      // the rule would then reject.
+      const raw = readValue(product.values, operand.specUuid);
+      const capacity = operand.groupField
+        ? groupTotal(raw, meta, operand.groupField)
+        : asNumber(raw, meta, "min");
       if (capacity === null) {
         return [];
       }

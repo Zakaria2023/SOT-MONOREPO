@@ -127,6 +127,28 @@ export const evaluatePredicate = (
 
     const list = asOptionList(raw);
 
+    // A value the definition does not know is UNREADABLE, not simply unequal.
+    //
+    // Left alone this was the quietest failure in the system: a product holding
+    // "40g" on a list that has no such option matched nothing, reported nothing,
+    // and dropped out of every rule reading that attribute — which looks
+    // identical to a product the rule examined and approved. The save path now
+    // refuses such a value (see `normalizeProductValues`), so this covers what is
+    // already stored, and an import or a hand-edited row.
+    //
+    // Only for option-backed types: a number, a boolean and a span have no list to
+    // be absent from, and a group's picks are validated per row instead.
+    if (
+      (meta.type === "single_select" || meta.type === "multi_select") &&
+      meta.options.length > 0
+    ) {
+      const known = new Set(meta.options.map((option) => option.value));
+      if (list.some((value) => !known.has(value))) {
+        missing.add(node.attr);
+        return false;
+      }
+    }
+
     switch (node.op) {
       case "equals":
         return scalarEquals(list, node.value);

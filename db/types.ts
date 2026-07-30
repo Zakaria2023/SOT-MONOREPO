@@ -306,7 +306,18 @@ export type ProductValues = Record<string, ProductValue>;
 // a single evaluator instead of a special case per family.
 export type Operand =
   // A product attribute. `perUnit` values are multiplied by the line quantity.
-  | { source: "spec"; specUuid: string }
+  //
+  // `groupField` names one numeric sub-field of a `group` attribute, and the
+  // operand then reads the SUM of that column across the rows — "how many ports
+  // does this switch have" is Σ(count) over its port groups, not the number of
+  // groups. Without it a group has no single magnitude and the operand reads
+  // nothing at all, which is why every rule about ports needs it.
+  //
+  // An optional field on the existing `spec` source rather than a source of its
+  // own, deliberately: `operandSpecUuid` keeps working, so the deletion guard
+  // still sees the reference, and every `source === "spec"` branch in the engine
+  // and the authoring layer stays correct without being touched.
+  | { source: "spec"; specUuid: string; groupField?: string }
   // A project input the buyer supplied (see ProjectVariables).
   | { source: "variable"; variableUuid: string }
   // The number of physical units in the selection that matched the side's

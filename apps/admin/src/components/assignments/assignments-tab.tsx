@@ -120,6 +120,9 @@ const toPredicateAttribute = (
   // The slice this category OFFERS, not the master list — a condition must not
   // be able to name a value the category does not put on the form.
   options: assignment.offeredOptions,
+  // Never narrowed per category: a category may offer fewer options, but it may
+  // not offer a differently-shaped row.
+  groupFields: assignment.definition.groupFields ?? [],
 });
 
 // Sensible defaults for a brand-new assignment: the engine reads it, the shopper
@@ -605,6 +608,7 @@ const AssignmentCard = ({
               ordered: definition.ordered,
               unit: definition.unit,
               options: definition.options,
+              groupFields: definition.groupFields ?? [],
             }}
             libraryAudience={definition.audience}
             triggers={triggers}

@@ -1,7 +1,7 @@
 "use client";
 
 import type { SpecificationType } from "@/db/enum";
-import type { Predicate, SpecOption } from "@/db/types";
+import type { Predicate, SpecGroupField, SpecOption } from "@/db/types";
 import { Dropdown } from "ui";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +44,9 @@ export type PredicateAttribute = {
   ordered: boolean;
   unit: string | null;
   options: SpecOption[];
+  // Only on `group`. The rule builder offers each numeric sub-field as its own
+  // operand, because a group has no single number to compare.
+  groupFields: SpecGroupField[];
   // The library group it is filed under, for narrowing a long picker. Filing
   // only, and never read here — a condition means the same thing whichever
   // drawer the attribute was found in. Absent on attributes resolved from a

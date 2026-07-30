@@ -125,11 +125,18 @@ const countedPatch = (
   };
 };
 
+// A group's sub-field is picked as one dropdown value, so the picker stays a flat
+// list rather than growing a second control that is meaningless for every other
+// attribute. A uuid cannot contain this character, so splitting is unambiguous.
+const FIELD_SEPARATOR = "::";
+
 /** What a side points at, or "" when it points at neither an attribute nor an
  * input — item_count and a constant have no uuid to show in a picker. */
 const operandUuid = (operand: Operand | null): string => {
   if (operand?.source === "spec") {
-    return operand.specUuid;
+    return operand.groupField
+      ? `${operand.specUuid}${FIELD_SEPARATOR}${operand.groupField}`
+      : operand.specUuid;
   }
   if (operand?.source === "variable") {
     return operand.variableUuid;
@@ -232,12 +239,29 @@ const RelationForm = ({
             groups.length === 0 ||
             groups.includes(attribute.groupName ?? UNGROUPED),
         )
-        .map((attribute) => ({
-          value: attribute.uuid,
-          label: attribute.unit
-            ? `${attribute.label} (${attribute.unit})`
-            : attribute.label,
-        })),
+        // A group is not offered as itself. It holds rows, so it has no single
+        // number to compare — each COUNT inside it is offered instead, which is
+        // what the rule actually totals. Offering the attribute alone would let an
+        // author build a rule that silently reads nothing.
+        .flatMap((attribute) =>
+          attribute.type === "group"
+            ? attribute.groupFields
+                .filter((field) => field.kind === "number")
+                .map((field) => ({
+                  value: `${attribute.uuid}${FIELD_SEPARATOR}${field.key}`,
+                  label: field.unit
+                    ? `${attribute.label} · ${field.label} (${field.unit}, totalled)`
+                    : `${attribute.label} · ${field.label} (totalled)`,
+                }))
+            : [
+                {
+                  value: attribute.uuid,
+                  label: attribute.unit
+                    ? `${attribute.label} (${attribute.unit})`
+                    : attribute.label,
+                },
+              ],
+        ),
       ...variables.map((variable) => ({
         value: variable.uuid,
         label: variable.unit
@@ -248,12 +272,17 @@ const RelationForm = ({
     [attributes, groups, variables],
   );
 
-  // Which kind of operand a picked uuid is. Variables are few and attributes
+  // Which kind of operand a picked value is. Variables are few and attributes
   // many, so asking the short list is the cheap question.
-  const toOperand = (uuid: string): Operand =>
-    variables.some((variable) => variable.uuid === uuid)
-      ? { source: "variable", variableUuid: uuid }
-      : { source: "spec", specUuid: uuid };
+  const toOperand = (picked: string): Operand => {
+    const [specUuid, groupField] = picked.split(FIELD_SEPARATOR);
+    if (specUuid && groupField) {
+      return { source: "spec", specUuid, groupField };
+    }
+    return variables.some((variable) => variable.uuid === picked)
+      ? { source: "variable", variableUuid: picked }
+      : { source: "spec", specUuid: picked };
+  };
 
   // Any edit invalidates the last verdict — a stale "nothing wrong" beside a
   // rule that has since changed is worse than no verdict at all.
@@ -723,10 +752,21 @@ export const RelationBuilder = ({
         return "—";
       }
       if (operand.source === "spec") {
-        return (
-          attributes.find((entry) => entry.uuid === operand.specUuid)?.label ??
-          "a deleted attribute"
+        const attribute = attributes.find(
+          (entry) => entry.uuid === operand.specUuid,
         );
+        if (!attribute) {
+          return "a deleted attribute";
+        }
+        if (!operand.groupField) {
+          return attribute.label;
+        }
+        // The column, not just the attribute — "Network Ports" alone would not
+        // say whether the rule counts ports or the wattage beside them.
+        const field = attribute.groupFields.find(
+          (entry) => entry.key === operand.groupField,
+        );
+        return `${attribute.label} · ${field?.label ?? "a removed sub-field"}`;
       }
       if (operand.source === "variable") {
         return (

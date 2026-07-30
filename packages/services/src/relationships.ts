@@ -36,7 +36,7 @@ import {
   type EngineVariable,
   type Finding,
 } from "./relationship-engine";
-import { unitFactor } from "./spec-values";
+import { groupSubField, unitFactor } from "./spec-values";
 
 // ---------------------------------------------------------------------------
 // THE RELATIONSHIP SERVICE — authoring compatibility rules.
@@ -218,7 +218,39 @@ export const validateRelationship = async (
     }
     if (operand.source === "spec") {
       const meta = model.attributes.get(operand.specUuid);
-      if (meta && meta.type !== "number" && !meta.ordered) {
+      if (!meta) {
+        return;
+      }
+      // A GROUP holds rows, so it has no magnitude until the rule names which
+      // column to total. Every one of these three cases reads as nothing at
+      // runtime and reports the item as missing a value — a rule that never fires
+      // looks exactly like a rule nothing violated, so all three are caught here
+      // where an author can still fix them.
+      if (meta.type === "group") {
+        if (!operand.groupField) {
+          problems.push({
+            field,
+            message: `"${meta.label}" holds rows, so a rule has to say which count to add up — how many ports, how many outlets. Pick one of its sub-fields.`,
+          });
+          return;
+        }
+        const subField = groupSubField(meta, operand.groupField);
+        if (!subField) {
+          problems.push({
+            field,
+            message: `"${meta.label}" no longer has the sub-field this rule adds up. Pick another one.`,
+          });
+          return;
+        }
+        if (subField.kind !== "number") {
+          problems.push({
+            field,
+            message: `"${subField.label}" is a pick, not a count, so it cannot be added up. Choose a sub-field that holds a number.`,
+          });
+        }
+        return;
+      }
+      if (meta.type !== "number" && !meta.ordered) {
         problems.push({
           field,
           message: `"${meta.label}" has no magnitude, so it cannot be added up or compared. Use a number attribute, or mark its options as an ordered scale.`,
@@ -359,7 +391,17 @@ const operandUnitFor = (
     return null;
   }
   if (operand.source === "spec") {
-    return model.attributes.get(operand.specUuid)?.unit ?? null;
+    const meta = model.attributes.get(operand.specUuid);
+    if (!meta) {
+      return null;
+    }
+    // The SUB-FIELD's unit when one is named. A group carries no unit of its own,
+    // so falling back to the attribute's would compare a port count against watts
+    // and find them both unitless — which `unitFactor` reads as compatible.
+    if (operand.groupField) {
+      return groupSubField(meta, operand.groupField)?.unit ?? null;
+    }
+    return meta.unit;
   }
   if (operand.source === "variable") {
     return (
