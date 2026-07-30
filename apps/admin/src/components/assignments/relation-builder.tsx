@@ -152,7 +152,10 @@ const comparatorsFor = (
   family: RelationshipFamily,
 ): RelationshipComparator[] => {
   if (family === "match") {
-    return ["in", "intersects", "eq", "lte", "gte"];
+    // "within" is the only one that reads a span, which is what a voltage or a
+    // frequency window actually is — a PSU supplying 48 V against a device
+    // accepting 36–57 V needs both ends, and a lone ceiling passes 12 V in silence.
+    return ["in", "intersects", "eq", "lte", "gte", "within"];
   }
   if (family === "budget" || family === "count" || family === "conditional") {
     return ["lte", "gte", "eq"];

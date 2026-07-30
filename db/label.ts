@@ -78,6 +78,7 @@ export const RELATIONSHIP_COMPARATOR_LABELS: Record<
   eq: "must equal",
   in: "must be one of",
   intersects: "must overlap",
+  within: "must fall within",
 };
 
 export const RELATIONSHIP_GATE_LABELS: Record<RelationshipGate, string> = {

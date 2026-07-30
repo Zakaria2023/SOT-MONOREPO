@@ -321,6 +321,42 @@ export const validateRelationship = async (
           message: `"at most" and "at least" only mean something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
         });
       }
+
+      // A side answered as a SPAN has no set of values to compare. Every
+      // comparator except "must fall within" then reads it as nothing and the rule
+      // reports every item as failing — one authoring slip blocking every cart in
+      // the catalog while reading like a real finding. Caught here instead.
+      //
+      // Read from `definitions` rather than `attributes`: `AttributeMeta` leaves
+      // `allowRange` out deliberately, because every READER judges a span by its
+      // shape. This is an authoring question, and authoring is where the flag lives.
+      const spanUuids = new Set(
+        model.definitions
+          .filter((definition) => definition.allowRange)
+          .map((definition) => definition.uuid),
+      );
+      const spanSide = [consumerMeta, providerMeta].find(
+        (meta) => meta && spanUuids.has(meta.uuid),
+      );
+      if (input.comparator !== "within" && spanSide) {
+        problems.push({
+          field: "comparator",
+          message: `"${spanSide.label}" is answered as a range, and this comparator compares sets of values. Use "must fall within" — it is the one that reads both ends of a span.`,
+        });
+      }
+      if (input.comparator === "within") {
+        // Both sides need a magnitude. A plain list has no inside, so "within"
+        // would silently answer no for every item.
+        const flat = [consumerMeta, providerMeta].find(
+          (meta) => meta && meta.type !== "number" && !meta.ordered,
+        );
+        if (flat) {
+          problems.push({
+            field: "comparator",
+            message: `"${flat.label}" has no magnitude, so nothing can fall within it. Use a number attribute, or mark its options as an ordered scale.`,
+          });
+        }
+      }
     }
   }
 

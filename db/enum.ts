@@ -297,6 +297,14 @@ export const relationshipComparators = [
   "eq",
   "in",
   "intersects",
+  // The A side must fall INSIDE the B side's span. The one comparison a pair of
+  // one-sided comparators cannot express: "the PSU supplies 48 V" against "the
+  // device accepts 36–57 V" needs both ends at once, and an author who writes
+  // only the ceiling has a rule that passes a 12 V supply in silence.
+  //
+  // A single number is the degenerate span [v, v], so this reads the same whether
+  // a side holds one value or two.
+  "within",
 ] as const satisfies readonly string[];
 
 export type RelationshipComparator = (typeof relationshipComparators)[number];

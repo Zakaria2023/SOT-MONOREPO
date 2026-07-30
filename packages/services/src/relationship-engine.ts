@@ -12,14 +12,17 @@ import type {
   Operand,
   Predicate,
   PresenceSpec,
+  ProductValue,
   ProductValues,
   RelationshipScope,
   SpecGroupField,
+  SpecRange,
 } from "../../../db/types";
 import { evaluatePredicate, filteredGroupTotal } from "./predicate";
 import {
   asNumber,
   asOptionList,
+  asRange,
   describeValue,
   formatValue,
   groupSubField,
@@ -884,6 +887,36 @@ const scaleRank = (
 };
 
 /**
+ * One side as a numeric span, or null when it has no magnitude.
+ *
+ * A single number is the degenerate span [v, v], which is what lets `within` read
+ * the same whether the side holds one value or two. An ORDERED select becomes its
+ * rank span, so "the module's speed must fall within the cage's supported range"
+ * works on a dropdown as well as on a number.
+ */
+const asSpan = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta | null,
+): SpecRange | null => {
+  const span = asRange(raw);
+  if (span) {
+    return span;
+  }
+  if (typeof raw === "number") {
+    return { min: raw, max: raw };
+  }
+  if (meta?.ordered) {
+    const ranks = asOptionList(raw)
+      .map((value) => optionRank(meta, value))
+      .filter((rank): rank is number => rank !== null);
+    if (ranks.length > 0) {
+      return { min: Math.min(...ranks), max: Math.max(...ranks) };
+    }
+  }
+  return null;
+};
+
+/**
  * Whether a consumer's value(s) fit a provider's.
  *
  *   in         — consumer ⊆ provider  (an impedance the amp supports)
@@ -891,14 +924,31 @@ const scaleRank = (
  *   lte / gte  — position on the scale (an af device fits an at switch, but not
  *                the reverse)
  *   eq         — the two sets are identical
+ *   within     — the consumer's whole span sits inside the provider's
  */
 const matchSatisfied = (
-  consumerValues: string[],
-  providerValues: string[],
+  consumerRaw: ProductValue | undefined,
+  providerRaw: ProductValue | undefined,
   rule: EngineRelationship,
   consumerMeta: AttributeMeta | null,
   providerMeta: AttributeMeta | null,
 ): boolean => {
+  // `within` is about magnitude, not membership, so it is answered before the
+  // values are flattened into option lists — a span flattens to nothing (see
+  // `asOptionList`), which is exactly why the set comparators cannot express it.
+  if (rule.comparator === "within") {
+    const consumerSpan = asSpan(consumerRaw, consumerMeta);
+    const providerSpan = asSpan(providerRaw, providerMeta);
+    if (!consumerSpan || !providerSpan) {
+      return false;
+    }
+    return (
+      consumerSpan.min >= providerSpan.min && consumerSpan.max <= providerSpan.max
+    );
+  }
+
+  const consumerValues = asOptionList(consumerRaw);
+  const providerValues = asOptionList(providerRaw);
   const provider = new Set(providerValues);
 
   if (rule.comparator === "intersects") {
@@ -1026,12 +1076,40 @@ const evaluateMatch = (
     };
   }
 
+  // A SPAN under a set comparator is unreadable, not unsatisfied.
+  //
+  // `asOptionList` flattens a span to nothing on purpose — stringifying it would
+  // hand the set operators "[object Object]" to match against. That left every
+  // comparator except `within` returning false for a span, so a match rule with a
+  // range on either side reported EVERY item as failing: one authoring slip and
+  // the rule blocked every cart in the catalog, while reading like a real finding.
+  // Reported as unknown instead, which is what an unanswerable comparison is.
+  const spanSide =
+    rule.comparator !== "within" &&
+    [...consumers, ...providers].some((item) =>
+      asRange(
+        readValue(
+          item.values,
+          consumers.includes(item)
+            ? consumerOperand.specUuid
+            : providerOperand.specUuid,
+        ),
+      ),
+    );
+  if (spanSide) {
+    return {
+      ...withSides,
+      status: "unknown",
+      message: `"${rule.name}" compares values as sets, but something in the selection answers "${consumerMeta.label}" or "${providerMeta.label}" as a range. Use "must fall within" to compare a value against a span.`,
+    };
+  }
+
   const failing = consumers.filter(
     (item) =>
       !providers.some((provider) =>
         matchSatisfied(
-          asOptionList(readValue(item.values, consumerOperand.specUuid)),
-          asOptionList(readValue(provider.values, providerOperand.specUuid)),
+          readValue(item.values, consumerOperand.specUuid),
+          readValue(provider.values, providerOperand.specUuid),
           rule,
           consumerMeta,
           providerMeta,
