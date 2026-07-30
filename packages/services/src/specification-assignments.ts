@@ -189,7 +189,16 @@ export const saveAssignment = async (
   await recordAudit({
     target: "assignment",
     action: existing ? "update" : "create",
-    targetUuid: `${input.categoryUuid}:${input.specificationUuid}`,
+    // The ATTRIBUTE, not a composite of it and the category. `target_uuid` is a
+    // char(36) holding one uuid, so a composite overflowed the column and — because
+    // recording an audit line must never fail the edit it describes — the error was
+    // swallowed. Every assignment change since the rebuild went unrecorded, which
+    // is why the trail held no assignment history at all while assignments are half
+    // of what gets blamed when a sale is blocked.
+    //
+    // A single uuid is also what makes "show me this one's history" work. A
+    // composite would have matched nothing even if it had fitted.
+    targetUuid: input.specificationUuid,
     targetLabel: await describeAssignment(input),
     actor,
   });
@@ -307,6 +316,7 @@ export const saveAssignments = async (
       },
     });
 
+  const names = await categoryNames(inputs.map((input) => input.categoryUuid));
   await recordAuditBatch(
     inputs.map((input) => ({
       target: "assignment" as const,
@@ -315,13 +325,14 @@ export const saveAssignments = async (
       )
         ? ("update" as const)
         : ("create" as const),
-      targetUuid: `${input.categoryUuid}:${input.specificationUuid}`,
-      // The label comes from the model already in hand — the per-row version
-      // fetched it again for every single entry.
+      targetUuid: input.specificationUuid,
+      // The attribute label comes from the model already in hand — the per-row
+      // version fetched it again for every single entry. The category names are one
+      // query for the whole batch.
       targetLabel: `${
         model.attributes.get(input.specificationUuid)?.label ??
         input.specificationUuid
-      } on ${input.categoryUuid}`,
+      } on ${names.get(input.categoryUuid) ?? input.categoryUuid}`,
       actor,
     })),
   );
@@ -329,12 +340,35 @@ export const saveAssignments = async (
   invalidateCatalogModel();
 };
 
+/**
+ * Category names for the audit label.
+ *
+ * Worth the extra read: this table's whole design is to store the label as it was
+ * at the time, and "AC Input Voltage on 868e77ce-a637-492e-…" tells a human
+ * nothing at all. One query for the whole batch, never one per row.
+ */
+const categoryNames = async (
+  uuids: string[],
+): Promise<Map<string, string>> => {
+  if (uuids.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select({ uuid: Categories.uuid, name: Categories.name })
+    .from(Categories)
+    .where(inArray(Categories.uuid, [...new Set(uuids)]));
+  return new Map(rows.map((row) => [row.uuid, row.name]));
+};
+
 const describeAssignment = async (input: AssignmentInput): Promise<string> => {
-  const model = await getCatalogModel();
+  const [model, names] = await Promise.all([
+    getCatalogModel(),
+    categoryNames([input.categoryUuid]),
+  ]);
   const label =
     model.attributes.get(input.specificationUuid)?.label ??
     input.specificationUuid;
-  return `${label} on ${input.categoryUuid}`;
+  return `${label} on ${names.get(input.categoryUuid) ?? input.categoryUuid}`;
 };
 
 /**
@@ -377,7 +411,7 @@ export const removeAssignment = async (
   await recordAudit({
     target: "assignment",
     action: "delete",
-    targetUuid: `${categoryUuid}:${specificationUuid}`,
+    targetUuid: specificationUuid,
     targetLabel:
       resolved.find(
         (assignment) => assignment.definition.uuid === specificationUuid,
@@ -446,7 +480,7 @@ export const removeAssignments = async (
     categoryUuids.map((categoryUuid) => ({
       target: "assignment" as const,
       action: "delete" as const,
-      targetUuid: `${categoryUuid}:${specificationUuid}`,
+      targetUuid: specificationUuid,
       targetLabel: label,
       actor,
     })),
