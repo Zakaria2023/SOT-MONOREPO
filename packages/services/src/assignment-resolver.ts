@@ -10,6 +10,7 @@ import {
   asGroupRows,
   asOptionList,
   completeGroupRows,
+  describeValue,
   groupRowIssues,
   hasValue,
   indexAttributes,
@@ -405,9 +406,10 @@ export type CompletenessProblem = {
   label: string;
   // revealed = the value is required because a condition brought the field into
   // view; assigned = it is required because the category assigns it as a rule
-  // input at all times.
-  reason: "revealed" | "assigned";
-  // Four different failures, deliberately not collapsed into "invalid":
+  // input at all times; held = nothing requires it — the product simply carries
+  // it, and that is the problem.
+  reason: "revealed" | "assigned" | "held";
+  // Five different failures, deliberately not collapsed into "invalid":
   //
   //   missing        — no value at all.
   //   outside_slice  — a real value the LIBRARY knows and this category does not
@@ -421,7 +423,18 @@ export type CompletenessProblem = {
   //                    today, almost always because a sub-field was added after
   //                    the rows were entered. The readers drop those rows, so the
   //                    product reads as having none.
-  kind: "missing" | "outside_slice" | "unknown_value" | "incomplete_rows";
+  //   unassigned     — an answered value for an attribute this category does not
+  //                    carry. The mirror image of `missing` and easy to miss
+  //                    precisely because the data LOOKS present: no rule reads it,
+  //                    no spec table shows it, and an author told only that eight
+  //                    attributes are missing will re-enter answers already
+  //                    sitting on the row.
+  kind:
+    | "missing"
+    | "outside_slice"
+    | "unknown_value"
+    | "incomplete_rows"
+    | "unassigned";
   // What is wrong, in the author's words. Only set for the kinds where naming the
   // offending value or row is what makes the problem fixable.
   detail?: string;
@@ -442,6 +455,10 @@ export type CompletenessProblem = {
 export const completenessProblems = (
   resolved: ResolvedAssignment[],
   values: ProductValues,
+  // Every definition the LIBRARY holds, so a value whose attribute this category
+  // does not carry can be named and rendered rather than reported as a bare uuid.
+  // Optional: without it those values are still reported, just less legibly.
+  known?: AttributeIndex,
 ): CompletenessProblem[] => {
   const visible = visibleAssignments(resolved, values);
   const problems: CompletenessProblem[] = [];
@@ -501,6 +518,31 @@ export const completenessProblems = (
         entry.unknownToLibrary.length > 0
           ? `${entry.unknownToLibrary.join(", ")} — not in the library's list for this attribute, so nothing can read it.`
           : `${entry.values.join(", ")} — the library has these, this category does not offer them.`,
+    });
+  }
+
+  // Values with nowhere to be read. Checked against the RESOLVED set rather than
+  // the visible one: an attribute hidden by a reveal is still carried by the
+  // category, and `clearHiddenValues` owns that case on save. What is reported
+  // here is an attribute the category does not carry at all — because it was never
+  // assigned, because the assignment suppresses it, or because the product changed
+  // category after it was answered.
+  const carried = new Set(
+    resolved.map((assignment) => assignment.definition.uuid),
+  );
+  for (const [specificationUuid, value] of Object.entries(values)) {
+    if (carried.has(specificationUuid) || !hasValue(value)) {
+      continue;
+    }
+    const meta = known?.get(specificationUuid);
+    problems.push({
+      specificationUuid,
+      label: meta?.label ?? specificationUuid,
+      reason: "held",
+      kind: "unassigned",
+      detail: meta
+        ? `Answered "${describeValue(value, meta)}", but this category does not carry ${meta.label} — so nothing reads it and no spec table shows it.`
+        : "The library no longer has this attribute, so the value can never be read again.",
     });
   }
 

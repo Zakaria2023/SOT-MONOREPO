@@ -15,6 +15,7 @@ import {
   type AssignmentDefinition,
   type AssignmentRow,
 } from "./assignment-resolver";
+import { indexAttributes } from "./spec-values";
 
 // The tree used throughout: Networking (root) → Switches → SMB Switches.
 const SMB = "cat-smb";
@@ -553,6 +554,68 @@ describe("completenessProblems", () => {
   it("accepts zero as a real answer", () => {
     expect(
       completenessProblems(resolved, { "a-poe": true, "a-budget": 0 }),
+    ).toEqual([]);
+  });
+
+  // The mirror image of "missing", and the one the live catalog was actually
+  // suffering from: three switches held five answers each for attributes their
+  // category does not carry. Reported as missing-only, an author re-enters answers
+  // that are already on the row.
+  it("reports an answered value for an attribute the category does not carry", () => {
+    const problems = completenessProblems(
+      resolved,
+      { "a-poe": true, "a-budget": 130, "a-orphan": 42 },
+      indexAttributes([
+        {
+          uuid: "a-orphan",
+          label: "Rack Units",
+          type: "number",
+          unit: "U",
+          ordered: false,
+          options: [],
+        },
+      ]),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.kind).toBe("unassigned");
+    expect(problems[0]?.reason).toBe("held");
+    expect(problems[0]?.label).toBe("Rack Units");
+    // Naming the value is what stops it being re-entered somewhere else.
+    expect(problems[0]?.detail).toContain("42");
+  });
+
+  it("still reports an orphan the library itself has forgotten", () => {
+    // No metadata to name it with. Reporting it by uuid is far better than
+    // staying silent: the value is unreadable for good, and only a report can say
+    // so.
+    const problems = completenessProblems(resolved, {
+      "a-poe": true,
+      "a-budget": 130,
+      "a-deleted": "something",
+    });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.specificationUuid).toBe("a-deleted");
+    expect(problems[0]?.label).toBe("a-deleted");
+  });
+
+  it("ignores an empty orphan", () => {
+    // An empty value carried for an attribute nothing reads is not a problem
+    // anybody needs to act on, and reporting it would bury the ones that are.
+    expect(
+      completenessProblems(resolved, {
+        "a-poe": true,
+        "a-budget": 130,
+        "a-orphan": "",
+      }),
+    ).toEqual([]);
+  });
+
+  it("does not call a reveal-hidden value an orphan", () => {
+    // a-budget is CARRIED by the category and merely hidden right now. Calling it
+    // unassigned would tell an author to delete a value the model itself clears
+    // on save.
+    expect(
+      completenessProblems(resolved, { "a-poe": false, "a-budget": 130 }),
     ).toEqual([]);
   });
 });

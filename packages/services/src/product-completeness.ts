@@ -192,6 +192,9 @@ export const getProductCompleteness = async (
   const problems = completenessProblems(
     resolved,
     (product.specValues ?? {}) as ProductValues,
+    // The whole library, not this category's slice — naming an attribute the
+    // category does NOT carry is the entire point of that check.
+    model.attributes,
   );
 
   return {
@@ -254,6 +257,7 @@ export const getCatalogCompleteness = async (
     const problems = completenessProblems(
       resolved,
       (row.specValues ?? {}) as ProductValues,
+      model.attributes,
     );
     return {
       productUuid: row.uuid,
