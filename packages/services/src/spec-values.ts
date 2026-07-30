@@ -322,6 +322,67 @@ export const groupPicks = (
   return [...seen];
 };
 
+/**
+ * Coerce authored rows into storable ones. The one place that decides what a
+ * group value MEANS on the way in.
+ *
+ * Pure, and here rather than beside the save path, because the save path opens a
+ * database connection and this is the part worth testing on its own.
+ *
+ *  - Anything the schema does not name is DROPPED. A stored key nothing describes
+ *    is data no reader will ever look at again.
+ *  - Each entry is coerced to its sub-field's kind, so a count arriving as the
+ *    string "24" becomes 24 — every reader above does arithmetic on it without
+ *    re-parsing.
+ *  - An INCOMPLETE row is dropped rather than half-stored, exactly as a
+ *    half-filled span is. The readers ignore it either way, so storing one would
+ *    show the author an answer that no rule can see.
+ */
+export const normalizeGroupRows = (
+  value: unknown,
+  fields: SpecGroupField[],
+): SpecGroupRow[] => {
+  if (fields.length === 0 || !Array.isArray(value)) {
+    return [];
+  }
+  const cleaned: SpecGroupRow[] = [];
+  for (const row of value) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) {
+      continue;
+    }
+    const entries: Record<string, unknown> = row;
+    const next: SpecGroupRow = {};
+    let complete = true;
+    for (const field of fields) {
+      const entry = entries[field.key];
+      if (field.kind === "number") {
+        const parsed = typeof entry === "number" ? entry : Number(entry);
+        if (
+          entry === undefined ||
+          entry === null ||
+          entry === "" ||
+          !Number.isFinite(parsed)
+        ) {
+          complete = false;
+          break;
+        }
+        next[field.key] = parsed;
+        continue;
+      }
+      const text = typeof entry === "string" ? entry.trim() : "";
+      if (text === "") {
+        complete = false;
+        break;
+      }
+      next[field.key] = text;
+    }
+    if (complete) {
+      cleaned.push(next);
+    }
+  }
+  return cleaned;
+};
+
 /** A group sub-field's option rank, for the ordered comparators. */
 export const groupFieldRank = (
   field: SpecGroupField,

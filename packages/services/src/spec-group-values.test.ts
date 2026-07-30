@@ -13,6 +13,7 @@ import {
   groupPicks,
   groupTotal,
   hasValue,
+  normalizeGroupRows,
   type AttributeMeta,
 } from "./spec-values";
 
@@ -285,6 +286,99 @@ describe("describeValue on a group", () => {
 
   it("leaves the other types alone", () => {
     expect(describeValue(["opus", "g711"], codecs)).toBe("Opus, G.711");
+  });
+});
+
+describe("normalizeGroupRows", () => {
+  it("keeps a complete row and coerces a count that arrived as text", () => {
+    // A form field hands back "24"; every reader above does arithmetic on it
+    // without re-parsing, so it has to be stored as a number.
+    expect(
+      normalizeGroupRows(
+        [{ count: "24", family: "base-t", "max-speed": "1g" }],
+        portFields,
+      ),
+    ).toEqual([{ count: 24, family: "base-t", "max-speed": "1g" }]);
+  });
+
+  it("drops keys the schema does not name", () => {
+    expect(
+      normalizeGroupRows(
+        [{ count: 8, family: "sfp", "max-speed": "10g", poe: "yes" }],
+        portFields,
+      ),
+    ).toEqual([{ count: 8, family: "sfp", "max-speed": "10g" }]);
+  });
+
+  it("drops an incomplete row rather than half-storing it", () => {
+    expect(
+      normalizeGroupRows(
+        [
+          { count: 24, family: "base-t", "max-speed": "1g" },
+          { count: 4, family: "sfp" },
+        ],
+        portFields,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("drops a row whose count is not a number", () => {
+    expect(
+      normalizeGroupRows(
+        [{ count: "lots", family: "sfp", "max-speed": "10g" }],
+        portFields,
+      ),
+    ).toEqual([]);
+  });
+
+  it("trims a pick and rejects one that is only whitespace", () => {
+    expect(
+      normalizeGroupRows(
+        [{ count: 2, family: "  qsfp  ", "max-speed": "100g" }],
+        portFields,
+      ),
+    ).toEqual([{ count: 2, family: "qsfp", "max-speed": "100g" }]);
+    expect(
+      normalizeGroupRows(
+        [{ count: 2, family: "   ", "max-speed": "100g" }],
+        portFields,
+      ),
+    ).toEqual([]);
+  });
+
+  it("refuses everything when the schema is empty", () => {
+    // No sub-fields means no way to read a row back, so nothing is stored — the
+    // library refuses to save such an attribute for the same reason.
+    expect(normalizeGroupRows(coreSwitch, [])).toEqual([]);
+  });
+
+  it("ignores entries that are not rows at all", () => {
+    expect(
+      normalizeGroupRows(
+        [
+          "sfp",
+          42,
+          null,
+          ["nested"],
+          { count: 2, family: "qsfp", "max-speed": "100g" },
+        ],
+        portFields,
+      ),
+    ).toEqual([{ count: 2, family: "qsfp", "max-speed": "100g" }]);
+  });
+
+  it("returns nothing for a value that is not a list", () => {
+    expect(normalizeGroupRows("24 x 1G", portFields)).toEqual([]);
+    expect(normalizeGroupRows(undefined, portFields)).toEqual([]);
+  });
+
+  it("survives the round trip the save path performs", () => {
+    // The bug this pins: with no group branch, the save path fell through to
+    // String(value[0]) and stored the literal "[object Object]" — a product that
+    // looked answered while carrying nothing any rule could read.
+    const stored = normalizeGroupRows(coreSwitch, portFields);
+    expect(isSpecGroupRows(stored)).toBe(true);
+    expect(groupTotal(stored, ports, "count")).toBe(50);
   });
 });
 

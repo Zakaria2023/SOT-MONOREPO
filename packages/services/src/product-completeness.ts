@@ -7,6 +7,8 @@ import {
   isSpecRange,
   type ProductValue,
   type ProductValues,
+  type SpecGroupField,
+  type SpecGroupRow,
   type SpecRange,
 } from "../../../db/types";
 import {
@@ -17,6 +19,7 @@ import {
   type ResolvedAssignment,
 } from "./assignment-resolver";
 import { getCatalogModel, resolveFromModel } from "./catalog-model";
+import { normalizeGroupRows } from "./spec-values";
 
 // ---------------------------------------------------------------------------
 // CATALOG COMPLETENESS.
@@ -107,6 +110,23 @@ export const normalizeProductValues = async (
     if (definition.type === "multi_select") {
       const list = Array.isArray(value) ? value.map(String) : [String(value)];
       const cleaned = list.filter((entry) => entry.trim() !== "");
+      if (cleaned.length > 0) {
+        typed[definition.uuid] = cleaned;
+      }
+      continue;
+    }
+    if (definition.type === "group") {
+      // Repeatable rows, keyed by sub-field.
+      //
+      // Without this branch the single-select fallthrough below would store
+      // `String(value[0])` — the literal "[object Object]" — and the product
+      // would look answered while carrying nothing any rule can read.
+      //
+      // Anything the schema does not name is DROPPED, and each remaining entry is
+      // coerced to its sub-field's kind: a count arriving as the string "24"
+      // becomes 24, because every reader above does arithmetic on it without
+      // re-parsing.
+      const cleaned = normalizeGroupRows(value, definition.groupFields ?? []);
       if (cleaned.length > 0) {
         typed[definition.uuid] = cleaned;
       }
@@ -288,6 +308,13 @@ export type ProductFormField = {
   // AssignmentDefinition.
   allowRange: boolean;
   options: ResolvedAssignment["offeredOptions"];
+  // Only on `group`. The sub-fields one repeatable row carries, in column order.
+  //
+  // Passed straight through from the definition and NOT narrowed per category, the
+  // way `options` is: a category may offer fewer options, but it may not offer a
+  // differently-shaped row — two shapes stored under one uuid is a value nothing
+  // can read back.
+  groupFields: SpecGroupField[];
   isRule: boolean;
   isFilter: boolean;
   inherited: boolean;
@@ -346,6 +373,7 @@ const toFormField = (
   allowRange: assignment.definition.allowRange,
   // The slice this category offers, never the whole master list.
   options: assignment.offeredOptions,
+  groupFields: assignment.definition.groupFields ?? [],
   isRule: assignment.isRule,
   isFilter: assignment.isFilter,
   inherited: assignment.inherited,

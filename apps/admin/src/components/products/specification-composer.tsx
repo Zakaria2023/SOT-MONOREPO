@@ -3,8 +3,15 @@
 import type { ProductFormValues } from "@/app/(dashboard)/products/validation";
 import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
-import { isSpecRange, type ProductValue, type SpecOption } from "@/db/types";
-import { X } from "lucide-react";
+import {
+  isSpecGroupRows,
+  isSpecRange,
+  type ProductValue,
+  type SpecGroupField,
+  type SpecGroupRow,
+  type SpecOption,
+} from "@/db/types";
+import { Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Dropdown, Input, type DropdownOption } from "ui";
@@ -36,6 +43,8 @@ export type FormField = {
   allowRange: boolean;
   // The slice this category offers — not the whole master list.
   options: SpecOption[];
+  // Only on `group`. The sub-fields one repeatable row carries, in column order.
+  groupFields: SpecGroupField[];
   isRule: boolean;
   isFilter: boolean;
   inherited: boolean;
@@ -70,13 +79,21 @@ type FieldRowProps = {
   onChange: (next: ProductValue | undefined) => void;
 };
 
+type GroupRowsEditorProps = {
+  fields: SpecGroupField[];
+  rows: SpecGroupRow[];
+  onChange: (next: SpecGroupRow[]) => void;
+};
+
 const asList = (value: ProductValue | undefined): string[] => {
   if (value === undefined || value === null || value === "") {
     return [];
   }
   // A span is a quantity, never a set membership — stringifying it would give
-  // the equals/in branches "[object Object]" to compare against.
-  if (isSpecRange(value)) {
+  // the equals/in branches "[object Object]" to compare against. A group's rows
+  // are the same hazard and they ARE an array, so they have to be caught before
+  // the `map(String)` below can reach them.
+  if (isSpecRange(value) || isSpecGroupRows(value)) {
     return [];
   }
   return Array.isArray(value) ? value.map(String) : [String(value)];
@@ -118,8 +135,65 @@ const hasValue = (value: ProductValue | undefined): boolean => {
   if (typeof value === "object" && !Array.isArray(value)) {
     return isSpecRange(value);
   }
+  // Same reasoning one level out: a row list the server cannot decode must not
+  // read as answered here, or the author sees a filled field that saves empty.
+  if (
+    Array.isArray(value) &&
+    value.some((entry) => typeof entry === "object" && entry !== null)
+  ) {
+    return isSpecGroupRows(value);
+  }
   return !(Array.isArray(value) && value.length === 0);
 };
+
+// ---------------------------------------------------------------------------
+// Group rows
+// ---------------------------------------------------------------------------
+
+const asRows = (value: ProductValue | undefined): SpecGroupRow[] =>
+  isSpecGroupRows(value) ? value : [];
+
+/** A row is only an answer once every sub-field is filled — see the server. */
+const isRowComplete = (row: SpecGroupRow, fields: SpecGroupField[]): boolean =>
+  fields.every((field) => {
+    const entry = row[field.key];
+    if (field.kind === "number") {
+      return typeof entry === "number" && Number.isFinite(entry);
+    }
+    return typeof entry === "string" && entry.trim().length > 0;
+  });
+
+/**
+ * A blank row, with every sub-field absent rather than zeroed.
+ *
+ * A count seeded with 0 is a real answer the author never gave, and it would make
+ * the row look complete while contributing nothing to a total.
+ */
+const blankRow = (): SpecGroupRow => ({});
+
+/**
+ * One sub-field of one row, replaced.
+ *
+ * Clearing a control DELETES the key rather than storing "" or NaN, so an
+ * incomplete row stays visibly incomplete instead of holding a value the readers
+ * would drop without saying why.
+ */
+const patchRow = (
+  rows: SpecGroupRow[],
+  index: number,
+  key: string,
+  entry: number | string | undefined,
+): SpecGroupRow[] =>
+  rows.map((row, at) => {
+    if (at !== index) {
+      return row;
+    }
+    if (entry === undefined) {
+      const { [key]: _dropped, ...rest } = row;
+      return rest;
+    }
+    return { ...row, [key]: entry };
+  });
 
 const satisfied = (
   condition: RevealCondition | null,
@@ -184,6 +258,111 @@ const satisfied = (
   }
   return numeric < target;
 };
+
+/**
+ * The repeatable-row control: one row per line, one input per sub-field.
+ *
+ * This is what replaces "GE RJ45 24 (1G/100M/10M)" typed into a text box. The
+ * count is a number, the family and the speed are picks from lists the library
+ * owns, and a switch adds as many rows as it has distinct port groups — so
+ * nothing here is free text and every part stays comparable.
+ */
+const GroupRowsEditor = ({ fields, rows, onChange }: GroupRowsEditorProps) => (
+  <div className="flex flex-col gap-2">
+    {rows.map((row, index) => {
+      const complete = isRowComplete(row, fields);
+      return (
+        <div
+          key={index}
+          className="flex flex-wrap items-start gap-2 rounded-card border border-hairline bg-hover/40 p-2"
+        >
+          {fields.map((subField) => {
+            const entry = row[subField.key];
+            const live = subField.options.filter((option) => !option.retired);
+            return (
+              <div key={subField.key} className="min-w-28 flex-1">
+                {subField.kind === "number" ? (
+                  <Input
+                    type="number"
+                    placeholder={subField.label}
+                    aria-label={subField.label}
+                    value={typeof entry === "number" ? String(entry) : ""}
+                    onChange={(event) =>
+                      onChange(
+                        patchRow(
+                          rows,
+                          index,
+                          subField.key,
+                          event.target.value === ""
+                            ? undefined
+                            : Number(event.target.value),
+                        ),
+                      )
+                    }
+                    rightSlot={
+                      subField.unit ? (
+                        <span className="text-xs text-faint">
+                          {subField.unit}
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <Dropdown
+                    value={typeof entry === "string" ? entry : ""}
+                    onChange={(next) =>
+                      onChange(
+                        patchRow(
+                          rows,
+                          index,
+                          subField.key,
+                          next === "" ? undefined : next,
+                        ),
+                      )
+                    }
+                    options={live.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    placeholder={subField.label}
+                    searchable={live.length > 8}
+                  />
+                )}
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => onChange(rows.filter((_, at) => at !== index))}
+            aria-label={`Remove row ${index + 1}`}
+            className="mt-2 shrink-0 rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+          >
+            <X size={13} />
+          </button>
+
+          {/* Said on the row itself, because the readers DROP an incomplete row
+              rather than partly counting it — so a half-filled port group would
+              otherwise look entered and contribute nothing. */}
+          {!complete && (
+            <p className="w-full text-xs text-amber-500">
+              Fill every box, or this row is ignored.
+            </p>
+          )}
+        </div>
+      );
+    })}
+
+    <button
+      type="button"
+      onClick={() => onChange([...rows, blankRow()])}
+      className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+    >
+      <Plus size={13} />
+      Add row
+    </button>
+  </div>
+);
 
 const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
   const live = field.options.filter((option) => !option.retired);
@@ -295,6 +474,24 @@ const FieldRow = ({ field, value, onChange, onRemove }: FieldRowProps) => {
           emptyMessage="This category offers no options here"
         />
       )}
+
+      {field.type === "group" &&
+        (field.groupFields.length === 0 ? (
+          // The library refuses to save a group without sub-fields, so this only
+          // shows for a row written before that guard existed. Better than
+          // rendering an "Add row" button that produces rows nothing can read.
+          <p className="rounded-card border border-dashed border-hairline px-3 py-4 text-center text-xs text-faint">
+            This specification has no sub-fields yet. Add them in the Library.
+          </p>
+        ) : (
+          <GroupRowsEditor
+            fields={field.groupFields}
+            rows={asRows(value)}
+            // An empty list is not a value — the readers treat a group with no
+            // rows as unanswered, so the form has to store nothing rather than [].
+            onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+          />
+        ))}
     </div>
   );
 };
