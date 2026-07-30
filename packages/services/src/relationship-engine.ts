@@ -16,14 +16,13 @@ import type {
   RelationshipScope,
   SpecGroupField,
 } from "../../../db/types";
-import { evaluatePredicate } from "./predicate";
+import { evaluatePredicate, filteredGroupTotal } from "./predicate";
 import {
   asNumber,
   asOptionList,
   describeValue,
   formatValue,
   groupSubField,
-  groupTotal,
   hasValue,
   optionLabel,
   optionRank,
@@ -259,7 +258,16 @@ const operandLabel = (
     // "Network Ports · Ports", so a finding names the column it actually counted
     // rather than the attribute it came from.
     const subField = operandSubField(operand, context);
-    return subField ? `${label} · ${subField.label}` : label;
+    if (!subField) {
+      return label;
+    }
+    // And "(matching rows only)" when a filter narrowed them, because otherwise a
+    // finding reading "8 of 24 ports" against a rule that only ever counted the
+    // 10G ones is a number the author cannot reconcile with the product in front
+    // of them.
+    const narrowed =
+      operand.source === "spec" && operand.where ? " (matching rows only)" : "";
+    return `${label} · ${subField.label}${narrowed}`;
   }
   if (operand.source === "variable") {
     return (
@@ -300,11 +308,16 @@ const itemOperandValue = (
   // port groups, not the number of groups, which is the plausible wrong answer
   // (4 instead of 50) that nothing would have reported.
   //
-  // Rows that do not answer the current schema are excluded by `groupTotal`, so a
+  // Rows that do not answer the current schema are excluded there, so a
   // switch whose ports became unreadable reads as null here and is reported as a
   // gap rather than counted short. Completeness names the same rows.
   if (operand.groupField) {
-    return groupTotal(raw, meta, operand.groupField);
+    return filteredGroupTotal(
+      raw,
+      meta,
+      operand.groupField,
+      operand.where,
+    );
   }
   return asNumber(raw, meta, bound);
 };
@@ -488,7 +501,7 @@ const suggestProviders = (
       // the rule would then reject.
       const raw = readValue(product.values, operand.specUuid);
       const capacity = operand.groupField
-        ? groupTotal(raw, meta, operand.groupField)
+        ? filteredGroupTotal(raw, meta, operand.groupField, operand.where)
         : asNumber(raw, meta, "min");
       if (capacity === null) {
         return [];

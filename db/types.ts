@@ -174,7 +174,19 @@ export type PredicateScalar = string | number | boolean;
 //
 //   `exists` means at least one row is READABLE — complete against the current
 //   schema. A group whose rows all became unreadable must not answer yes.
-export type PredicateField = { field?: string };
+//
+// `where` narrows WHICH ROWS the reduction above runs over, and it is what lets a
+// condition ask "how many 10G ports" rather than only "how many ports" or "is any
+// port 10G". Its `attr`s name this group's own SUB-FIELD KEYS — never library
+// attribute uuids — because a row is a world of its own with no access to the
+// product around it. That is also why `predicateAttributes` must not descend into
+// it: a sub-field key is not an attribute the reveal graph can chase.
+//
+// Ticking two columns without it is not the same question. "family is SFP" and
+// "speed is 10G" as two conditions ask whether SOME row is SFP and SOME row is
+// 10G, which a switch with an SFP 1G cage and an RJ45 10G port answers yes to.
+// `where` is what makes it one row that is both.
+export type PredicateField = { field?: string; where?: Predicate };
 
 export type Predicate =
   // Scalar comparison. On a multi-select attribute, `equals` holds when the
@@ -352,7 +364,23 @@ export type Operand =
   // own, deliberately: `operandSpecUuid` keeps working, so the deletion guard
   // still sees the reference, and every `source === "spec"` branch in the engine
   // and the authoring layer stays correct without being touched.
-  | { source: "spec"; specUuid: string; groupField?: string }
+  //
+  // `where` narrows which ROWS are totalled, so "how many 10G uplinks" is finally
+  // expressible: Σ(count) over the rows whose speed column says 10G. Its `attr`s
+  // name this group's sub-field keys, never library attributes.
+  //
+  // The distinction that makes it safe: a product with NO readable rows still
+  // measures nothing (null, and the rule skips it, as before), but a product with
+  // readable rows and none matching measures ZERO. Those must not collapse — a
+  // switch whose ports are all 1G has to FAIL a "needs two 10G uplinks" rule, and
+  // returning null there would make it skip the check instead, which is the exact
+  // silent pass this model exists to prevent.
+  | {
+      source: "spec";
+      specUuid: string;
+      groupField?: string;
+      where?: Predicate;
+    }
   // A project input the buyer supplied (see ProjectVariables).
   | { source: "variable"; variableUuid: string }
   // The number of physical units in the selection that matched the side's

@@ -9,10 +9,12 @@ import {
   type RelationshipProblem,
 } from "@/app/(dashboard)/assignments/actions";
 import { RelationPreview } from "@/components/assignments/relation-preview";
+import { RowFilter } from "@/components/assignments/row-filter";
 import { Field } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
   describePredicate,
+  describeRowFilter,
   type PredicateAttribute,
 } from "@/components/assignments/condition-picker";
 import {
@@ -535,6 +537,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
           <Field label="Consumer attribute (summed × qty)">
             <Dropdown
               value={operandUuid(form.consumer)}
@@ -544,6 +551,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.consumer}
+            attributes={attributes}
+            onChange={(next) => patch({ consumer: next })}
+          />
           <Input
             label="Headroom %"
             type="number"
@@ -570,6 +582,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
           <Field label="Counted source — a product group or a project variable">
             <Dropdown
               value={countedSource(form)}
@@ -594,6 +611,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.consumer}
+            attributes={attributes}
+            onChange={(next) => patch({ consumer: next })}
+          />
           <Field label="Compatible via">
             <Dropdown
               value={form.comparator}
@@ -612,6 +634,11 @@ const RelationForm = ({
               placeholder="— attribute —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
         </>
       )}
 
@@ -628,6 +655,11 @@ const RelationForm = ({
               placeholder="— source —"
             />
           </Field>
+          <RowFilter
+            operand={form.consumer}
+            attributes={attributes}
+            onChange={(next) => patch({ consumer: next })}
+          />
           <Field label="Supply — attribute or project variable">
             <Dropdown
               value={operandUuid(form.provider)}
@@ -637,6 +669,11 @@ const RelationForm = ({
               placeholder="— source —"
             />
           </Field>
+          <RowFilter
+            operand={form.provider}
+            attributes={attributes}
+            onChange={(next) => patch({ provider: next })}
+          />
           <Input
             label="Target ratio (n : 1)"
             type="number"
@@ -794,7 +831,13 @@ export const RelationBuilder = ({
         const field = attribute.groupFields.find(
           (entry) => entry.key === operand.groupField,
         );
-        return `${attribute.label} · ${field?.label ?? "a removed sub-field"}`;
+        const column = `${attribute.label} · ${field?.label ?? "a removed sub-field"}`;
+        // And that only some rows were counted. A rule totalling the 10G ports
+        // and one totalling every port read identically without this, which is
+        // the difference between a rule an author trusts and one they re-check.
+        return operand.where
+          ? `${column} (${describeRowFilter(operand.where, attribute)})`
+          : column;
       }
       if (operand.source === "variable") {
         return (

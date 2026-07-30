@@ -7,16 +7,17 @@ import {
   type PredicateScalar,
   type ProductValue,
   type ProductValues,
+  type SpecGroupRow,
 } from "../../../db/types";
 import {
   asNumber,
   asOptionList,
   asRange,
+  columnPicks,
+  columnTotal,
   completeGroupRows,
   groupFieldRank,
-  groupPicks,
   groupSubField,
-  groupTotal,
   hasValue,
   readValue,
   type AttributeIndex,
@@ -69,6 +70,77 @@ const setMatches = (
 };
 
 /**
+ * A group's sub-fields, as an attribute index a predicate can be run against.
+ *
+ * The trick that makes row filtering cost almost nothing: a row is already
+ * `{key: value}`, which is the exact shape `evaluatePredicate` reads, and a
+ * sub-field already carries a label, a kind, a unit and an option list. So a row
+ * filter is the SAME evaluator on a smaller world, and every operator — ordered
+ * comparisons, `in` with its match modes, `between`, `not` — works inside a row
+ * without a second comparison language being invented for rows.
+ *
+ * `single_select` rather than `multi_select` because one row holds one pick per
+ * column; `ordered` comes from the sub-field so an ordered scale still ranks.
+ */
+export const groupRowAttributes = (meta: AttributeMeta): AttributeIndex =>
+  new Map(
+    (meta.groupFields ?? []).map((field) => [
+      field.key,
+      {
+        uuid: field.key,
+        label: field.label,
+        type: field.kind === "number" ? "number" : "single_select",
+        unit: field.kind === "number" ? field.unit : null,
+        ordered: field.kind === "select" ? field.ordered : false,
+        options: field.kind === "select" ? field.options : [],
+      } satisfies AttributeMeta,
+    ]),
+  );
+
+/**
+ * The rows a row-filter keeps.
+ *
+ * A row that cannot answer the filter is DROPPED, not kept — the same call the
+ * readers make for a row that does not answer its schema. Keeping it would let
+ * "how many 10G ports" quietly include ports whose speed nobody can read.
+ */
+export const matchingGroupRows = (
+  rows: SpecGroupRow[],
+  meta: AttributeMeta,
+  where: Predicate,
+): SpecGroupRow[] => {
+  const fields = groupRowAttributes(meta);
+  return rows.filter((row) => {
+    const result = evaluatePredicate(where, row, fields);
+    return result.matched && result.missing.length === 0;
+  });
+};
+
+/**
+ * Σ of one column, over the rows a filter keeps — what an operand measures.
+ *
+ * The two nulls mean different things and both matter. No READABLE rows at all is
+ * unanswered: the engine reports the item as a gap and the rule skips it, exactly
+ * as before. No rows matching the FILTER is a total of zero: the product has ports,
+ * none of them are 10G, and a rule needing two 10G uplinks must fail it rather
+ * than skip it. Collapsing those two into one answer is how a rule stops firing on
+ * the products it was written for.
+ */
+export const filteredGroupTotal = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+  fieldKey: string,
+  where?: Predicate | null,
+): number | null => {
+  const readable = completeGroupRows(raw, meta);
+  if (readable.length === 0) {
+    return null;
+  }
+  const rows = where ? matchingGroupRows(readable, meta, where) : readable;
+  return columnTotal(rows, meta, fieldKey);
+};
+
+/**
  * Evaluate one operator against a single column of a group's rows.
  *
  * Split out because the reduction is the whole difficulty: rows have to become one
@@ -104,12 +176,28 @@ const walkGroupField = (
     return false;
   }
 
+  // Narrowed BEFORE any reduction runs, which is the whole point: "how many 10G
+  // ports" is the count column totalled over the 10G rows, and no reduction over
+  // all the rows can produce it.
+  //
+  // A filter that matches nothing is an ANSWER, not a gap. The rows are readable;
+  // the product simply has none of that kind. Everything below therefore reduces
+  // over an empty list rather than reporting the attribute as missing — a switch
+  // with no 10G port has to fail a "needs a 10G port" rule, and reporting it as
+  // unreadable would make the rule skip it, which reads as a pass.
+  const rows = node.where
+    ? matchingGroupRows(readable, meta, node.where)
+    : readable;
+
   if (node.op === "exists") {
-    return true;
+    // With a filter this is the natural reading and the most useful one: is there
+    // at least one row LIKE THAT. Without one it is what it always was: is there
+    // at least one readable row.
+    return rows.length > 0;
   }
 
   if (field.kind === "select") {
-    const picks = groupPicks(raw, meta, fieldKey);
+    const picks = columnPicks(rows, meta, fieldKey);
     switch (node.op) {
       // Existential: does ANY row hold this pick. `all` keeps its usual meaning —
       // every pick the product has is within the named set.
@@ -130,6 +218,11 @@ const walkGroupField = (
       .map((pick) => groupFieldRank(field, pick))
       .filter((rank): rank is number => rank !== null);
     if (ranks.length === 0) {
+      // No row survived the filter. Answerable, and the answer is no: there is no
+      // such row for a "fastest one of them" to be about.
+      if (node.where && rows.length === 0) {
+        return false;
+      }
       // An unordered list has no magnitude, so this is unanswerable rather than
       // false — the same call `asNumber` makes for an unordered select.
       missing.add(node.attr);
@@ -138,8 +231,10 @@ const walkGroupField = (
     return compareNumber(node, Math.max(...ranks));
   }
 
-  // A COUNT column. Totalled across rows, the same figure an operand reads.
-  const total = groupTotal(raw, meta, fieldKey);
+  // A COUNT column. Totalled across the rows above, the same figure an operand
+  // reads. Null only when the column is not a count at all — a configuration
+  // error, not a gap in the product's data.
+  const total = columnTotal(rows, meta, fieldKey);
   if (total === null) {
     missing.add(node.attr);
     return false;
@@ -378,6 +473,36 @@ const MAX_PREDICATE_DEPTH = 6;
  * `in` list silently never matches, and a predicate pointing at a deleted
  * attribute silently disables whatever it guards.
  */
+/**
+ * Problems inside a row filter, reported as problems of the attribute that hosts
+ * it.
+ *
+ * Validated by the SAME walker, against the group's own columns — so an unordered
+ * column compared with "at least", or an empty "is one of", is caught inside a
+ * filter exactly as it is outside one. The messages are prefixed rather than
+ * rewritten, because an author looking at "Network Ports" needs to know the
+ * complaint is about the narrowing and not about the column being totalled.
+ *
+ * A filter may not itself contain a filter: rows do not nest, and allowing the
+ * syntax would only produce conditions nobody can read.
+ */
+const rowFilterProblems = (
+  node: AttributePredicate,
+  meta: AttributeMeta,
+): PredicateProblem[] => {
+  if (!node.where) {
+    return [];
+  }
+  const nested = validatePredicate(node.where, groupRowAttributes(meta));
+  return nested.map((problem) => ({
+    ...problem,
+    // Keyed to the hosting attribute so the builder highlights the row an author
+    // is actually looking at.
+    attr: node.attr,
+    message: `Only some rows of "${meta.label}": ${problem.message}`,
+  }));
+};
+
 export const validatePredicate = (
   predicate: Predicate | null,
   attributes: AttributeIndex,
@@ -486,6 +611,11 @@ export const validatePredicate = (
           attr: node.attr,
         });
       }
+      // The row filter runs in a world of its own — this group's columns and
+      // nothing else — so it is validated against those, with the same walker.
+      // A filter naming a column that no longer exists matches no rows at all,
+      // which turns every total into a confident zero rather than an error.
+      problems.push(...rowFilterProblems(node, meta));
       return;
     }
 
@@ -493,6 +623,15 @@ export const validatePredicate = (
       problems.push({
         code: "unknown_sub_field",
         message: `"${meta.label}" does not hold rows, so it has no sub-fields for a condition to name.`,
+        attr: node.attr,
+      });
+      return;
+    }
+
+    if (node.where) {
+      problems.push({
+        code: "unknown_sub_field",
+        message: `"${meta.label}" does not hold rows, so there are no rows for a filter to narrow.`,
         attr: node.attr,
       });
       return;

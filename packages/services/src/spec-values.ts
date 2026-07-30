@@ -372,12 +372,33 @@ export const groupTotal = (
   meta: AttributeMeta,
   fieldKey: string,
 ): number | null => {
-  const field = schemaOf(meta).find((entry) => entry.key === fieldKey);
-  if (!field || field.kind !== "number") {
+  const rows = completeGroupRows(raw, meta);
+  // No readable rows is UNANSWERED, and must not read as a total of zero: a
+  // switch whose ports became unreadable would otherwise measure "0 ports" and
+  // pass a rule it should have failed. A caller narrowing rows itself decides
+  // that question for itself — see `columnTotal`.
+  if (rows.length === 0) {
     return null;
   }
-  const rows = completeGroupRows(raw, meta);
-  if (rows.length === 0) {
+  return columnTotal(rows, meta, fieldKey);
+};
+
+/**
+ * Σ of a numeric column over exactly the rows given.
+ *
+ * Split out from `groupTotal` so a caller that has already narrowed the rows —
+ * "only the 10G ones" — shares the same reduction rather than writing a second
+ * one. Null means the column is not a count at all, which is a configuration
+ * error; an empty list of rows sums to a genuine 0, and reading that as "unknown"
+ * is exactly what stops a rule failing a product it should fail.
+ */
+export const columnTotal = (
+  rows: SpecGroupRow[],
+  meta: AttributeMeta,
+  fieldKey: string,
+): number | null => {
+  const field = schemaOf(meta).find((entry) => entry.key === fieldKey);
+  if (!field || field.kind !== "number") {
     return null;
   }
   return round2(
@@ -386,6 +407,26 @@ export const groupTotal = (
       return sum + (typeof entry === "number" ? entry : 0);
     }, 0),
   );
+};
+
+/** The distinct picks of a select column over exactly the rows given. */
+export const columnPicks = (
+  rows: SpecGroupRow[],
+  meta: AttributeMeta,
+  fieldKey: string,
+): string[] => {
+  const field = schemaOf(meta).find((entry) => entry.key === fieldKey);
+  if (!field || field.kind !== "select") {
+    return [];
+  }
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const entry = row[fieldKey];
+    if (typeof entry === "string") {
+      seen.add(entry);
+    }
+  }
+  return [...seen];
 };
 
 /**
@@ -399,20 +440,7 @@ export const groupPicks = (
   raw: ProductValue | undefined,
   meta: AttributeMeta,
   fieldKey: string,
-): string[] => {
-  const field = schemaOf(meta).find((entry) => entry.key === fieldKey);
-  if (!field || field.kind !== "select") {
-    return [];
-  }
-  const seen = new Set<string>();
-  for (const row of completeGroupRows(raw, meta)) {
-    const entry = row[fieldKey];
-    if (typeof entry === "string") {
-      seen.add(entry);
-    }
-  }
-  return [...seen];
-};
+): string[] => columnPicks(completeGroupRows(raw, meta), meta, fieldKey);
 
 /**
  * Coerce authored rows into storable ones. The one place that decides what a

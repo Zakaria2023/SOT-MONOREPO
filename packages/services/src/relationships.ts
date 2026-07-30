@@ -29,7 +29,7 @@ import {
   type SelectionLine,
 } from "./catalog-model";
 import { ValidationError } from "./errors";
-import { validatePredicate } from "./predicate";
+import { groupRowAttributes, validatePredicate } from "./predicate";
 import {
   evaluateRelationship,
   type EngineRelationship,
@@ -248,7 +248,26 @@ export const validateRelationship = async (
             message: `"${subField.label}" is a pick, not a count, so it cannot be added up. Choose a sub-field that holds a number.`,
           });
         }
+        // The row filter, checked against this group's OWN columns. A filter
+        // naming a column that no longer exists keeps no rows, and the side then
+        // measures a confident zero rather than reporting anything — the one
+        // failure in this feature that would look like a real answer.
+        for (const problem of validatePredicate(
+          operand.where ?? null,
+          groupRowAttributes(meta),
+        )) {
+          problems.push({
+            field,
+            message: `Only some rows of "${meta.label}": ${problem.message}`,
+          });
+        }
         return;
+      }
+      if (operand.where) {
+        problems.push({
+          field,
+          message: `"${meta.label}" does not hold rows, so there are no rows for a filter to narrow.`,
+        });
       }
       if (meta.type !== "number" && !meta.ordered) {
         problems.push({

@@ -253,6 +253,13 @@ const decode = (
   }
 
   const one = (node: Predicate): string[] | null => {
+    // A row filter narrows WHICH rows the sentence is about, and this picker has
+    // no sentence for that. Decoding it as the unfiltered choice would look
+    // right and then drop the filter the moment anything else was ticked —
+    // quietly turning "has a 10G SFP port" into "has an SFP port" on a live rule.
+    if ("where" in node && node.where) {
+      return null;
+    }
     if (node.op === "exists") {
       const attribute = attributes.find((entry) => entry.uuid === node.attr);
       // On a select, "has any value" is every option at once — there is no
@@ -344,6 +351,33 @@ export const ConditionPicker = ({
   );
 };
 
+/**
+ * A group's columns, described as attributes in their own right.
+ *
+ * The same trick the evaluator uses to run a row filter: a row is a small world
+ * whose attributes are the columns. It means a filter is rendered and validated
+ * by the SAME code as everything else, rather than by a second describer that
+ * could word the same condition differently inside a row than outside one.
+ */
+export const rowAttributes = (
+  attribute: PredicateAttribute,
+): PredicateAttribute[] =>
+  attribute.groupFields.map((field) => ({
+    uuid: field.key,
+    label: field.label,
+    type: field.kind === "number" ? "number" : "single_select",
+    ordered: field.kind === "select" ? field.ordered : false,
+    unit: field.kind === "number" ? field.unit : null,
+    options: field.kind === "select" ? field.options : [],
+    groupFields: [],
+  }));
+
+/** "Speed is 10G and Family is SFP" — which rows a side or a condition counts. */
+export const describeRowFilter = (
+  where: Predicate,
+  attribute: PredicateAttribute,
+): string => describePredicate(where, rowAttributes(attribute));
+
 /** A read-only one-line rendering of a condition, for list rows and previews. */
 export const describePredicate = (
   predicate: Predicate | null,
@@ -368,6 +402,20 @@ export const describePredicate = (
     const subField = attribute.groupFields.find((entry) => entry.key === field);
     return `${attribute.label} · ${subField?.label ?? "a removed sub-field"}`;
   };
+
+  // The row world for one attribute, or nothing when it holds no rows.
+  const rowsOf = (uuid: string): PredicateAttribute[] => {
+    const attribute = attributes.find((entry) => entry.uuid === uuid);
+    return attribute ? rowAttributes(attribute) : [];
+  };
+
+  // " counting only rows where …". Always spelled out: a number that came from
+  // some of the rows and a number that came from all of them look identical, and
+  // the author is the only one who can tell them apart.
+  const narrowing = (uuid: string, where: Predicate | undefined): string =>
+    where
+      ? `, counting only rows where ${describePredicate(where, rowsOf(uuid))}`
+      : "";
 
   const optionLabel = (
     uuid: string,
@@ -401,13 +449,19 @@ export const describePredicate = (
   }
 
   const on = predicate.field;
+  const only = narrowing(predicate.attr, predicate.where);
   if (predicate.op === "exists") {
-    return on
-      ? `${label(predicate.attr, on)} is filled in on at least one row`
-      : `${label(predicate.attr)} is filled in`;
+    if (!on) {
+      return `${label(predicate.attr)} is filled in`;
+    }
+    // With a filter this is the useful reading and the one the evaluator takes:
+    // is there a row LIKE THAT at all.
+    return predicate.where
+      ? `${label(predicate.attr)} has a row where ${describePredicate(predicate.where, rowsOf(predicate.attr))}`
+      : `${label(predicate.attr, on)} is filled in on at least one row`;
   }
   if (predicate.op === "between") {
-    return `${label(predicate.attr, on)} is between ${predicate.min} and ${predicate.max}`;
+    return `${label(predicate.attr, on)} is between ${predicate.min} and ${predicate.max}${only}`;
   }
   if (predicate.op === "in" || predicate.op === "not_in") {
     const values = predicate.values
@@ -422,7 +476,7 @@ export const describePredicate = (
       : predicate.op === "in"
         ? "is"
         : "is not";
-    return `${label(predicate.attr, on)} ${verb} ${values || "—"}`;
+    return `${label(predicate.attr, on)} ${verb} ${values || "—"}${only}`;
   }
   if (predicate.op === "equals" || predicate.op === "not_equals") {
     const rendered =
@@ -435,7 +489,7 @@ export const describePredicate = (
     // not "has an SFP". The distinction is the whole difference between the two
     // operators and has to survive into the sentence.
     if (on) {
-      return `${label(predicate.attr, on)} ${predicate.op === "equals" ? "is only" : "is not only"} ${rendered}`;
+      return `${label(predicate.attr, on)} ${predicate.op === "equals" ? "is only" : "is not only"} ${rendered}${only}`;
     }
     return `${label(predicate.attr)} ${predicate.op === "equals" ? "is" : "is not"} ${rendered}`;
   }
@@ -445,5 +499,5 @@ export const describePredicate = (
     lt: "is less than",
     lte: "is at most",
   }[predicate.op];
-  return `${label(predicate.attr, on)} ${comparator} ${predicate.value}`;
+  return `${label(predicate.attr, on)} ${comparator} ${predicate.value}${only}`;
 };
