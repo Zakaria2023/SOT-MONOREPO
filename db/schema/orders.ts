@@ -11,6 +11,7 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { invoiceStatuses, orderStatuses } from "../enum";
+import type { ProjectAnswers } from "../types";
 import { Boqs } from "./boqs";
 import { Offers } from "./offers";
 import { Users } from "./users";
@@ -67,6 +68,13 @@ export const Orders = mysqlTable(
     designFindings: json("design_findings").$type<
       { id: string; title: string; message: string; tone: string }[]
     >(),
+    // The buyer's project answers the findings above were reached ON. A verdict
+    // without its inputs cannot be reconstructed: "the recorder requirement did
+    // not apply" is only explainable next to "because the buyer said recording is
+    // in the cloud". Same reason the findings are snapshotted rather than
+    // re-derived — an answer is as much a part of what this order was judged
+    // against as the rule was.
+    projectInputs: json("project_inputs").$type<ProjectAnswers>(),
     // Set only when a buyer was let through despite blockers. The reason is what
     // makes the override auditable; without one, the gate refuses.
     designOverrideReason: varchar("design_override_reason", { length: 500 }),

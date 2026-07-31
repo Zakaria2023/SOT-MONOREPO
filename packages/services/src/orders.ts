@@ -216,6 +216,10 @@ export const createOrderFromCart = async ({
       // could not run is a different fact from one judged clean, and this
       // snapshot is the only place that distinction survives.
       designFindings: [...gate.blockers, ...gate.warnings, ...gate.unknowns],
+      // And what those findings were reached on. Null when the rules asked the
+      // buyer nothing, which is not the same fact as answering nothing.
+      projectInputs:
+        variables && Object.keys(variables).length > 0 ? variables : null,
       designOverrideReason: gate.overridden ? (override?.reason ?? null) : null,
     });
 

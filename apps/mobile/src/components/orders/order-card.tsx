@@ -13,18 +13,22 @@ type OrderCardProps = {
 
 // The buyer's own words for each state. The API sends the stored value, and
 // showing "awaiting_payment" to a customer is showing them our column.
+//
+// These four ARE the `orderStatuses` enum — kept in step with db/label.ts by hand,
+// because the app cannot import from `db`. Inventing a fifth would be worse than
+// useless: it would never render, while the real state it was meant to cover fell
+// through to the raw column value.
 const STATUS_LABELS: Record<string, string> = {
   awaiting_payment: "Awaiting payment",
   paid: "Paid",
-  fulfilling: "Being fulfilled",
-  completed: "Completed",
   cancelled: "Cancelled",
+  refunded: "Refunded",
 };
 
 const STATUS_TONE: Record<string, "primary" | "success" | "danger"> = {
   paid: "success",
-  completed: "success",
   cancelled: "danger",
+  refunded: "danger",
 };
 
 export const OrderCard = ({ order, highlighted }: OrderCardProps) => (
