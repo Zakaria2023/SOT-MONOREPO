@@ -66,13 +66,34 @@ export type DesignFinding = {
   failingProductUuids: string[];
 };
 
+// A question about the SITE rather than about a product, which some rule needs an
+// answer to before it can run. Only ever the ones the current basket touches.
+export type DesignQuestion = {
+  uuid: string;
+  label: string;
+  unit: string | null;
+  // `magnitude` collects a number, `toggle` a yes/no. Taken from how the rule
+  // uses the input, so the app never needs the variable library.
+  kind: "magnitude" | "toggle";
+  value: number | boolean | null;
+  affects: string[];
+};
+
 export type DesignCheckResult = {
   blockers: DesignFinding[];
   warnings: DesignFinding[];
   // Checks that could not run. Same reason the web shows them: a check we could
   // not make must not read as a check that passed.
   unknowns: DesignFinding[];
+  // Questions whose answers would change one of the findings above. The engine
+  // has always refused to run a rule whose project input was unanswered and said
+  // so; these are what makes it answerable.
+  questions: DesignQuestion[];
 };
+
+// Buyer answers, keyed by question uuid. Numbers and booleans only — the engine
+// compares them numerically, and a string "12" would fail rather than match.
+export type ProjectAnswers = Record<string, number | boolean>;
 
 export type Category = {
   uuid: string;
@@ -95,6 +116,51 @@ export type CartLineItem = {
   currency: string | null;
   quantity: number;
   kind: string;
+};
+
+// One column of the compare table plus the rows it shares with the others. The
+// cells are already formatted and audience-filtered, by the same renderer that
+// produces a spec row — so a value can never read one way here and another there.
+export type ComparisonRow = {
+  uuid: string;
+  label: string;
+  groupName: string | null;
+  // productUuid → rendered value. A product silent on this row is absent from the
+  // map rather than holding a dash, so this screen decides how a gap looks.
+  values: Record<string, string>;
+};
+
+export type ProductComparison = {
+  products: {
+    uuid: string;
+    name: string;
+    image: string | null;
+    price: string | null;
+    currency: string | null;
+    brandName: string | null;
+  }[];
+  rows: ComparisonRow[];
+};
+
+export type Order = {
+  uuid: string;
+  reference: string;
+  status: string | null;
+  productTotal: string;
+  serviceTotal: string;
+  grandTotal: string;
+  currency: string | null;
+  boqUuid: string | null;
+  // Present on the list endpoint (joined), absent on the single order.
+  boqReference?: string | null;
+  createdAt: string;
+};
+
+export type Boq = {
+  uuid: string;
+  reference: string;
+  status: string | null;
+  createdAt: string;
 };
 
 export type Brand = {

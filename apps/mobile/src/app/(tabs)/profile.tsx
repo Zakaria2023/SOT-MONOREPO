@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Handshake,
   Layers,
+  Package,
   ReceiptText,
 } from "lucide-react-native";
 import { useCallback } from "react";
@@ -21,7 +22,7 @@ type ProfileRowProps = {
 };
 
 type LinkRowProps = {
-  href: "/brands" | "/offers" | "/partner";
+  href: "/brands" | "/offers" | "/orders" | "/partner";
   label: string;
   icon: ComponentType<{ color: string; size: number }>;
 };
@@ -108,6 +109,7 @@ const ProfileScreen = () => {
       <View style={styles.links}>
         <LinkRow href="/brands" label="Browse brands" icon={Layers} />
         <LinkRow href="/offers" label="Your offers" icon={ReceiptText} />
+        <LinkRow href="/orders" label="Your orders" icon={Package} />
         <LinkRow href="/partner" label="Become a partner" icon={Handshake} />
       </View>
 
