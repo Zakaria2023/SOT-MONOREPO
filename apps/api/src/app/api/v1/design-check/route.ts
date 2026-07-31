@@ -2,6 +2,7 @@ import { readBody, tooManyRequests } from "@/lib/helpers";
 import { NextResponse } from "next/server";
 import { checkDesign, type SelectionInput } from "services";
 import { clientAddress, withinRateLimit } from "utils";
+import { projectAnswersSchema } from "validators";
 
 /**
  * Run the design check over a selection — requires-companion gaps and
@@ -64,5 +65,25 @@ export const POST = async (request: Request) => {
     return [{ productUuid, quantity: Math.floor(count) }];
   });
 
-  return NextResponse.json(await checkDesign({ selection }));
+  // Buyer answers to the project questions a previous check asked for. Strict
+  // here, unlike the web form's hidden field: that one is our own JSON and
+  // dropping it silently is better than costing the buyer their checkout, while a
+  // body an app composed by hand is a bug worth reporting — and an answer quietly
+  // ignored turns into a check that reports "we could not run this" forever.
+  const answers = projectAnswersSchema.safeParse(
+    (body as { variables?: unknown }).variables ?? {},
+  );
+  if (!answers.success) {
+    return NextResponse.json(
+      {
+        error:
+          "`variables` must map a project question's uuid to a number or a boolean",
+      },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json(
+    await checkDesign({ selection, variables: answers.data }),
+  );
 };

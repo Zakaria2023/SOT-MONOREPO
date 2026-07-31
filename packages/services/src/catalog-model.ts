@@ -183,9 +183,21 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
       uuid: row.uuid,
       label: row.label,
       unit: row.unit,
+      type: row.type,
       // Unanswered until a cart supplies it. The default stands in only when the
       // author gave one; otherwise a rule needing it simply does not run.
-      value: row.defaultValue === null ? null : Number(row.defaultValue),
+      //
+      // A boolean's default has to come back as a BOOLEAN. It is stored in the
+      // same decimal column as a number, and coercing it with `Number` handed the
+      // engine a 1 — where `variable_true` tests `value === true`, so a presence
+      // requirement the author defaulted to "yes" was never satisfied and the
+      // buyer was blocked over an answer already on file.
+      value:
+        row.defaultValue === null
+          ? null
+          : row.type === "boolean"
+            ? Number(row.defaultValue) !== 0
+            : Number(row.defaultValue),
     })),
     chains: buildChains(categories),
   };

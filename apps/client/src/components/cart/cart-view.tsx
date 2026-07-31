@@ -9,6 +9,7 @@ import {
 import { useCompatibility } from "@/app/cart/use-compatibility";
 import { CompatibilityGateModal } from "@/components/cart/compatibility-gate-modal";
 import { DesignCheck } from "@/components/cart/design-check";
+import { ProjectQuestions } from "@/components/cart/project-questions";
 import { ProfileGateModal } from "@/components/profile/profile-gate-modal";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
@@ -32,6 +33,7 @@ import {
   lineTotal,
   summarizeCart,
 } from "utils";
+import type { ProjectAnswersInput } from "validators";
 
 type CartViewProps = {
   items: CartLineItem[];
@@ -244,9 +246,17 @@ export const CartView = ({
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [, startTransition] = useTransition();
 
+  // Answers to the project questions the check asks for. Held here rather than in
+  // the questions panel because both checkout forms have to submit them: the gate
+  // runs again on the server, and it must judge the design the buyer was shown.
+  const [answers, setAnswers] = useState<ProjectAnswersInput>({});
+
   // Design check over everything in the cart, re-run (debounced) on change.
   // Blockers (missing companions + broken rules) must be fixed; warnings caution.
-  const { blockers, warnings, unknowns } = useCompatibility(items);
+  const { blockers, warnings, unknowns, questions } = useCompatibility(
+    items,
+    answers,
+  );
   // The form intercepted before checkout; "Continue anyway" (warnings only)
   // re-submits it with the gate bypassed.
   const [pendingCheckout, setPendingCheckout] =
@@ -329,6 +339,14 @@ export const CartView = ({
               unknowns={unknowns}
             />
 
+            {/* Below the findings, because the questions only make sense once the
+                buyer has read what they would clear. */}
+            <ProjectQuestions
+              questions={questions}
+              answers={answers}
+              onChange={setAnswers}
+            />
+
             {[...solutionGroups.entries()].map(([categoryUuid, groupItems]) => (
               <CartSection
                 key={categoryUuid}
@@ -365,6 +383,11 @@ export const CartView = ({
                       name="categoryUuid"
                       value={categoryUuid}
                     />
+                    <input
+                      type="hidden"
+                      name="projectInputs"
+                      value={JSON.stringify(answers)}
+                    />
                     <BoqSubmitButton />
                   </form>
                 }
@@ -399,6 +422,11 @@ export const CartView = ({
                       }
                     }}
                   >
+                    <input
+                      type="hidden"
+                      name="projectInputs"
+                      value={JSON.stringify(answers)}
+                    />
                     <ProductCheckoutButton />
                   </form>
                 }

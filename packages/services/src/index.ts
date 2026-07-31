@@ -10,6 +10,7 @@ export * from "./catalog-model";
 export * from "./categories";
 export * from "./classifications";
 export * from "./design-check";
+export * from "./design-questions";
 export * from "./errors";
 export * from "./government";
 export * from "./handovers";

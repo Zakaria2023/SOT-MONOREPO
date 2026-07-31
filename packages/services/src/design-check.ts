@@ -1,11 +1,12 @@
 import type { RelationshipFamily } from "../../../db/enum";
-import type { CorrectionShape } from "../../../db/types";
+import type { CorrectionShape, ProjectAnswers } from "../../../db/types";
 import {
   getCatalogModel,
   loadSelection,
   loadSuggestionCatalog,
   type SelectionLine,
 } from "./catalog-model";
+import { pendingQuestions, type DesignQuestion } from "./design-questions";
 import {
   evaluateSelection,
   type EngineVariable,
@@ -47,6 +48,9 @@ export type DesignCheckResult = {
   // buyer has not answered. Surfaced, never swallowed: a check we could not run
   // must not look like a check that passed.
   unknowns: DesignFinding[];
+  // Questions whose answers would change a finding above. Empty when the rules
+  // this basket touched need nothing from the buyer.
+  questions: DesignQuestion[];
   passed: number;
   // True when the engine itself failed. The sale is allowed through (blocking
   // real revenue on our own bug is worse than shipping one bad design) but the
@@ -59,7 +63,7 @@ export type DesignCheckInput = {
   // Buyer answers to project questions, keyed by ProjectVariables.uuid. A
   // variable with no answer here falls back to its default, and a rule needing
   // one with neither does not run.
-  variables?: Record<string, number | boolean>;
+  variables?: ProjectAnswers;
   region?: string;
 };
 
@@ -82,6 +86,7 @@ const EMPTY: DesignCheckResult = {
   blockers: [],
   warnings: [],
   unknowns: [],
+  questions: [],
   passed: 0,
   degraded: false,
 };
@@ -132,6 +137,11 @@ export const checkDesign = async (
       blockers: report.blockers.map(toFinding),
       warnings: report.warnings.map(toFinding),
       unknowns: report.unknowns.map(toFinding),
+      questions: pendingQuestions(
+        report.findings,
+        model.relationships,
+        variables,
+      ),
       passed: report.passed,
       degraded: false,
     };
@@ -154,6 +164,11 @@ export type GateDecision = {
   // what we managed to check cannot later tell "nothing was wrong" from "we
   // never looked", and that snapshot is how a wrong rule gets found.
   unknowns: DesignFinding[];
+  // Questions still unanswered at the moment of the decision. Carried for the
+  // same reason as the unknowns: a refusal that says "incompatible" when the real
+  // problem is a question nobody was asked sends the buyer looking for a fault in
+  // the products.
+  questions: DesignQuestion[];
   // Set when the buyer is allowed through despite blockers, because they have a
   // recorded override.
   overridden: boolean;
@@ -191,6 +206,7 @@ export const gateSelection = async (
     blockers: result.blockers,
     warnings: result.warnings,
     unknowns: result.unknowns,
+    questions: result.questions,
     overridden,
     degraded: result.degraded,
   };

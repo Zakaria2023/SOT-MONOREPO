@@ -4,12 +4,14 @@ import {
   decimal,
   index,
   int,
+  json,
   mysqlEnum,
   mysqlTable,
   timestamp,
   varchar,
 } from "drizzle-orm/mysql-core";
 import { boqItemRoles, boqLineTypes, boqStatuses } from "../enum";
+import type { ProjectAnswers } from "../types";
 import { Products } from "./products";
 import { Users } from "./users";
 
@@ -30,6 +32,11 @@ export const Boqs = mysqlTable(
     // The physical place this solution is for, and how the BOQ was built.
     site: varchar("site", { length: 255 }),
     source: varchar("source", { length: 30 }).default("self_selected"),
+
+    // The buyer's answers to the project questions the design check asked in
+    // the cart, carried so the pre-seller's validation judges the same design
+    // the buyer saw. Null for a BOQ whose rules asked nothing.
+    projectInputs: json("project_inputs").$type<ProjectAnswers>(),
 
     assignedPreSellerId: varchar("assigned_pre_seller_id", { length: 64 }),
     assignedPreSellerName: varchar("assigned_pre_seller_name", { length: 255 }),

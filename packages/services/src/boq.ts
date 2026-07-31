@@ -30,6 +30,7 @@ import { CartItems, Carts } from "../../../db/schema/carts";
 import { Categories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
+import type { ProjectAnswers } from "../../../db/types";
 import { checkDesign, type DesignCheckResult } from "./design-check";
 import { ConflictError, ValidationError } from "./errors";
 import {
@@ -103,6 +104,10 @@ export type AdminBoqDetail = {
 export const createBoqFromCart = async (
   userUuid: string,
   categoryUuid: string,
+  // What the buyer answered to the design check's project questions in the cart.
+  // Stored on the BOQ, because validation runs again later in someone else's
+  // hands and has to judge the same design the buyer was shown.
+  projectInputs?: ProjectAnswers,
 ): Promise<SelectBoqs> => {
   const [cart] = await db
     .select({ uuid: Carts.uuid })
@@ -148,7 +153,17 @@ export const createBoqFromCart = async (
   const sectionName = firstLine?.categoryName ?? "System";
 
   return db.transaction(async (tx) => {
-    await tx.insert(Boqs).values({ uuid: boqUuid, userUuid, reference });
+    await tx.insert(Boqs).values({
+      uuid: boqUuid,
+      userUuid,
+      reference,
+      // Only when there is something to keep: an empty object would read as
+      // "asked and answered nothing" rather than "nothing was asked".
+      projectInputs:
+        projectInputs && Object.keys(projectInputs).length > 0
+          ? projectInputs
+          : null,
+    });
     await tx
       .insert(BoqSections)
       .values({ uuid: sectionUuid, boqUuid, name: sectionName, order: 0 });
@@ -264,7 +279,13 @@ export const validateBoq = async (
       ? [{ productUuid: item.productUuid, quantity: item.quantity }]
       : [],
   );
-  const design = await checkDesign({ selection });
+  // The buyer's own answers, not defaults: a requirement the buyer excused in the
+  // cart must stay excused here, or validation reports a blocker on a design that
+  // was fine when they saw it.
+  const design = await checkDesign({
+    selection,
+    variables: detail.boq.projectInputs ?? undefined,
+  });
   // The purchase gate: a clean pass needs no blocking findings from any family.
   // A degraded run (the engine itself failed) does NOT promote the BOQ — "we
   // could not look" is not the same as "nothing is wrong", and a BOQ marked

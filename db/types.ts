@@ -438,6 +438,16 @@ export type PresenceAlternative =
   // (e.g. recording is in the cloud, so no on-site recorder is required).
   | { type: "variable_true"; variableUuid: string };
 
+// What the buyer answered, keyed by ProjectVariables.uuid. Keyed by uuid rather
+// than by the variable's `key` for the same reason product values are: a label or
+// a slug can be renamed, and a stored answer must not stop matching its question.
+//
+// Stored on a BOQ so the answers survive the handover. Without that the buyer
+// answers "recording is in the cloud" in the cart, the pre-seller re-runs the
+// check an hour later, and the requirement the answer excused comes back as a
+// blocker on a design that was fine.
+export type ProjectAnswers = Record<string, number | boolean>;
+
 export type PresenceRequirement = {
   description: string;
   // ANY one alternative satisfies the requirement.

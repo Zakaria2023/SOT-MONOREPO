@@ -12,6 +12,7 @@ import {
   SelectInvoices,
   SelectOrders,
 } from "../../../db/schema/orders";
+import type { ProjectAnswers } from "../../../db/types";
 import { gateSelection } from "./design-check";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
@@ -137,7 +138,7 @@ export const createOrderFromCart = async ({
   // override gets one — and the recorded reason is what makes it auditable.
   override?: { allowed: boolean; reason: string };
   region?: string;
-  variables?: Record<string, number | boolean>;
+  variables?: ProjectAnswers;
 }): Promise<SelectOrders> => {
   const items = (await getCart(userUuid)).filter(
     (item) => item.kind === "product",
@@ -160,10 +161,19 @@ export const createOrderFromCart = async ({
     override,
   });
   if (!gate.allowed) {
+    // Naming the unanswered questions matters as much as naming the blockers: a
+    // refusal that only says "incompatible" sends the buyer hunting for a fault
+    // in the products when the real gap is a question nobody asked them.
+    const pending =
+      gate.questions.length > 0
+        ? ` We also still need: ${gate.questions
+            .map((question) => question.label)
+            .join(", ")}.`
+        : "";
     throw new ValidationError(
       `This design cannot be ordered yet: ${gate.blockers
         .map((finding) => finding.message)
-        .join(" ")}`,
+        .join(" ")}${pending}`,
     );
   }
 

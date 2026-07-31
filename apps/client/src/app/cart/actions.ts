@@ -16,9 +16,11 @@ import {
   type CartLineItem,
   type DesignCheckResult as ServiceDesignCheckResult,
   type DesignFinding as ServiceDesignFinding,
+  type DesignQuestion as ServiceDesignQuestion,
   type GuestCartItem,
   type SelectionInput,
 } from "services";
+import { readProjectAnswers, type ProjectAnswersInput } from "validators";
 
 export type AddToCartResult = {
   error?: string;
@@ -97,10 +99,14 @@ export const removeItem = async (cartItemUuid: string) => {
 // check itself lives in packages/services because the mobile API runs it too.
 export type DesignFinding = ServiceDesignFinding;
 export type DesignCheckResult = ServiceDesignCheckResult;
+export type DesignQuestion = ServiceDesignQuestion;
 
 export const checkCartDesign = async (
   selection: SelectionInput[],
-): Promise<DesignCheckResult> => checkDesign({ selection });
+  // What the buyer has answered so far. The result names the questions still
+  // worth asking, so the cart can ask them and re-check with the answers.
+  variables?: ProjectAnswersInput,
+): Promise<DesignCheckResult> => checkDesign({ selection, variables });
 
 // Checkout turns one solution in the cart into a draft BOQ. The category comes
 // from a hidden field on the solution's checkout form. The draft lands in the
@@ -122,14 +128,20 @@ export const checkout = async (formData: FormData) => {
     throw new Error("Missing solution to check out");
   }
 
-  const boq = await createBoqFromCart(user.uuid, categoryUuid);
+  // The answers travel with the BOQ. A pre-seller validates it later, and a
+  // requirement the buyer excused in the cart has to stay excused there.
+  const boq = await createBoqFromCart(
+    user.uuid,
+    categoryUuid,
+    readProjectAnswers(formData.get("projectInputs")),
+  );
   redirect(`/boq/${boq.uuid}`);
 };
 
 // Direct checkout: turn the individual "product" items in the cart into an order
 // (no BOQ), applying the partner discount for partners. Lands on the order page,
 // where the (stubbed) payment is taken.
-export const checkoutProducts = async () => {
+export const checkoutProducts = async (formData: FormData) => {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/sign-in");
@@ -145,6 +157,10 @@ export const checkoutProducts = async () => {
   const order = await createOrderFromCart({
     userUuid: user.uuid,
     discountPercent,
+    // The gate runs again server-side, so it needs the same answers the cart's
+    // live check had — otherwise a design the buyer was shown as fine is refused
+    // at the last step, on defaults they never saw.
+    variables: readProjectAnswers(formData.get("projectInputs")),
   });
   redirect(`/orders/${order.uuid}`);
 };

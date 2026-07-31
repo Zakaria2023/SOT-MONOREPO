@@ -3,6 +3,7 @@
 import { previewGuestCart } from "@/app/cart/actions";
 import { useCompatibility } from "@/app/cart/use-compatibility";
 import { DesignCheck } from "@/components/cart/design-check";
+import { ProjectQuestions } from "@/components/cart/project-questions";
 import { documentDownloadUrl } from "@/lib/documents";
 import {
   removeFromGuestCart,
@@ -22,6 +23,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CartLineItem } from "services";
 import { formatMoney, lineTotal, summarizeCart } from "utils";
+import type { ProjectAnswersInput } from "validators";
 
 export const GuestCartView = () => {
   const items = useGuestCart();
@@ -68,8 +70,15 @@ export const GuestCartView = () => {
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const { subtotal, vat, total } = summarizeCart(lines);
 
-  // Same design check as the signed-in cart.
-  const { blockers, warnings, unknowns } = useCompatibility(lines);
+  // Same design check as the signed-in cart, and the same questions — a guest
+  // building a basket needs the check to finish as much as anyone. The answers
+  // live only in this page's state: there is no cart row to hang them on yet, and
+  // the buyer is asked again after signing in, where they can be saved.
+  const [answers, setAnswers] = useState<ProjectAnswersInput>({});
+  const { blockers, warnings, unknowns, questions } = useCompatibility(
+    lines,
+    answers,
+  );
 
   return (
     <main className="min-h-screen w-full bg-page">
@@ -93,11 +102,16 @@ export const GuestCartView = () => {
           </p>
         ) : (
           <>
-            <div className="mt-8">
+            <div className="mt-8 flex flex-col gap-4">
               <DesignCheck
                 blockers={blockers}
                 warnings={warnings}
                 unknowns={unknowns}
+              />
+              <ProjectQuestions
+                questions={questions}
+                answers={answers}
+                onChange={setAnswers}
               />
             </div>
             <section className="mt-6 rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)]">
