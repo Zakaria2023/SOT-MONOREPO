@@ -18,6 +18,7 @@ import type {
   SpecGroupField,
   SpecRange,
 } from "../../../db/types";
+import { operandVariableUuid } from "../../../db/types";
 import { evaluatePredicate, filteredGroupTotal } from "./predicate";
 import {
   asNumber,
@@ -1553,6 +1554,51 @@ const noteSkipped = (finding: Finding): Finding => {
     ...finding,
     message: `${finding.message} ${finding.skipped.length} item(s) could not be checked because data is missing: ${names}.`,
   };
+};
+
+// How a rule uses a project input, which is also what kind of answer to collect.
+//
+// `magnitude` is a number the rule totals or compares — "how many calls at
+// once". `toggle` is a yes/no that can excuse a required companion — "recording
+// is in the cloud", which makes an on-site recorder unnecessary. The USE decides
+// the input, not the variable's declared type: a rule is the only thing that
+// knows whether it needs a quantity or a permission.
+export type VariableAsk = {
+  variableUuid: string;
+  kind: "magnitude" | "toggle";
+};
+
+/**
+ * The project inputs a rule reads — pure, so the surfaces can ask for them.
+ *
+ * The engine already refuses to run a rule whose variable is unanswered, and
+ * says so in the finding. But nothing was collecting the answer, so a ratio rule
+ * reported "tell us X" to a buyer with no field to tell us in, and a presence
+ * requirement excusable by a yes/no could never be excused. This is the list a
+ * cart turns into questions.
+ */
+export const ruleVariables = (rule: EngineRelationship): VariableAsk[] => {
+  const asks: VariableAsk[] = [];
+  const add = (variableUuid: string | null, kind: VariableAsk["kind"]) => {
+    if (!variableUuid) {
+      return;
+    }
+    if (asks.some((ask) => ask.variableUuid === variableUuid)) {
+      return;
+    }
+    asks.push({ variableUuid, kind });
+  };
+
+  add(operandVariableUuid(rule.consumer), "magnitude");
+  add(operandVariableUuid(rule.provider), "magnitude");
+  for (const requirement of rule.presence?.requires ?? []) {
+    for (const alternative of requirement.satisfiedBy) {
+      if (alternative.type === "variable_true") {
+        add(alternative.variableUuid, "toggle");
+      }
+    }
+  }
+  return asks;
 };
 
 /** Evaluate one relationship against a selection — pure, no I/O. */

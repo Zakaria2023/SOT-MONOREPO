@@ -1,11 +1,16 @@
 import { useAuth } from "@clerk/clerk-expo";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { CartRow } from "@/components/cart/cart-row";
 import { DesignCheck } from "@/components/cart/design-check";
+import { ProjectQuestions } from "@/components/cart/project-questions";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
 import {
+  ApiError,
+  createBoq,
+  createOrder,
   fetchCart,
   fetchDesignCheck,
   removeCartItem,
@@ -14,7 +19,11 @@ import {
 import { formatMoney, summarizeCart } from "@/lib/format";
 import { colors, fonts, radius, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
-import type { CartLineItem, DesignCheckResult } from "@/lib/types";
+import type {
+  CartLineItem,
+  DesignCheckResult,
+  ProjectAnswers,
+} from "@/lib/types";
 
 type SummaryRowProps = {
   label: string;
@@ -51,8 +60,17 @@ const CartScreen = () => {
   // buyer sees the problem while they can still fix it rather than at checkout.
   const [design, setDesign] = useState<DesignCheckResult | null>(null);
   const [checking, setChecking] = useState(false);
+  // Answers to the project questions the check asks for. They are sent back with
+  // the next check AND with the checkout, because the gate runs again server-side
+  // and has to judge the design the buyer was shown.
+  const [answers, setAnswers] = useState<ProjectAnswers>({});
+  const [placing, setPlacing] = useState(false);
   const signature = (data ?? [])
     .map((item) => `${item.productUuid}:${item.quantity}`)
+    .join(",");
+  const answerSignature = Object.entries(answers)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([uuid, value]) => `${uuid}=${value}`)
     .join(",");
 
   useEffect(() => {
@@ -67,6 +85,7 @@ const CartScreen = () => {
         productUuid: item.productUuid,
         quantity: item.quantity,
       })),
+      answers,
     )
       .then((result) => {
         if (!cancelled) {
@@ -87,9 +106,9 @@ const CartScreen = () => {
     return () => {
       cancelled = true;
     };
-    // Keyed on the lines, not the array identity, so a reload with identical
-    // contents doesn't re-check.
-  }, [signature]);
+    // Keyed on the lines and the answers, not the array identity, so a reload with
+    // identical contents doesn't re-check but a new answer does.
+  }, [signature, answerSignature]);
 
   const mutate = useCallback(
     async (item: CartLineItem, action: "inc" | "dec" | "remove") => {
@@ -113,6 +132,68 @@ const CartScreen = () => {
     [getToken, reload],
   );
 
+  // Checkout has two destinations, exactly as on the web: standalone PRODUCTS
+  // become an order the buyer pays for, while a SOLUTION (a whole category added
+  // at once) becomes a draft BOQ our team quotes. Sending one down the other's
+  // path is what "Proceed to checkout" used to imply and never did — the button
+  // called `reload`.
+  const checkoutProducts = useCallback(async () => {
+    setPlacing(true);
+    try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error("Please sign in.");
+      }
+      const order = await createOrder({ projectInputs: answers }, token);
+      reload();
+      // Straight to the order, which is where payment will be taken.
+      router.push(`/orders?highlight=${order.uuid}`);
+    } catch (failure) {
+      // The server's own sentence, because a blocked design explains itself
+      // ("87 W of cameras on a 38 W budget") far better than "order failed".
+      Alert.alert(
+        "Could not place the order",
+        failure instanceof ApiError
+          ? failure.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setPlacing(false);
+    }
+  }, [answers, getToken, reload]);
+
+  const sendBoq = useCallback(
+    async (categoryUuid: string, categoryName: string) => {
+      setPlacing(true);
+      try {
+        const token = await getToken();
+        if (!token) {
+          throw new Error("Please sign in.");
+        }
+        const boq = await createBoq(
+          { categoryUuid, projectInputs: answers },
+          token,
+        );
+        reload();
+        Alert.alert(
+          "Sent for quoting",
+          `${categoryName} is now ${boq.reference}. Our team prices it and the quote arrives under Offers.`,
+          [{ text: "View offers", onPress: () => router.push("/offers") }],
+        );
+      } catch (failure) {
+        Alert.alert(
+          "Could not send the BOQ",
+          failure instanceof ApiError
+            ? failure.message
+            : "Something went wrong. Please try again.",
+        );
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [answers, getToken, reload],
+  );
+
   if (loading || error || !data || data.length === 0) {
     return (
       <View style={styles.container}>
@@ -133,6 +214,17 @@ const CartScreen = () => {
   const { subtotal, vat, total } = summarizeCart(data);
   // A blocking finding gates checkout, exactly as it does on the web.
   const blocked = (design?.blockers.length ?? 0) > 0;
+
+  const products = data.filter((item) => item.kind === "product");
+  // One entry per solution, keyed by the category it was added from — that
+  // category is what the BOQ is built out of, so a cart holding two solutions
+  // sends two BOQs rather than mixing the systems into one.
+  const solutions = new Map<string, string>();
+  for (const item of data) {
+    if (item.kind === "solution" && item.categoryUuid) {
+      solutions.set(item.categoryUuid, item.categoryName ?? "Solution");
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -168,19 +260,49 @@ const CartScreen = () => {
       />
       <View style={styles.footer}>
         <DesignCheck result={design} checking={checking} />
+        {/* Under the findings, because a question only makes sense once the buyer
+            has read what answering it would clear. */}
+        <ProjectQuestions
+          questions={design?.questions ?? []}
+          answers={answers}
+          onChange={setAnswers}
+        />
         <View style={styles.summary}>
           <SummaryRow label="Subtotal" value={formatMoney(subtotal, currency)} />
           <SummaryRow label="VAT (15%)" value={formatMoney(vat, currency)} />
           <View style={styles.divider} />
           <SummaryRow label="Total" value={formatMoney(total, currency)} emphasis />
         </View>
-        <Button
-          label={
-            blocked ? "Fix the problems above to continue" : "Proceed to checkout"
-          }
-          onPress={reload}
-          disabled={blocked}
-        />
+
+        {blocked ? (
+          <Text style={styles.gate}>
+            Fix the {design?.blockers.length} problem
+            {design?.blockers.length === 1 ? "" : "s"} above to continue.
+          </Text>
+        ) : null}
+
+        {[...solutions.entries()].map(([categoryUuid, name]) => (
+          <Button
+            key={categoryUuid}
+            label={`Send ${name} for a quote`}
+            onPress={() => sendBoq(categoryUuid, name)}
+            disabled={blocked}
+            loading={placing}
+          />
+        ))}
+
+        {products.length > 0 ? (
+          <Button
+            label="Checkout & pay"
+            // Secondary when a solution is also in the cart: quoting the system is
+            // the main path, and two identical primaries make the buyer choose
+            // between two things that look equally intended.
+            variant={solutions.size > 0 ? "outline" : "primary"}
+            onPress={checkoutProducts}
+            disabled={blocked}
+            loading={placing}
+          />
+        ) : null}
       </View>
     </View>
   );
@@ -208,6 +330,13 @@ const styles = StyleSheet.create({
   },
   summary: {
     gap: spacing.sm,
+  },
+  // Says why the button is dead. A disabled control with no sentence beside it
+  // reads as a broken screen.
+  gate: {
+    color: colors.danger,
+    fontFamily: fonts.medium,
+    fontSize: 13,
   },
   summaryRow: {
     flexDirection: "row",

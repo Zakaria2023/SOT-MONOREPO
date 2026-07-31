@@ -1,7 +1,12 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { Image } from "expo-image";
-import { Stack, useLocalSearchParams } from "expo-router";
-import { Check, ImageOff, ShoppingCart } from "lucide-react-native";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import {
+  Check,
+  Columns3,
+  ImageOff,
+  ShoppingCart,
+} from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +116,16 @@ const ProductScreen = () => {
           icon={added ? Check : ShoppingCart}
           onPress={addToCart}
           loading={adding}
+        />
+        {/* The same comparison the web product page shows, built from the same
+            service — so the two cannot compare different attributes. Its own
+            screen rather than a block here: the table scrolls sideways, and it
+            has no business fighting the page for that gesture. */}
+        <Button
+          label="Compare with similar"
+          icon={Columns3}
+          variant="outline"
+          onPress={() => router.push(`/compare/${product.uuid}`)}
         />
         {cartMessage ? <Text style={styles.message}>{cartMessage}</Text> : null}
       </View>

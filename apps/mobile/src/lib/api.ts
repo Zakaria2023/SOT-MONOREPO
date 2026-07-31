@@ -1,14 +1,18 @@
 import { API_URL } from "./env";
 import type {
   AuthUser,
+  Boq,
   Brand,
   CartLineItem,
   Category,
   DesignCheckResult,
   Offer,
+  Order,
   PartnerRequestInput,
   Product,
+  ProductComparison,
   ProductDetail,
+  ProjectAnswers,
   SpecFacet,
 } from "./types";
 
@@ -146,11 +150,27 @@ export const fetchCategoryFacets = (
  */
 export const fetchDesignCheck = (
   selection: { productUuid: string; quantity: number }[],
+  // Answers to the questions a previous check asked for. Sent back so the rules
+  // that were waiting on them actually run.
+  variables?: ProjectAnswers,
 ): Promise<DesignCheckResult> =>
   request<DesignCheckResult>("/design-check", {
     method: "POST",
-    body: { selection },
+    body: { selection, variables },
   });
+
+/**
+ * This product beside its comparables, as one table.
+ *
+ * The rows come from the same service the web compare table uses, already
+ * formatted and audience-filtered, so the app holds no copy of the attribute
+ * library and the two surfaces cannot compare different things.
+ */
+export const fetchProductComparison = (
+  uuid: string,
+  token?: string,
+): Promise<ProductComparison> =>
+  request<ProductComparison>(`/products/${uuid}/compare`, { token });
 
 export const fetchCategory = (uuid: string): Promise<Category> =>
   request<Category>(`/categories/${uuid}`);
@@ -198,6 +218,31 @@ export const updateCartItem = (
 
 export const removeCartItem = (uuid: string, token: string): Promise<void> =>
   request<void>(`/cart/items/${uuid}`, { method: "DELETE", token });
+
+// ---- Checkout ----
+//
+// Two destinations, exactly as on the web: a SOLUTION (a whole category added at
+// once) becomes a draft BOQ our team quotes, while standalone PRODUCTS become an
+// order the buyer pays for. The purchase gate runs server-side inside both, so a
+// design the cart showed as blocked cannot be ordered by calling this directly.
+
+export const createBoq = (
+  input: { categoryUuid: string; projectInputs?: ProjectAnswers },
+  token: string,
+): Promise<Boq> =>
+  request<Boq>("/boqs", { method: "POST", token, body: input });
+
+export const createOrder = (
+  input: { projectInputs?: ProjectAnswers },
+  token: string,
+): Promise<Order> =>
+  request<Order>("/orders", { method: "POST", token, body: input });
+
+export const fetchOrders = (token: string): Promise<Order[]> =>
+  request<Order[]>("/orders", { token });
+
+export const fetchBoqs = (token: string): Promise<Boq[]> =>
+  request<Boq[]>("/boqs", { token });
 
 // ---- Partner request (public) ----
 
