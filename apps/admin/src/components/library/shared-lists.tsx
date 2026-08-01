@@ -7,7 +7,6 @@ import {
   type OptionSet,
   type OptionSetInput,
 } from "@/app/(dashboard)/library/action";
-import { Field } from "@/components/shared/field";
 import {
   liveOptions,
   OptionListEditor,
@@ -17,7 +16,7 @@ import {
 import { ArrowUpDown, Library, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Button, Checkbox, ConfirmDialog, Input, Textarea } from "ui";
+import { Button, Checkbox, ConfirmDialog, Input } from "ui";
 
 // ---------------------------------------------------------------------------
 // SHARED LISTS — one vocabulary, spelled the same way everywhere it is used.
@@ -58,7 +57,6 @@ const ListForm = ({
   error,
 }: ListFormProps) => {
   const [name, setName] = useState(initial?.name ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [options, setOptions] = useState<OptionDraft[]>(
     initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
@@ -69,25 +67,12 @@ const ListForm = ({
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input
-          label="Name"
-          placeholder="Port Speed"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Field
-          label="What belongs in it"
-          hint="A shared list is inherited, so the next author needs to know its scope."
-        >
-          <Textarea
-            rows={2}
-            placeholder="Ethernet link speeds, slowest first. Not wireless rates."
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </Field>
-      </div>
+      <Input
+        label="Name"
+        placeholder="Port Speed"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
 
       <div className="flex flex-col gap-2">
         {/* On the SET and not on the attributes borrowing it: whether 1G is
@@ -137,7 +122,6 @@ const ListForm = ({
           onClick={() =>
             onSubmit({
               name,
-              description: description.trim() || null,
               ordered,
               options: liveOptions(options, ordered),
             })
@@ -264,12 +248,6 @@ export const SharedLists = ({ lists }: SharedListsProps) => {
                   </span>
                 )}
               </div>
-
-              {list.description && (
-                <p className="mt-0.5 text-[11px] text-faint">
-                  {list.description}
-                </p>
-              )}
 
               <p className="mt-1 line-clamp-2 text-xs text-muted">
                 {live.map((option) => option.label).join(" · ")}
