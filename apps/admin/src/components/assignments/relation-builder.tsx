@@ -423,7 +423,14 @@ const RelationForm = ({
       return `${counted} ≤ Σ("${b}" × qty)`;
     }
     if (form.family === "match") {
-      return `"${a}" ${RELATIONSHIP_COMPARATOR_LABELS[form.comparator]} "${b}"`;
+      // The FILTERS belong in the summary, not just in the form. The port model
+      // is three rules that differ only by their family guard, and without this
+      // all three read as one identical sentence in the list.
+      const side = (predicate: Predicate | null): string =>
+        predicate
+          ? ` (${describePredicate(predicate, attributes, categoryOptions)})`
+          : "";
+      return `"${a}"${side(form.consumerWhen)} ${RELATIONSHIP_COMPARATOR_LABELS[form.comparator]} "${b}"${side(form.providerWhen)}`;
     }
     if (form.family === "ratio") {
       return `"${a}" ÷ "${b}" ≤ ${form.ratioLimit ?? "…"}:1`;
