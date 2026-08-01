@@ -118,6 +118,24 @@ export const Specifications = mysqlTable("Specifications", {
     { onDelete: "restrict" },
   ),
 
+  // Which of the borrowed set's words this attribute actually uses. Null or
+  // empty = all of them, which is the normal case.
+  //
+  // Only meaningful with `optionSetUuid`. Borrowing a vocabulary should not mean
+  // swallowing it whole: "Port speed" runs 10M to 100G, and a Module Speed that
+  // offers 100G on an SFP form is a dropdown full of answers nobody can pick.
+  //
+  // NARROWING IS NOT FORKING, and that distinction is what makes this safe. The
+  // set is untouched and every value keeps the set's identity, so two attributes
+  // narrowed differently still compare — a cage that offers 1G–100G and a module
+  // that offers 1G–25G spell 10G the same way. An attribute with its OWN list
+  // would not, which is the whole reason shared sets exist.
+  //
+  // Read literally, like the per-category slice: exactly these values, gaps
+  // included. A slice naming only words the set no longer has falls back to the
+  // whole set rather than leaving the attribute with nothing to offer.
+  setValues: json("set_values").$type<string[] | null>(),
+
   // Only meaningful for `group`. The sub-fields one authored row carries, in
   // column order — {count, family, max speed} for network ports, {outlet type,
   // count} for outlets.

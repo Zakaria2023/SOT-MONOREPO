@@ -26,6 +26,7 @@ import { ValidationError } from "./errors";
 import {
   mergeGroupFields,
   mergeOptions,
+  normalizeSetValues,
   resolveGroupFields,
   resolveVocabulary,
   usedOptionValues,
@@ -69,6 +70,9 @@ export type LibraryAttributeInput = {
   // vocabulary and `options`/`ordered` above are ignored — which is what lets two
   // attributes hold comparable values without either naming the other.
   optionSetUuid: string | null;
+  // Which of the borrowed set's words this attribute uses. Empty = all of them.
+  // Ignored without `optionSetUuid` — there is nothing to narrow.
+  setValues: string[] | null;
   // Only meaningful on `group`. The sub-fields one repeatable row carries.
   groupFields: LibraryGroupFieldInput[];
 };
@@ -89,6 +93,9 @@ export type LibraryAttribute = {
   options: SpecOption[];
   // Which of those two it was. The form needs it to reopen on the right source.
   optionSetUuid: SelectSpecifications["optionSetUuid"];
+  // The narrowing, so the form reopens showing what the author chose. `options`
+  // above is already narrowed by it — this is for the control, not the readers.
+  setValues: SelectSpecifications["setValues"];
   // Only populated on `group`. Empty for every other type. Each select sub-field's
   // options are resolved the same way.
   groupFields: SpecGroupField[];
@@ -234,6 +241,7 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
       audience: spec.audience,
       options: vocabulary.options,
       optionSetUuid: spec.optionSetUuid,
+      setValues: spec.setValues,
       groupFields: resolveGroupFields(spec.groupFields ?? [], sets),
       order: spec.order,
       categoryUuids: categoriesBySpec.get(spec.uuid) ?? [],
@@ -376,6 +384,12 @@ export const createLibraryAttribute = async (
     optionSetUuid: isOptionBacked(input.type)
       ? input.optionSetUuid || null
       : null,
+    // Only stored alongside a set. A narrowing with nothing to narrow would sit
+    // there looking meaningful the day somebody pointed the attribute at a list.
+    setValues:
+      isOptionBacked(input.type) && input.optionSetUuid
+        ? normalizeSetValues(input.setValues)
+        : null,
     groupFields:
       input.type === "group" ? mergeGroupFields([], input.groupFields) : [],
     order: Number(total?.value ?? 0),
@@ -626,6 +640,10 @@ export const updateLibraryAttribute = async (
     : null;
   const nextOrdered =
     isOptionBacked(input.type) && !nextSet ? input.ordered : false;
+  // Dropped when the attribute stops borrowing. A narrowing of a set it no longer
+  // points at would come back to life the day somebody re-pointed it, silently
+  // hiding words the author never chose to hide.
+  const nextSetValues = nextSet ? normalizeSetValues(input.setValues) : null;
   const nextOptions =
     isOptionBacked(input.type) && !nextSet
       ? mergeOptions(current.options ?? [], input.options, nextOrdered)
@@ -660,6 +678,7 @@ export const updateLibraryAttribute = async (
       // mistake for the truth.
       options: nextOptions,
       optionSetUuid: nextSet,
+      setValues: nextSetValues,
       groupFields: nextGroupFields,
     })
     .where(eq(Specifications.uuid, uuid));

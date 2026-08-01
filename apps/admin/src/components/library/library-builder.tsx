@@ -361,6 +361,12 @@ const AttributeForm = ({
   const [optionSetUuid, setOptionSetUuid] = useState(
     initial?.optionSetUuid ?? "",
   );
+  // Which of the borrowed list's words this attribute uses. Empty = all of them,
+  // which is why it is not seeded with every value: ticking all ten and picking
+  // none must not be two different stored states.
+  const [setValues, setSetValues] = useState<string[]>(
+    initial?.setValues ?? [],
+  );
   const [groupFields, setGroupFields] = useState<GroupFieldDraft[]>(
     initial ? toFieldDrafts(initial.groupFields) : [],
   );
@@ -445,6 +451,7 @@ const AttributeForm = ({
           ? liveOptions(options, ordered)
           : [],
       optionSetUuid: isOptionType(type) ? optionSetUuid || null : null,
+      setValues: isOptionType(type) && optionSetUuid ? setValues : null,
       groupFields:
         type === "group"
           ? namedGroupFields.map((field) => ({
@@ -609,14 +616,62 @@ const AttributeForm = ({
           </Field>
 
           {chosenList ? (
-            <SharedListNote
-              list={chosenList}
-              // Excluded from its own "shared with" count. Without this the note
-              // read "shared with 0 other places" on an attribute that was clearly
-              // linked, and "1 other place" once saved — the one place being
-              // itself.
-              exceptLabel={initial?.label}
-            />
+            <>
+              <SharedListNote
+                list={chosenList}
+                // Excluded from its own "shared with" count. Without this the note
+                // read "shared with 0 other places" on an attribute that was clearly
+                // linked, and "1 other place" once saved — the one place being
+                // itself.
+                exceptLabel={initial?.label}
+              />
+
+              {/* Borrowing a vocabulary should not mean swallowing it whole.
+                  "Port speed" runs 10M to 100G, and a Module Speed offering 100G
+                  on an SFP form is a dropdown full of answers nobody can pick.
+
+                  Narrowing is NOT forking: every value keeps the set's identity,
+                  so an attribute offering 1G–25G and one offering the whole scale
+                  still spell 10G the same way and still compare. An attribute
+                  with its own list would not — which is the whole reason to
+                  borrow in the first place. */}
+              <Field
+                label="Which of its values this attribute uses"
+                hint={
+                  setValues.length === 0
+                    ? `All ${chosenList.options.length}, including any added to the list later.`
+                    : "Exactly these. Values added to the shared list later will not appear here until you add them."
+                }
+                accessory={
+                  setValues.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSetValues([])}
+                      className="rounded-control px-2 py-0.5 text-xs text-muted hover:bg-hover hover:text-ink"
+                    >
+                      Use all
+                    </button>
+                  )
+                }
+              >
+                <Dropdown
+                  multiple
+                  value={setValues}
+                  onChange={setSetValues}
+                  options={chosenList.options
+                    .filter((option) => !option.retired)
+                    .map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  // Empty is "all of them", not "none" — which is why it stays
+                  // distinct from ticking every box, and why the placeholder says
+                  // so rather than reading as an unanswered field.
+                  placeholder={`All ${chosenList.options.length} values`}
+                  searchable={chosenList.options.length > 8}
+                />
+              </Field>
+            </>
           ) : (
             <div className="flex flex-col gap-2">
               {/* One plain question instead of the jargon it replaces. The author

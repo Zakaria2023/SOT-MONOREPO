@@ -102,6 +102,11 @@ export type SpecGroupField = {
   // Optional so every row stored before sets existed still parses — an absent
   // pointer and a null one both mean "this list is my own".
   optionSetUuid?: string | null;
+  // Which of the borrowed set's words this column uses. Absent/empty = all of
+  // them. Same narrowing the attribute itself can do, and for the same reason:
+  // a port group's Speed column has no business offering 100G on a switch whose
+  // fastest cage is 10G. See Specifications.setValues.
+  setValues?: string[] | null;
 };
 
 // One authored row of a `group` attribute: sub-field key → value.

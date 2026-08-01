@@ -133,7 +133,8 @@ export const mergeOptions = (
 
 // Letters and digits only, lowercased, so punctuation and spacing stop mattering:
 // "802.3at", "802-3AT" and "802 3 at" all reduce to the same thing.
-const squash = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+const squash = (text: string): string =>
+  text.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 // The alphanumeric runs of a label, which is what makes "PoE+ (802.3at)" and
 // "802.3at" comparable: one's tokens contain the other's.
@@ -238,18 +239,57 @@ export const indexOptionSets = (
  * an author reports, where falling back to the stale inline list would be an
  * invisible one that hands out values no rule can compare.
  */
+/**
+ * A borrowed-list narrowing, as it will be stored.
+ *
+ * Empty becomes NULL rather than `[]`, because the two would otherwise be a
+ * distinction without a difference that every reader has to remember: null means
+ * "all the words", and an empty array means the same thing while looking like
+ * "none of them".
+ */
+export const normalizeSetValues = (
+  values: string[] | null | undefined,
+): string[] | null => {
+  const cleaned = (values ?? []).map((value) => value.trim()).filter(Boolean);
+  return cleaned.length > 0 ? [...new Set(cleaned)] : null;
+};
+
 export const resolveVocabulary = (
   own: {
     ordered: boolean;
     options: SpecOption[] | null;
     optionSetUuid?: string | null;
+    setValues?: string[] | null;
   },
   sets: OptionSetIndex,
 ): OptionVocabulary => {
   if (!own.optionSetUuid) {
     return { ordered: own.ordered, options: own.options ?? [] };
   }
-  return sets.get(own.optionSetUuid) ?? { ordered: own.ordered, options: [] };
+  const set = sets.get(own.optionSetUuid);
+  if (!set) {
+    return { ordered: own.ordered, options: [] };
+  }
+  // The borrowed list, narrowed to the words this attribute actually uses.
+  //
+  // THE ONE PLACE this happens, which is why a group's sub-fields get it for
+  // free — `resolveGroupFields` resolves through here too. Every reader above is
+  // handed the narrowed list and never learns it was narrowed, exactly as it
+  // never learns the words were borrowed.
+  //
+  // `ordered` still comes from the SET. Whether 1G is smaller than 10G belongs
+  // to the words, not to whoever borrowed a few of them.
+  if (!own.setValues || own.setValues.length === 0) {
+    return set;
+  }
+  const chosen = new Set(own.setValues);
+  const narrowed = set.options.filter((option) => chosen.has(option.value));
+  // A slice naming only words the set no longer has would otherwise leave the
+  // attribute with an empty dropdown and no explanation. The whole set is the
+  // safer answer: over-offering is visible, offering nothing looks broken.
+  return narrowed.length > 0
+    ? { ordered: set.ordered, options: narrowed }
+    : set;
 };
 
 /**
@@ -366,6 +406,8 @@ export type LibraryGroupFieldInput = {
   // When set, the picks come from a shared vocabulary and `options`/`ordered` on
   // this input are ignored.
   optionSetUuid?: string | null;
+  // Which of that vocabulary's words this column uses. Empty = all of them.
+  setValues?: string[] | null;
 };
 
 /**
@@ -462,6 +504,10 @@ export const mergeGroupFields = (
             )
           : [],
       optionSetUuid: shared,
+      // Stored only alongside a pointer, on the same reasoning as the attribute's
+      // own narrowing: a slice of a list this column does not borrow is a setting
+      // waiting to surprise whoever points it at one later.
+      setValues: shared ? normalizeSetValues(entry.setValues) : null,
     });
   });
 

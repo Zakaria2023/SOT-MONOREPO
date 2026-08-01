@@ -435,3 +435,138 @@ describe("the SFP seat rule", () => {
     expect(optionRank(ownList, "1g")).not.toBe(optionRank(moduleSpeed, "1g"));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Narrowing a borrowed list
+//
+// Borrowing a vocabulary should not mean swallowing it whole. "Port speed" runs
+// 10M to 100G, and a module attribute offering 100G on an SFP form is a dropdown
+// full of answers nobody can pick.
+//
+// The property that makes it safe is the one the whole set mechanism rests on:
+// narrowing is not forking. Every value keeps the SET's identity, so an attribute
+// offering three rungs and one offering all of them still spell 10G the same way,
+// and a rule across them still lines up. An attribute with its own shorter list
+// would not — it would be a second vocabulary that merely looks alike.
+// ---------------------------------------------------------------------------
+
+describe("an attribute using only some of a shared list", () => {
+  const narrowed = resolveVocabulary(
+    {
+      ordered: false,
+      options: null,
+      optionSetUuid: SPEED_SET,
+      setValues: ["1g", "10g"],
+    },
+    sets,
+  );
+
+  it("offers only the values it named", () => {
+    expect(narrowed.options.map((option) => option.value)).toEqual([
+      "1g",
+      "10g",
+    ]);
+  });
+
+  it("keeps the SET's ranks, so it still compares with an attribute that took them all", () => {
+    // THE property. Narrowing must not renumber anything — if it did, this
+    // attribute's "10G" would sit at rank 2 while a wider one's sat at 10000,
+    // and every comparison across them would be quietly wrong rather than
+    // refused.
+    const whole = resolveVocabulary(
+      { ordered: false, options: null, optionSetUuid: SPEED_SET },
+      sets,
+    );
+    const asMeta = (options: SpecOption[]): AttributeMeta => ({
+      uuid: "attr-speed",
+      label: "Speed",
+      type: "single_select",
+      unit: null,
+      ordered: true,
+      options,
+    });
+    expect(optionRank(asMeta(narrowed.options), "10g")).toBe(
+      optionRank(asMeta(whole.options), "10g"),
+    );
+    expect(optionRank(asMeta(narrowed.options), "10g")).toBe(10000);
+  });
+
+  it("keeps the SET's scale, because a slice does not own that fact either", () => {
+    expect(narrowed.ordered).toBe(true);
+  });
+
+  it("offers everything when it names nothing", () => {
+    expect(
+      resolveVocabulary(
+        {
+          ordered: false,
+          options: null,
+          optionSetUuid: SPEED_SET,
+          setValues: [],
+        },
+        sets,
+      ).options,
+    ).toHaveLength(speedOptions.length);
+  });
+
+  it("falls back to the whole set when its slice has gone stale", () => {
+    // A slice naming only words the set no longer has would otherwise leave the
+    // attribute with an empty dropdown and nothing to explain it. Over-offering
+    // is visible; offering nothing reads as broken.
+    expect(
+      resolveVocabulary(
+        {
+          ordered: false,
+          options: null,
+          optionSetUuid: SPEED_SET,
+          setValues: ["40g", "400g"],
+        },
+        sets,
+      ).options,
+    ).toHaveLength(speedOptions.length);
+  });
+
+  it("is ignored by an attribute that owns its list", () => {
+    // A narrowing of a set the attribute does not borrow must not quietly hide
+    // half of its own options.
+    const own: SpecOption[] = [
+      { value: "a", label: "A", rank: null, retired: false },
+      { value: "b", label: "B", rank: null, retired: false },
+    ];
+    expect(
+      resolveVocabulary(
+        {
+          ordered: false,
+          options: own,
+          optionSetUuid: null,
+          setValues: ["a"],
+        },
+        sets,
+      ).options,
+    ).toEqual(own);
+  });
+});
+
+describe("a group column using only some of a shared list", () => {
+  it("narrows through the same one place the attribute does", () => {
+    const fields: SpecGroupField[] = [
+      {
+        key: "speed",
+        label: "Speed",
+        kind: "select",
+        unit: null,
+        ordered: false,
+        options: [],
+        optionSetUuid: SPEED_SET,
+        setValues: ["1g"],
+      },
+    ];
+    const [resolved] = resolveGroupFields(fields, sets);
+    expect(resolved?.options.map((option) => option.value)).toEqual(["1g"]);
+    // And the rank still comes from the set, so a row's speed compares against a
+    // module's exactly as before.
+    expect(groupFieldRank({ ...(resolved as SpecGroupField) }, "1g")).toBe(
+      1000,
+    );
+  });
+});
