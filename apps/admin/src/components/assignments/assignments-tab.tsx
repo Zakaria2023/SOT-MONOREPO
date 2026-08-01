@@ -270,24 +270,42 @@ const AssignmentFields = ({
         </Field>
       </div>
 
-      {optionBacked && (
+      {/* THE SLICE, hidden rather than removed.
+
+          It narrows which options a category offers — "these devices only do
+          802.3af, so do not put bt on the form". A real guardrail, and one that
+          no assignment in the catalog uses: every row offers the whole list.
+          A control that is always left at its default is a question an author
+          has to read and dismiss on every attribute they touch.
+
+          The MODEL stays, and that is the point of hiding rather than deleting.
+          `enabledValues: null` already means "offer everything", which is what
+          every stored row says, so nothing changes behaviour. What it keeps
+          alive is the machinery that depends on it: `outside_slice` — the
+          completeness problem that says "this switch does 40G and this category
+          stops at 10G" — plus `widenSlice`, which is what stops an author adding
+          an option and watching the dropdown not offer it.
+
+          A row that DOES carry a slice keeps it: the draft is seeded from the
+          stored value and saved back untouched, so hiding the control cannot
+          silently widen a category somebody narrowed on purpose.
+
+          Showing it again is deleting this one condition. */}
+      {optionBacked && draft.enabledValues.length > 0 && (
         <Field
           label="Options this category offers"
-          hint={
-            draft.enabledValues.length === 0
-              ? "Every option, including any added to the library later."
-              : "Exactly these are offered — gaps included. Nothing is re-expanded later, so what you pick is what the shopper and the product form get."
-          }
+          hint="Exactly these are offered — gaps included. Nothing is re-expanded later, so what you pick is what the shopper and the product form get."
           accessory={
-            draft.enabledValues.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onChange({ enabledValues: [] })}
-                className="rounded-control px-2 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
-              >
-                Offer all
-              </button>
-            )
+            // The way OUT. With the control hidden by default, this is what
+            // clears a narrowing — and clearing it hides the field, which is the
+            // honest outcome: there is no longer a slice to look at.
+            <button
+              type="button"
+              onClick={() => onChange({ enabledValues: [] })}
+              className="rounded-control px-2 py-0.5 text-[11px] text-muted hover:bg-hover hover:text-ink"
+            >
+              Offer all
+            </button>
           }
         >
           <Dropdown
@@ -610,11 +628,13 @@ const AssignmentCard = ({
             ) : (
               <span className="text-faint">always shown</span>
             )}
-            {optionBacked && (
+            {/* Only when the slice is NARROWED. "all 10 options" on every card is
+                the same sentence repeated down the whole list, and it buries the
+                one card where the count is actually different. */}
+            {optionBacked && assignment.enabledValues && (
               <span>
-                {assignment.enabledValues
-                  ? `${assignment.offeredOptions.length} of ${liveOptions.length} options`
-                  : `all ${liveOptions.length} options`}
+                {assignment.offeredOptions.length} of {liveOptions.length}{" "}
+                options
               </span>
             )}
             {assignment.isFilter && (
