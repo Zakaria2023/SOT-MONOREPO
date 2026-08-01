@@ -17,7 +17,11 @@ type Props = {
 };
 
 type WorkspaceProps = {
-  categoryUuid: string;
+  // NULL when nothing is selected. Relations are global — they reference
+  // attributes, not categories — so they load and render either way. Only the
+  // Assignments tab needs a category, and gating the whole screen on one made
+  // the rules look as though they did not exist.
+  categoryUuid: string | null;
   // The whole tree, depth-ordered. Passed down rather than re-fetched: the page
   // already loaded it for the sidebar, and a rule's product-group picker needs
   // the same list.
@@ -32,29 +36,28 @@ type WorkspaceProps = {
 // in-process catalog model, so this page costs the same whether a category
 // carries three attributes or thirty.
 const Workspace = async ({ categoryUuid, categoryOptions }: WorkspaceProps) => {
-  const category = await getCategory(categoryUuid);
-  if (!category) {
-    return (
-      <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">
-        That category no longer exists. Pick another from the tree.
-      </p>
-    );
-  }
-
-  const [assignments, library, relationships, variables] = await Promise.all([
-    getCategoryAssignments(categoryUuid),
+  // The three global reads happen whether or not a category is selected; the
+  // per-category one is skipped when there is nothing to resolve. A selected
+  // category that has since been deleted falls back to the same state as none,
+  // rather than replacing the screen — the rules are still there to work on.
+  const [category, library, relationships, variables] = await Promise.all([
+    categoryUuid ? getCategory(categoryUuid) : null,
     getAllSpecifications(),
     listRelationships(),
     getProjectVariables(),
   ]);
 
+  const assignments = category
+    ? await getCategoryAssignments(category.uuid)
+    : null;
+
   return (
     <AssignmentWorkspace
-      categoryUuid={categoryUuid}
-      categoryName={category.name}
-      categoryPath={category.path}
-      resolved={assignments.resolved}
-      problems={assignments.problems}
+      categoryUuid={category?.uuid ?? null}
+      categoryName={category?.name ?? null}
+      categoryPath={category?.path ?? null}
+      resolved={assignments?.resolved ?? []}
+      problems={assignments?.problems ?? []}
       library={library.map((spec) => ({
         uuid: spec.uuid,
         label: spec.label,
@@ -96,19 +99,16 @@ const AssignmentsPage = async ({ searchParams }: Props) => {
         </aside>
 
         <div className="min-w-0 flex-1">
-          {category ? (
-            <AsyncSection reloadKey={category}>
-              <Workspace
-                categoryUuid={category}
-                categoryOptions={categoryOptions}
-              />
-            </AsyncSection>
-          ) : (
-            <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">
-              Pick a category — its attributes are what it inherits, plus its
-              own.
-            </p>
-          )}
+          {/* Always rendered. Half of this screen — the rules — is global, and
+              hiding it behind a category selection did more than inconvenience:
+              picking "Switch" and then authoring a rule implies the rule belongs
+              to switches. It does not. */}
+          <AsyncSection reloadKey={category ?? "all"}>
+            <Workspace
+              categoryUuid={category ?? null}
+              categoryOptions={categoryOptions}
+            />
+          </AsyncSection>
         </div>
       </div>
     </div>

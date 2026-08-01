@@ -12,8 +12,10 @@ import { useState } from "react";
 import type { ResolvedAssignment, RevealProblem } from "services";
 
 type AssignmentWorkspaceProps = {
-  categoryUuid: string;
-  categoryName: string;
+  // NULL when no category is selected. Assignments need one; relations do not,
+  // and pretending otherwise is what used to hide the whole screen.
+  categoryUuid: string | null;
+  categoryName: string | null;
   categoryPath: string | null;
   resolved: ResolvedAssignment[];
   problems: RevealProblem[];
@@ -38,7 +40,12 @@ export const AssignmentWorkspace = ({
   variables,
   categoryOptions,
 }: AssignmentWorkspaceProps) => {
-  const [tab, setTab] = useState<Tab>("assignments");
+  // Relations open first when there is no category, because they are the half of
+  // this screen that does not need one. Landing on an Assignments tab that can
+  // only say "pick a category" is what made the rules look unreachable.
+  const [tab, setTab] = useState<Tab>(
+    categoryUuid ? "assignments" : "relations",
+  );
 
   const tabClass = (active: boolean): string =>
     `rounded-control px-3 py-1.5 text-sm ${
@@ -53,7 +60,9 @@ export const AssignmentWorkspace = ({
         {categoryPath && (
           <span className="font-mono text-xs text-faint">{categoryPath}</span>
         )}
-        <h2 className="font-heading text-lg text-ink">{categoryName}</h2>
+        <h2 className="font-heading text-lg text-ink">
+          {categoryName ?? "Every category"}
+        </h2>
       </div>
 
       <div className="flex items-center gap-1 border-b border-hairline pb-2">
@@ -63,7 +72,11 @@ export const AssignmentWorkspace = ({
           className={tabClass(tab === "assignments")}
         >
           Assignments
-          <span className="ml-1.5 text-xs text-faint">{resolved.length}</span>
+          {/* No count without a category — "0" would read as "this category
+              carries nothing" rather than "nothing is selected". */}
+          {categoryUuid && (
+            <span className="ml-1.5 text-xs text-faint">{resolved.length}</span>
+          )}
         </button>
         <button
           type="button"
@@ -78,17 +91,25 @@ export const AssignmentWorkspace = ({
       </div>
 
       {tab === "assignments" ? (
-        <AssignmentsTab
-          categoryUuid={categoryUuid}
-          resolved={resolved}
-          problems={problems}
-          library={library}
-        />
+        categoryUuid ? (
+          <AssignmentsTab
+            categoryUuid={categoryUuid}
+            resolved={resolved}
+            problems={problems}
+            library={library}
+          />
+        ) : (
+          // Only THIS tab needs a category. Gating the whole screen on one was
+          // what hid the rules.
+          <p className="rounded-card border border-dashed border-hairline p-10 text-center text-sm text-faint">
+            Pick a category — its attributes are what it inherits, plus its own.
+          </p>
+        )
       ) : (
         // Relations are global — they reference attributes, not categories — so
-        // the same list shows whichever category is selected. Keeping them on
-        // this page is deliberate: an author writes a rule right after assigning
-        // the attributes it reads.
+        // the same list shows whichever category is selected, and the whole list
+        // shows when none is. Keeping them on this page is deliberate: an author
+        // writes a rule right after assigning the attributes it reads.
         <RelationBuilder
           relationships={relationships}
           // Free text is left OUT of the rule builder entirely, rather than
