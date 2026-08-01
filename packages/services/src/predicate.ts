@@ -141,6 +141,32 @@ export const filteredGroupTotal = (
 };
 
 /**
+ * The distinct picks of one select column, over the rows a filter keeps.
+ *
+ * The set-membership sibling of `filteredGroupTotal`, and what lets a MATCH rule
+ * read a group at all: "which port families does this switch actually have cages
+ * for" is this list, and without it the match evaluator flattened a group's rows
+ * with `asOptionList` — which returns an empty list for rows on purpose — and
+ * then judged every consumer against nothing.
+ *
+ * Returns an empty list for unreadable rows, and that is safe here in a way it is
+ * NOT for a total: the caller treats an empty side as "this item does not
+ * participate", where a zero total would have been read as a real capacity of
+ * zero. The two nulls `filteredGroupTotal` draws apart do not arise, because a
+ * set has no zero.
+ */
+export const filteredGroupPicks = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+  fieldKey: string,
+  where?: Predicate | null,
+): string[] => {
+  const readable = completeGroupRows(raw, meta);
+  const rows = where ? matchingGroupRows(readable, meta, where) : readable;
+  return columnPicks(rows, meta, fieldKey);
+};
+
+/**
  * Evaluate one operator against a single column of a group's rows.
  *
  * Split out because the reduction is the whole difficulty: rows have to become one
