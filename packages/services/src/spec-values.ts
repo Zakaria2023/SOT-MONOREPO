@@ -471,42 +471,71 @@ export const groupPicks = (
  *    half-filled span is. The readers ignore it either way, so storing one would
  *    show the author an answer that no rule can see.
  */
+export type NormalizedGroupRows = {
+  rows: SpecGroupRow[];
+  // Rows that held SOMETHING and still could not be stored.
+  //
+  // The distinction this draws is the whole point. A row with nothing in it at
+  // all is an abandoned "Add row" click and is dropped in silence — refusing a
+  // save over it would block an author who clicked once too often. A row with
+  // some columns answered and some blank is data somebody typed, and dropping
+  // that silently is how four slot systems become three with no message.
+  rejected: GroupRowIssue[];
+};
+
 export const normalizeGroupRows = (
   value: unknown,
   fields: SpecGroupField[],
-): SpecGroupRow[] => {
+): NormalizedGroupRows => {
   if (fields.length === 0 || !Array.isArray(value)) {
-    return [];
+    return { rows: [], rejected: [] };
   }
   const cleaned: SpecGroupRow[] = [];
-  for (const row of value) {
+  const rejected: GroupRowIssue[] = [];
+
+  value.forEach((row, index) => {
     if (typeof row !== "object" || row === null || Array.isArray(row)) {
-      continue;
+      return;
     }
     const entries: Record<string, unknown> = row;
     const next: SpecGroupRow = {};
-    let complete = true;
+    const issues: GroupRowIssue[] = [];
+    // Whether the author put anything in this row at all — what tells an
+    // abandoned row apart from a half-finished one.
+    let answered = 0;
+
     for (const field of fields) {
       const entry = entries[field.key];
+      const shared = {
+        row: index + 1,
+        fieldKey: field.key,
+        fieldLabel: field.label,
+      };
+
       if (field.kind === "number") {
+        const blank = entry === undefined || entry === null || entry === "";
         const parsed = typeof entry === "number" ? entry : Number(entry);
-        if (
-          entry === undefined ||
-          entry === null ||
-          entry === "" ||
-          !Number.isFinite(parsed)
-        ) {
-          complete = false;
-          break;
+        if (blank || !Number.isFinite(parsed)) {
+          // A number that was typed but is not a number ("abc") counts as
+          // answered: the author meant to fill it in and got it wrong, which is
+          // exactly the case worth telling them about.
+          if (!blank) {
+            answered += 1;
+          }
+          issues.push({ ...shared, problem: "missing" });
+          continue;
         }
+        answered += 1;
         next[field.key] = parsed;
         continue;
       }
+
       const text = typeof entry === "string" ? entry.trim() : "";
       if (text === "") {
-        complete = false;
-        break;
+        issues.push({ ...shared, problem: "missing" });
+        continue;
       }
+      answered += 1;
       // Membership, on the same terms as `isCompleteGroupRow` — including its
       // exception for a list that resolved to nothing, so a missing shared
       // vocabulary does not erase rows an author entered correctly.
@@ -514,16 +543,22 @@ export const normalizeGroupRows = (
         field.options.length > 0 &&
         !field.options.some((option) => option.value === text)
       ) {
-        complete = false;
-        break;
+        issues.push({ ...shared, problem: "unknown_value", value: text });
+        continue;
       }
       next[field.key] = text;
     }
-    if (complete) {
+
+    if (issues.length === 0) {
       cleaned.push(next);
+      return;
     }
-  }
-  return cleaned;
+    if (answered > 0) {
+      rejected.push(...issues);
+    }
+  });
+
+  return { rows: cleaned, rejected };
 };
 
 /** A group sub-field's option rank, for the ordered comparators. */

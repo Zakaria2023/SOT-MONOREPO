@@ -297,7 +297,7 @@ describe("normalizeGroupRows", () => {
       normalizeGroupRows(
         [{ count: "24", family: "base-t", "max-speed": "1g" }],
         portFields,
-      ),
+      ).rows,
     ).toEqual([{ count: 24, family: "base-t", "max-speed": "1g" }]);
   });
 
@@ -306,20 +306,81 @@ describe("normalizeGroupRows", () => {
       normalizeGroupRows(
         [{ count: 8, family: "sfp", "max-speed": "10g", poe: "yes" }],
         portFields,
-      ),
+      ).rows,
     ).toEqual([{ count: 8, family: "sfp", "max-speed": "10g" }]);
   });
 
   it("drops an incomplete row rather than half-storing it", () => {
-    expect(
-      normalizeGroupRows(
-        [
-          { count: 24, family: "base-t", "max-speed": "1g" },
-          { count: 4, family: "sfp" },
-        ],
-        portFields,
-      ),
-    ).toHaveLength(1);
+    const result = normalizeGroupRows(
+      [
+        { count: 24, family: "base-t", "max-speed": "1g" },
+        { count: 4, family: "sfp" },
+      ],
+      portFields,
+    );
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("REPORTS a half-filled row rather than dropping it in silence", () => {
+    // The bug this pins. The row was dropped, the save succeeded, and four port
+    // groups came back as three with nothing to say why — the author's only
+    // clue was a number that looked wrong days later.
+    const result = normalizeGroupRows(
+      [
+        { count: 24, family: "base-t", "max-speed": "1g" },
+        { count: 4, family: "sfp" },
+      ],
+      portFields,
+    );
+    expect(result.rejected).toEqual([
+      {
+        row: 2,
+        fieldKey: "max-speed",
+        fieldLabel: "Max speed",
+        problem: "missing",
+      },
+    ]);
+  });
+
+  it("says nothing about a row the author added and never touched", () => {
+    // An abandoned "Add row" click is not a mistake worth blocking a save over.
+    // The distinction is whether ANY column was answered.
+    const result = normalizeGroupRows(
+      [
+        { count: 24, family: "base-t", "max-speed": "1g" },
+        { count: "", family: "", "max-speed": "" },
+      ],
+      portFields,
+    );
+    expect(result.rows).toHaveLength(1);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it("reports a pick the list does not contain, naming the value", () => {
+    const result = normalizeGroupRows(
+      [{ count: 4, family: "sfp", "max-speed": "40g" }],
+      portFields,
+    );
+    expect(result.rows).toEqual([]);
+    expect(result.rejected).toEqual([
+      {
+        row: 1,
+        fieldKey: "max-speed",
+        fieldLabel: "Max speed",
+        problem: "unknown_value",
+        value: "40g",
+      },
+    ]);
+  });
+
+  it("reports every missing column of one row, not just the first", () => {
+    // The old loop broke on the first failure, so an author fixed one column,
+    // saved, and was stopped again by the next.
+    const result = normalizeGroupRows([{ count: 4 }], portFields);
+    expect(result.rejected.map((issue) => issue.fieldKey)).toEqual([
+      "family",
+      "max-speed",
+    ]);
   });
 
   it("drops a row whose count is not a number", () => {
@@ -327,7 +388,7 @@ describe("normalizeGroupRows", () => {
       normalizeGroupRows(
         [{ count: "lots", family: "sfp", "max-speed": "10g" }],
         portFields,
-      ),
+      ).rows,
     ).toEqual([]);
   });
 
@@ -336,20 +397,20 @@ describe("normalizeGroupRows", () => {
       normalizeGroupRows(
         [{ count: 2, family: "  qsfp  ", "max-speed": "100g" }],
         portFields,
-      ),
+      ).rows,
     ).toEqual([{ count: 2, family: "qsfp", "max-speed": "100g" }]);
     expect(
       normalizeGroupRows(
         [{ count: 2, family: "   ", "max-speed": "100g" }],
         portFields,
-      ),
+      ).rows,
     ).toEqual([]);
   });
 
   it("refuses everything when the schema is empty", () => {
     // No sub-fields means no way to read a row back, so nothing is stored — the
     // library refuses to save such an attribute for the same reason.
-    expect(normalizeGroupRows(coreSwitch, [])).toEqual([]);
+    expect(normalizeGroupRows(coreSwitch, []).rows).toEqual([]);
   });
 
   it("ignores entries that are not rows at all", () => {
@@ -363,20 +424,20 @@ describe("normalizeGroupRows", () => {
           { count: 2, family: "qsfp", "max-speed": "100g" },
         ],
         portFields,
-      ),
+      ).rows,
     ).toEqual([{ count: 2, family: "qsfp", "max-speed": "100g" }]);
   });
 
   it("returns nothing for a value that is not a list", () => {
-    expect(normalizeGroupRows("24 x 1G", portFields)).toEqual([]);
-    expect(normalizeGroupRows(undefined, portFields)).toEqual([]);
+    expect(normalizeGroupRows("24 x 1G", portFields).rows).toEqual([]);
+    expect(normalizeGroupRows(undefined, portFields).rows).toEqual([]);
   });
 
   it("survives the round trip the save path performs", () => {
     // The bug this pins: with no group branch, the save path fell through to
     // String(value[0]) and stored the literal "[object Object]" — a product that
     // looked answered while carrying nothing any rule could read.
-    const stored = normalizeGroupRows(coreSwitch, portFields);
+    const stored = normalizeGroupRows(coreSwitch, portFields).rows;
     expect(isSpecGroupRows(stored)).toBe(true);
     expect(groupTotal(stored, ports, "count")).toBe(50);
   });

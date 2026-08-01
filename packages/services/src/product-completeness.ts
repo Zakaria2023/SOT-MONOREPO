@@ -19,7 +19,8 @@ import {
   type ResolvedAssignment,
 } from "./assignment-resolver";
 import { getCatalogModel, resolveFromModel } from "./catalog-model";
-import { normalizeGroupRows } from "./spec-values";
+import { ValidationError } from "./errors";
+import { normalizeGroupRows, type GroupRowIssue } from "./spec-values";
 
 // ---------------------------------------------------------------------------
 // CATALOG COMPLETENESS.
@@ -100,6 +101,11 @@ export const normalizeProductValues = async (
   const model = await getCatalogModel();
   const resolved = resolveFromModel(model, categoryUuid);
 
+  // Rows the author half-filled. Collected across every group attribute and
+  // raised together at the end, so somebody with two broken rows is told about
+  // both rather than fixing one and being stopped again.
+  const rejected: { label: string; issues: GroupRowIssue[] }[] = [];
+
   const typed: ProductValues = {};
   for (const assignment of resolved) {
     const { definition } = assignment;
@@ -176,8 +182,11 @@ export const normalizeProductValues = async (
       // becomes 24, because every reader above does arithmetic on it without
       // re-parsing.
       const cleaned = normalizeGroupRows(value, definition.groupFields ?? []);
-      if (cleaned.length > 0) {
-        typed[definition.uuid] = cleaned;
+      if (cleaned.rejected.length > 0) {
+        rejected.push({ label: definition.label, issues: cleaned.rejected });
+      }
+      if (cleaned.rows.length > 0) {
+        typed[definition.uuid] = cleaned.rows;
       }
       continue;
     }
@@ -186,6 +195,32 @@ export const normalizeProductValues = async (
     if (knows(definition, chosen)) {
       typed[definition.uuid] = chosen;
     }
+  }
+
+  // REFUSED, not saved-and-warned. The product form redirects on success, so a
+  // warning returned alongside a successful save has nowhere to be read — the
+  // author is already on another page. And the alternative the code used to
+  // have was worse: the row was dropped, the save succeeded, and four slot
+  // systems came back as three with nothing to say why.
+  //
+  // Only half-filled rows reach here. An untouched row an author added and left
+  // alone is dropped in silence, so this cannot fire on a stray click.
+  if (rejected.length > 0) {
+    throw new ValidationError(
+      `Some rows could not be saved because they are incomplete. Finish them or remove them, then save again — ${rejected
+        .map(
+          (entry) =>
+            `${entry.label}: ${entry.issues
+              .slice(0, 3)
+              .map((issue) =>
+                issue.problem === "missing"
+                  ? `row ${issue.row} has no ${issue.fieldLabel}`
+                  : `row ${issue.row}'s ${issue.fieldLabel} is "${issue.value}", which is not on the list`,
+              )
+              .join("; ")}`,
+        )
+        .join(". ")}.`,
+    );
   }
 
   return clearHiddenValues(resolved, typed);

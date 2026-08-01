@@ -88,7 +88,22 @@ describe("a group pick outside its sub-field's list", () => {
   });
 
   it("is refused on the way IN, so it cannot be stored", () => {
-    expect(normalizeGroupRows(rogue, portFields)).toEqual([]);
+    expect(normalizeGroupRows(rogue, portFields).rows).toEqual([]);
+  });
+
+  it("and is REPORTED, so the refusal is not silent", () => {
+    // Refusing on the way in was always right; doing it without a word was not.
+    // The row vanished, the save succeeded, and the author's first clue was a
+    // port count that looked wrong days later.
+    expect(normalizeGroupRows(rogue, portFields).rejected).toEqual([
+      {
+        row: 1,
+        fieldKey: "max-speed",
+        fieldLabel: "Max speed",
+        problem: "unknown_value",
+        value: "40g",
+      },
+    ]);
   });
 
   it("is named on the way OUT, for whatever is already stored", () => {
@@ -110,7 +125,7 @@ describe("a group pick outside its sub-field's list", () => {
     const unresolved: SpecGroupField[] = portFields.map((field) =>
       field.kind === "select" ? { ...field, options: [] } : field,
     );
-    expect(normalizeGroupRows(rogue, unresolved)).toEqual([
+    expect(normalizeGroupRows(rogue, unresolved).rows).toEqual([
       { count: 24, "max-speed": "40g" },
     ]);
   });
