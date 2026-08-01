@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from ".";
 import { Categories } from "./schema/categories";
-import { Relationships } from "./schema/relationships";
 import { SpecificationGroups } from "./schema/specification-groups";
 import { SpecificationOptionSets } from "./schema/specification-option-sets";
 import { Specifications } from "./schema/specifications";
@@ -9,7 +8,6 @@ import type { Predicate } from "./types";
 import {
   createLibraryAttribute,
   createRelationship,
-  invalidateCatalogModel,
   saveAssignments,
   validateRelationship,
   type AssignmentInput,
@@ -38,9 +36,11 @@ import {
 // rather than authoring a second "Network Ports" that half the catalog then
 // answers instead of the first.
 //
-// EVERY RULE IS AUTHORED AS A DRAFT. A published rule gates real carts the
-// instant it is written, and these have never run against the live catalog. They
-// are previewed on the Relations tab and published by a human.
+// EVERY RULE IS AUTHORED LIVE, like every other rule in this system. There is no
+// draft step: it was removed on purpose, and there is no button anywhere to undo
+// one. What keeps this safe is `validateRelationship` below — a rule that cannot
+// be evaluated is never written — plus Try it on the Relations tab, which reviews
+// a live rule exactly as well as it reviewed a draft.
 //
 // WHAT IT DELIBERATELY DOES NOT DO: it does not touch `Uplink Speed`,
 // `Downlink Speed`, `Uplink Media Type`, `Downlink Media Type` or
@@ -476,32 +476,28 @@ const main = async () => {
       }
       continue;
     }
-    // `createRelationship` PUBLISHES — deliberately, because in the admin the
-    // author has just previewed the rule against a real selection and a draft
-    // nobody presses "publish" on is a gate that protects nothing.
+    // LIVE, like every other rule authored in this system. The draft/publish
+    // lifecycle is off, and deliberately: a rule sitting unpublished is a gate
+    // somebody believes is protecting them while it protects nothing. "Try it"
+    // reviews a live rule as well as it reviews a draft.
     //
-    // A script has done no such preview. These four have never been run against
-    // the catalog even once, and one of them is a `block` — so they are demoted
-    // immediately after creation. The demotion is a separate statement rather
-    // than an argument because publishing-by-default is the right behaviour for
-    // the screen; it is this caller that is the exception.
-    const uuid = await createRelationship(rule, ACTOR);
-    await db
-      .update(Relationships)
-      .set({ status: "draft" })
-      .where(eq(Relationships.uuid, uuid));
-    console.log(`  + ${rule.name} (draft)`);
+    // An earlier version of this script demoted these four to `draft` on the
+    // theory that a script has previewed nothing. That was wrong twice over — it
+    // reintroduced a lifecycle that had been removed on purpose, and since there
+    // is no publish button anywhere in the admin, it left four rules inert with
+    // no way to revive them from the UI. The safety came from `validateRelationship`
+    // above, which refuses a rule that cannot be evaluated; a status column was
+    // never what made this safe.
+    await createRelationship(rule, ACTOR);
+    console.log(`  + ${rule.name}`);
   }
-  // The cached model still holds them as published — `createRelationship`
-  // invalidated on its way out, before the demotion above.
-  invalidateCatalogModel();
 
   console.log(
     [
       "",
       "NEXT, by a human:",
-      "  1. Open Assignments > Relations, preview each draft against a real",
-      "     selection, then publish it. Nothing above gates a cart until you do.",
+      "  1. Open Assignments > Relations and press Try it on each new rule against",
+      "     a real selection. They are LIVE — that is what Try it is for.",
       "  2. Fill in Network Ports on the switches. Until a switch has rows, every",
       "     port rule reads it as unanswered and reports it as a gap — which is",
       "     the intended behaviour, not a bug.",
