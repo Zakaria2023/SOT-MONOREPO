@@ -39,6 +39,17 @@ export const mergeOptions = (
   existing: SpecOption[],
   input: LibraryOptionInput[],
   ordered: boolean,
+  // Values some product currently holds. When supplied, an option the author
+  // removed and NOTHING holds is deleted for real instead of retired.
+  //
+  // Retiring exists to stop a stored value pointing at a word that no longer
+  // exists — it is a refusal, not a filing system. Applied to a value nobody
+  // holds it refuses nothing, and the author is left with a list that grows
+  // every time they correct a typo and never shrinks.
+  //
+  // Omitted = retire everything absent, the old behaviour. A caller that has not
+  // checked what is held must not be able to delete on a guess.
+  held?: ReadonlySet<string>,
 ): SpecOption[] => {
   const usable = input.filter((entry) => entry.label.trim() !== "");
 
@@ -108,9 +119,15 @@ export const mergeOptions = (
   });
 
   for (const option of existing) {
-    if (!seen.has(option.value)) {
-      merged.push({ ...option, retired: true });
+    if (seen.has(option.value)) {
+      continue;
     }
+    // Safe to lose: no product spells anything with it, so nothing can be left
+    // pointing at a word that stopped existing.
+    if (held && !held.has(option.value)) {
+      continue;
+    }
+    merged.push({ ...option, retired: true });
   }
   return merged;
 };

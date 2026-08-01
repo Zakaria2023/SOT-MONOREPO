@@ -3,6 +3,7 @@ import type { SpecGroupField, SpecOption } from "../../../db/types";
 import {
   indexOptionSets,
   mergeGroupFields,
+  mergeOptions,
   resolveGroupFields,
   resolveVocabulary,
   usedOptionValues,
@@ -613,5 +614,47 @@ describe("a column's narrowing survives the save path", () => {
       [field({ optionSetUuid: null, setValues: ["1g"] })],
     );
     expect(merged?.setValues).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Removing a word from a shared list
+//
+// Retiring is a REFUSAL: it stops a stored value pointing at a word that no
+// longer exists. Applied to a word nobody holds it refuses nothing, and the list
+// grows every time an author corrects a typo and never shrinks.
+// ---------------------------------------------------------------------------
+
+describe("deleting an option from a shared list", () => {
+  const existing: SpecOption[] = [
+    { value: "1g", label: "1G", rank: 1000, retired: false },
+    { value: "50g", label: "50G", rank: 50000, retired: false },
+  ];
+  const keep = [{ value: "1g", label: "1G", rank: 1000 }];
+
+  it("removes it outright when no product holds it", () => {
+    const merged = mergeOptions(existing, keep, true, new Set<string>());
+    expect(merged.map((option) => option.value)).toEqual(["1g"]);
+  });
+
+  it("retires it when a product still holds it", () => {
+    // The refusal doing its job. A product spelling "50g" must not be left
+    // pointing at a word that stopped existing — it would drop out of every rule
+    // reading the attribute, in silence.
+    const merged = mergeOptions(existing, keep, true, new Set(["50g"]));
+    const retired = merged.find((option) => option.value === "50g");
+    expect(retired?.retired).toBe(true);
+  });
+
+  it("retires it when the caller did not check what is held", () => {
+    // The safe default. A caller that has not asked must not be able to delete
+    // on a guess, so omitting the argument keeps the old behaviour exactly.
+    const merged = mergeOptions(existing, keep, true);
+    expect(merged.find((option) => option.value === "50g")?.retired).toBe(true);
+  });
+
+  it("never touches a value that is still listed", () => {
+    const merged = mergeOptions(existing, keep, true, new Set<string>());
+    expect(merged.find((option) => option.value === "1g")?.retired).toBe(false);
   });
 });

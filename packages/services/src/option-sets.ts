@@ -8,7 +8,11 @@ import type { ProductValue, SpecOption } from "../../../db/types";
 import { recordAudit } from "./catalog-audit";
 import { invalidateCatalogModel } from "./catalog-model";
 import { ValidationError } from "./errors";
-import { mergeOptions, type LibraryOptionInput } from "./library-options";
+import {
+  mergeOptions,
+  usedOptionValues,
+  type LibraryOptionInput,
+} from "./library-options";
 
 // ---------------------------------------------------------------------------
 // SHARED VOCABULARIES — the option lists more than one attribute spells the same
@@ -176,11 +180,15 @@ export const updateOptionSet = async (
     .update(SpecificationOptionSets)
     .set({
       name: input.name.trim(),
-        ordered: input.ordered,
+      ordered: input.ordered,
+      // Removing a word an author took out of the list, rather than retiring it,
+      // whenever no product spells anything with it. Retiring is a refusal, and
+      // there is nothing here to refuse.
       options: mergeOptions(
         current.options ?? [],
         input.options,
         input.ordered,
+        await heldSetValues(uuid),
       ),
     })
     .where(eq(SpecificationOptionSets.uuid, uuid));
@@ -260,6 +268,58 @@ export const optionSetUsers = async (uuid: string): Promise<string[]> => {
     }
   }
   return found;
+};
+
+/**
+ * Every value products actually hold through a shared list.
+ *
+ * A set is borrowed by attributes and by group columns, and a value is "in use"
+ * if ANY of them holds it — so this asks each borrower and unions the answers.
+ * Asking only the attribute would miss a port group's speed column, and deleting
+ * a word that a hundred stored rows spell is the one outcome this must not allow.
+ *
+ * One query for the borrowers, then one per borrower. Bounded by how many
+ * attributes point at a list — three, in practice — and it runs on an authoring
+ * save, never on a read path.
+ */
+export const heldSetValues = async (uuid: string): Promise<Set<string>> => {
+  const specs = await db
+    .select({
+      uuid: Specifications.uuid,
+      optionSetUuid: Specifications.optionSetUuid,
+      groupFields: Specifications.groupFields,
+    })
+    .from(Specifications);
+
+  // Which attribute, and which COLUMN of it when the pointer is on a sub-field —
+  // the values live at different depths and `usedOptionValues` needs to be told
+  // which.
+  const borrowers: { specUuid: string; fieldKey?: string }[] = [];
+  for (const spec of specs) {
+    if (spec.optionSetUuid === uuid) {
+      borrowers.push({ specUuid: spec.uuid });
+    }
+    for (const field of spec.groupFields ?? []) {
+      if (field.optionSetUuid === uuid) {
+        borrowers.push({ specUuid: spec.uuid, fieldKey: field.key });
+      }
+    }
+  }
+
+  const held = await Promise.all(
+    borrowers.map((borrower) => readHeldValues(borrower.specUuid)),
+  );
+
+  const values = new Set<string>();
+  borrowers.forEach((borrower, index) => {
+    for (const value of usedOptionValues(
+      held[index]?.values ?? [],
+      borrower.fieldKey,
+    )) {
+      values.add(value);
+    }
+  });
+  return values;
 };
 
 export type HeldValues = {
