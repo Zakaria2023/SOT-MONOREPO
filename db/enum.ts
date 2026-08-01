@@ -294,6 +294,16 @@ export type RelationshipFamily = (typeof relationshipFamilies)[number];
 export const relationshipComparators = [
   "lte",
   "gte",
+  // STRICTLY below / above. The pair `lte`/`gte` cannot say "these are not the
+  // same rung", and that is exactly what a downshift notice is: a 1G module seats
+  // fine in a 10G cage and the link then runs at 1G. Said with `lte` the warning
+  // also fires on a correctly matched pair, and a warning that fires on the right
+  // answer is one people learn to click past.
+  //
+  // Only meaningful on an ordered scale — authoring refuses them otherwise,
+  // because "strictly below" has no membership reading the way `lte` does.
+  "lt",
+  "gt",
   "eq",
   "in",
   "intersects",

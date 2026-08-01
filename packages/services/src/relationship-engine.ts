@@ -963,11 +963,30 @@ const matchSatisfied = (
       ? consumerValues.some((value) => provider.has(value))
       : consumerValues.every((value) => provider.has(value));
   }
-  if (rule.comparator === "lte" || rule.comparator === "gte") {
+  if (
+    rule.comparator === "lte" ||
+    rule.comparator === "gte" ||
+    rule.comparator === "lt" ||
+    rule.comparator === "gt"
+  ) {
+    // STRICT comparisons exist for one job: saying that two rungs are not the
+    // same rung. "A 1G module in a 10G cage runs at 1G" is a fact worth telling
+    // the buyer, and it is only true when the module is genuinely below the cage
+    // — `lte` would say it about a correctly matched pair too, and a warning that
+    // fires on the right answer is a warning people learn to ignore.
+    const strict = rule.comparator === "lt" || rule.comparator === "gt";
+    // Which way the consumer has to sit relative to the provider.
+    const below = rule.comparator === "lte" || rule.comparator === "lt";
+
     // A ceiling comparison is only meaningful on a scale. An unordered list has
     // no "at most", so it degrades to plain membership rather than silently
     // comparing alphabetical position.
     if (!consumerMeta?.ordered && !providerMeta?.ordered) {
+      // There is no membership reading of "strictly below" — authoring refuses
+      // this pairing, and reaching it means the scale was turned off afterwards.
+      if (strict) {
+        return false;
+      }
       return (
         consumerValues.length > 0 &&
         consumerValues.every((value) => provider.has(value))
@@ -983,15 +1002,15 @@ const matchSatisfied = (
     if (providerRanks.length === 0 || consumerRanks.length === 0) {
       return false;
     }
-    // The provider offers its best rung: the highest it supports for "at most",
-    // the lowest it requires for "at least".
-    const best =
-      rule.comparator === "lte"
-        ? Math.max(...providerRanks)
-        : Math.min(...providerRanks);
-    return consumerRanks.every((rank) =>
-      rule.comparator === "lte" ? rank <= best : rank >= best,
-    );
+    // The provider offers its best rung: the highest it supports when the
+    // consumer must sit below it, the lowest it requires when it must sit above.
+    const best = below ? Math.max(...providerRanks) : Math.min(...providerRanks);
+    return consumerRanks.every((rank) => {
+      if (below) {
+        return strict ? rank < best : rank <= best;
+      }
+      return strict ? rank > best : rank >= best;
+    });
   }
 
   const consumer = new Set(consumerValues);

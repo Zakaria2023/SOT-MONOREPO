@@ -8,6 +8,7 @@ import type {
   RelationshipFamily,
   RelationshipGate,
 } from "../../../db/enum";
+import { RELATIONSHIP_COMPARATOR_LABELS } from "../../../db/label";
 import {
   Relationships,
   type SelectRelationships,
@@ -311,14 +312,15 @@ export const validateRelationship = async (
     } else {
       const consumerMeta = model.attributes.get(input.consumer.specUuid);
       const providerMeta = model.attributes.get(input.provider.specUuid);
-      if (
-        (input.comparator === "lte" || input.comparator === "gte") &&
-        !consumerMeta?.ordered &&
-        !providerMeta?.ordered
-      ) {
+      const ranked =
+        input.comparator === "lte" ||
+        input.comparator === "gte" ||
+        input.comparator === "lt" ||
+        input.comparator === "gt";
+      if (ranked && !consumerMeta?.ordered && !providerMeta?.ordered) {
         problems.push({
           field: "comparator",
-          message: `"at most" and "at least" only mean something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
+          message: `"${RELATIONSHIP_COMPARATOR_LABELS[input.comparator]}" only means something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
         });
       }
 
