@@ -168,6 +168,8 @@ type GroupFieldDraft = {
   // "" = this sub-field owns its picks. Anything else is a shared list's uuid,
   // and then `options`/`ordered` above are not shown and not sent.
   optionSetUuid: string;
+  // Which of that list's words this column uses. Empty = all of them.
+  setValues: string[];
 };
 
 type SharedListNoteProps = {
@@ -253,6 +255,7 @@ const toFieldDrafts = (fields: SpecGroupField[]): GroupFieldDraft[] =>
     ordered: field.ordered,
     options: toDrafts(field.options),
     optionSetUuid: field.optionSetUuid ?? "",
+    setValues: field.setValues ?? [],
   }));
 
 // Where a select's options come from. "" is the default and the common case —
@@ -332,6 +335,60 @@ const SubFieldSharedList = ({
       one, or give it its own options.
     </p>
   );
+
+// Which of a borrowed list's words ONE COLUMN of a repeatable row uses.
+//
+// The same narrowing the attribute itself can do, and it earns its place here
+// more than it does there: a port group's Speed column on a switch range that
+// tops out at 10G has no business offering 100G, and every row an author adds
+// puts that dropdown in front of them again.
+//
+// Nothing is rendered when the list has gone missing — `SubFieldSharedList`
+// above already says so, and a second complaint about the same fact is noise.
+const SubFieldSlice = ({
+  list,
+  value,
+  onChange,
+}: {
+  list?: OptionSet;
+  value: string[];
+  onChange: (next: string[]) => void;
+}) =>
+  list ? (
+    <Field
+      label="Which of its values this column uses"
+      hint={
+        value.length === 0
+          ? `All ${list.options.length}, including any added to the list later.`
+          : "Exactly these. Values added to the shared list later will not appear here until you add them."
+      }
+      accessory={
+        value.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="rounded-control px-2 py-0.5 text-xs text-muted hover:bg-hover hover:text-ink"
+          >
+            Use all
+          </button>
+        )
+      }
+    >
+      <Dropdown
+        multiple
+        value={value}
+        onChange={onChange}
+        options={list.options
+          .filter((option) => !option.retired)
+          .map((option) => ({ value: option.value, label: option.label }))}
+        // Empty is "all of them", not "none" — the same distinction the stored
+        // null draws, said out loud so an untouched field does not read as
+        // unanswered.
+        placeholder={`All ${list.options.length} values`}
+        searchable={list.options.length > 8}
+      />
+    </Field>
+  ) : null;
 
 const AttributeForm = ({
   groupUuid,
@@ -474,6 +531,10 @@ const AttributeForm = ({
                   : [],
               optionSetUuid:
                 field.kind === "select" ? field.optionSetUuid || null : null,
+              setValues:
+                field.kind === "select" && field.optionSetUuid
+                  ? field.setValues
+                  : null,
             }))
           : [],
     });
@@ -834,16 +895,27 @@ const AttributeForm = ({
                       />
                     </div>
                   ) : (
-                    <SubFieldSharedList
-                      list={sharedLists.find(
-                        (list) => list.uuid === field.optionSetUuid,
-                      )}
-                      exceptLabel={
-                        initial
-                          ? `${initial.label} · ${field.label}`
-                          : undefined
-                      }
-                    />
+                    <>
+                      <SubFieldSharedList
+                        list={sharedLists.find(
+                          (list) => list.uuid === field.optionSetUuid,
+                        )}
+                        exceptLabel={
+                          initial
+                            ? `${initial.label} · ${field.label}`
+                            : undefined
+                        }
+                      />
+                      <SubFieldSlice
+                        list={sharedLists.find(
+                          (list) => list.uuid === field.optionSetUuid,
+                        )}
+                        value={field.setValues}
+                        onChange={(setValues) =>
+                          setGroupField(index, { setValues })
+                        }
+                      />
+                    </>
                   )}
                 </div>
               )}
@@ -857,6 +929,7 @@ const AttributeForm = ({
                 ...current,
                 {
                   label: "",
+                  setValues: [],
                   kind: "number",
                   unit: "",
                   ordered: false,

@@ -570,3 +570,48 @@ describe("a group column using only some of a shared list", () => {
     );
   });
 });
+
+describe("a column's narrowing survives the save path", () => {
+  const field = (
+    extra: Partial<{
+      optionSetUuid: string | null;
+      setValues: string[] | null;
+    }>,
+  ) => ({
+    key: "speed",
+    label: "Speed",
+    kind: "select" as const,
+    unit: null,
+    ordered: false,
+    options: [],
+    ...extra,
+  });
+
+  it("is stored when the column borrows a list", () => {
+    const [merged] = mergeGroupFields(
+      [],
+      [field({ optionSetUuid: SPEED_SET, setValues: ["1g", "10g"] })],
+    );
+    expect(merged?.setValues).toEqual(["1g", "10g"]);
+  });
+
+  it("stores nothing rather than an empty list when every value is used", () => {
+    // Null and [] both mean "all of them", and two spellings of one state is
+    // something every reader below has to remember not to get wrong.
+    const [merged] = mergeGroupFields(
+      [],
+      [field({ optionSetUuid: SPEED_SET, setValues: [] })],
+    );
+    expect(merged?.setValues).toBeNull();
+  });
+
+  it("is dropped when the column stops borrowing", () => {
+    // Otherwise it comes back to life the day somebody points the column at a
+    // list again, hiding words nobody chose to hide.
+    const [merged] = mergeGroupFields(
+      [],
+      [field({ optionSetUuid: null, setValues: ["1g"] })],
+    );
+    expect(merged?.setValues).toBeNull();
+  });
+});
