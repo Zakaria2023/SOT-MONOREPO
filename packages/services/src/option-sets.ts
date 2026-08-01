@@ -2,10 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import { Products } from "../../../db/schema/products";
-import {
-  SelectSpecificationOptionSets,
-  SpecificationOptionSets,
-} from "../../../db/schema/specification-option-sets";
+import { SpecificationOptionSets } from "../../../db/schema/specification-option-sets";
 import { Specifications } from "../../../db/schema/specifications";
 import type { ProductValue, SpecOption } from "../../../db/types";
 import { recordAudit } from "./catalog-audit";
@@ -35,7 +32,6 @@ import { mergeOptions, type LibraryOptionInput } from "./library-options";
 
 export type OptionSetInput = {
   name: string;
-  description: string | null;
   ordered: boolean;
   options: LibraryOptionInput[];
 };
@@ -43,7 +39,6 @@ export type OptionSetInput = {
 export type OptionSet = {
   uuid: string;
   name: string;
-  description: SelectSpecificationOptionSets["description"];
   ordered: boolean;
   options: SpecOption[];
   // What points at it. Drives the "in use by" line and the delete guard's
@@ -103,7 +98,6 @@ export const getOptionSets = async (): Promise<OptionSet[]> => {
   return sets.map((set) => ({
     uuid: set.uuid,
     name: set.name,
-    description: set.description,
     ordered: set.ordered,
     options: set.options ?? [],
     attributeLabels: direct.get(set.uuid) ?? [],
@@ -133,7 +127,6 @@ export const createOptionSet = async (
   await db.insert(SpecificationOptionSets).values({
     uuid,
     name: input.name.trim(),
-    description: input.description?.trim() || null,
     ordered: input.ordered,
     options: mergeOptions([], input.options, input.ordered),
   });
@@ -183,8 +176,7 @@ export const updateOptionSet = async (
     .update(SpecificationOptionSets)
     .set({
       name: input.name.trim(),
-      description: input.description?.trim() || null,
-      ordered: input.ordered,
+        ordered: input.ordered,
       options: mergeOptions(
         current.options ?? [],
         input.options,

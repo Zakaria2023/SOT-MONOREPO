@@ -13,6 +13,7 @@ import { RowFilter } from "@/components/assignments/row-filter";
 import { Field } from "@/components/shared/field";
 import { PresenceEditor } from "@/components/assignments/presence-editor";
 import {
+  ConditionPicker,
   describePredicate,
   describeRowFilter,
   type PredicateAttribute,
@@ -155,7 +156,12 @@ const comparatorsFor = (
     // "within" is the only one that reads a span, which is what a voltage or a
     // frequency window actually is — a PSU supplying 48 V against a device
     // accepting 36–57 V needs both ends, and a lone ceiling passes 12 V in silence.
-    return ["in", "intersects", "eq", "lte", "gte", "within"];
+    //
+    // "below"/"above" are the strict pair, and they exist for the notice rather
+    // than the gate: a 1G module seats fine in a 10G cage, and the thing worth
+    // telling the buyer is that the link then runs at 1G. "at most" would say it
+    // about a correctly matched pair too.
+    return ["in", "intersects", "eq", "lte", "gte", "lt", "gt", "within"];
   }
   if (family === "budget" || family === "count" || family === "conditional") {
     return ["lte", "gte", "eq"];
@@ -417,7 +423,14 @@ const RelationForm = ({
       return `${counted} ≤ Σ("${b}" × qty)`;
     }
     if (form.family === "match") {
-      return `"${a}" ${RELATIONSHIP_COMPARATOR_LABELS[form.comparator]} "${b}"`;
+      // The FILTERS belong in the summary, not just in the form. The port model
+      // is three rules that differ only by their family guard, and without this
+      // all three read as one identical sentence in the list.
+      const side = (predicate: Predicate | null): string =>
+        predicate
+          ? ` (${describePredicate(predicate, attributes, categoryOptions)})`
+          : "";
+      return `"${a}"${side(form.consumerWhen)} ${RELATIONSHIP_COMPARATOR_LABELS[form.comparator]} "${b}"${side(form.providerWhen)}`;
     }
     if (form.family === "ratio") {
       return `"${a}" ÷ "${b}" ≤ ${form.ratioLimit ?? "…"}:1`;
@@ -619,6 +632,23 @@ const RelationForm = ({
             attributes={attributes}
             onChange={(next) => patch({ consumer: next })}
           />
+          {/* WHICH items count as side A, beyond simply carrying the attribute.
+              The engine has always applied these; nothing could author them, so
+              every match rule compared every item that held the value against
+              every item that held the other. That is unanswerable for a physical
+              fit: an SFP module and a QSFP cage both carry a speed, and without a
+              family guard the rule cheerfully compares them. */}
+          <Field
+            label="Side A is limited to"
+            hint="Leave empty and every item carrying the attribute takes part."
+          >
+            <ConditionPicker
+              value={form.consumerWhen}
+              onChange={(consumerWhen) => patch({ consumerWhen })}
+              attributes={attributes}
+              emptyLabel="Anything carrying attribute A"
+            />
+          </Field>
           <Field label="Compatible via">
             <Dropdown
               value={form.comparator}
@@ -642,6 +672,17 @@ const RelationForm = ({
             attributes={attributes}
             onChange={(next) => patch({ provider: next })}
           />
+          <Field
+            label="Side B is limited to"
+            hint="The pair of these two is what expresses a family guard — SFP against SFP, never SFP against QSFP."
+          >
+            <ConditionPicker
+              value={form.providerWhen}
+              onChange={(providerWhen) => patch({ providerWhen })}
+              attributes={attributes}
+              emptyLabel="Anything carrying attribute B"
+            />
+          </Field>
         </>
       )}
 

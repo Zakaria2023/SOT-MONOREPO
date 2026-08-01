@@ -8,6 +8,7 @@ import type {
   RelationshipFamily,
   RelationshipGate,
 } from "../../../db/enum";
+import { RELATIONSHIP_COMPARATOR_LABELS } from "../../../db/label";
 import {
   Relationships,
   type SelectRelationships,
@@ -311,14 +312,15 @@ export const validateRelationship = async (
     } else {
       const consumerMeta = model.attributes.get(input.consumer.specUuid);
       const providerMeta = model.attributes.get(input.provider.specUuid);
-      if (
-        (input.comparator === "lte" || input.comparator === "gte") &&
-        !consumerMeta?.ordered &&
-        !providerMeta?.ordered
-      ) {
+      const ranked =
+        input.comparator === "lte" ||
+        input.comparator === "gte" ||
+        input.comparator === "lt" ||
+        input.comparator === "gt";
+      if (ranked && !consumerMeta?.ordered && !providerMeta?.ordered) {
         problems.push({
           field: "comparator",
-          message: `"at most" and "at least" only mean something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
+          message: `"${RELATIONSHIP_COMPARATOR_LABELS[input.comparator]}" only means something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
         });
       }
 
@@ -649,6 +651,36 @@ export const previewRelationship = async (
 };
 
 /** A one-line reading of the rule, built from the row itself. */
+/**
+ * A side filter, short enough to sit inside a one-line summary.
+ *
+ * Deliberately shallow: the value is what distinguishes one guard from another
+ * ("family is SFP" against "family is QSFP"), so a simple equality is spelled out
+ * in full and anything more complex is named rather than unfolded. A summary that
+ * tried to render a whole predicate tree would stop being a summary.
+ */
+const describeSide = (
+  predicate: Predicate | null,
+  model: Awaited<ReturnType<typeof getCatalogModel>>,
+): string => {
+  if (!predicate) {
+    return "";
+  }
+  if (predicate.op === "equals" || predicate.op === "not_equals") {
+    const meta = model.attributes.get(predicate.attr);
+    const label =
+      meta?.options.find((option) => option.value === predicate.value)?.label ??
+      String(predicate.value);
+    const negated = predicate.op === "not_equals" ? " not" : "";
+    return ` (where ${meta?.label ?? "a deleted attribute"} is${negated} ${label})`;
+  }
+  if (predicate.op === "exists") {
+    const meta = model.attributes.get(predicate.attr);
+    return ` (where ${meta?.label ?? "a deleted attribute"} is answered)`;
+  }
+  return " (on a filtered set)";
+};
+
 export const summarizeRelationship = (
   rule: EngineRelationship,
   model: Awaited<ReturnType<typeof getCatalogModel>>,
@@ -694,7 +726,11 @@ export const summarizeRelationship = (
     return `The number of ${counted} must fit ${name(rule.provider)}${headroom}.`;
   }
   if (rule.family === "match") {
-    return `${name(rule.consumer)} must be compatible with ${name(rule.provider)}.`;
+    // Names the comparator and both side filters. "must be compatible with" hid
+    // the difference between a seat gate and a downshift notice, and hid the
+    // family guard entirely — so the three rules the port model needs, which
+    // differ ONLY by their guard, all read as the same sentence.
+    return `${name(rule.consumer)}${describeSide(rule.consumerWhen, model)} ${RELATIONSHIP_COMPARATOR_LABELS[rule.comparator]} ${name(rule.provider)}${describeSide(rule.providerWhen, model)}.`;
   }
   if (rule.family === "ratio") {
     return `${name(rule.consumer)} ÷ ${name(rule.provider)} must stay within ${rule.ratioLimit}:1.`;

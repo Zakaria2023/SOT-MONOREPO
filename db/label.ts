@@ -75,6 +75,8 @@ export const RELATIONSHIP_COMPARATOR_LABELS: Record<
 > = {
   lte: "must be at most",
   gte: "must be at least",
+  lt: "must be below",
+  gt: "must be above",
   eq: "must equal",
   in: "must be one of",
   intersects: "must overlap",

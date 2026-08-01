@@ -19,7 +19,6 @@ import {
   ConfirmDialog,
   Dropdown,
   Input,
-  Textarea,
   type DropdownOption,
 } from "ui";
 
@@ -56,16 +55,10 @@ const VariableForm = ({
   error,
 }: VariableFormProps) => {
   const [label, setLabel] = useState(initial?.label ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
   const [type, setType] = useState<"number" | "boolean">(
     initial?.type ?? "number",
   );
   const [unit, setUnit] = useState(initial?.unit ?? "");
-  const [defaultValue, setDefaultValue] = useState(
-    initial?.defaultValue === null || initial?.defaultValue === undefined
-      ? ""
-      : String(Number(initial.defaultValue)),
-  );
 
   return (
     <div className="flex flex-col gap-3 rounded-card border border-primary/40 bg-surface p-4">
@@ -75,14 +68,7 @@ const VariableForm = ({
         value={label}
         onChange={(event) => setLabel(event.target.value)}
       />
-      <Textarea
-        label="Help text (optional)"
-        rows={2}
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-      />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Answer type">
           <Dropdown
             value={type}
@@ -102,19 +88,12 @@ const VariableForm = ({
           </Field>
         )}
 
-        <Input
-          label="Default (optional)"
-          type="number"
-          placeholder="Leave blank"
-          value={defaultValue}
-          onChange={(event) => setDefaultValue(event.target.value)}
-        />
       </div>
 
       <p className="text-[11px] text-muted">
-        Leave the default blank when there is no sensible one. A rule that needs
-        an unanswered input does not run — it asks the buyer the question instead
-        of guessing at a number nobody supplied.
+        There is no default: the buyer is always asked. A rule whose input is
+        unanswered does not run, which is the honest outcome — it reports the
+        question rather than guessing at a number nobody supplied.
       </p>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
@@ -128,11 +107,8 @@ const VariableForm = ({
           onClick={() =>
             onSubmit({
               label,
-              description: description.trim() === "" ? null : description,
               type,
               unit: type === "number" ? unit || null : null,
-              defaultValue:
-                defaultValue.trim() === "" ? null : Number(defaultValue),
             })
           }
         >
@@ -248,15 +224,7 @@ export const ProjectInputs = ({ variables }: ProjectInputsProps) => {
                     {variable.unit}
                   </span>
                 )}
-                {variable.defaultValue !== null && (
-                  <span className="text-[11px] text-faint">
-                    default {Number(variable.defaultValue)}
-                  </span>
-                )}
               </div>
-              {variable.description && (
-                <p className="mt-1 text-xs text-muted">{variable.description}</p>
-              )}
             </div>
 
             <div className="flex shrink-0 items-center gap-1">

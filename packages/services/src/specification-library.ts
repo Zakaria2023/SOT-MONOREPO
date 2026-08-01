@@ -825,11 +825,12 @@ export const reorderLibraryAttributes = async (
 // ---------------------------------------------------------------------------
 
 export type ProjectVariableInput = {
+  // The question, in the buyer's words. There is no help text and no default:
+  // a second prose box asks what the question already says, and a default is a
+  // number nobody supplied being fed to a rule as though someone had.
   label: string;
-  description: string | null;
   type: "number" | "boolean";
   unit: string | null;
-  defaultValue: number | null;
 };
 
 export const getProjectVariables = async () =>
@@ -849,11 +850,8 @@ export const createProjectVariable = async (
     uuid,
     label: input.label.trim(),
     key: slugify(input.label) || "input",
-    description: input.description?.trim() || null,
     type: input.type,
     unit: input.type === "number" ? input.unit?.trim() || null : null,
-    defaultValue:
-      input.defaultValue === null ? null : String(input.defaultValue),
     order: Number(total?.value ?? 0),
   });
 
@@ -877,11 +875,8 @@ export const updateProjectVariable = async (
     .update(ProjectVariables)
     .set({
       label: input.label.trim(),
-      description: input.description?.trim() || null,
       type: input.type,
       unit: input.type === "number" ? input.unit?.trim() || null : null,
-      defaultValue:
-        input.defaultValue === null ? null : String(input.defaultValue),
     })
     .where(eq(ProjectVariables.uuid, uuid));
 

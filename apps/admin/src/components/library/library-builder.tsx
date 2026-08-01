@@ -562,7 +562,15 @@ const AttributeForm = ({
               out only to watch it disappear. */}
           <Field
             label="Where the options come from"
-            hint="Point at a shared list when this attribute's values have to be comparable with another one's — a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
+            // With no shared list authored yet this control offers exactly one
+            // choice, and a dropdown with a single dead entry reads as a broken
+            // field rather than a feature nobody has used — so it says where the
+            // second choice comes from instead of leaving the author to find out.
+            hint={
+              sharedLists.length === 0
+                ? "No shared lists yet — create one on the Shared lists tab and it appears here. You want one when this attribute's values have to be comparable with another one's: a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
+                : "Point at a shared list when this attribute's values have to be comparable with another one's — a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
+            }
           >
             <Dropdown
               value={optionSetUuid}
