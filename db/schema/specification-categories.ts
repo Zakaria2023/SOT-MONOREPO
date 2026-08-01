@@ -91,6 +91,32 @@ export const SpecificationCategories = mysqlTable(
     // of thing nobody remembers six months later.
     suppressed: boolean("suppressed").default(false).notNull(),
 
+    // Switch 8 — is a BLANK a real answer here?
+    //
+    // Only read when `isRule` is on, and it is deliberately not a third state of
+    // that switch. isRule=false means the engine never reads the attribute at
+    // all; this means the engine reads it when it is there and expects nothing
+    // when it is not.
+    //
+    // Default false, because the default has to be the safe one: an attribute the
+    // engine reads is mandatory, and a camera with a blank power draw passing
+    // every budget check is the failure the whole completeness model exists to
+    // stop. Turning this on is an author SAYING, per category, that this
+    // particular blank is legitimate.
+    //
+    // The case it is for: an attribute that is genuinely unanswerable for some
+    // members of a category. A switch's uplink media type is a real fact on a
+    // fixed copper uplink and a meaningless one on an SFP cage, where the media
+    // is whatever transceiver someone plugs in later. Without this the SFP switch
+    // is permanently incomplete and every rule touching it reports "could not be
+    // checked" — a warning that fires on the correct answer, which is the kind
+    // people learn to click past, and then they click past the real ones too.
+    //
+    // What it does NOT waive: a value that IS present must still be readable. An
+    // unknown option or an unreadable group row is reported exactly as before.
+    // The waiver is only over absence.
+    optional: boolean("optional").default(false).notNull(),
+
     // Display order within this category, independent of the library's own.
     order: int("order").default(0).notNull(),
 

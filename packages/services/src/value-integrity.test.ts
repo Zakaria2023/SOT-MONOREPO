@@ -180,6 +180,7 @@ const assignment = (
 ): ResolvedAssignment => ({
   isFilter: false,
   isRule: true,
+  optional: false,
   scope: "branch",
   showIf: null,
   audience: "everyone",

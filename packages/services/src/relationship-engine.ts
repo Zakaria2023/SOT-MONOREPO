@@ -16,16 +16,22 @@ import type {
   ProductValues,
   RelationshipScope,
   SpecGroupField,
+  SpecOption,
   SpecRange,
 } from "../../../db/types";
 import { operandVariableUuid } from "../../../db/types";
-import { evaluatePredicate, filteredGroupTotal } from "./predicate";
+import {
+  evaluatePredicate,
+  filteredGroupPicks,
+  filteredGroupTotal,
+} from "./predicate";
 import {
   asNumber,
   asOptionList,
   asRange,
   describeValue,
   formatValue,
+  groupFieldRank,
   groupSubField,
   hasValue,
   optionLabel,
@@ -316,12 +322,7 @@ const itemOperandValue = (
   // switch whose ports became unreadable reads as null here and is reported as a
   // gap rather than counted short. Completeness names the same rows.
   if (operand.groupField) {
-    return filteredGroupTotal(
-      raw,
-      meta,
-      operand.groupField,
-      operand.where,
-    );
+    return filteredGroupTotal(raw, meta, operand.groupField, operand.where);
   }
   return asNumber(raw, meta, bound);
 };
@@ -871,17 +872,108 @@ const describeSkipped = (skipped: SkippedItem[]): string =>
 // Match
 // ---------------------------------------------------------------------------
 
+// ONE SIDE of a match, reduced to what the comparators need.
+//
+// This type exists because a match side is not always an attribute's own value.
+// When the operand names a group column — "the families this switch has cages
+// for" — the values are that column's picks and the RANKS are the column's own,
+// because a `group` attribute has no options of its own to rank against.
+//
+// Before it existed the match path read `asOptionList(readValue(...))` directly,
+// which returns an EMPTY list for group rows by design. A match rule pointed at a
+// group therefore judged every consumer against nothing, found nothing
+// satisfiable, and — on a `block` rule — stopped every cart in the catalog. It
+// looked like a real finding, which is what made it worth a type rather than a
+// patch at each of the four call sites.
+type MatchSide = {
+  // Option values. Empty for a span, which is why `span` is carried alongside
+  // rather than derived at the comparator.
+  values: string[];
+  ordered: boolean;
+  // The vocabulary carrying the ranks — the attribute's list, or the group
+  // column's.
+  options: SpecOption[];
+  span: SpecRange | null;
+  // Whether this item participates on this side at all. NOT `values.length > 0`:
+  // a span has no option values and is still a perfectly readable answer.
+  readable: boolean;
+  // What a finding calls it — "Network Ports · Family", not "Network Ports".
+  label: string;
+};
+
+const matchSide = (
+  operand: Operand & { source: "spec" },
+  values: ProductValues,
+  context: EngineContext,
+): MatchSide => {
+  const meta = operandMeta(operand, context);
+  const raw = readValue(values, operand.specUuid);
+  const label = operandLabel(operand, context);
+  if (!meta) {
+    return {
+      values: [],
+      ordered: false,
+      options: [],
+      span: null,
+      readable: false,
+      label,
+    };
+  }
+
+  const subField = operandSubField(operand, context);
+  if (subField && operand.groupField) {
+    const picks = filteredGroupPicks(
+      raw,
+      meta,
+      operand.groupField,
+      operand.where,
+    );
+    const ranks = picks
+      .map((value) => groupFieldRank(subField, value))
+      .filter((rank): rank is number => rank !== null);
+    return {
+      values: picks,
+      ordered: subField.ordered,
+      options: subField.options,
+      // An ordered column spans its own picks, so a 1G/10G switch reads as
+      // [1G, 10G] and `within` works on a group exactly as it does elsewhere.
+      span:
+        subField.ordered && ranks.length > 0
+          ? { min: Math.min(...ranks), max: Math.max(...ranks) }
+          : null,
+      readable: picks.length > 0,
+      label,
+    };
+  }
+
+  return {
+    values: asOptionList(raw),
+    ordered: meta.ordered,
+    options: meta.options,
+    span: asSpan(raw, meta),
+    // The plain case, and identical to the old `hasValue` test for every type
+    // that reaches it — a select yields its picks, a number yields one entry, a
+    // span yields a span.
+    readable: hasValue(raw),
+    label,
+  };
+};
+
+/**
+ * A value's position on the scale, taking either side's vocabulary.
+ *
+ * Both sides are tried because two attributes sharing a vocabulary resolve the
+ * same options, and a value one side does not carry may still be rankable by the
+ * other — which is exactly the case a shared option set exists to create.
+ */
 const scaleRank = (
   value: string,
-  metas: (AttributeMeta | null)[],
+  vocabularies: SpecOption[][],
 ): number | null => {
-  for (const meta of metas) {
-    if (!meta) {
-      continue;
-    }
-    const rank = optionRank(meta, value);
-    if (rank !== null) {
-      return rank;
+  for (const options of vocabularies) {
+    const option = options.find((entry) => entry.value === value);
+    if (option && option.rank !== null) {
+      return option.rank;
     }
   }
   return null;
@@ -928,28 +1020,27 @@ const asSpan = (
  *   within     — the consumer's whole span sits inside the provider's
  */
 const matchSatisfied = (
-  consumerRaw: ProductValue | undefined,
-  providerRaw: ProductValue | undefined,
+  consumerSide: MatchSide,
+  providerSide: MatchSide,
   rule: EngineRelationship,
-  consumerMeta: AttributeMeta | null,
-  providerMeta: AttributeMeta | null,
 ): boolean => {
   // `within` is about magnitude, not membership, so it is answered before the
   // values are flattened into option lists — a span flattens to nothing (see
   // `asOptionList`), which is exactly why the set comparators cannot express it.
   if (rule.comparator === "within") {
-    const consumerSpan = asSpan(consumerRaw, consumerMeta);
-    const providerSpan = asSpan(providerRaw, providerMeta);
+    const consumerSpan = consumerSide.span;
+    const providerSpan = providerSide.span;
     if (!consumerSpan || !providerSpan) {
       return false;
     }
     return (
-      consumerSpan.min >= providerSpan.min && consumerSpan.max <= providerSpan.max
+      consumerSpan.min >= providerSpan.min &&
+      consumerSpan.max <= providerSpan.max
     );
   }
 
-  const consumerValues = asOptionList(consumerRaw);
-  const providerValues = asOptionList(providerRaw);
+  const consumerValues = consumerSide.values;
+  const providerValues = providerSide.values;
   const provider = new Set(providerValues);
 
   if (rule.comparator === "intersects") {
@@ -981,7 +1072,7 @@ const matchSatisfied = (
     // A ceiling comparison is only meaningful on a scale. An unordered list has
     // no "at most", so it degrades to plain membership rather than silently
     // comparing alphabetical position.
-    if (!consumerMeta?.ordered && !providerMeta?.ordered) {
+    if (!consumerSide.ordered && !providerSide.ordered) {
       // There is no membership reading of "strictly below" — authoring refuses
       // this pairing, and reaching it means the scale was turned off afterwards.
       if (strict) {
@@ -992,19 +1083,21 @@ const matchSatisfied = (
         consumerValues.every((value) => provider.has(value))
       );
     }
-    const metas = [providerMeta, consumerMeta];
+    const vocabularies = [providerSide.options, consumerSide.options];
     const providerRanks = providerValues
-      .map((value) => scaleRank(value, metas))
+      .map((value) => scaleRank(value, vocabularies))
       .filter((rank): rank is number => rank !== null);
     const consumerRanks = consumerValues
-      .map((value) => scaleRank(value, metas))
+      .map((value) => scaleRank(value, vocabularies))
       .filter((rank): rank is number => rank !== null);
     if (providerRanks.length === 0 || consumerRanks.length === 0) {
       return false;
     }
     // The provider offers its best rung: the highest it supports when the
     // consumer must sit below it, the lowest it requires when it must sit above.
-    const best = below ? Math.max(...providerRanks) : Math.min(...providerRanks);
+    const best = below
+      ? Math.max(...providerRanks)
+      : Math.min(...providerRanks);
     return consumerRanks.every((rank) => {
       if (below) {
         return strict ? rank < best : rank <= best;
@@ -1060,39 +1153,60 @@ const evaluateMatch = (
     totalValue: 0,
   });
 
-  const consumers = selection.filter(
-    (item) =>
-      hasValue(readValue(item.values, consumerOperand.specUuid)) &&
-      evaluatePredicate(rule.consumerWhen, item.values, context.attributes, {
-        categoryChain: item.categoryChain,
-      }).matched,
+  // Each item reduced to its side ONCE. Reading it per comparison instead would
+  // re-filter every group's rows for every consumer/provider pair, which is the
+  // quadratic allocation this engine deliberately avoids.
+  const sideFor = (
+    operand: Operand & { source: "spec" },
+    items: EngineItem[],
+  ): { item: EngineItem; side: MatchSide }[] =>
+    items
+      .map((item) => ({ item, side: matchSide(operand, item.values, context) }))
+      .filter((entry) => entry.side.readable);
+
+  const consumers = sideFor(
+    consumerOperand,
+    selection.filter(
+      (item) =>
+        evaluatePredicate(rule.consumerWhen, item.values, context.attributes, {
+          categoryChain: item.categoryChain,
+        }).matched,
+    ),
   );
+  // The operand's label, not the attribute's — a rule reading one column of a
+  // group has to say which column, or "Nothing carries Network Ports" is said
+  // about a switch that plainly has ports.
+  const consumerLabel = operandLabel(consumerOperand, context);
+  const providerLabel = operandLabel(providerOperand, context);
+
   if (consumers.length === 0) {
     return {
       ...base,
       status: "not_applicable",
-      message: `Nothing in the selection carries "${consumerMeta.label}" — this check does not apply.`,
+      message: `Nothing in the selection carries "${consumerLabel}" — this check does not apply.`,
     };
   }
 
-  const providers = selection.filter(
-    (item) =>
-      hasValue(readValue(item.values, providerOperand.specUuid)) &&
-      evaluatePredicate(rule.providerWhen, item.values, context.attributes, {
-        categoryChain: item.categoryChain,
-      }).matched,
+  const providers = sideFor(
+    providerOperand,
+    selection.filter(
+      (item) =>
+        evaluatePredicate(rule.providerWhen, item.values, context.attributes, {
+          categoryChain: item.categoryChain,
+        }).matched,
+    ),
   );
   const withSides = {
     ...base,
-    consumers: consumers.map(participant),
-    providers: providers.map(participant),
+    consumers: consumers.map((entry) => participant(entry.item)),
+    providers: providers.map((entry) => participant(entry.item)),
   };
 
   if (providers.length === 0) {
     return {
       ...withSides,
       status: "not_applicable",
-      message: `Nothing in the selection carries "${providerMeta.label}" to match against.`,
+      message: `Nothing in the selection carries "${providerLabel}" to match against.`,
     };
   }
 
@@ -1104,36 +1218,28 @@ const evaluateMatch = (
   // range on either side reported EVERY item as failing: one authoring slip and
   // the rule blocked every cart in the catalog, while reading like a real finding.
   // Reported as unknown instead, which is what an unanswerable comparison is.
+  //
+  // Asked of each side's OWN reduction rather than by re-reading the item: an
+  // item can be on both sides of a rule, and the old test picked the consumer
+  // operand for anything that was, so a span on the provider side of such an item
+  // went unnoticed.
   const spanSide =
     rule.comparator !== "within" &&
-    [...consumers, ...providers].some((item) =>
-      asRange(
-        readValue(
-          item.values,
-          consumers.includes(item)
-            ? consumerOperand.specUuid
-            : providerOperand.specUuid,
-        ),
-      ),
+    [...consumers, ...providers].some(
+      (entry) => entry.side.span !== null && entry.side.values.length === 0,
     );
   if (spanSide) {
     return {
       ...withSides,
       status: "unknown",
-      message: `"${rule.name}" compares values as sets, but something in the selection answers "${consumerMeta.label}" or "${providerMeta.label}" as a range. Use "must fall within" to compare a value against a span.`,
+      message: `"${rule.name}" compares values as sets, but something in the selection answers "${consumerLabel}" or "${providerLabel}" as a range. Use "must fall within" to compare a value against a span.`,
     };
   }
 
   const failing = consumers.filter(
-    (item) =>
+    (entry) =>
       !providers.some((provider) =>
-        matchSatisfied(
-          readValue(item.values, consumerOperand.specUuid),
-          readValue(provider.values, providerOperand.specUuid),
-          rule,
-          consumerMeta,
-          providerMeta,
-        ),
+        matchSatisfied(entry.side, provider.side, rule),
       ),
   );
 
@@ -1141,32 +1247,41 @@ const evaluateMatch = (
     return {
       ...withSides,
       status: "pass",
-      message: `Every item's "${consumerMeta.label}" is compatible with the available "${providerMeta.label}".`,
+      message: `Every item's "${consumerLabel}" is compatible with the available "${providerLabel}".`,
     };
   }
 
+  // Labels resolved against the side's OWN vocabulary — a group column's options,
+  // when that is where the values came from. Read off the attribute instead, a
+  // group has no options and every value rendered as its raw stored string.
+  const describeSide = (side: MatchSide): string =>
+    side.values
+      .map(
+        (value) =>
+          side.options.find((option) => option.value === value)?.label ?? value,
+      )
+      .join(", ");
+
   const offered = [
-    ...new Set(
-      providers.flatMap((item) =>
-        asOptionList(readValue(item.values, providerOperand.specUuid)),
-      ),
-    ),
-  ].map((value) => optionLabel(providerMeta, value));
+    ...new Set(providers.flatMap((entry) => entry.side.values)),
+  ].map(
+    (value) =>
+      providers
+        .flatMap((entry) => entry.side.options)
+        .find((option) => option.value === value)?.label ?? value,
+  );
 
   return {
     ...withSides,
-    failingItems: failing.map(participant),
+    failingItems: failing.map((entry) => participant(entry.item)),
     status: violation(rule),
-    message: `${failing.length} item(s) have a "${consumerMeta.label}" the available "${providerMeta.label}" (${offered.join(", ") || "none"}) cannot support: ${failing
-      .map(
-        (item) =>
-          `${item.name} (${describeValue(readValue(item.values, consumerOperand.specUuid), consumerMeta)})`,
-      )
+    message: `${failing.length} item(s) have a "${consumerLabel}" the available "${providerLabel}" (${offered.join(", ") || "none"}) cannot support: ${failing
+      .map((entry) => `${entry.item.name} (${describeSide(entry.side)})`)
       .join(", ")}.`,
     corrections: [
       correction(
         "swap",
-        `Swap either side: pick items whose "${consumerMeta.label}" is one of ${offered.join(", ") || "the supported values"}, or a device whose "${providerMeta.label}" covers what you have.`,
+        `Swap either side: pick items whose "${consumerLabel}" is one of ${offered.join(", ") || "the supported values"}, or a device whose "${providerLabel}" covers what you have.`,
       ),
     ],
   };

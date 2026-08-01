@@ -183,6 +183,8 @@ const applyAttributeCategories = async (
           specificationUuid,
           isFilter: false,
           isRule: true,
+          // Mandatory by default — see the note on the other branch.
+          optional: false,
           scope: "branch" as const,
           showIf: null,
           audience: "everyone" as const,
@@ -213,6 +215,10 @@ const applyAttributeCategories = async (
         // decides that deliberately on the assignments screen.
         isFilter: false,
         isRule: true,
+        // Mandatory by default. Whether a blank is legitimate is a per-category
+        // judgement, made deliberately on the assignments screen — never a
+        // default applied to every category an attribute was just linked to.
+        optional: false,
         scope: "branch" as const,
         showIf: null,
         audience: "everyone" as const,

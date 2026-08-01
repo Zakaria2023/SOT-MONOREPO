@@ -193,6 +193,7 @@ const assignment = (
 ): AssignmentRow => ({
   isFilter: false,
   isRule: true,
+  optional: false,
   scope: "branch",
   showIf: null,
   audience: "everyone",

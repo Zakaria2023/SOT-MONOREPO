@@ -151,6 +151,8 @@ export type SpecificationDomain = (typeof specificationDomains)[number];
 //                   every such bug looks like a passing check.
 //   group         — a REPEATABLE row of counts and picks, defined by the
 //                   attribute's own `groupFields` schema.
+//   text          — prose. The ONLY type nothing can compute on, and the only
+//                   one forbidden from every switch that would let it try.
 //
 // `group` exists because some facts are a list, not a value. "24 × 1G BASE-T,
 // 16 × 10G SFP" is four port groups on one switch, and no single option can hold
@@ -159,15 +161,27 @@ export type SpecificationDomain = (typeof specificationDomains)[number];
 // the first place. One type covers every such fact we have — network ports,
 // power outlets, and slot systems are all {how many, of which kind}.
 //
-// There is no `text` type. Free text can never feed a rule, and an attribute
-// that cannot feed a rule or a filter is marketing copy — it belongs on the
-// product, not in a registry whose whole purpose is machine comparison.
+// `text` exists reluctantly, and for one reason: WITHOUT it, prose still gets
+// recorded — as OPTIONS. An author with a mounting note and only a select to put
+// it in adds "Ceiling or wall, bracket sold separately" to the master list, and
+// that list is now a vocabulary with a sentence in it. Every attribute sharing it
+// inherits the sentence, near-duplicate detection cannot see that two long
+// sentences are the same fact, and a rule keyed on that list quietly stops
+// lining up. The pollution is worse than the prose.
+//
+// So the fear the old comment recorded — "an attribute that cannot feed a rule is
+// marketing copy" — is answered structurally rather than by leaving the type out:
+// a `text` attribute may not be a rule input, may not be a facet, may not be a
+// rule operand, and may not appear in a condition. All four are REFUSED at save
+// time (see specification-assignments, relationships, predicate), not merely
+// discouraged. It is a place to write things down, and it is wired to nothing.
 export const specificationTypes = [
   "number",
   "single_select",
   "multi_select",
   "boolean",
   "group",
+  "text",
 ] as const satisfies readonly string[];
 
 export type SpecificationType = (typeof specificationTypes)[number];

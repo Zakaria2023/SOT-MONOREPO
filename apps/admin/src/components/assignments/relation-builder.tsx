@@ -242,6 +242,16 @@ const RelationForm = ({
   // in the same dropdown as attributes because from the rule's point of view
   // they are the same thing — a number to compare. There are none today, so this
   // reads as a plain attribute list; it stays correct the day somebody adds one.
+  // WHICH column of a group a rule can use depends on the family, because the two
+  // read a group completely differently. Budget and count TOTAL a column, so they
+  // need the counts. Match COMPARES a column's picks, so it needs the lists — the
+  // families a switch has cages for, against the family a module is.
+  //
+  // Offering counts to a match rule was what made the port model unauthorable:
+  // the only sub-fields on the list were "Ports", the picks were nowhere, and the
+  // rule an author could actually build compared two numbers of ports.
+  const wantedColumn = form.family === "match" ? "select" : "number";
+
   const sideOptions = useMemo<DropdownOption[]>(
     () => [
       ...attributes
@@ -251,18 +261,21 @@ const RelationForm = ({
             groups.includes(attribute.groupName ?? UNGROUPED),
         )
         // A group is not offered as itself. It holds rows, so it has no single
-        // number to compare — each COUNT inside it is offered instead, which is
-        // what the rule actually totals. Offering the attribute alone would let an
-        // author build a rule that silently reads nothing.
+        // value to compare — each usable COLUMN inside it is offered instead,
+        // which is what the rule actually reads. Offering the attribute alone
+        // would let an author build a rule that silently reads nothing.
         .flatMap((attribute) =>
           attribute.type === "group"
             ? attribute.groupFields
-                .filter((field) => field.kind === "number")
+                .filter((field) => field.kind === wantedColumn)
                 .map((field) => ({
                   value: `${attribute.uuid}${FIELD_SEPARATOR}${field.key}`,
-                  label: field.unit
-                    ? `${attribute.label} · ${field.label} (${field.unit}, totalled)`
-                    : `${attribute.label} · ${field.label} (totalled)`,
+                  label:
+                    wantedColumn === "select"
+                      ? `${attribute.label} · ${field.label} (the values in the rows)`
+                      : field.unit
+                        ? `${attribute.label} · ${field.label} (${field.unit}, totalled)`
+                        : `${attribute.label} · ${field.label} (totalled)`,
                 }))
             : [
                 {
@@ -280,11 +293,11 @@ const RelationForm = ({
           : `${variable.label} — the buyer tells us`,
       })),
     ],
-    [attributes, groups, variables],
+    [attributes, groups, variables, wantedColumn],
   );
 
-  // Groups that offer nothing to total, so the picker above can say why they are
-  // missing instead of simply omitting them.
+  // Groups that offer nothing this family can read, so the picker above can say
+  // why they are missing instead of simply omitting them.
   const uncountableGroups = useMemo<string[]>(
     () =>
       attributes
@@ -293,10 +306,10 @@ const RelationForm = ({
             attribute.type === "group" &&
             (groups.length === 0 ||
               groups.includes(attribute.groupName ?? UNGROUPED)) &&
-            !attribute.groupFields.some((field) => field.kind === "number"),
+            !attribute.groupFields.some((field) => field.kind === wantedColumn),
         )
         .map((attribute) => `"${attribute.label}"`),
-    [attributes, groups],
+    [attributes, groups, wantedColumn],
   );
 
   // Which kind of operand a picked value is. Variables are few and attributes
@@ -518,10 +531,13 @@ const RelationForm = ({
           hunting for "Network Ports" and not finding it has no way to guess that
           the reason is a missing count column. */}
       {uncountableGroups.length > 0 && (
-        <p className="text-[11px] text-muted">
-          {uncountableGroups.join(", ")} hold rows but no count, so there is
-          nothing to add up and they are not listed below. Add a count sub-field
-          in the library to use one in a rule.
+        <p className="text-xs text-muted">
+          {uncountableGroups.join(", ")} hold rows but no{" "}
+          {wantedColumn === "select" ? "list column" : "count"}, so there is
+          nothing to {wantedColumn === "select" ? "compare" : "add up"} and they
+          are not listed below. Add a{" "}
+          {wantedColumn === "select" ? "pick" : "count"} sub-field in the
+          library to use one in a rule.
         </p>
       )}
 

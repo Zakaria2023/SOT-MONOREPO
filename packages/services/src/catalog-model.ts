@@ -9,6 +9,7 @@ import { SpecificationOptionSets } from "../../../db/schema/specification-option
 import { Specifications } from "../../../db/schema/specifications";
 import type { ProductValues } from "../../../db/types";
 import {
+  expectedAttributes,
   resolveAssignments,
   type AssignmentDefinition,
   type AssignmentRow,
@@ -171,6 +172,7 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
       categoryUuid: row.categoryUuid,
       isFilter: row.isFilter,
       isRule: row.isRule,
+      optional: row.optional,
       scope: row.scope,
       showIf: row.showIf ?? null,
       audience: row.audience,
@@ -296,9 +298,7 @@ export const loadSelection = async (
     if (cached) {
       return cached;
     }
-    const expects = resolveFromModel(model, categoryUuid)
-      .filter((assignment) => assignment.isRule)
-      .map((assignment) => assignment.definition.uuid);
+    const expects = expectedAttributes(resolveFromModel(model, categoryUuid));
     expectedByCategory.set(categoryUuid, expects);
     return expects;
   };

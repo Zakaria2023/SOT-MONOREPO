@@ -51,6 +51,7 @@ import {
   ToggleLeft,
   Trash2,
   TriangleAlert,
+  Type,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -216,6 +217,9 @@ const TYPE_META: Record<
   },
   boolean: { badge: "yes / no", className: "bg-amber-500/15 text-amber-500" },
   group: { badge: "rows", className: "bg-sky-500/15 text-sky-400" },
+  // Deliberately the muted one. A free-text attribute feeds nothing, and the
+  // badge should not suggest it sits alongside the types that do.
+  text: { badge: "text", className: "bg-hover text-secondary" },
 };
 
 const isOptionType = (type: SpecificationType): boolean =>
@@ -233,6 +237,9 @@ const TypeIcon = ({ type }: { type: SpecificationType }) => {
   }
   if (type === "group") {
     return <Rows3 size={15} className="text-faint" />;
+  }
+  if (type === "text") {
+    return <Type size={15} className="text-faint" />;
   }
   return <ArrowUpDown size={15} className="text-faint" />;
 };
@@ -552,6 +559,28 @@ const AttributeForm = ({
                 : "Leave this off when one figure is the answer, like 8 ports or 130 W."}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Free text has nothing to configure — no unit, no list, no scale — so the
+          space where those controls would be says what the type is FOR instead.
+          Worth the words: the reason this type exists is that authors were
+          putting sentences into option lists, and an author who does not know it
+          is here will keep doing that. */}
+      {type === "text" && (
+        <div className="flex flex-col gap-2 rounded-card border border-hairline bg-hover px-3 py-3">
+          <p className="text-sm text-ink">Recorded, and nothing more</p>
+          <p className="text-xs text-muted">
+            Use this for a fact that is genuinely a sentence — a mounting note,
+            a licensing caveat, what is in the box. It is stored on the product
+            and shown on its spec table.
+          </p>
+          <p className="text-xs text-muted">
+            Nothing can compare prose, so a free-text attribute is never a
+            shopper filter, never a rule input and never required before a
+            product can be sold. If a rule will need to read this, record it as
+            a number or a pick instead.
+          </p>
         </div>
       )}
 

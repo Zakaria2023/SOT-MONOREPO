@@ -37,7 +37,7 @@ import {
   type EngineVariable,
   type Finding,
 } from "./relationship-engine";
-import { groupSubField, unitFactor } from "./spec-values";
+import { groupSubField, unitFactor, type AttributeMeta } from "./spec-values";
 
 // ---------------------------------------------------------------------------
 // THE RELATIONSHIP SERVICE — authoring compatibility rules.
@@ -205,6 +205,30 @@ export const validateRelationship = async (
     return true;
   };
 
+  // Free text can never be a side of a rule, in ANY family — checked before the
+  // family branches so it is one refusal rather than six.
+  //
+  // Without it the failure is quiet and family-shaped: budget/count would report
+  // "has no magnitude", which reads as "mark it ordered" and sends the author to
+  // add ranks to sentences; match would accept it outright and then compare two
+  // notes for string equality, passing exactly the pairs whose authors happened to
+  // phrase things the same way. Neither looks like a broken rule from the outside.
+  for (const [field, operand] of [
+    ["consumer", input.consumer],
+    ["provider", input.provider],
+  ] as const) {
+    if (operand?.source !== "spec") {
+      continue;
+    }
+    const meta = model.attributes.get(operand.specUuid);
+    if (meta?.type === "text") {
+      problems.push({
+        field,
+        message: `"${meta.label}" holds free text, so it cannot be a side of a rule — there is nothing in it to add up or compare. Record the fact as a number or a pick if a rule needs to read it.`,
+      });
+    }
+  }
+
   const numericOperand = (operand: Operand | null, field: string): void => {
     if (!operand) {
       problems.push({ field, message: "This side has not been set." });
@@ -312,15 +336,77 @@ export const validateRelationship = async (
     } else {
       const consumerMeta = model.attributes.get(input.consumer.specUuid);
       const providerMeta = model.attributes.get(input.provider.specUuid);
+
+      // A GROUP side, resolved to the column the rule actually compares.
+      //
+      // The match evaluator reads a group through its named column, so the
+      // ordering — and the vocabulary the ranks live in — belong to the SUB-FIELD,
+      // not to the attribute. A group's own `ordered` is always false, so without
+      // this every ordered comparator on a port group would be refused with advice
+      // to go and mark the group as a scale, which is not a thing a group can be.
+      //
+      // Each failure below is a rule that would have matched every consumer
+      // against an empty set of provider values: no column named, a column that no
+      // longer exists, or a count column, which has no picks to compare. All three
+      // read as "nothing satisfies this" and, on a blocking rule, stop every cart.
+      const columnOf = (
+        operand: Operand,
+        meta: AttributeMeta | undefined,
+        field: string,
+      ): { label: string; ordered: boolean } => {
+        if (!meta) {
+          return { label: "the attribute", ordered: false };
+        }
+        if (meta.type !== "group") {
+          if (operand.source === "spec" && operand.groupField) {
+            problems.push({
+              field,
+              message: `"${meta.label}" does not hold rows, so it has no columns for a rule to compare.`,
+            });
+          }
+          return { label: meta.label, ordered: meta.ordered };
+        }
+        const key = operand.source === "spec" ? operand.groupField : undefined;
+        if (!key) {
+          problems.push({
+            field,
+            message: `"${meta.label}" holds rows, so a rule has to say which column to compare — the family, the speed. Pick one of its sub-fields.`,
+          });
+          return { label: meta.label, ordered: false };
+        }
+        const subField = groupSubField(meta, key);
+        if (!subField) {
+          problems.push({
+            field,
+            message: `"${meta.label}" no longer has the column this rule compares. Pick another one.`,
+          });
+          return { label: meta.label, ordered: false };
+        }
+        if (subField.kind !== "select") {
+          problems.push({
+            field,
+            message: `"${subField.label}" is a count, not a pick, so there is nothing in it to match against. Choose a column that holds a list of values.`,
+          });
+          return { label: subField.label, ordered: false };
+        }
+        return {
+          label: `${meta.label} · ${subField.label}`,
+          ordered: subField.ordered,
+        };
+      };
+
+      const consumerSide = columnOf(input.consumer, consumerMeta, "consumer");
+      const providerSide = columnOf(input.provider, providerMeta, "provider");
+
       const ranked =
         input.comparator === "lte" ||
         input.comparator === "gte" ||
         input.comparator === "lt" ||
         input.comparator === "gt";
-      if (ranked && !consumerMeta?.ordered && !providerMeta?.ordered) {
+      if (ranked && !consumerSide.ordered && !providerSide.ordered) {
         problems.push({
           field: "comparator",
-          message: `"${RELATIONSHIP_COMPARATOR_LABELS[input.comparator]}" only means something on an ordered scale. Mark ${consumerMeta?.label ?? "the attribute"} as ordered in the library, or use "must be one of".`,
+          message: `"${RELATIONSHIP_COMPARATOR_LABELS[input.comparator]}" only means something on an ordered scale. Mark ${consumerSide.label} as ordered in the library, or use "must be one of".`,
         });
       }
 
@@ -348,14 +434,20 @@ export const validateRelationship = async (
       }
       if (input.comparator === "within") {
         // Both sides need a magnitude. A plain list has no inside, so "within"
-        // would silently answer no for every item.
-        const flat = [consumerMeta, providerMeta].find(
-          (meta) => meta && meta.type !== "number" && !meta.ordered,
+        // would silently answer no for every item. Judged on the resolved SIDE,
+        // so an ordered column of a group counts as a magnitude and an unordered
+        // one is named as the column rather than as the group holding it.
+        const flat = [
+          { meta: consumerMeta, side: consumerSide },
+          { meta: providerMeta, side: providerSide },
+        ].find(
+          (entry) =>
+            entry.meta && entry.meta.type !== "number" && !entry.side.ordered,
         );
         if (flat) {
           problems.push({
             field: "comparator",
-            message: `"${flat.label}" has no magnitude, so nothing can fall within it. Use a number attribute, or mark its options as an ordered scale.`,
+            message: `"${flat.side.label}" has no magnitude, so nothing can fall within it. Use a number attribute, or mark its options as an ordered scale.`,
           });
         }
       }

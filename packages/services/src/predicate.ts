@@ -141,6 +141,32 @@ export const filteredGroupTotal = (
 };
 
 /**
+ * The distinct picks of one select column, over the rows a filter keeps.
+ *
+ * The set-membership sibling of `filteredGroupTotal`, and what lets a MATCH rule
+ * read a group at all: "which port families does this switch actually have cages
+ * for" is this list, and without it the match evaluator flattened a group's rows
+ * with `asOptionList` — which returns an empty list for rows on purpose — and
+ * then judged every consumer against nothing.
+ *
+ * Returns an empty list for unreadable rows, and that is safe here in a way it is
+ * NOT for a total: the caller treats an empty side as "this item does not
+ * participate", where a zero total would have been read as a real capacity of
+ * zero. The two nulls `filteredGroupTotal` draws apart do not arise, because a
+ * set has no zero.
+ */
+export const filteredGroupPicks = (
+  raw: ProductValue | undefined,
+  meta: AttributeMeta,
+  fieldKey: string,
+  where?: Predicate | null,
+): string[] => {
+  const readable = completeGroupRows(raw, meta);
+  const rows = where ? matchingGroupRows(readable, meta, where) : readable;
+  return columnPicks(rows, meta, fieldKey);
+};
+
+/**
  * Evaluate one operator against a single column of a group's rows.
  *
  * Split out because the reduction is the whole difficulty: rows have to become one
@@ -458,7 +484,11 @@ export type PredicateProblem = {
     | "unknown_sub_field"
     // A group was named without saying WHICH column. There is no sensible
     // default: a port count and a port speed are different questions.
-    | "missing_sub_field";
+    | "missing_sub_field"
+    // The condition names a free-text attribute. Nothing can compare prose, so
+    // the condition would be answered by whether one sentence happens to equal
+    // another — see the check in `validatePredicate`.
+    | "free_text";
   message: string;
   attr?: string;
 };
@@ -552,6 +582,21 @@ export const validatePredicate = (
       problems.push({
         code: "unknown_attribute",
         message: "This condition refers to an attribute that no longer exists.",
+        attr: node.attr,
+      });
+      return;
+    }
+    // Prose is not comparable, and every operator here would nonetheless produce
+    // an answer: `equals` on two sentences, `exists` on whether anyone typed
+    // anything, `gte` on Number("48 W over two rails"). All three are the same
+    // failure — a condition that is decided by how the note was WORDED, and that
+    // changes meaning when somebody rephrases it. Refused outright rather than
+    // per-operator, because `exists` is the tempting one and it is the one that
+    // makes a reveal depend on whether a colleague finished typing.
+    if (meta.type === "text") {
+      problems.push({
+        code: "free_text",
+        message: `"${meta.label}" holds free text, so there is nothing here a condition can test. Free-text attributes are for writing things down, not for driving logic.`,
         attr: node.attr,
       });
       return;
