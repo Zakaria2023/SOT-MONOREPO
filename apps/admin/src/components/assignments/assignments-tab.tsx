@@ -30,6 +30,7 @@ import {
   Plus,
   ToggleLeft,
   TriangleAlert,
+  Type,
   X,
   Zap,
 } from "lucide-react";
@@ -46,11 +47,12 @@ type AssignmentsTabProps = {
   library: PredicateAttribute[];
 };
 
-// The seven switches, as the form holds them. Shared by the add form and the
-// edit expansion so the two cannot drift into offering different things.
+// The switches, as the form holds them. Shared by the add form and the edit
+// expansion so the two cannot drift into offering different things.
 type Draft = {
   isFilter: boolean;
   isRule: boolean;
+  optional: boolean;
   scope: AssignmentScope;
   audience: AssignmentAudience;
   showIf: Predicate | null;
@@ -131,6 +133,10 @@ const toPredicateAttribute = (
 const emptyDraft = (): Draft => ({
   isFilter: false,
   isRule: true,
+  // Mandatory. The safe default has to be the strict one — an attribute the
+  // engine reads and nobody has to fill in is the "looks like approval" failure
+  // with a checkbox in front of it.
+  optional: false,
   scope: "branch",
   audience: "everyone",
   showIf: null,
@@ -140,6 +146,7 @@ const emptyDraft = (): Draft => ({
 const toDraft = (assignment: ResolvedAssignment): Draft => ({
   isFilter: assignment.isFilter,
   isRule: assignment.isRule,
+  optional: assignment.optional,
   scope: assignment.scope,
   audience: assignment.audience,
   showIf: assignment.showIf,
@@ -156,6 +163,9 @@ const TypeIcon = ({ assignment }: { assignment: ResolvedAssignment }) => {
   }
   if (type === "multi_select") {
     return <ListChecks size={14} className="text-faint" />;
+  }
+  if (type === "text") {
+    return <Type size={14} className="text-faint" />;
   }
   return ordered ? (
     <ArrowUpDown size={14} className="text-faint" />
@@ -179,21 +189,54 @@ const AssignmentFields = ({
   const optionBacked =
     attribute.type === "single_select" || attribute.type === "multi_select";
   const liveOptions = attribute.options.filter((option) => !option.retired);
+  // Free text is recorded and shown, and does nothing else. Both switches are
+  // shown OFF and disabled rather than hidden, so it is visible that the choice
+  // was made rather than forgotten — the server normalises them away regardless.
+  const freeText = attribute.type === "text";
 
   return (
     <>
       <div className="flex flex-wrap gap-x-6 gap-y-2">
         <Checkbox
           label="Shopper sees it (filter)"
-          checked={draft.isFilter}
+          checked={draft.isFilter && !freeText}
+          disabled={freeText}
           onChange={(event) => onChange({ isFilter: event.target.checked })}
         />
         <Checkbox
           label="Engine reads it (rule)"
-          checked={draft.isRule}
+          checked={draft.isRule && !freeText}
+          disabled={freeText}
           onChange={(event) => onChange({ isRule: event.target.checked })}
         />
+        {/* Only meaningful while the engine reads it. Hidden rather than
+            disabled when it does not: a waiver over a requirement that does not
+            exist is not a setting an author should have to reason about. */}
+        {draft.isRule && !freeText && (
+          <Checkbox
+            label="A blank is a real answer"
+            checked={draft.optional}
+            onChange={(event) => onChange({ optional: event.target.checked })}
+          />
+        )}
       </div>
+
+      {freeText && (
+        <p className="text-xs text-muted">
+          Free text is recorded on the product and shown on its spec table.
+          Nothing can compare prose, so it is never a facet, never a rule input,
+          and never required.
+        </p>
+      )}
+
+      {draft.isRule && draft.optional && !freeText && (
+        <p className="text-xs text-amber-500">
+          Products in this category may leave {attribute.label} blank. Rules
+          still read it when it is filled in — they just stop reporting the
+          blanks. Use this only where the value genuinely does not exist, not to
+          clear a backlog.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {draft.isFilter && (
@@ -330,6 +373,7 @@ const AddAssignmentForm = ({
       specificationUuid: attribute.uuid,
       isFilter: draft.isFilter,
       isRule: draft.isRule,
+      optional: draft.optional,
       scope: draft.scope,
       showIf: draft.showIf,
       audience: draft.audience,
@@ -470,6 +514,7 @@ const AssignmentCard = ({
       specificationUuid: definition.uuid,
       isFilter: draft.isFilter,
       isRule: draft.isRule,
+      optional: draft.optional,
       scope: draft.scope,
       showIf: draft.showIf,
       audience: draft.audience,
@@ -538,6 +583,15 @@ const AssignmentCard = ({
               <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
                 <Zap size={9} />
                 rule
+              </span>
+            )}
+            {/* Said on the collapsed card, not only inside the expansion. An
+                attribute nobody has to fill in is the one fact about an
+                assignment that changes what "complete" means for every product
+                in the category — it should never take a click to find out. */}
+            {assignment.isRule && assignment.optional && (
+              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-400">
+                blank ok
               </span>
             )}
             {assignment.effectiveAudience !== "everyone" && (
@@ -645,8 +699,15 @@ export const AssignmentsTab = ({
     [resolved],
   );
 
+  // What a reveal condition may watch. Free text is excluded: a condition on
+  // prose is decided by how somebody worded a note, and `exists` — the one that
+  // looks harmless — makes a field appear and disappear as the catalog is filled
+  // in. The server refuses it too; this is so it is never offered.
   const triggers = useMemo(
-    () => resolved.map(toPredicateAttribute),
+    () =>
+      resolved
+        .filter((assignment) => assignment.definition.type !== "text")
+        .map(toPredicateAttribute),
     [resolved],
   );
 

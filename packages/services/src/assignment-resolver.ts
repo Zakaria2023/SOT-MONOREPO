@@ -26,7 +26,7 @@ import {
 //
 // Two registries join here. The LIBRARY holds each definition exactly once. The
 // TREE holds navigation. An ASSIGNMENT is a category borrowing a definition and
-// setting seven switches on that pointer:
+// setting eight switches on that pointer:
 //
 //   1. isFilter      — does the shopper see it and click it?
 //   2. isRule        — does the compatibility engine read it?
@@ -35,6 +35,7 @@ import {
 //   5. audience      — who is it surfaced to?
 //   6. enabledValues — which slice of the master list does this category offer?
 //   7. suppressed    — is an inherited attribute removed here entirely?
+//   8. optional      — is a BLANK a real answer, or a gap?
 //
 // The definition never varies per category; only the switches do.
 // ---------------------------------------------------------------------------
@@ -59,6 +60,11 @@ export type AssignmentDefinition = AttributeMeta & {
 export type AssignmentSwitches = {
   isFilter: boolean;
   isRule: boolean;
+  // Whether a BLANK is a real answer. Only meaningful when `isRule` is on: it
+  // waives the requirement to fill the attribute in, not the engine's interest in
+  // it. A value that IS present is read, checked and reported exactly as before —
+  // the waiver is over absence and nothing else.
+  optional: boolean;
   scope: AssignmentScope;
   showIf: Predicate | null;
   audience: AssignmentAudience;
@@ -226,6 +232,7 @@ export const resolveAssignments = ({
     resolved.push({
       isFilter: row.isFilter,
       isRule: row.isRule,
+      optional: row.optional,
       scope: row.scope,
       showIf: row.showIf,
       audience: row.audience,
@@ -384,6 +391,12 @@ export const facetAssignments = (
       isVisibleTo(assignment.effectiveAudience, viewer) &&
       (!assignment.inherited || assignment.scope === "branch") &&
       revealed.has(assignment.definition.uuid) &&
+      // Free text has no set of values to tick, so there is no facet to render.
+      // Said explicitly rather than left to the options check below: a text
+      // attribute has no options and would fall out of that test anyway, but for
+      // the wrong reason — it would start appearing the day that condition
+      // changed shape.
+      assignment.definition.type !== "text" &&
       // A number facet is a range input and needs no options; an option-backed
       // facet with nothing to offer would render an empty box.
       (assignment.definition.type === "number" ||
@@ -392,10 +405,38 @@ export const facetAssignments = (
   );
 };
 
+/**
+ * Whether the engine may read this assignment AT ALL.
+ *
+ * Two conditions, and the second is not redundant with the first. `isRule` is the
+ * author's switch; the type check is a floor under it. Saving an assignment
+ * normalises `isRule` off for a free-text attribute, so a stored row should never
+ * carry both — but "should never" is a claim about a different file, and a text
+ * attribute reaching the engine would make every product in the category
+ * permanently incomplete for a value no rule could ever use.
+ */
+const engineReads = (assignment: ResolvedAssignment): boolean =>
+  assignment.isRule && assignment.definition.type !== "text";
+
 /** The assignments the compatibility engine may read. Audience never gates this. */
 export const ruleAssignments = (
   resolved: ResolvedAssignment[],
-): ResolvedAssignment[] => resolved.filter((assignment) => assignment.isRule);
+): ResolvedAssignment[] => resolved.filter(engineReads);
+
+/**
+ * The attributes a product in this category OWES the engine a value for.
+ *
+ * Not the same list as `ruleAssignments`, and the difference is the whole point
+ * of `optional`. The engine reads every rule attribute it finds; it only reports
+ * a blank as a gap for the ones on this list. An optional attribute is read when
+ * answered and expected of nobody.
+ *
+ * This is what `EngineItem.expects` is built from — see catalog-model.
+ */
+export const expectedAttributes = (resolved: ResolvedAssignment[]): string[] =>
+  resolved
+    .filter((assignment) => engineReads(assignment) && !assignment.optional)
+    .map((assignment) => assignment.definition.uuid);
 
 // ---------------------------------------------------------------------------
 // Completeness — the most dangerous failure mode in the system
@@ -464,12 +505,24 @@ export const completenessProblems = (
   const problems: CompletenessProblem[] = [];
 
   for (const assignment of visible) {
-    if (!assignment.isRule) {
+    if (!engineReads(assignment)) {
       continue;
     }
     const { definition } = assignment;
     const raw = readValue(values, definition.uuid);
     if (!hasValue(raw)) {
+      // A blank the author DECLARED legitimate for this category — an uplink
+      // media type on a switch whose uplink is an empty SFP cage. Not reported,
+      // and deliberately not reported as a softer kind either: a permanent
+      // problem nobody can clear is one people stop reading, and then they stop
+      // reading the real ones next to it.
+      //
+      // Only absence is waived. Everything below still runs on the categories
+      // that DID answer, so an optional attribute holding an unreadable value is
+      // still a problem — that is a wrong answer, not a missing one.
+      if (assignment.optional) {
+        continue;
+      }
       problems.push({
         specificationUuid: definition.uuid,
         label: definition.label,

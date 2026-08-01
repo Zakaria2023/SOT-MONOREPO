@@ -205,6 +205,30 @@ export const validateRelationship = async (
     return true;
   };
 
+  // Free text can never be a side of a rule, in ANY family — checked before the
+  // family branches so it is one refusal rather than six.
+  //
+  // Without it the failure is quiet and family-shaped: budget/count would report
+  // "has no magnitude", which reads as "mark it ordered" and sends the author to
+  // add ranks to sentences; match would accept it outright and then compare two
+  // notes for string equality, passing exactly the pairs whose authors happened to
+  // phrase things the same way. Neither looks like a broken rule from the outside.
+  for (const [field, operand] of [
+    ["consumer", input.consumer],
+    ["provider", input.provider],
+  ] as const) {
+    if (operand?.source !== "spec") {
+      continue;
+    }
+    const meta = model.attributes.get(operand.specUuid);
+    if (meta?.type === "text") {
+      problems.push({
+        field,
+        message: `"${meta.label}" holds free text, so it cannot be a side of a rule — there is nothing in it to add up or compare. Record the fact as a number or a pick if a rule needs to read it.`,
+      });
+    }
+  }
+
   const numericOperand = (operand: Operand | null, field: string): void => {
     if (!operand) {
       problems.push({ field, message: "This side has not been set." });

@@ -91,7 +91,12 @@ export const AssignmentWorkspace = ({
         // the attributes it reads.
         <RelationBuilder
           relationships={relationships}
-          attributes={library}
+          // Free text is left OUT of the rule builder entirely, rather than
+          // offered and then refused on save. Nothing in a sentence can be added
+          // up or compared, so an attribute an author cannot use here should not
+          // appear here — the save-time guard exists for rules written before the
+          // type did, not as the place an author finds out.
+          attributes={library.filter((attribute) => attribute.type !== "text")}
           variables={variables}
           categoryOptions={categoryOptions}
         />

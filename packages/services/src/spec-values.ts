@@ -191,6 +191,15 @@ export const asNumber = (
   if (meta.type === "boolean") {
     return raw === true || raw === "true" ? 1 : 0;
   }
+  // Prose has no magnitude, and the danger is that some of it PARSES. "48" typed
+  // into a mounting note is a perfectly good Number(), so falling through would
+  // let a free-text field feed arithmetic for exactly the products whose note
+  // happened to start with a digit — a rule that runs on some items and not
+  // others, with nothing to say which. Authoring already refuses text as an
+  // operand; this is the floor under that refusal.
+  if (meta.type === "text") {
+    return null;
+  }
   if (!meta.ordered) {
     return null;
   }
@@ -652,6 +661,12 @@ export const describeValue = (
   }
   if (meta.type === "boolean") {
     return asBoolean(raw) ? "Yes" : "No";
+  }
+  // Prose, shown as written. Not run through `optionLabel` — a text attribute has
+  // no options, so the lookup would miss and return the same string, but only by
+  // accident. Said explicitly so it stays true if that fallback ever changes.
+  if (meta.type === "text") {
+    return String(raw);
   }
   return asOptionList(raw)
     .map((value) => optionLabel(meta, value))

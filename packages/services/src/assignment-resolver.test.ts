@@ -48,6 +48,7 @@ const row = (
 ): AssignmentRow => ({
   isFilter: true,
   isRule: true,
+  optional: false,
   scope: "branch",
   showIf: null,
   audience: "everyone",

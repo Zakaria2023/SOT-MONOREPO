@@ -34,6 +34,9 @@ export type AssignmentInput = {
   specificationUuid: string;
   isFilter: boolean;
   isRule: boolean;
+  // Whether a blank is a real answer here. Only read when `isRule` is on — see
+  // SpecificationCategories.optional.
+  optional: boolean;
   scope: AssignmentScope;
   showIf: Predicate | null;
   audience: AssignmentAudience;
@@ -141,12 +144,52 @@ const assertAssignmentValid = (
   }
 };
 
+/**
+ * The switches as they will be STORED, normalised to the attribute's type.
+ *
+ * Free text cannot be a rule input or a facet — the engine has no way to compare
+ * prose (see the guards in relationships and predicate), and a facet needs a
+ * finite set to tick. Normalised here rather than refused, on the same footing as
+ * the library normalising `unit` away from a select: the switches are meaningless
+ * for the type, not a mistake the author made, and there is exactly one place
+ * that decides it.
+ *
+ * Forcing them OFF is the safe direction and the only one done here. Nothing in
+ * this function ever turns a switch on — a normalisation that widened what the
+ * engine reads would be the "looks like approval" failure wearing a different hat.
+ *
+ * `optional` goes with them: it is a waiver over a requirement that no longer
+ * exists once isRule is off, and a stored true would read as meaningful the day
+ * somebody changed the type back.
+ */
+const toStoredSwitches = (
+  input: AssignmentInput,
+  model: Awaited<ReturnType<typeof getCatalogModel>>,
+) => {
+  const isText = model.attributes.get(input.specificationUuid)?.type === "text";
+  return {
+    isFilter: isText ? false : input.isFilter,
+    isRule: isText ? false : input.isRule,
+    optional: isText ? false : input.optional,
+    scope: input.scope,
+    showIf: input.showIf,
+    audience: input.audience,
+    enabledValues:
+      input.enabledValues && input.enabledValues.length > 0
+        ? input.enabledValues
+        : null,
+    suppressed: input.suppressed,
+    order: input.order,
+  };
+};
+
 /** Create or update one assignment. Upsert, because the pair is unique. */
 export const saveAssignment = async (
   input: AssignmentInput,
   actor?: { uuid: string; name: string },
 ): Promise<void> => {
-  assertAssignmentValid(input, await getCatalogModel());
+  const model = await getCatalogModel();
+  assertAssignmentValid(input, model);
 
   const [existing] = await db
     .select({ uuid: SpecificationCategories.uuid })
@@ -158,19 +201,7 @@ export const saveAssignment = async (
       ),
     );
 
-  const values = {
-    isFilter: input.isFilter,
-    isRule: input.isRule,
-    scope: input.scope,
-    showIf: input.showIf,
-    audience: input.audience,
-    enabledValues:
-      input.enabledValues && input.enabledValues.length > 0
-        ? input.enabledValues
-        : null,
-    suppressed: input.suppressed,
-    order: input.order,
-  };
+  const values = toStoredSwitches(input, model);
 
   if (existing) {
     await db
@@ -265,20 +296,6 @@ export const saveAssignments = async (
     }
   }
 
-  const toValues = (input: AssignmentInput) => ({
-    isFilter: input.isFilter,
-    isRule: input.isRule,
-    scope: input.scope,
-    showIf: input.showIf,
-    audience: input.audience,
-    enabledValues:
-      input.enabledValues && input.enabledValues.length > 0
-        ? input.enabledValues
-        : null,
-    suppressed: input.suppressed,
-    order: input.order,
-  });
-
   // One statement covers both paths. The (specification_uuid, category_uuid)
   // unique key turns an already-linked pair into an update and a new pair into
   // an insert, so there is no need to split the two or to issue a statement per
@@ -300,13 +317,14 @@ export const saveAssignments = async (
           ) ?? generateUuid(),
         categoryUuid: input.categoryUuid,
         specificationUuid: input.specificationUuid,
-        ...toValues(input),
+        ...toStoredSwitches(input, model),
       })),
     )
     .onDuplicateKeyUpdate({
       set: {
         isFilter: sql`values(${SpecificationCategories.isFilter})`,
         isRule: sql`values(${SpecificationCategories.isRule})`,
+        optional: sql`values(${SpecificationCategories.optional})`,
         scope: sql`values(${SpecificationCategories.scope})`,
         showIf: sql`values(${SpecificationCategories.showIf})`,
         audience: sql`values(${SpecificationCategories.audience})`,
@@ -347,9 +365,7 @@ export const saveAssignments = async (
  * at the time, and "AC Input Voltage on 868e77ce-a637-492e-…" tells a human
  * nothing at all. One query for the whole batch, never one per row.
  */
-const categoryNames = async (
-  uuids: string[],
-): Promise<Map<string, string>> => {
+const categoryNames = async (uuids: string[]): Promise<Map<string, string>> => {
   if (uuids.length === 0) {
     return new Map();
   }
@@ -507,6 +523,7 @@ export const suppressInherited = async (
       specificationUuid,
       isFilter: false,
       isRule: false,
+      optional: false,
       scope: "leaf",
       showIf: null,
       audience: "everyone",
@@ -532,7 +549,9 @@ export const reorderAssignments = async (
     .update(SpecificationCategories)
     .set({
       order: sql`case ${SpecificationCategories.specificationUuid} ${sql.join(
-        order.map((entry) => sql`when ${entry.specificationUuid} then ${entry.order}`),
+        order.map(
+          (entry) => sql`when ${entry.specificationUuid} then ${entry.order}`,
+        ),
         sql` `,
       )} end`,
     })

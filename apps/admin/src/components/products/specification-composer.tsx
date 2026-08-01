@@ -388,7 +388,9 @@ const withAdded = (
   ...added
     .filter(
       (entry) =>
-        !options.some((option) => option.value === entry.value && !option.retired),
+        !options.some(
+          (option) => option.value === entry.value && !option.retired,
+        ),
     )
     .map((entry) => ({ ...entry, retired: false })),
 ];
@@ -477,6 +479,21 @@ const FieldRow = ({
           />
         ))}
 
+      {field.type === "text" && (
+        // A textarea rather than an Input, because the type only exists for facts
+        // that are a sentence. A single-line box would quietly invite the short
+        // answers that should have been options in the first place.
+        <textarea
+          rows={3}
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) =>
+            onChange(event.target.value === "" ? undefined : event.target.value)
+          }
+          placeholder={`Notes on ${field.label.toLowerCase()}`}
+          className="w-full resize-y rounded-control border border-hairline bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-primary focus:outline-none"
+        />
+      )}
+
       {field.type === "boolean" && (
         <Dropdown
           value={value === undefined ? "" : value === true ? "true" : "false"}
@@ -562,7 +579,9 @@ const FieldRow = ({
               rows={asRows(value)}
               // An empty list is not a value — the readers treat a group with no
               // rows as unanswered, so the form has to store nothing rather than [].
-              onChange={(next) => onChange(next.length === 0 ? undefined : next)}
+              onChange={(next) =>
+                onChange(next.length === 0 ? undefined : next)
+              }
             />
             {/* Per COLUMN and below the rows, not inside one. A value belongs to
                 the column; offering it on a row would suggest it were local to

@@ -131,6 +131,29 @@ export const normalizeProductValues = async (
         value === true || value === "true" || value === "Yes";
       continue;
     }
+    if (definition.type === "text") {
+      // Prose, trimmed and stored as written. Nothing to coerce it against —
+      // there is no option list, no unit and no rank, which is the whole point of
+      // the type.
+      //
+      // Whitespace-only is dropped rather than stored, so a field somebody
+      // tabbed through does not read as answered. That distinction is the same
+      // one `hasValue` draws, and the two have to agree or a product looks
+      // complete on the form and incomplete on the dashboard.
+      // Only a scalar becomes text. An array or an object arriving here is a form
+      // sending the wrong shape, and `String(value)` would store the literal
+      // "[object Object]" — a product that looks answered and reads as nonsense.
+      const text =
+        typeof value === "string"
+          ? value.trim()
+          : typeof value === "number" || typeof value === "boolean"
+            ? String(value)
+            : "";
+      if (text !== "") {
+        typed[definition.uuid] = text;
+      }
+      continue;
+    }
     if (definition.type === "multi_select") {
       const list = Array.isArray(value) ? value.map(String) : [String(value)];
       const cleaned = list
