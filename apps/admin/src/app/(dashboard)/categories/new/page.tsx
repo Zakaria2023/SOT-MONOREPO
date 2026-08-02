@@ -1,6 +1,5 @@
 import { CategoryForm } from "@/components/categories/category-form";
-import { getClassifications } from "@/app/(dashboard)/classifications/action";
-import { getCategories } from "services";
+import { getCategories, getClassifications } from "services";
 
 const NewCategoryPage = async () => {
   const [categories, classifications] = await Promise.all([

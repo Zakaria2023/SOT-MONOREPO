@@ -4,32 +4,19 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  ClassificationFields,
   createClassification as createClassificationRecord,
   deleteClassification as deleteClassificationRecord,
-  getClassification as getClassificationRecord,
-  getClassifications as getClassificationsList,
   updateClassification as updateClassificationRecord,
 } from "services";
-import type {
-  ClassificationFields,
-  ClassificationListItem,
-  SelectClassifications,
-} from "services";
-import type { ActionResult } from "utils";
+import { ActionResult, fail } from "utils";
 
-// A "use server" file may only export async functions; types are re-declared as
-// local aliases so consumers can keep importing them from here.
-
+// Only what a "use client" file has to reach through an action lives here. The
+// reads a server component makes — getClassifications, getClassification — go
+// straight to services, the way apps/client already calls them.
 export type ClassificationActionResult = ActionResult & {
   classificationUuid?: string;
 };
-
-export const getClassifications = async (): Promise<ClassificationListItem[]> =>
-  getClassificationsList();
-
-export const getClassification = async (
-  uuid: string,
-): Promise<SelectClassifications | null> => getClassificationRecord(uuid);
 
 export const createClassification = async (
   _prevState: ClassificationActionResult,
@@ -39,12 +26,7 @@ export const createClassification = async (
   try {
     await createClassificationRecord(fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to create classification",
-    };
+    return fail(error, "Failed to create classification");
   }
 
   revalidatePath("/classifications");
@@ -60,12 +42,7 @@ export const updateClassification = async (
   try {
     await updateClassificationRecord(uuid, fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update classification",
-    };
+    return fail(error, "Failed to update classification");
   }
 
   revalidatePath("/classifications");
@@ -81,11 +58,6 @@ export const deleteClassification = async (
     revalidatePath("/classifications");
     return { success: true, classificationUuid: uuid };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to delete classification",
-    };
+    return fail(error, "Failed to delete classification");
   }
 };

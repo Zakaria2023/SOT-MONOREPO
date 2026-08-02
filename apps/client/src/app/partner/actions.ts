@@ -1,6 +1,7 @@
 "use server";
 
 import { createPartnerRequest } from "services";
+import { fail } from "utils";
 import { partnerRequestSchema, type PartnerRequestInput } from "validators";
 
 export type PartnerRequestActionState = {
@@ -22,11 +23,6 @@ export const submitPartnerRequest = async (
     await createPartnerRequest(parsed.data);
     return { success: true };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to submit partner request.",
-    };
+    return fail(error, "Failed to submit partner request.");
   }
 };

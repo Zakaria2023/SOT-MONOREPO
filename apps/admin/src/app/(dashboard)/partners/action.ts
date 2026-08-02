@@ -2,7 +2,7 @@
 
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import type { ListParams, PaginatedResult } from "utils";
-import { getReviewerName, paginate } from "utils";
+import { fail, getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
@@ -126,12 +126,7 @@ export const approvePartnerRequestAction = async (
       };
     }
 
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to approve partner request.",
-    };
+    return fail(error, "Failed to approve partner request.");
   }
 
   revalidatePath("/partners");
@@ -148,12 +143,7 @@ export const setPartnerIntegrationAction = async (
   try {
     await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update partner profile.",
-    };
+    return fail(error, "Failed to update partner profile.");
   }
 
   revalidatePath("/partners");
@@ -179,12 +169,7 @@ export const rejectPartnerRequestAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to reject partner request.",
-    };
+    return fail(error, "Failed to reject partner request.");
   }
 
   revalidatePath("/partners");

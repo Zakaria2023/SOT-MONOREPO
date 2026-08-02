@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
 import type { ListParams, PaginatedResult } from "utils";
-import { getReviewerName, paginate } from "utils";
+import { fail, getReviewerName, paginate } from "utils";
 import { revalidatePath } from "next/cache";
 import {
   approveGovernmentRequest as approveGovernmentRequestRecord,
@@ -105,12 +105,7 @@ export const approveGovernmentRequestAction = async (
       };
     }
 
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to approve government request.",
-    };
+    return fail(error, "Failed to approve government request.");
   }
 
   revalidatePath("/government");
@@ -136,12 +131,7 @@ export const rejectGovernmentRequestAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to reject government request.",
-    };
+    return fail(error, "Failed to reject government request.");
   }
 
   revalidatePath("/government");
