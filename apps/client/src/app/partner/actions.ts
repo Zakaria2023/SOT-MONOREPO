@@ -1,10 +1,7 @@
 "use server";
 
 import { createPartnerRequest } from "services";
-import {
-  partnerRequestSchema,
-  type PartnerRequestInput,
-} from "validators";
+import { partnerRequestSchema, type PartnerRequestInput } from "validators";
 
 export type PartnerRequestActionState = {
   error?: string;

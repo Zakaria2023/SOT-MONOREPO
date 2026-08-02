@@ -3,10 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import {
-  partnerRequestSchema,
-  type PartnerRequestInput,
-} from "validators";
+import { partnerRequestSchema, type PartnerRequestInput } from "validators";
 import {
   submitPartnerRequest,
   type PartnerRequestActionState,

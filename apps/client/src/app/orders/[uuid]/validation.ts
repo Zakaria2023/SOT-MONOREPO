@@ -17,7 +17,10 @@ export const fakePaymentSchema = z.object({
     .refine((value) => /^\d{2}\/\d{2}$/.test(value.trim()), "Use MM/YY"),
   cvc: z
     .string()
-    .refine((value) => /^\d{3,4}$/.test(value.trim()), "Enter the 3–4 digit CVC"),
+    .refine(
+      (value) => /^\d{3,4}$/.test(value.trim()),
+      "Enter the 3–4 digit CVC",
+    ),
 });
 
 export type FakePaymentInput = z.infer<typeof fakePaymentSchema>;

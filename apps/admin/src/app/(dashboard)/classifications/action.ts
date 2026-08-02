@@ -15,14 +15,13 @@ import type {
   ClassificationListItem,
   SelectClassifications,
 } from "services";
+import type { ActionResult } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases so consumers can keep importing them from here.
 
-export type ClassificationActionResult = {
+export type ClassificationActionResult = ActionResult & {
   classificationUuid?: string;
-  error?: string;
-  success?: boolean;
 };
 
 export const getClassifications = async (): Promise<ClassificationListItem[]> =>

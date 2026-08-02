@@ -23,7 +23,10 @@ export const PATCH = async (request: Request, { params }: Params) => {
 
   const quantity = getNumberField(await readBody(request), "quantity");
   if (quantity === null) {
-    return NextResponse.json({ error: "quantity is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "quantity is required" },
+      { status: 400 },
+    );
   }
 
   const { uuid } = await params;

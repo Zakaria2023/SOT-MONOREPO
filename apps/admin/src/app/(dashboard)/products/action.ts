@@ -25,17 +25,13 @@ import type {
   SelectProducts,
 } from "services";
 import type { PaginatedResult } from "utils";
-import { fail } from "utils";
+import { fail, type ActionResult } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
 // treat as a runtime export) so consumers can keep importing them from here.
 
-export type ProductActionResult = {
-  productUuid?: string;
-  error?: string;
-  success?: boolean;
-};
+export type ProductActionResult = ActionResult & { productUuid?: string };
 
 // Reads pass straight through to the service — the admin pages/components call
 // these from `./action`, keeping the transport boundary in one place.

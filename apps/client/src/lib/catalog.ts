@@ -71,7 +71,12 @@ export const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
   { value: "name", label: "Name A–Z" },
 ];
 
-const SORT_KEYS: ProductSort[] = ["featured", "price-asc", "price-desc", "name"];
+const SORT_KEYS: ProductSort[] = [
+  "featured",
+  "price-asc",
+  "price-desc",
+  "name",
+];
 
 // Coerce an untrusted `sort` search-param value to a known sort key.
 export const normalizeSort = (value: string | undefined): ProductSort =>

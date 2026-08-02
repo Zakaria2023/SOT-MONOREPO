@@ -5,19 +5,14 @@ import {
   governmentRequestSchema,
   type GovernmentRequestInput,
 } from "validators";
-import { fail } from "utils";
-
-export type GovernmentRequestState = {
-  error?: string;
-  success?: boolean;
-};
+import { fail, type ActionResult } from "utils";
 
 // Government entities can't self-serve a login — this records a request that an
 // admin reviews and (on approval) invites to Clerk.
 export const submitGovernmentRequest = async (
-  _prevState: GovernmentRequestState,
+  _prevState: ActionResult,
   input: GovernmentRequestInput,
-): Promise<GovernmentRequestState> => {
+): Promise<ActionResult> => {
   const parsed = governmentRequestSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Please check the form and try again." };

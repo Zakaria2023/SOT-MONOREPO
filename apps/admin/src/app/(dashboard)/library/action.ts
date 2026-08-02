@@ -31,10 +31,8 @@ import {
   type ProjectVariableInput,
   type SpecificationGroupFields,
 } from "services";
-import { fail } from "utils";
+import { fail, type ActionResult as BaseActionResult } from "utils";
 
-// Types re-declared as local aliases — a "use server" file may only export
-// async functions.
 // The service input plus the categories the form lets an author tick. Kept as an
 // ADMIN type on purpose: `createLibraryAttribute` still refuses to write category
 // links, so the two writes stay separate and the assignment service remains the
@@ -43,9 +41,7 @@ export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
   categoryUuids: string[];
 };
 
-export type ActionResult = {
-  error?: string;
-  success?: boolean;
+export type ActionResult = BaseActionResult & {
   // The save went through, and there is something about it the author needs to
   // know — adding a sub-field to a group whose rows are already entered is the
   // case this exists for. Not an error: refusing would leave a group unable to

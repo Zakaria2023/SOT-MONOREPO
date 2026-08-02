@@ -35,8 +35,10 @@ export const findCountryNameByIso = (isoCode: string): string =>
 
 // Stored form: "City, Country" — keeps the first token as the city so the
 // same-city partner matching keeps working. Empty until both are chosen.
-export const formatLocation = (cityName: string, countryName: string): string =>
-  cityName && countryName ? `${cityName}, ${countryName}` : "";
+export const formatLocation = (
+  cityName: string,
+  countryName: string,
+): string => (cityName && countryName ? `${cityName}, ${countryName}` : "");
 
 export const parseLocation = (value: string): ParsedLocation => {
   const [cityName = "", countryName = ""] = value

@@ -7,12 +7,7 @@ import {
   setPartnerDiscounts as setPartnerDiscountsRecord,
 } from "services";
 import type { PartnerDiscountMap } from "services";
-import { fail } from "utils";
-
-export type PartnerDiscountsActionResult = {
-  error?: string;
-  success?: boolean;
-};
+import { fail, type ActionResult } from "utils";
 
 export const getPartnerDiscounts = async (): Promise<PartnerDiscountMap> => {
   await requireAdmin();
@@ -20,9 +15,9 @@ export const getPartnerDiscounts = async (): Promise<PartnerDiscountMap> => {
 };
 
 export const savePartnerDiscounts = async (
-  _prevState: PartnerDiscountsActionResult,
+  _prevState: ActionResult,
   values: PartnerDiscountMap,
-): Promise<PartnerDiscountsActionResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
   try {
     await setPartnerDiscountsRecord(values);

@@ -36,8 +36,7 @@ const byDialLengthDesc = [...phoneCountries].sort(
   (a, b) => b.dial.length - a.dial.length,
 );
 
-export const dialCodeForIso = (iso: string): string =>
-  dialByIso.get(iso) ?? "";
+export const dialCodeForIso = (iso: string): string => dialByIso.get(iso) ?? "";
 
 /** Combines a country and a locally-typed number into an E.164 string. */
 export const composeE164 = (iso: string, nationalNumber: string): string => {

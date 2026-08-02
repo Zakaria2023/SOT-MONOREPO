@@ -11,7 +11,6 @@ export const requireAuth = async () => {
   return userId;
 };
 
-
 // The admin app is internal-staff-only (gated by Clerk sign-in), so any
 // signed-in user is allowed — the same as the rest of the dashboard. We still
 // resolve the Clerk user here because callers use it (e.g. reviewer name).

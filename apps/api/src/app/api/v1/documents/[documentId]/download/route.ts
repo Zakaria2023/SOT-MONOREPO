@@ -8,7 +8,10 @@ export const GET = async (
     const { documentId } = await context.params;
     const fileName = new URL(req.url).searchParams.get("fileName") ?? undefined;
 
-    const downloadUrl = await createDocumentDownloadUrl({ documentId, fileName });
+    const downloadUrl = await createDocumentDownloadUrl({
+      documentId,
+      fileName,
+    });
 
     return Response.redirect(downloadUrl);
   } catch (error) {

@@ -9,12 +9,7 @@ import {
 } from "services";
 import type { BoqStatus } from "@/db/enum";
 import { offerSchema, type OfferInput } from "validators";
-import { fail } from "utils";
-
-export type OfferActionState = {
-  error?: string;
-  success?: boolean;
-};
+import { fail, type ActionResult } from "utils";
 
 export type StageActionState = {
   error?: string;
@@ -45,9 +40,9 @@ export const advanceStage = async (
 
 export const submitOffer = async (
   boqUuid: string,
-  _prevState: OfferActionState,
+  _prevState: ActionResult,
   input: OfferInput,
-): Promise<OfferActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
 
   const parsed = offerSchema.safeParse(input);

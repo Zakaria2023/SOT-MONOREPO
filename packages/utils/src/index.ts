@@ -505,6 +505,28 @@ export const clientAddress = (
 };
 
 /**
+ * What a Server Action hands back to the form that called it.
+ *
+ * Declared once because it was declared eight times: the same two optional
+ * fields under eight names — ActionResult, BrandActionResult,
+ * PartnerDiscountsActionResult, GovernmentRequestState, OfferActionState and so
+ * on — differing only in which page they sat on.
+ *
+ * Both fields are optional and that is deliberate. An action that redirects on
+ * success never returns at all, so `success` stays unset; one that reports a
+ * refusal sets `error` and nothing else. A required field here would force every
+ * action to answer a question half of them do not have.
+ *
+ * Actions needing more intersect it rather than redeclare it, so the extra field
+ * is the only thing their type says — see ProductActionResult and the library's
+ * warnings.
+ */
+export type ActionResult = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
  * The message a Server Action shows when something threw.
  *
  * Every action in every app ends in the same catch: report what the service

@@ -3,27 +3,22 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
+  AssignmentInput,
   createRelationship,
   deleteRelationship,
   previewRelationship,
-  removeAssignment,
-  saveAssignment,
-  searchProductsForPicker,
-  AssignmentInput,
   ProductPickerItem,
   RelationshipInput,
   RelationshipPreview,
   RelationshipProblem,
+  removeAssignment,
+  saveAssignment,
+  searchProductsForPicker,
   suppressInherited,
   updateRelationship,
   validateRelationship,
 } from "services";
-import { fail } from "utils";
-
-export type ActionResult = {
-  error?: string;
-  success?: boolean;
-};
+import { fail, type ActionResult } from "utils";
 
 const refreshCatalog = (): void => {
   revalidatePath("/assignments");
@@ -77,9 +72,7 @@ export const suppressAssignmentAction = async (
   return { success: true };
 };
 
-// ---------------------------------------------------------------------------
 // Relations
-// ---------------------------------------------------------------------------
 
 export const validateRelationAction = async (
   input: RelationshipInput,
