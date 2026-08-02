@@ -1,9 +1,9 @@
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { PageHeader } from "@/components/shared/page-header";
-import { getDashboardStats } from "./action";
+import { getAdminDashboardStats } from "services";
 
 const HomePage = async () => {
-  const stats = await getDashboardStats();
+  const stats = await getAdminDashboardStats();
 
   return (
     <div className="flex flex-col gap-5">
