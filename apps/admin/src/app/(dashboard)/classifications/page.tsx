@@ -1,12 +1,6 @@
-import { ClassificationsTable } from "@/components/classifications/classifications-table";
+import { ClassificationsList } from "@/components/classifications/classifications-list";
 import { AsyncSection } from "@/components/shared/async-section";
 import { PageHeader } from "@/components/shared/page-header";
-import { getClassifications } from "services";
-
-const ClassificationsList = async () => {
-  const classifications = await getClassifications();
-  return <ClassificationsTable classifications={classifications} />;
-};
 
 const ClassificationsPage = () => (
   <div className="flex flex-col gap-5">
