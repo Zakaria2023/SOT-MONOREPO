@@ -38,7 +38,7 @@ export const ProfileMenu = ({ fullName }: ProfileMenuProps) => {
         onClick={() => setOpen((value) => !value)}
         aria-label="Account menu"
         aria-expanded={open}
-        className="font-grotesk flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white"
+        className="font-grotesk flex h-10 w-10 items-center justify-center rounded-full bg-primary-solid text-sm font-bold text-white"
       >
         {getInitials(fullName)}
       </button>

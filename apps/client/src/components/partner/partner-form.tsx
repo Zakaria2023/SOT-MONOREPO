@@ -186,7 +186,7 @@ export const PartnerForm = () => {
                 <span
                   className={`flex h-5 w-5 items-center justify-center rounded-md border ${
                     active
-                      ? "border-primary bg-primary text-white"
+                      ? "border-primary bg-primary-solid text-white"
                       : "border-search-border text-transparent"
                   }`}
                 >
@@ -201,7 +201,7 @@ export const PartnerForm = () => {
           type="button"
           disabled={capabilities.length === 0}
           onClick={() => setCapsDone(true)}
-          className="font-grotesk mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+          className="font-grotesk mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
         >
           Continue
           <ArrowRight size={18} />
@@ -472,7 +472,7 @@ export const PartnerForm = () => {
         <button
           type="submit"
           disabled={isPending}
-          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
         >
           {isPending ? "Submitting…" : "Submit request"}
           <ArrowRight size={18} />

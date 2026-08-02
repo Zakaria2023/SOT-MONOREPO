@@ -18,6 +18,20 @@
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
   --color-primary-tint: #f4f1fb;
+
+  /* Primary as a FILL sitting behind white text — buttons, badges, avatars.
+     Separate from --color-primary because that token has to do the opposite
+     job in dark mode, and one value cannot do both:
+
+       as text on the dark page (#060a14), it must be light  -> L >= 0.22
+       as a fill under white text, it must be dark           -> L <= 0.18
+
+     Dark mode lightens --color-primary to #8b7bff to satisfy the first, which
+     drops white-on-violet to 3.29:1 and fails WCAG AA. These stay at the light
+     -theme violet in both themes: 5.70:1 with white, and still 3.47:1 against
+     the dark page, so the button is identifiable as a control. */
+  --color-primary-solid: #7c3aed;
+  --color-primary-solid-hover: #6d28d9;
   --color-accent-cyan: #22d3ee;
   --color-accent-violet: #8b7bff;
   --color-success: #34e29b;

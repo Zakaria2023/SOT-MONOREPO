@@ -225,7 +225,7 @@ export const GuestCartView = () => {
 
                 <Link
                   href="/sign-in"
-                  className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+                  className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary-solid px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover"
                 >
                   Sign in to checkout
                   <ArrowRight size={17} />

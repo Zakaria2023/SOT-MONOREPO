@@ -66,7 +66,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
           >
             {parent.name}
             {activeTopUuid === parent.uuid && (
-              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-solid" />
             )}
           </button>
         ))}

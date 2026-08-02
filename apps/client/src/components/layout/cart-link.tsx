@@ -24,7 +24,7 @@ export const CartLink = ({ serverCount }: CartLinkProps) => {
     >
       <ShoppingCart size={18} />
       {count > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 font-grotesk text-xs font-bold text-white">
+        <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-solid px-1 font-grotesk text-xs font-bold text-white">
           {count}
         </span>
       )}

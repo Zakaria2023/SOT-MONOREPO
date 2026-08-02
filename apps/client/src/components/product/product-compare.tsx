@@ -65,7 +65,7 @@ export const ProductCompare = ({
                         {product.name}
                       </Link>
                       {isCurrent && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">
+                        <span className="rounded-full bg-primary-solid px-2 py-0.5 text-xs font-semibold text-white">
                           This product
                         </span>
                       )}

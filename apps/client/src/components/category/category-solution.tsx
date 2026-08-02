@@ -63,7 +63,7 @@ export const CategorySolution = ({
               type="button"
               onClick={onAddAll}
               disabled={isPending}
-              className="font-grotesk inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
+              className="font-grotesk inline-flex items-center gap-2 rounded-xl bg-primary-solid px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-solid-hover disabled:opacity-60"
             >
               {added ? <Check size={17} /> : <ShoppingCart size={17} />}
               {added

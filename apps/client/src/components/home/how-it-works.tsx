@@ -148,7 +148,7 @@ export const HowItWorks = () => {
               <span
                 className={cn(
                   "absolute top-1/2 left-6 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-primary shadow-[0_8px_24px_-6px_rgba(124,58,237,0.5)] transition-all duration-500 motion-safe:ease-spring md:left-1/2",
-                  isLast ? "bg-primary" : "bg-page",
+                  isLast ? "bg-primary-solid" : "bg-page",
                   isVisible ? "" : "motion-safe:scale-50 motion-safe:opacity-0",
                 )}
               >

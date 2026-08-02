@@ -44,7 +44,7 @@ export const ProfileGateModal = ({
 
       <Link
         href={`/complete-profile?next=${encodeURIComponent(next)}`}
-        className="font-grotesk mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+        className="font-grotesk mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover"
       >
         Complete profile
       </Link>

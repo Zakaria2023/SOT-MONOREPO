@@ -46,7 +46,7 @@ export const AddToCartButton = ({ productUuid }: AddToCartButtonProps) => {
       disabled={isPending || !isLoaded}
       aria-label="Add to cart"
       title={error}
-      className="font-grotesk relative z-20 inline-flex items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-60 cursor-pointer"
+      className="font-grotesk relative z-20 inline-flex items-center gap-1.5 rounded-[10px] bg-primary-solid px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-solid-hover disabled:opacity-60 cursor-pointer"
     >
       {added ? <Check size={16} /> : <ShoppingCart size={16} />}
       {added ? "Added" : isPending ? "Adding…" : "Add"}

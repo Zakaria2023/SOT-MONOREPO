@@ -136,7 +136,7 @@ export const HandoverView = ({
               type="button"
               onClick={onConfirm}
               disabled={isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary-solid px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
             >
               <CheckCircle2 size={16} />
               {isPending ? "Confirming…" : "My access works — confirm"}

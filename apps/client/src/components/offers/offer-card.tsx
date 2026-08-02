@@ -97,7 +97,7 @@ export const OfferCard = ({
           <button
             type="button"
             disabled
-            className="font-grotesk inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-white opacity-60"
+            className="font-grotesk inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3 text-sm font-semibold text-white opacity-60"
           >
             <CreditCard size={16} />
             Proceed to payment
@@ -107,7 +107,7 @@ export const OfferCard = ({
             type="button"
             onClick={() => onSelect(offer.uuid)}
             disabled={isSelecting}
-            className="font-grotesk inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white disabled:pointer-events-none disabled:opacity-60"
+            className="font-grotesk inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary-solid hover:text-white disabled:pointer-events-none disabled:opacity-60"
           >
             {isSelecting ? "Selecting…" : "Select this offer"}
           </button>

@@ -23,7 +23,7 @@ export const Navbar = async () => {
     <header className="sticky top-0 z-50 w-full border-b border-hairline bg-page/80 shadow-[0_1px_3px_rgba(20,22,27,0.06)] backdrop-blur-xl">
       <nav className="mx-auto flex h-18 items-center justify-between px-6 lg:px-12 xl:px-20">
         <Link href="/" className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-solid text-white">
             <Menu size={20} strokeWidth={2.5} />
           </span>
           <span className="font-heading text-2xl text-ink">Stratum</span>
@@ -42,7 +42,7 @@ export const Navbar = async () => {
             </Link>
             <Link
               href="/offers"
-              className="font-grotesk rounded-[10px] bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+              className="font-grotesk rounded-[10px] bg-primary-solid px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover"
             >
               Accept offer
             </Link>
@@ -68,7 +68,7 @@ export const Navbar = async () => {
             </Link>
             <Link
               href="/sign-up"
-              className="font-grotesk rounded-[10px] bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+              className="font-grotesk rounded-[10px] bg-primary-solid px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover"
             >
               Sign up
             </Link>

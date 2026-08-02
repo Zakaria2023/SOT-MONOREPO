@@ -100,7 +100,7 @@ export const OffersSection = ({
             type="button"
             onClick={onConfirm}
             disabled={isPending}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary-solid px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
           >
             {isPending ? "Confirming…" : "Confirm & order"}
             <ArrowRight size={16} />
