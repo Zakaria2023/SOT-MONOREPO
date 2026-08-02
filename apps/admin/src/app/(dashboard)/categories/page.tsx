@@ -1,15 +1,7 @@
-import { CategoriesBoard } from "@/components/categories/categories-board";
+import { CategoriesBoardSection } from "@/components/categories/categories-board-section";
 import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
-import { getCategoryChildren } from "services";
-
-const CategoriesBoardSection = async () => {
-  // First render fetches only the top-level cards; each child column is loaded
-  // on demand when its parent card is opened.
-  const rootItems = await getCategoryChildren(null);
-  return <CategoriesBoard rootItems={rootItems} />;
-};
 
 const CategoriesPage = () => (
   <div className="flex flex-col gap-5">

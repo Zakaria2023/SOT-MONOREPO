@@ -1,17 +1,16 @@
 "use client";
 
+import { SelectCategories } from "@/db/schema/categories";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import { createCategory, updateCategory } from "./action";
-import type { CategoryActionResult } from "./action";
-import type { CategoryFields } from "services";
-import { categoryFormSchema } from "./validation";
-import type { CategoryFormValues } from "./validation";
-import type { SelectCategories } from "@/db/schema/categories";
+import { CategoryFields } from "services";
+import { CategoryActionResult, createCategory, updateCategory } from "./action";
+import { categoryFormSchema, CategoryFormValues } from "./validation";
 
 type UseCategoryFormArgs =
-  { mode: "add" } | { mode: "edit"; category: SelectCategories };
+  | { mode: "add" }
+  | { mode: "edit"; category: SelectCategories };
 
 export const useCategoryForm = (args: UseCategoryFormArgs) => {
   const action =
