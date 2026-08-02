@@ -1,8 +1,6 @@
 "use server";
 
-import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
-import type { ActionResult, ListParams, PaginatedResult } from "utils";
-import { fail, getReviewerName } from "utils";
+import { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import { requireAdmin } from "@/lib/server/auth";
 import { inviteOrAttachClerkUser } from "@/lib/server/clerk";
 import { failClerk } from "@/lib/server/clerk-error";
@@ -15,7 +13,14 @@ import {
   rejectPartnerRequest as rejectPartnerRequestRecord,
   setPartnerIntegration,
 } from "services";
-import { partnerRejectionSchema, type PartnerRejectionInput } from "validators";
+import {
+  ActionResult,
+  fail,
+  getReviewerName,
+  ListParams,
+  PaginatedResult,
+} from "utils";
+import { PartnerRejectionInput, partnerRejectionSchema } from "validators";
 
 // Searched + paginated page of partner requests for the list table. The
 // frontend drives `search`/`page` through URL search params.

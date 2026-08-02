@@ -4,10 +4,10 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
   getPartnerDiscounts as getPartnerDiscountsRecord,
+  PartnerDiscountMap,
   setPartnerDiscounts as setPartnerDiscountsRecord,
 } from "services";
-import type { PartnerDiscountMap } from "services";
-import { fail, type ActionResult } from "utils";
+import { ActionResult, fail } from "utils";
 
 export const getPartnerDiscounts = async (): Promise<PartnerDiscountMap> => {
   await requireAdmin();

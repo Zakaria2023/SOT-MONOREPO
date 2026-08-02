@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Whole-number percentage, 0–100. Fields use valueAsNumber, so the value is
-// already a number by the time it reaches the resolver — only numbers pass.
 const percentField = z
   .number()
   .int("Whole numbers only")

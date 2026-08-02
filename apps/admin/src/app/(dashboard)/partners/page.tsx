@@ -1,32 +1,10 @@
-import { PartnerRequestsTable } from "@/components/partners/partner-requests-table";
+import { PartnersList } from "@/components/partners/partners-list";
+import { AsyncSection } from "@/components/shared/async-section";
 import { ListSearch } from "@/components/shared/list-search";
 import { PageHeader } from "@/components/shared/page-header";
-import { Pagination } from "@/components/shared/pagination";
-import { AsyncSection } from "@/components/shared/async-section";
-import { getPartnerRequestsPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
-};
-
-type PartnersListProps = {
-  search?: string;
-  page?: string;
-};
-
-const PartnersList = async ({ search, page }: PartnersListProps) => {
-  const result = await getPartnerRequestsPage({ search, page });
-  return (
-    <>
-      <PartnerRequestsTable requests={result.items} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
 };
 
 const PartnersPage = async ({ searchParams }: Props) => {
