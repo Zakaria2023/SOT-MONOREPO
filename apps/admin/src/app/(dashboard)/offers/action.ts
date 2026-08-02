@@ -1,8 +1,9 @@
 "use server";
 
-import type { ListParams, PaginatedResult } from "utils";
-import { fail, getReviewerName, paginate } from "utils";
+import type { ActionResult, ListParams, PaginatedResult } from "utils";
+import { fail, getReviewerName } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
+import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
 import {
   approveOffer,
@@ -14,25 +15,15 @@ import { offerRejectionSchema, type OfferRejectionInput } from "validators";
 
 export type OfferRow = OfferListItem;
 
-export type OfferReviewResult = {
-  error?: string;
-  success?: boolean;
-};
-
 // Searched + paginated page of offers for the list table. The frontend drives
 // `search`/`page` through URL search params.
 export const getOffersPage = async (
   params: ListParams = {},
-): Promise<PaginatedResult<OfferRow>> => {
-  await requireAdmin();
-  return paginate(params, ({ limit, offset }) =>
-    listOffers({ search: params.search, limit, offset }),
-  );
-};
+): Promise<PaginatedResult<OfferRow>> => adminListPage(params, listOffers);
 
 export const approveOfferAction = async (
   offerUuid: string,
-): Promise<OfferReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
 
   try {
@@ -52,7 +43,7 @@ export const approveOfferAction = async (
 export const rejectOfferAction = async (
   offerUuid: string,
   input: OfferRejectionInput,
-): Promise<OfferReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
 
   const parsed = offerRejectionSchema.safeParse(input);

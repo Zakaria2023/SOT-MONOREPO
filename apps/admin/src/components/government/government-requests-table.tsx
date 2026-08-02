@@ -1,6 +1,6 @@
 "use client";
 
-import type { GovernmentRequestListItem } from "@/app/(dashboard)/government/action";
+import type { SelectGovernmentRequests } from "@/db/schema/government-requests";
 import { GovernmentRequestRowActions } from "@/components/government/government-request-row-actions";
 import type { GovernmentRequestStatus } from "@/db/enum";
 import { GOVERNMENT_REQUEST_STATUS_LABELS } from "@/db/label";
@@ -8,7 +8,7 @@ import type { TableColumn } from "ui";
 import { Table } from "ui";
 
 type GovernmentRequestsTableProps = {
-  requests: GovernmentRequestListItem[];
+  requests: SelectGovernmentRequests[];
 };
 
 const STATUS_BADGE_CLASSES: Record<GovernmentRequestStatus, string> = {
@@ -17,7 +17,7 @@ const STATUS_BADGE_CLASSES: Record<GovernmentRequestStatus, string> = {
   rejected: "bg-danger-tint text-danger",
 };
 
-const columns: TableColumn<GovernmentRequestListItem>[] = [
+const columns: TableColumn<SelectGovernmentRequests>[] = [
   {
     key: "entity",
     header: "Entity",

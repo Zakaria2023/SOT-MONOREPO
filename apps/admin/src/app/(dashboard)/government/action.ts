@@ -1,11 +1,10 @@
 "use server";
 
-import type { SelectGovernmentRequests } from "@/db/schema/government-requests";
+import { SelectGovernmentRequests } from "@/db/schema/government-requests";
 import { requireAdmin } from "@/lib/server/auth";
-import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
-import { clerkClient } from "@clerk/nextjs/server";
-import type { ListParams, PaginatedResult } from "utils";
-import { fail, getReviewerName, paginate } from "utils";
+import { failClerk } from "@/lib/server/clerk-error";
+import { inviteOrAttachClerkUser } from "@/lib/server/clerk";
+import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
 import {
   approveGovernmentRequest as approveGovernmentRequestRecord,
@@ -14,39 +13,33 @@ import {
   rejectGovernmentRequest as rejectGovernmentRequestRecord,
 } from "services";
 import {
+  ActionResult,
+  fail,
+  getReviewerName,
+  ListParams,
+  PaginatedResult,
+} from "utils";
+import {
+  GovernmentRejectionInput,
   governmentRejectionSchema,
-  type GovernmentRejectionInput,
 } from "validators";
-
-export type GovernmentRequestListItem = SelectGovernmentRequests;
-
-export type GovernmentReviewResult = {
-  error?: string;
-  success?: boolean;
-};
 
 // Searched + paginated page of government requests for the list table. The
 // frontend drives `search`/`page` through URL search params.
 export const getGovernmentRequestsPage = async (
   params: ListParams = {},
-): Promise<PaginatedResult<GovernmentRequestListItem>> => {
-  await requireAdmin();
-  return paginate(params, ({ limit, offset }) =>
-    listGovernmentRequests({ search: params.search, limit, offset }),
-  );
-};
+): Promise<PaginatedResult<SelectGovernmentRequests>> =>
+  adminListPage(params, listGovernmentRequests);
 
 export const approveGovernmentRequestAction = async (
   governmentRequestUuid: string,
-): Promise<GovernmentReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
 
   const request = await getGovernmentRequestByUuid(governmentRequestUuid);
   if (!request) {
     return { error: "Government request not found." };
   }
-
-  const client = await clerkClient();
 
   try {
     if (request.status !== "pending") {
@@ -65,28 +58,10 @@ export const approveGovernmentRequestAction = async (
       location: request.location,
     };
 
-    // If a Clerk account with this email already exists, an invitation would
-    // never apply this metadata (invitations only seed brand-new signups), so
-    // set it directly on the existing user; otherwise invite them.
-    const { data: existingUsers } = await client.users.getUserList({
-      emailAddress: [request.officialEmail],
-    });
-    const [existingUser] = existingUsers;
-
-    let approvedClerkUserId: string;
-    if (existingUser) {
-      await client.users.updateUserMetadata(existingUser.id, {
-        publicMetadata: { ...existingUser.publicMetadata, ...publicMetadata },
-      });
-      approvedClerkUserId = existingUser.id;
-    } else {
-      const invitation = await client.invitations.createInvitation({
-        emailAddress: request.officialEmail,
-        ignoreExisting: true,
-        publicMetadata,
-      });
-      approvedClerkUserId = invitation.id;
-    }
+    const approvedClerkUserId = await inviteOrAttachClerkUser(
+      request.officialEmail,
+      publicMetadata,
+    );
 
     await approveGovernmentRequestRecord({
       governmentRequestUuid,
@@ -95,17 +70,7 @@ export const approveGovernmentRequestAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    if (isClerkAPIResponseError(error)) {
-      const [firstError] = error.errors;
-      return {
-        error:
-          firstError?.longMessage ??
-          firstError?.message ??
-          "Failed to approve government request.",
-      };
-    }
-
-    return fail(error, "Failed to approve government request.");
+    return failClerk(error, "Failed to approve government request.");
   }
 
   revalidatePath("/government");
@@ -115,7 +80,7 @@ export const approveGovernmentRequestAction = async (
 export const rejectGovernmentRequestAction = async (
   governmentRequestUuid: string,
   input: GovernmentRejectionInput,
-): Promise<GovernmentReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
   const parsed = governmentRejectionSchema.safeParse(input);
 

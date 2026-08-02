@@ -10,12 +10,7 @@ import {
   updateHandoverAsset,
 } from "services";
 import type { HandoverCredentialType } from "@/db/enum";
-import { fail } from "utils";
-
-export type HandoverActionState = {
-  error?: string;
-  success?: boolean;
-};
+import { fail, type ActionResult } from "utils";
 
 const guard = async (boqUuid: string) => {
   const user = await requirePartner();
@@ -25,7 +20,7 @@ const guard = async (boqUuid: string) => {
 
 export const openPack = async (
   boqUuid: string,
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
   try {
     await createHandoverPack({ boqUuid, partnerClerkUserId: user.id });
@@ -46,7 +41,7 @@ export const saveAsset = async (
     macAddress?: string;
     serialNumber?: string;
   },
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
   try {
     await updateHandoverAsset({
@@ -70,7 +65,7 @@ export const addCredential = async (
     username?: string;
     secret?: string;
   },
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const { user, detail } = await guard(boqUuid);
   if (!detail) {
     return { error: "Handover pack not found" };
@@ -92,7 +87,7 @@ export const addCredential = async (
 export const submitPack = async (
   boqUuid: string,
   trainingNotes?: string,
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const { user, detail } = await guard(boqUuid);
   if (!detail) {
     return { error: "Handover pack not found" };

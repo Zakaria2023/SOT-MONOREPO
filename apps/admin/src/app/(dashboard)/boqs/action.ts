@@ -2,15 +2,10 @@
 
 import { requireAdmin } from "@/lib/server/auth";
 import { getClerkPreSellerUsers } from "@/lib/server/clerk";
+import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
 import { assignBoq, BoqListItem, getAllBoqs } from "services";
-import {
-  ActionResult,
-  fail,
-  ListParams,
-  paginate,
-  PaginatedResult,
-} from "utils";
+import { ActionResult, fail, ListParams, PaginatedResult } from "utils";
 
 export type PreSellerOption = {
   id: string;
@@ -19,12 +14,7 @@ export type PreSellerOption = {
 
 export const getBoqsPage = async (
   params: ListParams = {},
-): Promise<PaginatedResult<BoqListItem>> => {
-  await requireAdmin();
-  return paginate(params, ({ limit, offset }) =>
-    getAllBoqs({ search: params.search, limit, offset }),
-  );
-};
+): Promise<PaginatedResult<BoqListItem>> => adminListPage(params, getAllBoqs);
 
 /** Clerk users whose publicMetadata role is "pre-seller". */
 export const listPreSellers = async (): Promise<PreSellerOption[]> => {

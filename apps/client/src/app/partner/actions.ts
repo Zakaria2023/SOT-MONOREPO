@@ -1,18 +1,13 @@
 "use server";
 
 import { createPartnerRequest } from "services";
-import { fail } from "utils";
+import { fail, type ActionResult } from "utils";
 import { partnerRequestSchema, type PartnerRequestInput } from "validators";
 
-export type PartnerRequestActionState = {
-  error?: string;
-  success?: boolean;
-};
-
 export const submitPartnerRequest = async (
-  _prevState: PartnerRequestActionState,
+  _prevState: ActionResult,
   input: PartnerRequestInput,
-): Promise<PartnerRequestActionState> => {
+): Promise<ActionResult> => {
   const parsed = partnerRequestSchema.safeParse(input);
 
   if (!parsed.success) {

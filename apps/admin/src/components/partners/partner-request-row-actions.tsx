@@ -1,6 +1,6 @@
 "use client";
 
-import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
+import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import {
   approvePartnerRequestAction,
   rejectPartnerRequestAction,
@@ -14,7 +14,7 @@ import { useState, useTransition } from "react";
 import { Button } from "ui";
 
 type PartnerRequestRowActionsProps = {
-  request: PartnerRequestListItem;
+  request: SelectPartnerRequests;
 };
 
 export const PartnerRequestRowActions = ({
