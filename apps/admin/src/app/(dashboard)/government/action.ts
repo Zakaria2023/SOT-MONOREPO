@@ -4,7 +4,7 @@ import type { SelectGovernmentRequests } from "@/db/schema/government-requests";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { clerkClient } from "@clerk/nextjs/server";
-import type { PaginatedResult } from "utils";
+import type { ListParams, PaginatedResult } from "utils";
 import { getReviewerName, paginate } from "utils";
 import { revalidatePath } from "next/cache";
 import {
@@ -25,16 +25,10 @@ export type GovernmentReviewResult = {
   success?: boolean;
 };
 
-export type GovernmentRequestListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
-
 // Searched + paginated page of government requests for the list table. The
 // frontend drives `search`/`page` through URL search params.
 export const getGovernmentRequestsPage = async (
-  params: GovernmentRequestListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<GovernmentRequestListItem>> => {
   await requireAdmin();
   return paginate(params, ({ limit, offset }) =>

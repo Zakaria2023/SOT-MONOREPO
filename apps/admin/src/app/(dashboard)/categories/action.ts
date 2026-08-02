@@ -22,10 +22,9 @@ import type {
   CategoryBoardItem,
   CategoryFields,
   CategoryListItem,
-  CategoryListParams,
   SelectCategories,
 } from "services";
-import type { PaginatedResult } from "utils";
+import type { ListParams, PaginatedResult } from "utils";
 import { fail, type ActionResult } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
@@ -40,7 +39,7 @@ export const getCategories = async (): Promise<CategoryListItem[]> =>
   getCategoriesList();
 
 export const getCategoriesPage = async (
-  params: CategoryListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<CategoryListItem>> => getCategoriesPageList(params);
 
 // One column's cards — the top-level cards when parentUuid is null, otherwise a

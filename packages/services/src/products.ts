@@ -17,6 +17,7 @@ import {
   generateUuid,
   resolvePagination,
   slugify,
+  type ListParams,
   type PaginatedResult,
 } from "utils";
 import { db } from "../../../db";
@@ -43,12 +44,6 @@ export type ProductFields = Omit<
 
 // The client form never sets the slug — it's derived from the name on save.
 export type ProductClientFields = Omit<ProductFields, "slug">;
-
-export type ProductListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
 
 export type ProductDetail = ProductListItem & {
   category: SelectCategories | null;
@@ -233,7 +228,7 @@ const adminProductSearchFilter = (search?: string) => {
 
 /** A searched + paginated page of products for the admin list table. */
 export const getProductsPage = async (
-  params: ProductListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<ProductListItem>> => {
   const { page, pageSize, offset } = resolvePagination(
     params.page,

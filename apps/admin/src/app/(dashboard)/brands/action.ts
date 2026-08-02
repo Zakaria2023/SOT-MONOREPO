@@ -22,10 +22,9 @@ import type {
   BrandBoardItem,
   BrandFields,
   BrandListItem,
-  BrandListParams,
   SelectBrands,
 } from "services";
-import type { PaginatedResult } from "utils";
+import type { ListParams, PaginatedResult } from "utils";
 import { fail, type ActionResult } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
@@ -39,7 +38,7 @@ export type BrandActionResult = ActionResult & { brandUuid?: string };
 export const getBrands = async (): Promise<BrandListItem[]> => getBrandsList();
 
 export const getBrandsPage = async (
-  params: BrandListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<BrandListItem>> => getBrandsPageList(params);
 
 // One column's cards — the top-level cards when parentUuid is null, otherwise a

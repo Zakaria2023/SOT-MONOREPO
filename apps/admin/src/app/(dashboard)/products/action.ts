@@ -21,10 +21,9 @@ import type {
   ProductClientFields,
   ProductDetail,
   ProductListItem,
-  ProductListParams,
   SelectProducts,
 } from "services";
-import type { PaginatedResult } from "utils";
+import type { ListParams, PaginatedResult } from "utils";
 import { fail, type ActionResult } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
@@ -36,7 +35,7 @@ export type ProductActionResult = ActionResult & { productUuid?: string };
 // Reads pass straight through to the service — the admin pages/components call
 // these from `./action`, keeping the transport boundary in one place.
 export const getProductsPage = async (
-  params: ProductListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<ProductListItem>> => getProductsPageList(params);
 
 export const getProduct = async (

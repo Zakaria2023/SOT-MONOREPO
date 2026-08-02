@@ -18,6 +18,24 @@ type ReviewerUser = {
 /** Generates a random UUID v4. */
 export const generateUuid = (): string => crypto.randomUUID();
 
+/**
+ * What a searched, paginated list is asked for — the other half of
+ * PaginatedResult.
+ *
+ * All three are optional because all three come off the URL, where any of them
+ * may be absent; `resolvePagination` decides what a missing or unparseable page
+ * means. `page`/`pageSize` admit strings for the same reason: search params
+ * arrive as text and are never pre-parsed for us.
+ *
+ * A list that filters on more than a search box intersects this rather than
+ * redeclaring it, so the extra filter is the only thing its type says.
+ */
+export type ListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
 /** A page of results plus the metadata a list UI needs to paginate. */
 export type PaginatedResult<T> = {
   items: T[];

@@ -1,7 +1,7 @@
 "use server";
 
 import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
-import type { PaginatedResult } from "utils";
+import type { ListParams, PaginatedResult } from "utils";
 import { getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
@@ -23,16 +23,10 @@ export type PartnerReviewResult = {
   success?: boolean;
 };
 
-export type PartnerRequestListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
-
 // Searched + paginated page of partner requests for the list table. The
 // frontend drives `search`/`page` through URL search params.
 export const getPartnerRequestsPage = async (
-  params: PartnerRequestListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<PartnerRequestListItem>> => {
   await requireAdmin();
   return paginate(params, ({ limit, offset }) =>
