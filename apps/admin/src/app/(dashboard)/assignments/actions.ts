@@ -3,20 +3,22 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
-  AssignmentInput,
   createRelationship,
   deleteRelationship,
   previewRelationship,
-  ProductPickerItem,
-  RelationshipInput,
-  RelationshipPreview,
-  RelationshipProblem,
   removeAssignment,
   saveAssignment,
   searchProductsForPicker,
   suppressInherited,
   updateRelationship,
   validateRelationship,
+} from "services";
+import type {
+  AssignmentInput,
+  ProductPickerItem,
+  RelationshipInput,
+  RelationshipPreview,
+  RelationshipProblem,
 } from "services";
 import { fail, type ActionResult } from "utils";
 
