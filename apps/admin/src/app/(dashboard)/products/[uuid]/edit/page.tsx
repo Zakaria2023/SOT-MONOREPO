@@ -3,9 +3,9 @@ import { ProductForm } from "@/components/products/product-form";
 import {
   getBrands,
   getCategories,
+  getProduct,
   getProductFormFieldsByCategory,
 } from "services";
-import { getProduct } from "../../action";
 
 type Props = {
   params: Promise<{ uuid: string }>;

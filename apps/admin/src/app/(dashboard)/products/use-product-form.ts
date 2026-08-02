@@ -1,14 +1,12 @@
 "use client";
 
+import { SelectProducts } from "@/db/schema/products";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import { createProduct, updateProduct } from "./action";
-import type { ProductActionResult } from "./action";
-import type { ProductClientFields } from "services";
-import { productFormSchema } from "./validation";
-import type { ProductFormValues } from "./validation";
-import type { SelectProducts } from "@/db/schema/products";
+import { ProductClientFields } from "services";
+import { createProduct, ProductActionResult, updateProduct } from "./action";
+import { productFormSchema, ProductFormValues } from "./validation";
 
 type UseProductFormArgs =
   | { mode: "add" }

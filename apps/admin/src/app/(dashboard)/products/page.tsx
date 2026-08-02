@@ -1,32 +1,10 @@
-import { ProductsTable } from "@/components/products/products-table";
-import { ListSearch } from "@/components/shared/list-search";
-import { Pagination } from "@/components/shared/pagination";
-import { PageHeader } from "@/components/shared/page-header";
+import { ProductsList } from "@/components/products/products-list";
 import { AsyncSection } from "@/components/shared/async-section";
-import { getProductsPage } from "./action";
+import { ListSearch } from "@/components/shared/list-search";
+import { PageHeader } from "@/components/shared/page-header";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
-};
-
-type ProductsListProps = {
-  search?: string;
-  page?: string;
-};
-
-const ProductsList = async ({ search, page }: ProductsListProps) => {
-  const result = await getProductsPage({ search, page });
-  return (
-    <>
-      <ProductsTable products={result.items} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
 };
 
 const ProductsPage = async ({ searchParams }: Props) => {

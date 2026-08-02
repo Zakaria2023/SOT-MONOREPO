@@ -1,54 +1,24 @@
 "use server";
 
-import type { ProductValues } from "@/db/types";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  AddOptionRequest,
+  AddOptionResult,
+  ProductClientFields,
   addAttributeOption as addAttributeOptionRecord,
   createProduct as createProductRecord,
   deleteProduct as deleteProductRecord,
-  getProduct as getProductRecord,
-  getProductDetailByUuid as getProductDetailByUuidRecord,
-  getProductSpecsForDisplay as getProductSpecsForDisplayRecord,
-  getProductsPage as getProductsPageList,
   updateProduct as updateProductRecord,
 } from "services";
-import type {
-  AddOptionRequest,
-  AddOptionResult,
-  DisplaySpec,
-  ProductClientFields,
-  ProductDetail,
-  ProductListItem,
-  SelectProducts,
-} from "services";
-import type { ListParams, PaginatedResult } from "utils";
-import { fail, type ActionResult } from "utils";
+import { ActionResult, fail } from "utils";
 
-// A "use server" file may only export async functions; types are re-declared as
-// local aliases (not `export type { ... } from`, which the RSC compiler would
-// treat as a runtime export) so consumers can keep importing them from here.
-
+// Only what a "use client" file has to reach through an action lives here. The
+// reads a server component makes — getProductsPage, getProduct,
+// getProductDetailByUuid, getProductSpecsForDisplay — go straight to services.
 export type ProductActionResult = ActionResult & { productUuid?: string };
 
-// Reads pass straight through to the service — the admin pages/components call
-// these from `./action`, keeping the transport boundary in one place.
-export const getProductsPage = async (
-  params: ListParams = {},
-): Promise<PaginatedResult<ProductListItem>> => getProductsPageList(params);
-
-export const getProduct = async (
-  uuid: string,
-): Promise<SelectProducts | null> => getProductRecord(uuid);
-
-export const getProductDetail = async (
-  uuid: string,
-): Promise<ProductDetail | null> => getProductDetailByUuidRecord(uuid);
-
-// "admin" so the panel shows partner-only and staff-only attributes: this is
-// where the catalog is authored, and an attribute an author cannot see is one they
-// cannot notice is wrong.
 /**
  * Add one value to a library list, from the product form.
  *
@@ -70,12 +40,6 @@ export const addSpecOption = async (
     return fail(error, "Failed to add the value");
   }
 };
-
-export const getProductSpecs = async (
-  categoryUuid: string,
-  values: ProductValues,
-): Promise<DisplaySpec[]> =>
-  getProductSpecsForDisplayRecord(categoryUuid, values, "admin");
 
 export const createProduct = async (
   _prevState: ProductActionResult,
