@@ -1,6 +1,7 @@
 import { CategoryTree } from "@/components/assignments/category-tree";
 import { WorkspacePanel } from "@/components/assignments/workspace-panel";
 import { AsyncSection } from "@/components/shared/async-section";
+import { PageHeader } from "@/components/shared/page-header";
 import { buildCategoryTreeOptions } from "@/lib/categories";
 import { getCategories } from "services";
 
@@ -15,9 +16,7 @@ const AssignmentsPage = async ({ searchParams }: Props) => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h1 className="font-heading text-2xl text-ink">
-        Define once, assign down
-      </h1>
+      <PageHeader title="Define once, assign down" />
 
       <div className="flex flex-col gap-5 lg:flex-row">
         <aside className="shrink-0 lg:w-72 xl:w-80">

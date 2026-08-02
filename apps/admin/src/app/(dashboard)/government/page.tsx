@@ -1,5 +1,6 @@
 import { GovernmentRequestsTable } from "@/components/government/government-requests-table";
 import { ListSearch } from "@/components/shared/list-search";
+import { PageHeader } from "@/components/shared/page-header";
 import { Pagination } from "@/components/shared/pagination";
 import { requireAdmin } from "@/lib/server/auth";
 import { AsyncSection } from "@/components/shared/async-section";
@@ -35,12 +36,10 @@ const GovernmentPage = async ({ searchParams }: Props) => {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-heading text-2xl text-ink">Government</h1>
-        <p className="text-sm text-muted">
-          Review government access requests and invite approved entities.
-        </p>
-      </div>
+      <PageHeader
+        title="Government"
+        description="Review government access requests and invite approved entities."
+      />
 
       <ListSearch placeholder="Search by entity, name, or email..." />
 

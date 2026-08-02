@@ -1,30 +1,14 @@
-import { BrandsBoard } from "@/components/brands/brands-board";
+import { BrandsBoardSection } from "@/components/brands/brands-board-section";
 import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
-import { Plus } from "lucide-react";
-import Link from "next/link";
-import { getBrandChildren } from "./action";
-
-const BrandsBoardSection = async () => {
-  // First render fetches only the top-level cards; each child column is loaded
-  // on demand when its parent card is opened.
-  const rootItems = await getBrandChildren(null);
-  return <BrandsBoard rootItems={rootItems} />;
-};
+import { PageHeader } from "@/components/shared/page-header";
 
 const BrandsPage = () => (
   <div className="flex flex-col gap-5">
-    <div className="flex items-center justify-between">
-      <h1 className="font-heading text-2xl text-ink">Brands</h1>
-
-      <Link
-        href="/brands/new"
-        className="flex items-center gap-1.5 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
-      >
-        <Plus size={16} />
-        Add Brand
-      </Link>
-    </div>
+    <PageHeader
+      title="Brands"
+      action={{ href: "/brands/new", label: "Add Brand" }}
+    />
 
     <AsyncSection reloadKey="brands-board" skeleton={<BoardSkeleton />}>
       <BrandsBoardSection />

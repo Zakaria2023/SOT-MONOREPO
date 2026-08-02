@@ -1,5 +1,6 @@
 import { PartnerRequestsTable } from "@/components/partners/partner-requests-table";
 import { ListSearch } from "@/components/shared/list-search";
+import { PageHeader } from "@/components/shared/page-header";
 import { Pagination } from "@/components/shared/pagination";
 import { requireAdmin } from "@/lib/server/auth";
 import { AsyncSection } from "@/components/shared/async-section";
@@ -35,12 +36,10 @@ const PartnersPage = async ({ searchParams }: Props) => {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-heading text-2xl text-ink">Partners</h1>
-        <p className="text-sm text-muted">
-          Review public partner applications and approve or reject them.
-        </p>
-      </div>
+      <PageHeader
+        title="Partners"
+        description="Review public partner applications and approve or reject them."
+      />
 
       <ListSearch placeholder="Search by company, name, or email..." />
 
