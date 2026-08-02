@@ -1,16 +1,18 @@
 import { ClassificationFilter } from "@/components/category/classification-filter";
 import { documentDownloadUrl } from "@/lib/documents";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { getCategories, getClassifications } from "services";
 
-export const metadata: Metadata = {
-  title: "Solutions · SOT Solutions",
+export const metadata: Metadata = pageMetadata({
+  title: "Solutions",
   description:
     "Shop by solution — add a whole category of networking, infrastructure or security hardware to your deployment.",
-};
+  path: "/categories",
+});
 
 // Reads the live category tree and has no dynamic API of its own, so it would
 // otherwise be prerendered once at build and serve a frozen tree on live —

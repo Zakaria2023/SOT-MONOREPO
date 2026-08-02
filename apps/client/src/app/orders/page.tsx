@@ -1,14 +1,18 @@
 import { getCurrentUser } from "@/lib/auth";
 import { ORDER_STATUS_LABELS } from "@/db/label";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { formatMoney } from "utils";
 import { getUserOrders } from "services";
 
-export const metadata: Metadata = {
-  title: "Your orders · Stratum",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Your orders",
+  description: "Track the status of every order you have placed.",
+  path: "/orders",
+  noIndex: true,
+});
 
 const OrdersPage = async () => {
   const user = await getCurrentUser();

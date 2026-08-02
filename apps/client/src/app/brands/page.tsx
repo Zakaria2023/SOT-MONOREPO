@@ -1,15 +1,17 @@
 import { documentDownloadUrl } from "@/lib/documents";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { getBrands } from "services";
 
-export const metadata: Metadata = {
-  title: "Brands · SOT Solutions",
+export const metadata: Metadata = pageMetadata({
+  title: "Brands",
   description:
     "Shop by brand — explore hardware from the industry's leading manufacturers, unified under a single platform.",
-};
+  path: "/brands",
+});
 
 const BrandsPage = async () => {
   const brands = await getBrands();

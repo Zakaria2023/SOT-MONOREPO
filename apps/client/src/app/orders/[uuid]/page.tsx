@@ -1,6 +1,7 @@
 import { OrderPayment } from "@/components/orders/order-payment";
 import { getCurrentUser } from "@/lib/auth";
 import { ORDER_STATUS_LABELS } from "@/db/label";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -8,13 +9,18 @@ import { CheckCircle2, Clock, FileText } from "lucide-react";
 import { formatMoney } from "utils";
 import { getInvoiceForOrder, getOrderItems, getUserOrder } from "services";
 
-export const metadata: Metadata = {
-  title: "Your order · Stratum",
-};
-
 type Props = {
   params: Promise<{ uuid: string }>;
 };
+
+// Path-less canonical would be wrong here and a real one would leak an order id
+// into a crawlable URL, so this page carries noindex and nothing else.
+export const metadata: Metadata = pageMetadata({
+  title: "Your order",
+  description: "Order details, payment status and invoice.",
+  path: "/orders",
+  noIndex: true,
+});
 
 const OrderPage = async ({ params }: Props) => {
   const { uuid } = await params;

@@ -1,12 +1,19 @@
 import { PartnerForm } from "@/components/partner/partner-form";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Join us as a partner · Stratum",
+export const metadata: Metadata = pageMetadata({
+  title: "Become a partner",
   description:
-    "Apply to join Stratum's installer & integrator network — get matched to live deployments and quote from our catalog.",
-};
+    "Apply to join the SOT Solutions installer & integrator network — get matched to live deployments and quote from our catalog at partner pricing.",
+  path: "/partner",
+  keywords: [
+    "system integrator Saudi Arabia",
+    "network installer partner",
+    "IT contractor network",
+  ],
+});
 
 const PartnerPage = () => (
   <AuthShell>

@@ -35,14 +35,7 @@ export const TechHero = () => (
 
     <div className="relative mx-auto grid items-center gap-14 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 xl:px-20">
       <div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan shadow-[0_0_8px_rgba(34,211,238,0.9)]" />
-          <span className="font-mono text-[11.5px] tracking-[0.06em] text-accent-cyan uppercase">
-            Enterprise Network Deployment
-          </span>
-        </span>
-
-        <h1 className="font-display mt-6 text-[clamp(38px,5vw,58px)] leading-[1.03] font-bold tracking-[-0.03em]">
+        <h1 className="font-display text-[clamp(38px,5vw,58px)] leading-[1.03] font-bold tracking-[-0.03em]">
           <span className="block text-ink">Your enterprise network,</span>
           <span className="text-accent-gradient block">
             quoted and ready to build.
