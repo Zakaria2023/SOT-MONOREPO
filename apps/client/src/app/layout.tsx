@@ -12,8 +12,61 @@ import {
 import { graph, organizationNode, webSiteNode } from "@/lib/structured-data";
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
+import {
+  Cairo,
+  Hanken_Grotesk,
+  JetBrains_Mono,
+  Newsreader,
+  Space_Grotesk,
+} from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
+
+// Self-hosted at build time, so there is no request to fonts.googleapis.com and
+// no cross-origin chain in front of the first paint. Only the weights the
+// design actually uses are fetched; `swap` keeps text visible while they load.
+const cairo = Cairo({
+  subsets: ["latin", "arabic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-cairo",
+  display: "swap",
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+
+const hankenGrotesk = Hanken_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-hanken",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+const FONT_VARIABLES = [
+  cairo.variable,
+  newsreader.variable,
+  hankenGrotesk.variable,
+  spaceGrotesk.variable,
+  jetBrainsMono.variable,
+].join(" ");
 
 export const metadata: Metadata = {
   // Resolves every relative URL below — and every page's OG image — against the
@@ -96,7 +149,11 @@ const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');var d=
 
 const RootLayout = ({ children }: Props) => (
   <ClerkProvider>
-    <html lang="en" suppressHydrationWarning className="h-full antialiased">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`h-full antialiased ${FONT_VARIABLES}`}
+    >
       <body className="min-h-full flex flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {/* Site-wide identity: every page inherits it, and per-page nodes

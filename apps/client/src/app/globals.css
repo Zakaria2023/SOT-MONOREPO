@@ -1,19 +1,32 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @source "../../../../packages/ui/src";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
+/* Fonts come from next/font (see app/layout.tsx), which self-hosts them and
+   emits the --font-* variables below onto <html>.
+
+   They used to arrive via `@import url(fonts.googleapis.com)` at the top of
+   this file, which is the worst possible place for them: the browser has to
+   fetch and parse this stylesheet before it even learns a second origin is
+   involved, then pay DNS + TCP + TLS to Google, fetch another stylesheet, and
+   only then start on the font files. Four serial round trips ahead of the
+   first paint. Self-hosted, they are same-origin and preloaded.
+
+   `inline` so the generated utilities resolve the chain at use time rather
+   than baking in a literal. */
+@theme inline {
   /* "Twemoji Country Flags" (injected by the flag-emoji polyfill) only contains
      flag glyphs, so listing it first renders flags on Windows while all other
      text falls through to the real family. */
-  --font-sans: "Twemoji Country Flags", "Cairo", sans-serif;
-  --font-heading: "Newsreader", serif;
-  --font-grotesk: "Twemoji Country Flags", "Hanken Grotesk", sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Twemoji Country Flags", var(--font-cairo), sans-serif;
+  --font-heading: var(--font-newsreader), serif;
+  --font-grotesk: "Twemoji Country Flags", var(--font-hanken), sans-serif;
+  --font-display: var(--font-space-grotesk), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+}
 
+@theme {
   /* Accent (shared across themes) */
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
