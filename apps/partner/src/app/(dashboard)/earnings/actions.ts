@@ -3,6 +3,7 @@
 import { requirePartner } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { requestPayout } from "services";
+import { fail } from "utils";
 
 export type CashOutState = {
   error?: string;
@@ -17,9 +18,7 @@ export const cashOut = async (): Promise<CashOutState> => {
   try {
     await requestPayout({ partnerClerkUserId: user.id });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to cash out",
-    };
+    return fail(error, "Failed to cash out");
   }
 
   revalidatePath("/earnings");

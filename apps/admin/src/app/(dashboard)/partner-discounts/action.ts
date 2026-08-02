@@ -7,6 +7,7 @@ import {
   setPartnerDiscounts as setPartnerDiscountsRecord,
 } from "services";
 import type { PartnerDiscountMap as ServicePartnerDiscountMap } from "services";
+import { fail } from "utils";
 
 export type PartnerDiscountMap = ServicePartnerDiscountMap;
 
@@ -28,10 +29,7 @@ export const savePartnerDiscounts = async (
   try {
     await setPartnerDiscountsRecord(values);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to save discounts",
-    };
+    return fail(error, "Failed to save discounts");
   }
 
   revalidatePath("/partner-discounts");

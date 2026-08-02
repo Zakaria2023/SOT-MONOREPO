@@ -3,6 +3,7 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { completeHandover, disputeHandover, verifyHandover } from "services";
+import { fail } from "utils";
 
 export type HandoverReviewState = {
   error?: string;
@@ -21,9 +22,7 @@ const operatorName = (
 };
 
 // SOT remote completeness check — moves the pack to verified.
-export const verify = async (
-  boqUuid: string,
-): Promise<HandoverReviewState> => {
+export const verify = async (boqUuid: string): Promise<HandoverReviewState> => {
   const user = await requirePreSeller();
   try {
     await verifyHandover({
@@ -32,9 +31,7 @@ export const verify = async (
       sotName: operatorName(user),
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to verify",
-    };
+    return fail(error, "Failed to verify");
   }
   revalidate(boqUuid);
   return {};
@@ -48,9 +45,7 @@ export const complete = async (
   try {
     await completeHandover({ boqUuid });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to complete",
-    };
+    return fail(error, "Failed to complete");
   }
   revalidate(boqUuid);
   return {};
@@ -67,9 +62,7 @@ export const dispute = async (
   try {
     await disputeHandover({ boqUuid, reason });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to dispute",
-    };
+    return fail(error, "Failed to dispute");
   }
   revalidate(boqUuid);
   return {};

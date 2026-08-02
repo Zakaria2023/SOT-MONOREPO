@@ -3,6 +3,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getUserOrder, markOrderPaid } from "services";
+import { fail } from "utils";
 
 export type PayOrderResult = {
   error?: string;
@@ -32,9 +33,7 @@ export const payOrder = async (
   try {
     await markOrderPaid(orderUuid);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Payment failed",
-    };
+    return fail(error, "Payment failed");
   }
 
   revalidatePath(`/orders/${orderUuid}`);

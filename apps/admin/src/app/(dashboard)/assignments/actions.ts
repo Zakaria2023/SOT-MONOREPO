@@ -9,18 +9,17 @@ import {
   removeAssignment,
   saveAssignment,
   searchProductsForPicker,
+  AssignmentInput as ServiceAssignmentInput,
+  ProductPickerItem as ServiceProductPickerItem,
+  RelationshipInput as ServiceRelationshipInput,
+  RelationshipPreview as ServiceRelationshipPreview,
+  RelationshipProblem as ServiceRelationshipProblem,
   suppressInherited,
   updateRelationship,
   validateRelationship,
-  type AssignmentInput as ServiceAssignmentInput,
-  type ProductPickerItem as ServiceProductPickerItem,
-  type RelationshipInput as ServiceRelationshipInput,
-  type RelationshipPreview as ServiceRelationshipPreview,
-  type RelationshipProblem as ServiceRelationshipProblem,
 } from "services";
+import { fail } from "utils";
 
-// Types re-declared as local aliases — a "use server" file may only export
-// async functions.
 export type AssignmentInput = ServiceAssignmentInput;
 export type ProductPickerItem = ServiceProductPickerItem;
 export type RelationshipInput = ServiceRelationshipInput;
@@ -31,10 +30,6 @@ export type ActionResult = {
   error?: string;
   success?: boolean;
 };
-
-const fail = (error: unknown, fallback: string): ActionResult => ({
-  error: error instanceof Error ? error.message : fallback,
-});
 
 const refreshCatalog = (): void => {
   revalidatePath("/assignments");
@@ -179,9 +174,6 @@ export const previewRelationAction = async (
     }
     return { preview };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to run the preview",
-    };
+    return fail(error, "Failed to run the preview");
   }
 };

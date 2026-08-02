@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { updateUserProfile, type UpdateUserProfileInput } from "services";
 import { completeProfileSchema, type CompleteProfileInput } from "./validation";
+import { fail } from "utils";
 
 export type CompleteProfileState = {
   error?: string;
@@ -58,9 +59,7 @@ export const completeProfile = async (
   try {
     await updateUserProfile(user.uuid, fields);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to save profile.",
-    };
+    return fail(error, "Failed to save profile.");
   }
 
   redirect(safeNext(data.next));

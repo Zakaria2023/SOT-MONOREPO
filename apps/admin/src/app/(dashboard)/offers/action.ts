@@ -1,7 +1,7 @@
 "use server";
 
 import type { PaginatedResult } from "utils";
-import { getReviewerName, paginate } from "utils";
+import { fail, getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import {
@@ -48,9 +48,7 @@ export const approveOfferAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to approve offer.",
-    };
+    return fail(error, "Failed to approve offer.");
   }
 
   revalidatePath("/offers");
@@ -76,9 +74,7 @@ export const rejectOfferAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to reject offer.",
-    };
+    return fail(error, "Failed to reject offer.");
   }
 
   revalidatePath("/offers");
