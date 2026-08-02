@@ -396,7 +396,6 @@ export const expandFacetChoices = (
   return expanded;
 };
 
-
 // Spec facet selections travel in the URL as repeated `spec=key:value` params
 // (e.g. ?spec=cable-grade:Cat6&spec=cable-grade:Cat6a&spec=color:Black). Spec
 // keys are slugified and never contain a colon, so the first colon separates
@@ -504,3 +503,21 @@ export const clientAddress = (
   }
   return realIp ?? "unknown";
 };
+
+/**
+ * The message a Server Action shows when something threw.
+ *
+ * Every action in every app ends in the same catch: report what the service
+ * said if it said anything, otherwise a fallback the action wrote. That was
+ * spelled out roughly forty times, and the cost of the duplication was not the
+ * typing — it was that half the copies dropped the service's own message and
+ * showed only the fallback, so a `ValidationError` naming the exact fix arrived
+ * at the user as "Failed to save".
+ *
+ * Returns the object rather than the string so it drops straight into any
+ * result shape: every one of them has `error?: string`, and the extra fields
+ * (`success`, `productUuid`) stay optional.
+ */
+export const fail = (error: unknown, fallback: string): { error: string } => ({
+  error: error instanceof Error ? error.message : fallback,
+});

@@ -2,9 +2,14 @@
 
 import { requirePartner } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
-import { advanceBoqFulfilment, createOrUpdateOffer, getPartnerBoq } from "services";
+import {
+  advanceBoqFulfilment,
+  createOrUpdateOffer,
+  getPartnerBoq,
+} from "services";
 import type { BoqStatus } from "@/db/enum";
 import { offerSchema, type OfferInput } from "validators";
+import { fail } from "utils";
 
 export type OfferActionState = {
   error?: string;
@@ -31,9 +36,7 @@ export const advanceStage = async (
   try {
     await advanceBoqFulfilment(boqUuid, next);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to update stage",
-    };
+    return fail(error, "Failed to update stage");
   }
 
   revalidatePath(`/boqs/${boqUuid}`);
@@ -62,9 +65,7 @@ export const submitOffer = async (
       description: parsed.data.description,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to submit offer.",
-    };
+    return fail(error, "Failed to submit offer.");
   }
 
   revalidatePath(`/boqs/${boqUuid}`);

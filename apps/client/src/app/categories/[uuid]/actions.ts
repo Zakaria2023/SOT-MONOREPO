@@ -3,6 +3,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { addCategoryToCart } from "services";
+import { fail } from "utils";
 
 export type AddSolutionResult = {
   error?: string;
@@ -19,9 +20,7 @@ export const addSolutionToCart = async (
   try {
     await addCategoryToCart(user.uuid, categoryUuid);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to add solution",
-    };
+    return fail(error, "Failed to add solution");
   }
 
   revalidatePath("/");

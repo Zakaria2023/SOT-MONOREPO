@@ -21,6 +21,7 @@ import {
   type SelectionInput,
 } from "services";
 import { readProjectAnswers, type ProjectAnswersInput } from "validators";
+import { fail } from "utils";
 
 export type AddToCartResult = {
   error?: string;
@@ -39,9 +40,7 @@ export const addProductToCart = async (
   try {
     await addToCart({ userUuid: user.uuid, productUuid });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to add to cart",
-    };
+    return fail(error, "Failed to add to cart");
   }
 
   revalidatePath("/");
@@ -54,9 +53,7 @@ export const previewGuestCart = async (
 ): Promise<CartLineItem[]> => getCartPreview(items);
 
 // Moves a guest's local cart into their server cart after they sign in.
-export const mergeGuestCart = async (
-  items: GuestCartItem[],
-): Promise<void> => {
+export const mergeGuestCart = async (items: GuestCartItem[]): Promise<void> => {
   const user = await getCurrentUser();
   if (!user || items.length === 0) {
     return;
@@ -77,7 +74,10 @@ export const mergeGuestCart = async (
   revalidatePath("/");
 };
 
-export const updateQuantity = async (cartItemUuid: string, quantity: number) => {
+export const updateQuantity = async (
+  cartItemUuid: string,
+  quantity: number,
+) => {
   const user = await getCurrentUser();
   if (!user) {
     throw new Error("Not authenticated");
