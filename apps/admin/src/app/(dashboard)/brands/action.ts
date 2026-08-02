@@ -4,42 +4,23 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  createBrand as createBrandRecord,
-  deleteBrand as deleteBrandRecord,
-  getBrand as getBrandRecord,
-  getBrandBoard as getBrandBoardRecord,
-  getBrandChildren as getBrandChildrenList,
-  getBrandChildrenPage as getBrandChildrenPageList,
-  getBrands as getBrandsList,
-  getBrandsPage as getBrandsPageList,
-  moveBrandToParent as moveBrandToParentRecord,
-  reorderBrandChildren as reorderBrandChildrenRecord,
-  reorderBrands as reorderBrandsRecord,
-  updateBrand as updateBrandRecord,
-} from "services";
-import type {
-  BrandBoardColumn,
   BrandBoardItem,
   BrandFields,
-  BrandListItem,
-  SelectBrands,
+  createBrand as createBrandRecord,
+  deleteBrand as deleteBrandRecord,
+  getBrandChildren as getBrandChildrenList,
+  moveBrandToParent as moveBrandToParentRecord,
+  reorderBrandChildren as reorderBrandChildrenRecord,
+  updateBrand as updateBrandRecord,
 } from "services";
-import type { ListParams, PaginatedResult } from "utils";
-import { fail, type ActionResult } from "utils";
+import { ActionResult, fail } from "utils";
 
-// A "use server" file may only export async functions; types are re-declared as
-// local aliases (not `export type { ... } from`, which the RSC compiler would
-// treat as a runtime export) so consumers can keep importing them from here.
-
+// Only what a "use client" file has to reach through an action lives here. The
+// reads a server component makes — getBrands, getBrand — go straight to
+// services, the way apps/api and apps/client already call them. Wrapping them
+// bought nothing and cost every wrapper an alias, since the wrapper and the
+// service function want the same name.
 export type BrandActionResult = ActionResult & { brandUuid?: string };
-
-// Reads pass straight through to the service — the admin pages/components call
-// these from `./action`, keeping the transport boundary in one place.
-export const getBrands = async (): Promise<BrandListItem[]> => getBrandsList();
-
-export const getBrandsPage = async (
-  params: ListParams = {},
-): Promise<PaginatedResult<BrandListItem>> => getBrandsPageList(params);
 
 // One column's cards — the top-level cards when parentUuid is null, otherwise a
 // single parent's direct children. Each card carries its own childCount, so the
@@ -48,17 +29,6 @@ export const getBrandsPage = async (
 export const getBrandChildren = async (
   parentUuid: string | null,
 ): Promise<BrandBoardItem[]> => getBrandChildrenList(parentUuid);
-
-export const getBrandBoard = async (): Promise<BrandBoardColumn[]> =>
-  getBrandBoardRecord();
-
-export const getBrandChildrenPage = async (
-  parentUuid: string | null,
-  page: number,
-): Promise<BrandListItem[]> => getBrandChildrenPageList(parentUuid, page);
-
-export const getBrand = async (uuid: string): Promise<SelectBrands | null> =>
-  getBrandRecord(uuid);
 
 export const createBrand = async (
   _prevState: BrandActionResult,
@@ -99,19 +69,6 @@ export const deleteBrand = async (uuid: string): Promise<BrandActionResult> => {
     return { success: true, brandUuid: uuid };
   } catch (error) {
     return fail(error, "Failed to delete brand");
-  }
-};
-
-export const reorderBrands = async (
-  orderedUuids: string[],
-): Promise<{ error?: string }> => {
-  await requireAdmin();
-  try {
-    await reorderBrandsRecord(orderedUuids);
-    revalidatePath("/brands");
-    return {};
-  } catch (error) {
-    return fail(error, "Failed to reorder brands");
   }
 };
 

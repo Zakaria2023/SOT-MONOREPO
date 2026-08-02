@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { BrandForm } from "@/components/brands/brand-form";
-import { getBrand, getBrands } from "../../action";
+import { getBrand, getBrands } from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;

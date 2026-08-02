@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import { getBrands } from "@/app/(dashboard)/brands/action";
 import { getCategories } from "@/app/(dashboard)/categories/action";
 import { ProductForm } from "@/components/products/product-form";
-import { getProductFormFieldsByCategory } from "services";
+import { getBrands, getProductFormFieldsByCategory } from "services";
 import { getProduct } from "../../action";
 
 type Props = {
