@@ -10,6 +10,7 @@ import {
   getCustomerHandover,
   selectOffer,
 } from "services";
+import { fail } from "utils";
 
 export type SelectOfferResult = {
   error?: string;
@@ -27,9 +28,7 @@ export const chooseOffer = async (
   try {
     await selectOffer({ userUuid: user.uuid, boqUuid, offerUuid });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to select offer",
-    };
+    return fail(error, "Failed to select offer");
   }
 
   revalidatePath(`/boq/${boqUuid}`);
@@ -55,9 +54,7 @@ export const confirmOrder = async (
     });
     orderUuid = order.uuid;
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to confirm order",
-    };
+    return fail(error, "Failed to confirm order");
   }
 
   redirect(`/orders/${orderUuid}`);
@@ -75,10 +72,7 @@ export const confirmHandover = async (
   try {
     await confirmHandoverByCustomer({ userUuid: user.uuid, boqUuid });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to confirm handover",
-    };
+    return fail(error, "Failed to confirm handover");
   }
 
   revalidatePath(`/boq/${boqUuid}/handover`);
@@ -106,9 +100,7 @@ export const reportHandoverIssue = async (
   try {
     await disputeHandover({ boqUuid, reason });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to report issue",
-    };
+    return fail(error, "Failed to report issue");
   }
 
   revalidatePath(`/boq/${boqUuid}/handover`);

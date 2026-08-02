@@ -5,7 +5,7 @@ import { getClerkPreSellerUsers } from "@/lib/server/clerk";
 import { revalidatePath } from "next/cache";
 import { assignBoq, getAllBoqs, type BoqListItem } from "services";
 import type { PaginatedResult } from "utils";
-import { paginate } from "utils";
+import { fail, paginate } from "utils";
 
 export type PreSellerOption = {
   id: string;
@@ -63,10 +63,7 @@ export const assignBoqAction = async (
       await assignBoq(boqUuid, { id: preSeller.id, name: preSeller.label });
     }
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to assign pre-seller",
-    };
+    return fail(error, "Failed to assign pre-seller");
   }
 
   revalidatePath("/boqs");

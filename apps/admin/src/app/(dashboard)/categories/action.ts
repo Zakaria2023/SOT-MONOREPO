@@ -26,6 +26,7 @@ import type {
   SelectCategories as ServiceSelectCategories,
 } from "services";
 import type { PaginatedResult } from "utils";
+import { fail } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
@@ -80,10 +81,7 @@ export const createCategory = async (
   try {
     await createCategoryRecord(fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to create category",
-    };
+    return fail(error, "Failed to create category");
   }
 
   revalidatePath("/categories");
@@ -99,10 +97,7 @@ export const updateCategory = async (
   try {
     await updateCategoryRecord(uuid, fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to update category",
-    };
+    return fail(error, "Failed to update category");
   }
 
   revalidatePath("/categories");
@@ -118,10 +113,7 @@ export const deleteCategory = async (
     revalidatePath("/categories");
     return { success: true, categoryUuid: uuid };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to delete category",
-    };
+    return fail(error, "Failed to delete category");
   }
 };
 
@@ -134,10 +126,7 @@ export const reorderCategories = async (
     revalidatePath("/categories");
     return {};
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to reorder categories",
-    };
+    return fail(error, "Failed to reorder categories");
   }
 };
 
@@ -155,10 +144,7 @@ export const moveCategoryToParent = async (
     revalidatePath("/categories");
     return {};
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to move category",
-    };
+    return fail(error, "Failed to move category");
   }
 };
 
@@ -171,14 +157,15 @@ export const reorderCategoryChildren = async (
 ): Promise<{ error?: string }> => {
   await requireAdmin();
   try {
-    await reorderCategoryChildrenRecord(parentUuid, pageStart, orderedPageUuids);
+    await reorderCategoryChildrenRecord(
+      parentUuid,
+      pageStart,
+      orderedPageUuids,
+    );
     // No revalidatePath here: the column already reflects the new order
     // optimistically, and revalidating would snap every column back to page 1.
     return {};
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to reorder categories",
-    };
+    return fail(error, "Failed to reorder categories");
   }
 };

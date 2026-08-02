@@ -26,6 +26,7 @@ import type {
   SelectProducts as ServiceSelectProducts,
 } from "services";
 import type { PaginatedResult } from "utils";
+import { fail } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
@@ -81,9 +82,7 @@ export const addSpecOption = async (
   try {
     return await addAttributeOptionRecord(request, actor);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to add the value",
-    };
+    return fail(error, "Failed to add the value");
   }
 };
 
@@ -101,10 +100,7 @@ export const createProduct = async (
   try {
     await createProductRecord(fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to create product",
-    };
+    return fail(error, "Failed to create product");
   }
 
   revalidatePath("/products");
@@ -120,10 +116,7 @@ export const updateProduct = async (
   try {
     await updateProductRecord(uuid, fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to update product",
-    };
+    return fail(error, "Failed to update product");
   }
 
   revalidatePath("/products");
@@ -139,9 +132,6 @@ export const deleteProduct = async (
     revalidatePath("/products");
     return { success: true, productUuid: uuid };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to delete product",
-    };
+    return fail(error, "Failed to delete product");
   }
 };
