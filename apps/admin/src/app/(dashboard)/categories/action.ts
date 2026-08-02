@@ -4,43 +4,22 @@ import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  CategoryBoardItem,
+  CategoryFields,
   createCategory as createCategoryRecord,
   deleteCategory as deleteCategoryRecord,
-  getCategories as getCategoriesList,
-  getCategoriesPage as getCategoriesPageList,
-  getCategory as getCategoryRecord,
-  getCategoryBoard as getCategoryBoardRecord,
   getCategoryChildren as getCategoryChildrenList,
-  getCategoryChildrenPage as getCategoryChildrenPageList,
   moveCategoryToParent as moveCategoryToParentRecord,
-  reorderCategories as reorderCategoriesRecord,
   reorderCategoryChildren as reorderCategoryChildrenRecord,
   updateCategory as updateCategoryRecord,
 } from "services";
-import type {
-  CategoryBoardColumn,
-  CategoryBoardItem,
-  CategoryFields,
-  CategoryListItem,
-  SelectCategories,
-} from "services";
-import type { ListParams, PaginatedResult } from "utils";
-import { fail, type ActionResult } from "utils";
+import { ActionResult, fail } from "utils";
 
-// A "use server" file may only export async functions; types are re-declared as
-// local aliases (not `export type { ... } from`, which the RSC compiler would
-// treat as a runtime export) so consumers can keep importing them from here.
-
+// Only what a "use client" file has to reach through an action lives here. The
+// reads a server component makes — getCategories, getCategory — go straight to
+// services. Wrapping them bought nothing and cost every wrapper an alias, since
+// the wrapper and the service function want the same name.
 export type CategoryActionResult = ActionResult & { categoryUuid?: string };
-
-// Reads pass straight through to the service — the admin pages/components call
-// these from `./action`, keeping the transport boundary in one place.
-export const getCategories = async (): Promise<CategoryListItem[]> =>
-  getCategoriesList();
-
-export const getCategoriesPage = async (
-  params: ListParams = {},
-): Promise<PaginatedResult<CategoryListItem>> => getCategoriesPageList(params);
 
 // One column's cards — the top-level cards when parentUuid is null, otherwise a
 // single parent's direct children. Each card carries its own childCount, so the
@@ -49,18 +28,6 @@ export const getCategoriesPage = async (
 export const getCategoryChildren = async (
   parentUuid: string | null,
 ): Promise<CategoryBoardItem[]> => getCategoryChildrenList(parentUuid);
-
-export const getCategoryBoard = async (): Promise<CategoryBoardColumn[]> =>
-  getCategoryBoardRecord();
-
-export const getCategoryChildrenPage = async (
-  parentUuid: string | null,
-  page: number,
-): Promise<CategoryListItem[]> => getCategoryChildrenPageList(parentUuid, page);
-
-export const getCategory = async (
-  uuid: string,
-): Promise<SelectCategories | null> => getCategoryRecord(uuid);
 
 export const createCategory = async (
   _prevState: CategoryActionResult,
@@ -103,19 +70,6 @@ export const deleteCategory = async (
     return { success: true, categoryUuid: uuid };
   } catch (error) {
     return fail(error, "Failed to delete category");
-  }
-};
-
-export const reorderCategories = async (
-  orderedUuids: string[],
-): Promise<{ error?: string }> => {
-  await requireAdmin();
-  try {
-    await reorderCategoriesRecord(orderedUuids);
-    revalidatePath("/categories");
-    return {};
-  } catch (error) {
-    return fail(error, "Failed to reorder categories");
   }
 };
 

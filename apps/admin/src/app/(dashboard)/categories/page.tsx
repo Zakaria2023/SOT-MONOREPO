@@ -2,7 +2,7 @@ import { CategoriesBoard } from "@/components/categories/categories-board";
 import { AsyncSection } from "@/components/shared/async-section";
 import { BoardSkeleton } from "@/components/shared/board-skeleton";
 import { PageHeader } from "@/components/shared/page-header";
-import { getCategoryChildren } from "./action";
+import { getCategoryChildren } from "services";
 
 const CategoriesBoardSection = async () => {
   // First render fetches only the top-level cards; each child column is loaded

@@ -1,6 +1,9 @@
-import { getCategories } from "@/app/(dashboard)/categories/action";
 import { ProductForm } from "@/components/products/product-form";
-import { getBrands, getProductFormFieldsByCategory } from "services";
+import {
+  getBrands,
+  getCategories,
+  getProductFormFieldsByCategory,
+} from "services";
 
 const NewProductPage = async () => {
   const [categories, brands, fieldsByCategory] = await Promise.all([
