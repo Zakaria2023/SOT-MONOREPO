@@ -5,6 +5,7 @@ import {
   governmentRequestSchema,
   type GovernmentRequestInput,
 } from "validators";
+import { fail } from "utils";
 
 export type GovernmentRequestState = {
   error?: string;
@@ -26,9 +27,6 @@ export const submitGovernmentRequest = async (
     await createGovernmentRequest(parsed.data);
     return { success: true };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to submit request.",
-    };
+    return fail(error, "Failed to submit request.");
   }
 };

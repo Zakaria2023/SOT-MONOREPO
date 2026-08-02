@@ -26,6 +26,7 @@ import type {
   SelectBrands as ServiceSelectBrands,
 } from "services";
 import type { PaginatedResult } from "utils";
+import { fail } from "utils";
 
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
@@ -78,9 +79,7 @@ export const createBrand = async (
   try {
     await createBrandRecord(fields);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to create brand",
-    };
+    return fail(error, "Failed to create brand");
   }
 
   revalidatePath("/brands");
@@ -96,27 +95,21 @@ export const updateBrand = async (
   try {
     await updateBrandRecord(uuid, fields);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to update brand",
-    };
+    return fail(error, "Failed to update brand");
   }
 
   revalidatePath("/brands");
   redirect("/brands");
 };
 
-export const deleteBrand = async (
-  uuid: string,
-): Promise<BrandActionResult> => {
+export const deleteBrand = async (uuid: string): Promise<BrandActionResult> => {
   await requireAdmin();
   try {
     await deleteBrandRecord(uuid);
     revalidatePath("/brands");
     return { success: true, brandUuid: uuid };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to delete brand",
-    };
+    return fail(error, "Failed to delete brand");
   }
 };
 
@@ -129,9 +122,7 @@ export const reorderBrands = async (
     revalidatePath("/brands");
     return {};
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to reorder brands",
-    };
+    return fail(error, "Failed to reorder brands");
   }
 };
 
@@ -149,9 +140,7 @@ export const moveBrandToParent = async (
     revalidatePath("/brands");
     return {};
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to move brand",
-    };
+    return fail(error, "Failed to move brand");
   }
 };
 
@@ -169,8 +158,6 @@ export const reorderBrandChildren = async (
     // optimistically, and revalidating would snap every column back to page 1.
     return {};
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to reorder brands",
-    };
+    return fail(error, "Failed to reorder brands");
   }
 };

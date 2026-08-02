@@ -10,6 +10,7 @@ import {
   updateHandoverAsset,
 } from "services";
 import type { HandoverCredentialType } from "@/db/enum";
+import { fail } from "utils";
 
 export type HandoverActionState = {
   error?: string;
@@ -22,14 +23,14 @@ const guard = async (boqUuid: string) => {
   return { user, detail };
 };
 
-export const openPack = async (boqUuid: string): Promise<HandoverActionState> => {
+export const openPack = async (
+  boqUuid: string,
+): Promise<HandoverActionState> => {
   const user = await requirePartner();
   try {
     await createHandoverPack({ boqUuid, partnerClerkUserId: user.id });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to open pack",
-    };
+    return fail(error, "Failed to open pack");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };
@@ -54,9 +55,7 @@ export const saveAsset = async (
       values,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to save device",
-    };
+    return fail(error, "Failed to save device");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };
@@ -84,9 +83,7 @@ export const addCredential = async (
       values,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to add credential",
-    };
+    return fail(error, "Failed to add credential");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };
@@ -108,9 +105,7 @@ export const submitPack = async (
       trainingNotes,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to submit pack",
-    };
+    return fail(error, "Failed to submit pack");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };

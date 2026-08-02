@@ -3,6 +3,7 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { submitReviewedBoq } from "services";
+import { fail } from "utils";
 
 export type SubmitBoqResult = {
   error?: string;
@@ -28,9 +29,7 @@ export const submitBoq = async (
       comments,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to submit BOQ",
-    };
+    return fail(error, "Failed to submit BOQ");
   }
 
   revalidatePath(`/boqs/${boqUuid}`);

@@ -3,6 +3,7 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { markPayoutPaid } from "services";
+import { fail } from "utils";
 
 export type SettleState = {
   error?: string;
@@ -15,9 +16,7 @@ export const settlePayout = async (
   try {
     await markPayoutPaid(payoutUuid);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to settle payout",
-    };
+    return fail(error, "Failed to settle payout");
   }
   revalidatePath("/payouts");
   return {};
