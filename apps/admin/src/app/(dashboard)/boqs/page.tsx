@@ -1,39 +1,12 @@
-import { BoqsTable } from "@/components/boqs/boqs-table";
-import { ListSearch } from "@/components/shared/list-search";
-import { Pagination } from "@/components/shared/pagination";
-import { requireAdmin } from "@/lib/server/auth";
+import { BoqsList } from "@/components/boqs/boqs-list";
 import { AsyncSection } from "@/components/shared/async-section";
-import { getBoqsPage, listPreSellers } from "./action";
+import { ListSearch } from "@/components/shared/list-search";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
-type BoqsListProps = {
-  search?: string;
-  page?: string;
-};
-
-const BoqsList = async ({ search, page }: BoqsListProps) => {
-  const [result, preSellers] = await Promise.all([
-    getBoqsPage({ search, page }),
-    listPreSellers(),
-  ]);
-  return (
-    <>
-      <BoqsTable boqs={result.items} preSellers={preSellers} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
-};
-
 const BoqsPage = async ({ searchParams }: Props) => {
-  await requireAdmin();
   const { search, page } = await searchParams;
 
   return (
