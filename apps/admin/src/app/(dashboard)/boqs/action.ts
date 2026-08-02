@@ -3,16 +3,14 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { getClerkPreSellerUsers } from "@/lib/server/clerk";
 import { revalidatePath } from "next/cache";
-import { assignBoq, BoqListItem, getAllBoqs } from "services";
-import { fail, ListParams, paginate, PaginatedResult } from "utils";
+import { assignBoq, getAllBoqs } from "services";
+import type { BoqListItem } from "services";
+import { fail, paginate } from "utils";
+import type { ActionResult, ListParams, PaginatedResult } from "utils";
 
 export type PreSellerOption = {
   id: string;
   name: string;
-};
-
-export type AssignResult = {
-  error?: string;
 };
 
 export const getBoqsPage = async (
@@ -39,7 +37,7 @@ export const listPreSellers = async (): Promise<PreSellerOption[]> => {
 export const assignBoqAction = async (
   boqUuid: string,
   preSellerId: string,
-): Promise<AssignResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
 
   try {

@@ -3,7 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import { completeProfile, type CompleteProfileState } from "./actions";
+import { completeProfile } from "./actions";
+import type { ActionResult } from "utils";
 import { completeProfileSchema, type CompleteProfileInput } from "./validation";
 
 type CompleteProfileDefaults = {
@@ -18,7 +19,7 @@ export const useCompleteProfileForm = ({
   lastName,
 }: CompleteProfileDefaults) => {
   const [state, dispatch, isPending] = useActionState<
-    CompleteProfileState,
+    ActionResult,
     CompleteProfileInput
   >(completeProfile, {});
 

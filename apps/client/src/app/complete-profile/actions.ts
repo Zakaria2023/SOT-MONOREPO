@@ -4,20 +4,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { updateUserProfile, type UpdateUserProfileInput } from "services";
 import { completeProfileSchema, type CompleteProfileInput } from "./validation";
-import { fail } from "utils";
-
-export type CompleteProfileState = {
-  error?: string;
-};
+import { fail, type ActionResult } from "utils";
 
 // Only allow internal redirect targets so `next` can't bounce the user offsite.
 const safeNext = (next: string | undefined): string =>
   next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
 export const completeProfile = async (
-  _prevState: CompleteProfileState,
+  _prevState: ActionResult,
   input: CompleteProfileInput,
-): Promise<CompleteProfileState> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/sign-in");

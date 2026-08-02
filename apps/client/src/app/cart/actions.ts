@@ -21,17 +21,13 @@ import {
   type SelectionInput,
 } from "services";
 import { readProjectAnswers, type ProjectAnswersInput } from "validators";
-import { fail } from "utils";
-
-export type AddToCartResult = {
-  error?: string;
-};
+import { fail, type ActionResult } from "utils";
 
 // Adds a product to the signed-in user's server cart. Guests add to their local
 // (browser) cart instead — see lib/guest-cart — and it's merged in on sign-in.
 export const addProductToCart = async (
   productUuid: string,
-): Promise<AddToCartResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not signed in" };

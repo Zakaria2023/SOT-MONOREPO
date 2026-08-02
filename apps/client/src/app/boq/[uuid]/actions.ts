@@ -10,16 +10,12 @@ import {
   getCustomerHandover,
   selectOffer,
 } from "services";
-import { fail } from "utils";
-
-export type SelectOfferResult = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 export const chooseOffer = async (
   boqUuid: string,
   offerUuid: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -40,7 +36,7 @@ export const chooseOffer = async (
 // customer to the order's payment page. Redirect happens on the server.
 export const confirmOrder = async (
   boqUuid: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -63,7 +59,7 @@ export const confirmOrder = async (
 // The customer's own verification — confirms their access works.
 export const confirmHandover = async (
   boqUuid: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -82,7 +78,7 @@ export const confirmHandover = async (
 export const reportHandoverIssue = async (
   boqUuid: string,
   reason: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };

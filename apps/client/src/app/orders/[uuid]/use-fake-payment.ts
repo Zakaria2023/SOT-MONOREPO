@@ -3,14 +3,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import { payOrder, type PayOrderResult } from "./actions";
+import { payOrder } from "./actions";
+import type { ActionResult } from "utils";
 import { fakePaymentSchema, type FakePaymentInput } from "./validation";
 
 // Drives the fake card checkout: react-hook-form validates the card fields, then
 // the server action (payOrder) settles the order. On success the action
 // revalidates the page, which re-renders into its "paid" state.
 export const useFakePayment = (orderUuid: string) => {
-  const [state, dispatch, isPending] = useActionState<PayOrderResult, string>(
+  const [state, dispatch, isPending] = useActionState<ActionResult, string>(
     payOrder,
     {},
   );

@@ -3,15 +3,11 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { markPayoutPaid } from "services";
-import { fail } from "utils";
-
-export type SettleState = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 export const settlePayout = async (
   payoutUuid: string,
-): Promise<SettleState> => {
+): Promise<ActionResult> => {
   await requirePreSeller();
   try {
     await markPayoutPaid(payoutUuid);

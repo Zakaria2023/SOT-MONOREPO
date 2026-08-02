@@ -3,15 +3,11 @@
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { addCategoryToCart } from "services";
-import { fail } from "utils";
-
-export type AddSolutionResult = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 export const addSolutionToCart = async (
   categoryUuid: string,
-): Promise<AddSolutionResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Please sign in to add a solution to your cart." };

@@ -3,11 +3,7 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { submitReviewedBoq } from "services";
-import { fail } from "utils";
-
-export type SubmitBoqResult = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 /**
  * Submits the reviewed BOQ and dispatches it to the partners the pre-seller
@@ -18,7 +14,7 @@ export const submitBoq = async (
   boqUuid: string,
   partnerClerkUserIds: string[],
   comments: Record<string, string>,
-): Promise<SubmitBoqResult> => {
+): Promise<ActionResult> => {
   const user = await requirePreSeller();
 
   try {

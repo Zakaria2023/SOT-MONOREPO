@@ -9,18 +9,14 @@ import {
 } from "services";
 import type { BoqStatus } from "@/db/enum";
 import { offerSchema, type OfferInput } from "validators";
-import { fail, type ActionResult } from "utils";
-
-export type StageActionState = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 // Step the BOQ one fulfilment stage forward (assigned → installing →
 // installed). Guarded so a partner can only advance a BOQ dispatched to them.
 export const advanceStage = async (
   boqUuid: string,
   next: BoqStatus,
-): Promise<StageActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
 
   const detail = await getPartnerBoq(user.id, boqUuid);
