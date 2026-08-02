@@ -15,25 +15,24 @@ import {
   getLibrary,
   getOptionSets,
   getProjectVariables,
-  removeAssignments,
-  saveAssignments,
+  LibraryGroup,
   moveLibraryAttribute,
+  OptionSet,
+  OptionSetInput,
+  ProjectVariableInput,
+  removeAssignments,
   reorderLibraryAttributes,
   reorderSpecificationGroups,
+  saveAssignments,
+  LibraryAttributeInput as ServiceLibraryAttributeInput,
+  SpecificationGroupFields,
   updateLibraryAttribute,
   updateOptionSet,
   updateProjectVariable,
   updateSpecificationGroup,
-  type LibraryAttributeInput as ServiceLibraryAttributeInput,
-  type LibraryGroup as ServiceLibraryGroup,
-  type OptionSet as ServiceOptionSet,
-  type OptionSetInput as ServiceOptionSetInput,
-  type ProjectVariableInput as ServiceProjectVariableInput,
-  type SpecificationGroupFields as ServiceSpecificationGroupFields,
 } from "services";
+import { ActionResult as BaseActionResult, fail } from "utils";
 
-// Types re-declared as local aliases — a "use server" file may only export
-// async functions.
 // The service input plus the categories the form lets an author tick. Kept as an
 // ADMIN type on purpose: `createLibraryAttribute` still refuses to write category
 // links, so the two writes stay separate and the assignment service remains the
@@ -41,25 +40,14 @@ import {
 export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
   categoryUuids: string[];
 };
-export type LibraryGroup = ServiceLibraryGroup;
-export type OptionSet = ServiceOptionSet;
-export type OptionSetInput = ServiceOptionSetInput;
-export type ProjectVariableInput = ServiceProjectVariableInput;
-export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 
-export type ActionResult = {
-  error?: string;
-  success?: boolean;
+export type ActionResult = BaseActionResult & {
   // The save went through, and there is something about it the author needs to
   // know — adding a sub-field to a group whose rows are already entered is the
   // case this exists for. Not an error: refusing would leave a group unable to
   // grow once one product used it.
   warnings?: string[];
 };
-
-const fail = (error: unknown, fallback: string): ActionResult => ({
-  error: error instanceof Error ? error.message : fallback,
-});
 
 export const getLibraryData = async (): Promise<LibraryGroup[]> => {
   await requireAdmin();

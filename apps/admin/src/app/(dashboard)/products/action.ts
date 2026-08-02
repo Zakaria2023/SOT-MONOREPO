@@ -1,68 +1,24 @@
 "use server";
 
-import type { ProductValues } from "@/db/types";
 import { requireAdmin } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  AddOptionRequest,
+  AddOptionResult,
+  ProductClientFields,
   addAttributeOption as addAttributeOptionRecord,
   createProduct as createProductRecord,
   deleteProduct as deleteProductRecord,
-  getProduct as getProductRecord,
-  getProductDetailByUuid as getProductDetailByUuidRecord,
-  getProductSpecsForDisplay as getProductSpecsForDisplayRecord,
-  getProductsPage as getProductsPageList,
   updateProduct as updateProductRecord,
 } from "services";
-import type {
-  AddOptionRequest as ServiceAddOptionRequest,
-  AddOptionResult as ServiceAddOptionResult,
-  DisplaySpec as ServiceDisplaySpec,
-  ProductClientFields as ServiceProductClientFields,
-  ProductDetail as ServiceProductDetail,
-  ProductFields as ServiceProductFields,
-  ProductListItem as ServiceProductListItem,
-  ProductListParams as ServiceProductListParams,
-  SelectProducts as ServiceSelectProducts,
-} from "services";
-import type { PaginatedResult } from "utils";
+import { ActionResult, fail } from "utils";
 
-// A "use server" file may only export async functions; types are re-declared as
-// local aliases (not `export type { ... } from`, which the RSC compiler would
-// treat as a runtime export) so consumers can keep importing them from here.
-export type ProductFields = ServiceProductFields;
-export type ProductClientFields = ServiceProductClientFields;
-export type ProductListItem = ServiceProductListItem;
-export type ProductListParams = ServiceProductListParams;
-export type ProductDetail = ServiceProductDetail;
-export type SelectProducts = ServiceSelectProducts;
-export type DisplaySpec = ServiceDisplaySpec;
-export type AddOptionRequest = ServiceAddOptionRequest;
-export type AddOptionResult = ServiceAddOptionResult;
+// Only what a "use client" file has to reach through an action lives here. The
+// reads a server component makes — getProductsPage, getProduct,
+// getProductDetailByUuid, getProductSpecsForDisplay — go straight to services.
+export type ProductActionResult = ActionResult & { productUuid?: string };
 
-export type ProductActionResult = {
-  productUuid?: string;
-  error?: string;
-  success?: boolean;
-};
-
-// Reads pass straight through to the service — the admin pages/components call
-// these from `./action`, keeping the transport boundary in one place.
-export const getProductsPage = async (
-  params: ProductListParams = {},
-): Promise<PaginatedResult<ProductListItem>> => getProductsPageList(params);
-
-export const getProduct = async (
-  uuid: string,
-): Promise<SelectProducts | null> => getProductRecord(uuid);
-
-export const getProductDetail = async (
-  uuid: string,
-): Promise<ProductDetail | null> => getProductDetailByUuidRecord(uuid);
-
-// "admin" so the panel shows partner-only and staff-only attributes: this is
-// where the catalog is authored, and an attribute an author cannot see is one they
-// cannot notice is wrong.
 /**
  * Add one value to a library list, from the product form.
  *
@@ -81,17 +37,9 @@ export const addSpecOption = async (
   try {
     return await addAttributeOptionRecord(request, actor);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to add the value",
-    };
+    return fail(error, "Failed to add the value");
   }
 };
-
-export const getProductSpecs = async (
-  categoryUuid: string,
-  values: ProductValues,
-): Promise<DisplaySpec[]> =>
-  getProductSpecsForDisplayRecord(categoryUuid, values, "admin");
 
 export const createProduct = async (
   _prevState: ProductActionResult,
@@ -101,10 +49,7 @@ export const createProduct = async (
   try {
     await createProductRecord(fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to create product",
-    };
+    return fail(error, "Failed to create product");
   }
 
   revalidatePath("/products");
@@ -120,10 +65,7 @@ export const updateProduct = async (
   try {
     await updateProductRecord(uuid, fields);
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to update product",
-    };
+    return fail(error, "Failed to update product");
   }
 
   revalidatePath("/products");
@@ -139,9 +81,6 @@ export const deleteProduct = async (
     revalidatePath("/products");
     return { success: true, productUuid: uuid };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to delete product",
-    };
+    return fail(error, "Failed to delete product");
   }
 };

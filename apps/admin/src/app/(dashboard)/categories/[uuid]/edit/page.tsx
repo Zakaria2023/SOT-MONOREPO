@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { CategoryForm } from "@/components/categories/category-form";
-import { getClassifications } from "@/app/(dashboard)/classifications/action";
-import { getCategories, getCategory } from "../../action";
+import { getCategories, getCategory, getClassifications } from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;

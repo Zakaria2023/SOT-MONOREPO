@@ -7,8 +7,7 @@ import Link from "next/link";
 import { Button, FormError, Input } from "ui";
 
 type ClassificationFormProps =
-  | { mode: "add" }
-  | { mode: "edit"; classification: SelectClassifications };
+  { mode: "add" } | { mode: "edit"; classification: SelectClassifications };
 
 export const ClassificationForm = (props: ClassificationFormProps) => {
   const { mode } = props;

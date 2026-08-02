@@ -7,14 +7,12 @@ import {
   governmentRequestSchema,
   type GovernmentRequestInput,
 } from "validators";
-import {
-  submitGovernmentRequest,
-  type GovernmentRequestState,
-} from "./actions";
+import { submitGovernmentRequest } from "./actions";
+import type { ActionResult } from "utils";
 
 export const useGovernmentForm = () => {
   const [state, dispatch, isPending] = useActionState<
-    GovernmentRequestState,
+    ActionResult,
     GovernmentRequestInput
   >(submitGovernmentRequest, {});
 

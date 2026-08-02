@@ -2,25 +2,21 @@
 
 import { requirePartner } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
-import { advanceBoqFulfilment, createOrUpdateOffer, getPartnerBoq } from "services";
+import {
+  advanceBoqFulfilment,
+  createOrUpdateOffer,
+  getPartnerBoq,
+} from "services";
 import type { BoqStatus } from "@/db/enum";
 import { offerSchema, type OfferInput } from "validators";
-
-export type OfferActionState = {
-  error?: string;
-  success?: boolean;
-};
-
-export type StageActionState = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 // Step the BOQ one fulfilment stage forward (assigned → installing →
 // installed). Guarded so a partner can only advance a BOQ dispatched to them.
 export const advanceStage = async (
   boqUuid: string,
   next: BoqStatus,
-): Promise<StageActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
 
   const detail = await getPartnerBoq(user.id, boqUuid);
@@ -31,9 +27,7 @@ export const advanceStage = async (
   try {
     await advanceBoqFulfilment(boqUuid, next);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to update stage",
-    };
+    return fail(error, "Failed to update stage");
   }
 
   revalidatePath(`/boqs/${boqUuid}`);
@@ -42,9 +36,9 @@ export const advanceStage = async (
 
 export const submitOffer = async (
   boqUuid: string,
-  _prevState: OfferActionState,
+  _prevState: ActionResult,
   input: OfferInput,
-): Promise<OfferActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
 
   const parsed = offerSchema.safeParse(input);
@@ -62,9 +56,7 @@ export const submitOffer = async (
       description: parsed.data.description,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to submit offer.",
-    };
+    return fail(error, "Failed to submit offer.");
   }
 
   revalidatePath(`/boqs/${boqUuid}`);

@@ -5,7 +5,7 @@ import {
   moveBrandToParent,
   reorderBrandChildren,
 } from "@/app/(dashboard)/brands/action";
-import type { BrandBoardItem } from "@/app/(dashboard)/brands/action";
+import type { BrandBoardItem } from "services";
 import { BrandRowActions } from "@/components/brands/brand-row-actions";
 import { ReorderableBoard } from "@/components/shared/reorderable-board";
 

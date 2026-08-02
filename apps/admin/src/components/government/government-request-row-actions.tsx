@@ -3,8 +3,8 @@
 import {
   approveGovernmentRequestAction,
   rejectGovernmentRequestAction,
-  type GovernmentRequestListItem,
 } from "@/app/(dashboard)/government/action";
+import type { SelectGovernmentRequests } from "@/db/schema/government-requests";
 import { GovernmentRequestReviewDialog } from "@/components/government/government-request-review-dialog";
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -12,7 +12,7 @@ import { useState, useTransition } from "react";
 import { Button } from "ui";
 
 type GovernmentRequestRowActionsProps = {
-  request: GovernmentRequestListItem;
+  request: SelectGovernmentRequests;
 };
 
 export const GovernmentRequestRowActions = ({

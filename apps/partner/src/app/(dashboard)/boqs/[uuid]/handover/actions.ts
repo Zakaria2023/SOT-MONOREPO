@@ -10,11 +10,7 @@ import {
   updateHandoverAsset,
 } from "services";
 import type { HandoverCredentialType } from "@/db/enum";
-
-export type HandoverActionState = {
-  error?: string;
-  success?: boolean;
-};
+import { fail, type ActionResult } from "utils";
 
 const guard = async (boqUuid: string) => {
   const user = await requirePartner();
@@ -22,14 +18,14 @@ const guard = async (boqUuid: string) => {
   return { user, detail };
 };
 
-export const openPack = async (boqUuid: string): Promise<HandoverActionState> => {
+export const openPack = async (
+  boqUuid: string,
+): Promise<ActionResult> => {
   const user = await requirePartner();
   try {
     await createHandoverPack({ boqUuid, partnerClerkUserId: user.id });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to open pack",
-    };
+    return fail(error, "Failed to open pack");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };
@@ -45,7 +41,7 @@ export const saveAsset = async (
     macAddress?: string;
     serialNumber?: string;
   },
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const user = await requirePartner();
   try {
     await updateHandoverAsset({
@@ -54,9 +50,7 @@ export const saveAsset = async (
       values,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to save device",
-    };
+    return fail(error, "Failed to save device");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };
@@ -71,7 +65,7 @@ export const addCredential = async (
     username?: string;
     secret?: string;
   },
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const { user, detail } = await guard(boqUuid);
   if (!detail) {
     return { error: "Handover pack not found" };
@@ -84,9 +78,7 @@ export const addCredential = async (
       values,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to add credential",
-    };
+    return fail(error, "Failed to add credential");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };
@@ -95,7 +87,7 @@ export const addCredential = async (
 export const submitPack = async (
   boqUuid: string,
   trainingNotes?: string,
-): Promise<HandoverActionState> => {
+): Promise<ActionResult> => {
   const { user, detail } = await guard(boqUuid);
   if (!detail) {
     return { error: "Handover pack not found" };
@@ -108,9 +100,7 @@ export const submitPack = async (
       trainingNotes,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to submit pack",
-    };
+    return fail(error, "Failed to submit pack");
   }
   revalidatePath(`/boqs/${boqUuid}/handover`);
   return { success: true };

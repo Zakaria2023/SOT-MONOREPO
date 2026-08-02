@@ -1,5 +1,5 @@
 import { BrandForm } from "@/components/brands/brand-form";
-import { getBrands } from "../action";
+import { getBrands } from "services";
 
 const NewBrandPage = async () => {
   const brands = await getBrands();

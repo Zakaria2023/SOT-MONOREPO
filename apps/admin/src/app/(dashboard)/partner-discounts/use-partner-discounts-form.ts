@@ -4,8 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { savePartnerDiscounts } from "./action";
-import { partnerDiscountsSchema } from "./validation";
-import type { PartnerDiscountsFormValues } from "./validation";
+import {
+  PartnerDiscountsFormValues,
+  partnerDiscountsSchema,
+} from "./validation";
 
 type UsePartnerDiscountsFormArgs = {
   defaults: PartnerDiscountsFormValues;

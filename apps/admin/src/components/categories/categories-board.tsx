@@ -5,7 +5,7 @@ import {
   moveCategoryToParent,
   reorderCategoryChildren,
 } from "@/app/(dashboard)/categories/action";
-import type { CategoryBoardItem } from "@/app/(dashboard)/categories/action";
+import type { CategoryBoardItem } from "services";
 import { CategoryRowActions } from "@/components/categories/category-row-actions";
 import { ReorderableBoard } from "@/components/shared/reorderable-board";
 

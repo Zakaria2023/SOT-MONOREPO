@@ -10,15 +10,12 @@ import {
   getCustomerHandover,
   selectOffer,
 } from "services";
-
-export type SelectOfferResult = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 export const chooseOffer = async (
   boqUuid: string,
   offerUuid: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -27,9 +24,7 @@ export const chooseOffer = async (
   try {
     await selectOffer({ userUuid: user.uuid, boqUuid, offerUuid });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to select offer",
-    };
+    return fail(error, "Failed to select offer");
   }
 
   revalidatePath(`/boq/${boqUuid}`);
@@ -41,7 +36,7 @@ export const chooseOffer = async (
 // customer to the order's payment page. Redirect happens on the server.
 export const confirmOrder = async (
   boqUuid: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -55,9 +50,7 @@ export const confirmOrder = async (
     });
     orderUuid = order.uuid;
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to confirm order",
-    };
+    return fail(error, "Failed to confirm order");
   }
 
   redirect(`/orders/${orderUuid}`);
@@ -66,7 +59,7 @@ export const confirmOrder = async (
 // The customer's own verification — confirms their access works.
 export const confirmHandover = async (
   boqUuid: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -75,10 +68,7 @@ export const confirmHandover = async (
   try {
     await confirmHandoverByCustomer({ userUuid: user.uuid, boqUuid });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to confirm handover",
-    };
+    return fail(error, "Failed to confirm handover");
   }
 
   revalidatePath(`/boq/${boqUuid}/handover`);
@@ -88,7 +78,7 @@ export const confirmHandover = async (
 export const reportHandoverIssue = async (
   boqUuid: string,
   reason: string,
-): Promise<SelectOfferResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -106,9 +96,7 @@ export const reportHandoverIssue = async (
   try {
     await disputeHandover({ boqUuid, reason });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to report issue",
-    };
+    return fail(error, "Failed to report issue");
   }
 
   revalidatePath(`/boq/${boqUuid}/handover`);

@@ -1,44 +1,27 @@
 "use server";
 
-import type { PaginatedResult } from "utils";
-import { getReviewerName, paginate } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
+import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
+import { approveOffer, listOffers, OfferListItem, rejectOffer } from "services";
 import {
-  approveOffer,
-  listOffers,
-  rejectOffer,
-  type OfferListItem,
-} from "services";
-import { offerRejectionSchema, type OfferRejectionInput } from "validators";
+  ActionResult,
+  fail,
+  getReviewerName,
+  ListParams,
+  PaginatedResult,
+} from "utils";
+import { OfferRejectionInput, offerRejectionSchema } from "validators";
 
 export type OfferRow = OfferListItem;
 
-export type OfferReviewResult = {
-  error?: string;
-  success?: boolean;
-};
-
-export type OfferListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
-
-// Searched + paginated page of offers for the list table. The frontend drives
-// `search`/`page` through URL search params.
 export const getOffersPage = async (
-  params: OfferListParams = {},
-): Promise<PaginatedResult<OfferRow>> => {
-  await requireAdmin();
-  return paginate(params, ({ limit, offset }) =>
-    listOffers({ search: params.search, limit, offset }),
-  );
-};
+  params: ListParams = {},
+): Promise<PaginatedResult<OfferRow>> => adminListPage(params, listOffers);
 
 export const approveOfferAction = async (
   offerUuid: string,
-): Promise<OfferReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
 
   try {
@@ -48,9 +31,7 @@ export const approveOfferAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to approve offer.",
-    };
+    return fail(error, "Failed to approve offer.");
   }
 
   revalidatePath("/offers");
@@ -60,7 +41,7 @@ export const approveOfferAction = async (
 export const rejectOfferAction = async (
   offerUuid: string,
   input: OfferRejectionInput,
-): Promise<OfferReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
 
   const parsed = offerRejectionSchema.safeParse(input);
@@ -76,9 +57,7 @@ export const rejectOfferAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to reject offer.",
-    };
+    return fail(error, "Failed to reject offer.");
   }
 
   revalidatePath("/offers");

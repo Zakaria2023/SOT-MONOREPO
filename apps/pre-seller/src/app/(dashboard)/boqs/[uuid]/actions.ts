@@ -3,10 +3,7 @@
 import { requirePreSeller } from "@/lib/server/auth";
 import { revalidatePath } from "next/cache";
 import { submitReviewedBoq } from "services";
-
-export type SubmitBoqResult = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 /**
  * Submits the reviewed BOQ and dispatches it to the partners the pre-seller
@@ -17,7 +14,7 @@ export const submitBoq = async (
   boqUuid: string,
   partnerClerkUserIds: string[],
   comments: Record<string, string>,
-): Promise<SubmitBoqResult> => {
+): Promise<ActionResult> => {
   const user = await requirePreSeller();
 
   try {
@@ -28,9 +25,7 @@ export const submitBoq = async (
       comments,
     });
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Failed to submit BOQ",
-    };
+    return fail(error, "Failed to submit BOQ");
   }
 
   revalidatePath(`/boqs/${boqUuid}`);

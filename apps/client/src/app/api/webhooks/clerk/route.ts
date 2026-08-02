@@ -69,7 +69,10 @@ export const POST = async (request: Request) => {
   const svixTimestamp = headerList.get("svix-timestamp");
   const svixSignature = headerList.get("svix-signature");
   if (!svixId || !svixTimestamp || !svixSignature) {
-    return NextResponse.json({ error: "Missing svix headers" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing svix headers" },
+      { status: 400 },
+    );
   }
 
   const payload = await request.text();
@@ -114,7 +117,10 @@ export const POST = async (request: Request) => {
     // real Clerk user exists, point their approved request at this user id so
     // partner features resolve them by the signed-in id.
     if (email && event.data.public_metadata?.role === "partner") {
-      await linkPartnerRequestToClerkUser({ email, clerkUserId: event.data.id });
+      await linkPartnerRequestToClerkUser({
+        email,
+        clerkUserId: event.data.id,
+      });
     }
   }
 

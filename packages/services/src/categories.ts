@@ -17,6 +17,7 @@ import {
   generateUuid,
   resolvePagination,
   resolveUniqueCode,
+  type ListParams,
   type PaginatedResult,
 } from "utils";
 import { db } from "../../../db";
@@ -60,12 +61,6 @@ export type CategoryFields = Omit<
   InsertCategories,
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
-
-export type CategoryListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
 
 const ParentCategories = alias(Categories, "parent_categories");
 const ChildCategories = alias(Categories, "child_categories");
@@ -122,7 +117,7 @@ export const getCategories = async (): Promise<CategoryListItem[]> => {
 
 /** A searched + paginated page of categories for the admin list table. */
 export const getCategoriesPage = async (
-  params: CategoryListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<CategoryListItem>> => {
   const { page, pageSize, offset } = resolvePagination(
     params.page,

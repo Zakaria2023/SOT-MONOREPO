@@ -1,6 +1,6 @@
 "use client";
 
-import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
+import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import { PARTNER_TYPE_LABELS } from "@/db/label";
 import { documentDownloadUrl } from "@/lib/documents";
 import { FileText, X } from "lucide-react";
@@ -9,7 +9,7 @@ import { Button } from "ui";
 import { PARTNER_CAPABILITY_LABELS, type PartnerCapability } from "validators";
 
 type PartnerRequestDetailsDialogProps = {
-  request: PartnerRequestListItem;
+  request: SelectPartnerRequests;
   onClose: () => void;
 };
 

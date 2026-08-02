@@ -5,9 +5,8 @@ import {
   deleteRelationAction,
   updateRelationAction,
   validateRelationAction,
-  type RelationshipInput,
-  type RelationshipProblem,
 } from "@/app/(dashboard)/assignments/actions";
+import type { RelationshipInput, RelationshipProblem } from "services";
 import { RelationPreview } from "@/components/assignments/relation-preview";
 import { RowFilter } from "@/components/assignments/row-filter";
 import { Field } from "@/components/shared/field";

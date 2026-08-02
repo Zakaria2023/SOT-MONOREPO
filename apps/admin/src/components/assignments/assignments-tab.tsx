@@ -4,8 +4,8 @@ import {
   removeAssignmentAction,
   saveAssignmentAction,
   suppressAssignmentAction,
-  type AssignmentInput,
 } from "@/app/(dashboard)/assignments/actions";
+import type { AssignmentInput } from "services";
 import {
   ConditionPicker,
   describePredicate,

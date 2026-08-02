@@ -1,4 +1,3 @@
-import type { ProductDetail as ProductDetailData } from "@/app/(dashboard)/products/action";
 import type { BoqItemRole, ProductStatus } from "@/db/enum";
 import { BOQ_ITEM_ROLE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
 import { documentDownloadUrl } from "@/lib/documents";
@@ -6,7 +5,11 @@ import { ArrowLeft, FileText, ImageOff, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { sectionSpecs, type DisplaySpec } from "services";
+import {
+  sectionSpecs,
+  type DisplaySpec,
+  type ProductDetail as ProductDetailData,
+} from "services";
 import { formatPrice } from "utils";
 
 type ProductDetailProps = {

@@ -86,9 +86,10 @@ export const ProductForm = (props: ProductFormProps) => {
   // The selected brand may define an ID label (e.g. BOM / PID / Part Number).
   // When it does, show an input for the per-product value of that label.
   const selectedBrandUuid = useWatch({ control, name: "brandUuid" });
-  const selectedBrand = brands.find((brand) => brand.uuid === selectedBrandUuid);
+  const selectedBrand = brands.find(
+    (brand) => brand.uuid === selectedBrandUuid,
+  );
   const brandIdLabel = selectedBrand?.idLabel;
-
 
   return (
     <FormProvider {...form}>

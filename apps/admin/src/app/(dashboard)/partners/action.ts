@@ -1,11 +1,10 @@
 "use server";
 
-import type { SelectPartnerRequests } from "@/db/schema/partner-requests";
-import type { PaginatedResult } from "utils";
-import { getReviewerName, paginate } from "utils";
+import { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import { requireAdmin } from "@/lib/server/auth";
-import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
-import { clerkClient } from "@clerk/nextjs/server";
+import { inviteOrAttachClerkUser } from "@/lib/server/clerk";
+import { failClerk } from "@/lib/server/clerk-error";
+import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
 import {
   approvePartnerRequest as approvePartnerRequestRecord,
@@ -15,46 +14,31 @@ import {
   setPartnerIntegration,
 } from "services";
 import {
-  partnerRejectionSchema,
-  type PartnerRejectionInput,
-} from "validators";
-
-export type PartnerRequestListItem = SelectPartnerRequests;
-
-export type PartnerReviewResult = {
-  error?: string;
-  success?: boolean;
-};
-
-export type PartnerRequestListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
+  ActionResult,
+  fail,
+  getReviewerName,
+  ListParams,
+  PaginatedResult,
+} from "utils";
+import { PartnerRejectionInput, partnerRejectionSchema } from "validators";
 
 // Searched + paginated page of partner requests for the list table. The
 // frontend drives `search`/`page` through URL search params.
 export const getPartnerRequestsPage = async (
-  params: PartnerRequestListParams = {},
-): Promise<PaginatedResult<PartnerRequestListItem>> => {
-  await requireAdmin();
-  return paginate(params, ({ limit, offset }) =>
-    listPartnerRequests({ search: params.search, limit, offset }),
-  );
-};
+  params: ListParams = {},
+): Promise<PaginatedResult<SelectPartnerRequests>> =>
+  adminListPage(params, listPartnerRequests);
 
 export const approvePartnerRequestAction = async (
   partnerRequestUuid: string,
   isIntegrated: boolean,
-): Promise<PartnerReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
 
   const request = await getPartnerRequestByUuid(partnerRequestUuid);
   if (!request) {
     return { error: "Partner request not found." };
   }
-
-  const client = await clerkClient();
 
   try {
     if (request.status !== "pending") {
@@ -90,30 +74,10 @@ export const approvePartnerRequestAction = async (
       ),
     };
 
-    // If a Clerk account with this email already exists (e.g. the partner
-    // signed up as a customer first), an invitation would never apply this
-    // metadata — invitations only seed brand-new signups, so the account would
-    // keep role=undefined and be bounced by the partner app's role gate. So set
-    // the partner role directly on the existing user; otherwise invite them.
-    const { data: existingUsers } = await client.users.getUserList({
-      emailAddress: [request.email],
-    });
-    const [existingUser] = existingUsers;
-
-    let approvedClerkUserId: string;
-    if (existingUser) {
-      await client.users.updateUserMetadata(existingUser.id, {
-        publicMetadata: { ...existingUser.publicMetadata, ...publicMetadata },
-      });
-      approvedClerkUserId = existingUser.id;
-    } else {
-      const invitation = await client.invitations.createInvitation({
-        emailAddress: request.email,
-        ignoreExisting: true,
-        publicMetadata,
-      });
-      approvedClerkUserId = invitation.id;
-    }
+    const approvedClerkUserId = await inviteOrAttachClerkUser(
+      request.email,
+      publicMetadata,
+    );
 
     await approvePartnerRequestRecord({
       partnerRequestUuid,
@@ -125,22 +89,7 @@ export const approvePartnerRequestAction = async (
     // Set whether the partner is integrated (chosen at approval).
     await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
   } catch (error) {
-    if (isClerkAPIResponseError(error)) {
-      const [firstError] = error.errors;
-      return {
-        error:
-          firstError?.longMessage ??
-          firstError?.message ??
-          "Failed to approve partner request.",
-      };
-    }
-
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to approve partner request.",
-    };
+    return failClerk(error, "Failed to approve partner request.");
   }
 
   revalidatePath("/partners");
@@ -151,18 +100,13 @@ export const approvePartnerRequestAction = async (
 export const setPartnerIntegrationAction = async (
   partnerRequestUuid: string,
   isIntegrated: boolean,
-): Promise<PartnerReviewResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
 
   try {
     await setPartnerIntegration({ partnerRequestUuid, isIntegrated });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update partner profile.",
-    };
+    return fail(error, "Failed to update partner profile.");
   }
 
   revalidatePath("/partners");
@@ -172,7 +116,7 @@ export const setPartnerIntegrationAction = async (
 export const rejectPartnerRequestAction = async (
   partnerRequestUuid: string,
   input: PartnerRejectionInput,
-): Promise<PartnerReviewResult> => {
+): Promise<ActionResult> => {
   const { userId, user } = await requireAdmin();
   const parsed = partnerRejectionSchema.safeParse(input);
 
@@ -188,12 +132,7 @@ export const rejectPartnerRequestAction = async (
       reviewedByName: getReviewerName(user),
     });
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to reject partner request.",
-    };
+    return fail(error, "Failed to reject partner request.");
   }
 
   revalidatePath("/partners");

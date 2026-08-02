@@ -17,6 +17,7 @@ import {
   generateUuid,
   resolvePagination,
   resolveUniqueCode,
+  type ListParams,
   type PaginatedResult,
 } from "utils";
 import { db } from "../../../db";
@@ -51,12 +52,6 @@ export type BrandFields = Omit<
   InsertBrands,
   "id" | "uuid" | "createdAt" | "updatedAt"
 >;
-
-export type BrandListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
 
 const ParentBrands = alias(Brands, "parent_brands");
 const ChildBrands = alias(Brands, "child_brands");
@@ -106,7 +101,7 @@ export const getBrands = async (): Promise<BrandListItem[]> => {
 
 /** A searched + paginated page of brands for the admin list table. */
 export const getBrandsPage = async (
-  params: BrandListParams = {},
+  params: ListParams = {},
 ): Promise<PaginatedResult<BrandListItem>> => {
   const { page, pageSize, offset } = resolvePagination(
     params.page,

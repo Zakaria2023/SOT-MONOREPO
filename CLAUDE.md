@@ -461,6 +461,31 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
   };
   ```
 
+## Auth Checks
+
+- Never call `requireAdmin` (or any other auth guard) from a `page.tsx`. A page is layout — it decides what the screen looks like, not who may see it. The check belongs where the data is reached: the Server Action, or the shared helper the action goes through (e.g. `adminListPage`). Middleware (`proxy.ts`) already gates every route before a page renders, so a guard in the page grants nothing the caller did not already have, and it costs a `currentUser()` round trip to Clerk whose result the page throws away.
+- A page that reads a service directly with no action in front of it is still not the place for the guard. If that read needs a check of its own, give it an action; do not sprinkle `requireAdmin()` at the top of the page.
+
+  ```tsx
+  // ❌ Bad — guard in the page
+  const OffersPage = async ({ searchParams }: Props) => {
+    await requireAdmin();
+    const { search, page } = await searchParams;
+    // ...
+  };
+
+  // ✅ Good — page lays out, the action checks
+  const OffersPage = async ({ searchParams }: Props) => {
+    const { search, page } = await searchParams;
+    // ...
+  };
+
+  // app/(dashboard)/offers/action.ts
+  export const getOffersPage = async (
+    params: ListParams = {},
+  ): Promise<PaginatedResult<OfferRow>> => adminListPage(params, listOffers);
+  ```
+
 ## Dynamic Route Params
 
 - Page components for dynamic routes always type `params` as a `Promise` and `await` it to read the route values — never destructure `params` directly as a plain object.

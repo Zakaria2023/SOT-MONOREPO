@@ -2,36 +2,19 @@
 
 import { requireAdmin } from "@/lib/server/auth";
 import { getClerkPreSellerUsers } from "@/lib/server/clerk";
+import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
-import { assignBoq, getAllBoqs, type BoqListItem } from "services";
-import type { PaginatedResult } from "utils";
-import { paginate } from "utils";
+import { assignBoq, BoqListItem, getAllBoqs } from "services";
+import { ActionResult, fail, ListParams, PaginatedResult } from "utils";
 
 export type PreSellerOption = {
   id: string;
   name: string;
 };
 
-export type AssignResult = {
-  error?: string;
-};
-
-export type BoqListParams = {
-  search?: string;
-  page?: number | string;
-  pageSize?: number | string;
-};
-
-// Searched + paginated page of BOQs for the list table. The frontend drives
-// `search`/`page` through URL search params.
 export const getBoqsPage = async (
-  params: BoqListParams = {},
-): Promise<PaginatedResult<BoqListItem>> => {
-  await requireAdmin();
-  return paginate(params, ({ limit, offset }) =>
-    getAllBoqs({ search: params.search, limit, offset }),
-  );
-};
+  params: ListParams = {},
+): Promise<PaginatedResult<BoqListItem>> => adminListPage(params, getAllBoqs);
 
 /** Clerk users whose publicMetadata role is "pre-seller". */
 export const listPreSellers = async (): Promise<PreSellerOption[]> => {
@@ -48,7 +31,7 @@ export const listPreSellers = async (): Promise<PreSellerOption[]> => {
 export const assignBoqAction = async (
   boqUuid: string,
   preSellerId: string,
-): Promise<AssignResult> => {
+): Promise<ActionResult> => {
   await requireAdmin();
 
   try {
@@ -63,10 +46,7 @@ export const assignBoqAction = async (
       await assignBoq(boqUuid, { id: preSeller.id, name: preSeller.label });
     }
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "Failed to assign pre-seller",
-    };
+    return fail(error, "Failed to assign pre-seller");
   }
 
   revalidatePath("/boqs");

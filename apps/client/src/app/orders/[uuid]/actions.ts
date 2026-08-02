@@ -3,19 +3,16 @@
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getUserOrder, markOrderPaid } from "services";
-
-export type PayOrderResult = {
-  error?: string;
-};
+import { type ActionResult, fail } from "utils";
 
 // Fake payment — no gateway, no API keys, no card ever charged. It simulates the
 // round-trip to a provider (a short delay) then settles the order and raises its
 // invoice via the already-real markOrderPaid. Swap the delay for a licensed
 // provider (SAMA) callback when the real gateway is wired.
 export const payOrder = async (
-  _prevState: PayOrderResult,
+  _prevState: ActionResult,
   orderUuid: string,
-): Promise<PayOrderResult> => {
+): Promise<ActionResult> => {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Not authenticated" };
@@ -32,9 +29,7 @@ export const payOrder = async (
   try {
     await markOrderPaid(orderUuid);
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Payment failed",
-    };
+    return fail(error, "Payment failed");
   }
 
   revalidatePath(`/orders/${orderUuid}`);

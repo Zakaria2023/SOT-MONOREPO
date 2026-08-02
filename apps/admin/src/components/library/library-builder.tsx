@@ -9,9 +9,8 @@ import {
   updateAttributeAction,
   updateGroupAction,
   type LibraryAttributeInput,
-  type LibraryGroup,
-  type OptionSet,
 } from "@/app/(dashboard)/library/action";
+import type { LibraryGroup, OptionSet } from "services";
 import type { SpecificationDomain, SpecificationType } from "@/db/enum";
 import {
   measurementUnits,

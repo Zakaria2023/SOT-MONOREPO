@@ -3,9 +3,8 @@
 import {
   previewRelationAction,
   searchProductsAction,
-  type ProductPickerItem,
-  type RelationshipPreview,
 } from "@/app/(dashboard)/assignments/actions";
+import type { ProductPickerItem, RelationshipPreview } from "services";
 import type { RelationVariable } from "@/components/assignments/relation-builder";
 import { Field, FieldSet } from "@/components/shared/field";
 import type { SelectRelationships } from "@/db/schema/relationships";

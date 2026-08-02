@@ -18,6 +18,24 @@ type ReviewerUser = {
 /** Generates a random UUID v4. */
 export const generateUuid = (): string => crypto.randomUUID();
 
+/**
+ * What a searched, paginated list is asked for — the other half of
+ * PaginatedResult.
+ *
+ * All three are optional because all three come off the URL, where any of them
+ * may be absent; `resolvePagination` decides what a missing or unparseable page
+ * means. `page`/`pageSize` admit strings for the same reason: search params
+ * arrive as text and are never pre-parsed for us.
+ *
+ * A list that filters on more than a search box intersects this rather than
+ * redeclaring it, so the extra filter is the only thing its type says.
+ */
+export type ListParams = {
+  search?: string;
+  page?: number | string;
+  pageSize?: number | string;
+};
+
 /** A page of results plus the metadata a list UI needs to paginate. */
 export type PaginatedResult<T> = {
   items: T[];
@@ -396,7 +414,6 @@ export const expandFacetChoices = (
   return expanded;
 };
 
-
 // Spec facet selections travel in the URL as repeated `spec=key:value` params
 // (e.g. ?spec=cable-grade:Cat6&spec=cable-grade:Cat6a&spec=color:Black). Spec
 // keys are slugified and never contain a colon, so the first colon separates
@@ -504,3 +521,43 @@ export const clientAddress = (
   }
   return realIp ?? "unknown";
 };
+
+/**
+ * What a Server Action hands back to the form that called it.
+ *
+ * Declared once because it was declared eight times: the same two optional
+ * fields under eight names — ActionResult, BrandActionResult,
+ * PartnerDiscountsActionResult, GovernmentRequestState, OfferActionState and so
+ * on — differing only in which page they sat on.
+ *
+ * Both fields are optional and that is deliberate. An action that redirects on
+ * success never returns at all, so `success` stays unset; one that reports a
+ * refusal sets `error` and nothing else. A required field here would force every
+ * action to answer a question half of them do not have.
+ *
+ * Actions needing more intersect it rather than redeclare it, so the extra field
+ * is the only thing their type says — see ProductActionResult and the library's
+ * warnings.
+ */
+export type ActionResult = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * The message a Server Action shows when something threw.
+ *
+ * Every action in every app ends in the same catch: report what the service
+ * said if it said anything, otherwise a fallback the action wrote. That was
+ * spelled out roughly forty times, and the cost of the duplication was not the
+ * typing — it was that half the copies dropped the service's own message and
+ * showed only the fallback, so a `ValidationError` naming the exact fix arrived
+ * at the user as "Failed to save".
+ *
+ * Returns the object rather than the string so it drops straight into any
+ * result shape: every one of them has `error?: string`, and the extra fields
+ * (`success`, `productUuid`) stay optional.
+ */
+export const fail = (error: unknown, fallback: string): { error: string } => ({
+  error: error instanceof Error ? error.message : fallback,
+});

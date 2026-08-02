@@ -3,18 +3,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import {
-  partnerRequestSchema,
-  type PartnerRequestInput,
-} from "validators";
-import {
-  submitPartnerRequest,
-  type PartnerRequestActionState,
-} from "./actions";
+import { partnerRequestSchema, type PartnerRequestInput } from "validators";
+import { submitPartnerRequest } from "./actions";
+import type { ActionResult } from "utils";
 
 export const usePartnerForm = () => {
   const [state, dispatch, isPending] = useActionState<
-    PartnerRequestActionState,
+    ActionResult,
     PartnerRequestInput
   >(submitPartnerRequest, {});
 

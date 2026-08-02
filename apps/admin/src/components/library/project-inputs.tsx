@@ -4,10 +4,14 @@ import {
   addVariableAction,
   deleteVariableAction,
   updateVariableAction,
-  type ProjectVariableInput,
 } from "@/app/(dashboard)/library/action";
+import type { ProjectVariableInput } from "services";
 import { Field } from "@/components/shared/field";
-import { measurementUnits, projectVariableTypes, UNIT_DIMENSIONS } from "@/db/enum";
+import {
+  measurementUnits,
+  projectVariableTypes,
+  UNIT_DIMENSIONS,
+} from "@/db/enum";
 import { PROJECT_VARIABLE_TYPE_LABELS } from "@/db/label";
 import type { SelectProjectVariables } from "@/db/schema/project-variables";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -87,7 +91,6 @@ const VariableForm = ({
             />
           </Field>
         )}
-
       </div>
 
       <p className="text-[11px] text-muted">
@@ -153,8 +156,8 @@ export const ProjectInputs = ({ variables }: ProjectInputsProps) => {
         <p className="mt-1 text-xs text-muted">
           Some rules are not about products at all. “Expected concurrent calls ≤
           PBX capacity” and “access demand ÷ uplink ≤ 20:1” need an answer from
-          the person designing the system. These are those answers, and a rule can
-          use one on either side exactly like an attribute.
+          the person designing the system. These are those answers, and a rule
+          can use one on either side exactly like an attribute.
         </p>
       </div>
 

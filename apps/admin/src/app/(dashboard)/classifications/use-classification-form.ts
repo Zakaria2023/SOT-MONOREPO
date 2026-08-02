@@ -1,16 +1,19 @@
 "use client";
 
+import { SelectClassifications } from "@/db/schema/classifications";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import { createClassification, updateClassification } from "./action";
-import type {
+import { ClassificationFields } from "services";
+import {
   ClassificationActionResult,
-  ClassificationFields,
+  createClassification,
+  updateClassification,
 } from "./action";
-import { classificationFormSchema } from "./validation";
-import type { ClassificationFormValues } from "./validation";
-import type { SelectClassifications } from "@/db/schema/classifications";
+import {
+  classificationFormSchema,
+  ClassificationFormValues,
+} from "./validation";
 
 type UseClassificationFormArgs =
   | { mode: "add" }
@@ -25,8 +28,7 @@ export const useClassificationForm = (args: UseClassificationFormArgs) => {
 
   const [state, dispatch, isPending] = useActionState(action, {});
 
-  const classification =
-    args.mode === "edit" ? args.classification : undefined;
+  const classification = args.mode === "edit" ? args.classification : undefined;
 
   const form = useForm<ClassificationFormValues>({
     resolver: zodResolver(classificationFormSchema),

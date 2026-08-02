@@ -1,4 +1,5 @@
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
+import { PageHeader } from "@/components/shared/page-header";
 import { getDashboardStats } from "./action";
 
 const HomePage = async () => {
@@ -6,12 +7,10 @@ const HomePage = async () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="font-heading text-2xl text-ink">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted">
-          A live snapshot of everything in the store.
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="A live snapshot of everything in the store."
+      />
 
       <DashboardStats stats={stats} />
     </div>

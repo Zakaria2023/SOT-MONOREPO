@@ -219,8 +219,14 @@ const BoardCard = <T extends BoardItem>({
   onOpen,
   renderActions,
 }: BoardCardProps<T>) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.uuid, data: { columnKey } });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.uuid, data: { columnKey } });
 
   return (
     <div
@@ -476,8 +482,7 @@ export const ReorderableBoard = <T extends BoardItem>({
     }
 
     const overData = over.data.current as
-      | { columnKey?: string; isColumn?: boolean }
-      | undefined;
+      { columnKey?: string; isColumn?: boolean } | undefined;
     let targetKey: string | undefined;
     let overItemId: string | null = null;
     if (overData?.isColumn) {
@@ -541,7 +546,11 @@ export const ReorderableBoard = <T extends BoardItem>({
     });
     setError(null);
 
-    const result = await onMove(activeUuid, parentUuidOfKey(targetKey), insertAt);
+    const result = await onMove(
+      activeUuid,
+      parentUuidOfKey(targetKey),
+      insertAt,
+    );
     if (result.error) {
       setError(result.error);
       // Reload the two affected columns from source to recover.
@@ -553,7 +562,11 @@ export const ReorderableBoard = <T extends BoardItem>({
   };
 
   const columnsToRender = [
-    { key: ROOT, title: rootTitle, total: (state[ROOT] ?? emptyColumn()).items.length },
+    {
+      key: ROOT,
+      title: rootTitle,
+      total: (state[ROOT] ?? emptyColumn()).items.length,
+    },
     ...openColumns.map((column) => ({
       key: column.key,
       title: column.title,
@@ -565,7 +578,9 @@ export const ReorderableBoard = <T extends BoardItem>({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
-      onDragStart={(event: DragStartEvent) => setActiveId(String(event.active.id))}
+      onDragStart={(event: DragStartEvent) =>
+        setActiveId(String(event.active.id))
+      }
       onDragCancel={() => setActiveId(null)}
       onDragEnd={handleDragEnd}
     >

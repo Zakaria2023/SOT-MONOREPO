@@ -18,7 +18,8 @@ type ItemCardProps = {
   currency: string;
 };
 
-const lineTotal = (item: AdminBoqItem) => Number(item.unitPrice) * item.quantity;
+const lineTotal = (item: AdminBoqItem) =>
+  Number(item.unitPrice) * item.quantity;
 
 const ItemCard = ({ item, currency }: ItemCardProps) => (
   <div className="flex gap-4 rounded-card border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(27,35,51,0.04)]">
