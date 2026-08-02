@@ -1,14 +1,12 @@
 "use client";
 
+import { SelectBrands } from "@/db/schema/brands";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
-import { createBrand, updateBrand } from "./action";
-import type { BrandActionResult } from "./action";
-import type { BrandFields } from "services";
-import { brandFormSchema } from "./validation";
-import type { BrandFormValues } from "./validation";
-import type { SelectBrands } from "@/db/schema/brands";
+import { BrandFields } from "services";
+import { BrandActionResult, createBrand, updateBrand } from "./action";
+import { brandFormSchema, BrandFormValues } from "./validation";
 
 type UseBrandFormArgs = { mode: "add" } | { mode: "edit"; brand: SelectBrands };
 
