@@ -14,9 +14,6 @@ import {
 } from "services";
 import { ActionResult, fail } from "utils";
 
-// Only what a "use client" file has to reach through an action lives here. The
-// reads a server component makes — getProductsPage, getProduct,
-// getProductDetailByUuid, getProductSpecsForDisplay — go straight to services.
 export type ProductActionResult = ActionResult & { productUuid?: string };
 
 /**
