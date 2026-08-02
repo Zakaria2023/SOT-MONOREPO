@@ -15,23 +15,23 @@ import {
   getLibrary,
   getOptionSets,
   getProjectVariables,
-  removeAssignments,
-  saveAssignments,
+  LibraryGroup,
   moveLibraryAttribute,
+  OptionSet,
+  OptionSetInput,
+  ProjectVariableInput,
+  removeAssignments,
   reorderLibraryAttributes,
   reorderSpecificationGroups,
+  saveAssignments,
+  LibraryAttributeInput as ServiceLibraryAttributeInput,
+  SpecificationGroupFields,
   updateLibraryAttribute,
   updateOptionSet,
   updateProjectVariable,
   updateSpecificationGroup,
-  type LibraryAttributeInput as ServiceLibraryAttributeInput,
-  type LibraryGroup,
-  type OptionSet,
-  type OptionSetInput,
-  type ProjectVariableInput,
-  type SpecificationGroupFields,
 } from "services";
-import { fail, type ActionResult as BaseActionResult } from "utils";
+import { ActionResult as BaseActionResult, fail } from "utils";
 
 // The service input plus the categories the form lets an author tick. Kept as an
 // ADMIN type on purpose: `createLibraryAttribute` still refuses to write category

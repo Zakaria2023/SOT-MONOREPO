@@ -1,37 +1,13 @@
-import { GovernmentRequestsTable } from "@/components/government/government-requests-table";
+import { GovernmentList } from "@/components/government/government-list";
+import { AsyncSection } from "@/components/shared/async-section";
 import { ListSearch } from "@/components/shared/list-search";
 import { PageHeader } from "@/components/shared/page-header";
-import { Pagination } from "@/components/shared/pagination";
-import { requireAdmin } from "@/lib/server/auth";
-import { AsyncSection } from "@/components/shared/async-section";
-import { getGovernmentRequestsPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
-type GovernmentListProps = {
-  search?: string;
-  page?: string;
-};
-
-const GovernmentList = async ({ search, page }: GovernmentListProps) => {
-  const result = await getGovernmentRequestsPage({ search, page });
-  return (
-    <>
-      <GovernmentRequestsTable requests={result.items} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
-};
-
 const GovernmentPage = async ({ searchParams }: Props) => {
-  await requireAdmin();
   const { search, page } = await searchParams;
 
   return (
