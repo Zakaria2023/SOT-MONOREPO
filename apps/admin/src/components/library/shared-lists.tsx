@@ -4,9 +4,8 @@ import {
   addSharedListAction,
   deleteSharedListAction,
   updateSharedListAction,
-  type OptionSet,
-  type OptionSetInput,
 } from "@/app/(dashboard)/library/action";
+import type { OptionSet, OptionSetInput } from "services";
 import {
   liveOptions,
   OptionListEditor,

@@ -18,12 +18,12 @@ import {
   updateCategory as updateCategoryRecord,
 } from "services";
 import type {
-  CategoryBoardColumn as ServiceCategoryBoardColumn,
-  CategoryBoardItem as ServiceCategoryBoardItem,
-  CategoryFields as ServiceCategoryFields,
-  CategoryListItem as ServiceCategoryListItem,
-  CategoryListParams as ServiceCategoryListParams,
-  SelectCategories as ServiceSelectCategories,
+  CategoryBoardColumn,
+  CategoryBoardItem,
+  CategoryFields,
+  CategoryListItem,
+  CategoryListParams,
+  SelectCategories,
 } from "services";
 import type { PaginatedResult } from "utils";
 import { fail } from "utils";
@@ -31,12 +31,6 @@ import { fail } from "utils";
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
 // treat as a runtime export) so consumers can keep importing them from here.
-export type CategoryFields = ServiceCategoryFields;
-export type CategoryListItem = ServiceCategoryListItem;
-export type CategoryBoardItem = ServiceCategoryBoardItem;
-export type CategoryListParams = ServiceCategoryListParams;
-export type CategoryBoardColumn = ServiceCategoryBoardColumn;
-export type SelectCategories = ServiceSelectCategories;
 
 export type CategoryActionResult = {
   categoryUuid?: string;

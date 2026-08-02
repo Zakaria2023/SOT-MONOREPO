@@ -18,12 +18,12 @@ import {
   updateBrand as updateBrandRecord,
 } from "services";
 import type {
-  BrandBoardColumn as ServiceBrandBoardColumn,
-  BrandBoardItem as ServiceBrandBoardItem,
-  BrandFields as ServiceBrandFields,
-  BrandListItem as ServiceBrandListItem,
-  BrandListParams as ServiceBrandListParams,
-  SelectBrands as ServiceSelectBrands,
+  BrandBoardColumn,
+  BrandBoardItem,
+  BrandFields,
+  BrandListItem,
+  BrandListParams,
+  SelectBrands,
 } from "services";
 import type { PaginatedResult } from "utils";
 import { fail } from "utils";
@@ -31,12 +31,6 @@ import { fail } from "utils";
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
 // treat as a runtime export) so consumers can keep importing them from here.
-export type BrandFields = ServiceBrandFields;
-export type BrandListItem = ServiceBrandListItem;
-export type BrandBoardItem = ServiceBrandBoardItem;
-export type BrandListParams = ServiceBrandListParams;
-export type BrandBoardColumn = ServiceBrandBoardColumn;
-export type SelectBrands = ServiceSelectBrands;
 
 export type BrandActionResult = {
   brandUuid?: string;

@@ -4,10 +4,7 @@ import type { PartnerRequestListItem } from "@/app/(dashboard)/partners/action";
 import { PartnerRequestDetailsDialog } from "@/components/partners/partner-request-details-dialog";
 import { PartnerRequestRowActions } from "@/components/partners/partner-request-row-actions";
 import type { PartnerRequestStatus } from "@/db/enum";
-import {
-  PARTNER_REQUEST_STATUS_LABELS,
-  PARTNER_TYPE_LABELS,
-} from "@/db/label";
+import { PARTNER_REQUEST_STATUS_LABELS, PARTNER_TYPE_LABELS } from "@/db/label";
 import { Eye } from "lucide-react";
 import { useState } from "react";
 import type { TableColumn } from "ui";
@@ -116,9 +113,7 @@ const columns: TableColumn<PartnerRequestListItem>[] = [
   {
     key: "location",
     header: "Location",
-    render: (request) => (
-      <span className="text-muted">{request.location}</span>
-    ),
+    render: (request) => <span className="text-muted">{request.location}</span>,
   },
   {
     key: "status",

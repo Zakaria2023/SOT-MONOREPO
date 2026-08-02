@@ -4,14 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { startTransition, useActionState } from "react";
 import { useForm } from "react-hook-form";
 import { createBrand, updateBrand } from "./action";
-import type { BrandActionResult, BrandFields } from "./action";
+import type { BrandActionResult } from "./action";
+import type { BrandFields } from "services";
 import { brandFormSchema } from "./validation";
 import type { BrandFormValues } from "./validation";
 import type { SelectBrands } from "@/db/schema/brands";
 
-type UseBrandFormArgs =
-  | { mode: "add" }
-  | { mode: "edit"; brand: SelectBrands };
+type UseBrandFormArgs = { mode: "add" } | { mode: "edit"; brand: SelectBrands };
 
 export const useBrandForm = (args: UseBrandFormArgs) => {
   const action =

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProductListItem } from "@/app/(dashboard)/products/action";
+import type { ProductListItem } from "services";
 import { ProductRowActions } from "@/components/products/product-row-actions";
 import type { ProductStatus } from "@/db/enum";
 import { PRODUCT_STATUS_LABELS } from "@/db/label";

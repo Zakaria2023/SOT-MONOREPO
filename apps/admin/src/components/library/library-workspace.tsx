@@ -1,6 +1,6 @@
 "use client";
 
-import type { LibraryGroup, OptionSet } from "@/app/(dashboard)/library/action";
+import type { LibraryGroup, OptionSet } from "services";
 import { LibraryBuilder } from "@/components/library/library-builder";
 import { ProjectInputs } from "@/components/library/project-inputs";
 import { SharedLists } from "@/components/library/shared-lists";

@@ -148,9 +148,9 @@ export const AddOption = ({
         <div className="flex flex-col gap-2 rounded-control bg-warning-tint/40 px-2.5 py-2">
           <span className="flex items-start gap-1.5 text-[11px] leading-relaxed text-warning">
             <TriangleAlert size={13} className="mt-0.5 shrink-0" />
-            This may already exist under another name. Two spellings of one value
-            split the catalog in half, and every rule keyed on the other one stops
-            matching these products.
+            This may already exist under another name. Two spellings of one
+            value split the catalog in half, and every rule keyed on the other
+            one stops matching these products.
           </span>
           <div className="flex flex-wrap gap-1.5">
             {similar.map((option) => (

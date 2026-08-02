@@ -50,7 +50,9 @@ export const GovernmentRequestReviewDialog = ({
 
           <div className="flex flex-col gap-1 text-left">
             <h2 className="font-heading text-lg font-semibold text-ink">
-              {approve ? "Approve government entity" : "Reject government entity"}
+              {approve
+                ? "Approve government entity"
+                : "Reject government entity"}
             </h2>
             <p className="text-sm text-muted">
               {approve
@@ -90,8 +92,7 @@ export const GovernmentRequestReviewDialog = ({
             variant={approve ? "primary" : "danger"}
             onClick={onConfirm}
             disabled={
-              isSubmitting ||
-              (!approve && rejectionReason.trim().length === 0)
+              isSubmitting || (!approve && rejectionReason.trim().length === 0)
             }
           >
             {approve ? <ShieldCheck size={16} /> : <TriangleAlert size={16} />}

@@ -14,10 +14,7 @@ import {
   rejectPartnerRequest as rejectPartnerRequestRecord,
   setPartnerIntegration,
 } from "services";
-import {
-  partnerRejectionSchema,
-  type PartnerRejectionInput,
-} from "validators";
+import { partnerRejectionSchema, type PartnerRejectionInput } from "validators";
 
 export type PartnerRequestListItem = SelectPartnerRequests;
 

@@ -90,9 +90,7 @@ export const OfferRowActions = ({ offer }: OfferRowActionsProps) => {
             Reject
           </Button>
         </div>
-        {error && !rejectOpen && (
-          <p className="text-xs text-danger">{error}</p>
-        )}
+        {error && !rejectOpen && <p className="text-xs text-danger">{error}</p>}
       </div>
 
       <OfferRejectDialog

@@ -25,11 +25,11 @@ import {
   updateProjectVariable,
   updateSpecificationGroup,
   type LibraryAttributeInput as ServiceLibraryAttributeInput,
-  type LibraryGroup as ServiceLibraryGroup,
-  type OptionSet as ServiceOptionSet,
-  type OptionSetInput as ServiceOptionSetInput,
-  type ProjectVariableInput as ServiceProjectVariableInput,
-  type SpecificationGroupFields as ServiceSpecificationGroupFields,
+  type LibraryGroup,
+  type OptionSet,
+  type OptionSetInput,
+  type ProjectVariableInput,
+  type SpecificationGroupFields,
 } from "services";
 import { fail } from "utils";
 
@@ -42,11 +42,6 @@ import { fail } from "utils";
 export type LibraryAttributeInput = ServiceLibraryAttributeInput & {
   categoryUuids: string[];
 };
-export type LibraryGroup = ServiceLibraryGroup;
-export type OptionSet = ServiceOptionSet;
-export type OptionSetInput = ServiceOptionSetInput;
-export type ProjectVariableInput = ServiceProjectVariableInput;
-export type SpecificationGroupFields = ServiceSpecificationGroupFields;
 
 export type ActionResult = {
   error?: string;

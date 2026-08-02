@@ -1,7 +1,7 @@
 "use client";
 
 import { ClassificationRowActions } from "@/components/classifications/classification-row-actions";
-import type { ClassificationListItem } from "@/app/(dashboard)/classifications/action";
+import type { ClassificationListItem } from "services";
 import { Table } from "ui";
 import type { TableColumn } from "ui";
 

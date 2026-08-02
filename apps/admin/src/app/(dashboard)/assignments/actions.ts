@@ -9,22 +9,16 @@ import {
   removeAssignment,
   saveAssignment,
   searchProductsForPicker,
-  AssignmentInput as ServiceAssignmentInput,
-  ProductPickerItem as ServiceProductPickerItem,
-  RelationshipInput as ServiceRelationshipInput,
-  RelationshipPreview as ServiceRelationshipPreview,
-  RelationshipProblem as ServiceRelationshipProblem,
+  AssignmentInput,
+  ProductPickerItem,
+  RelationshipInput,
+  RelationshipPreview,
+  RelationshipProblem,
   suppressInherited,
   updateRelationship,
   validateRelationship,
 } from "services";
 import { fail } from "utils";
-
-export type AssignmentInput = ServiceAssignmentInput;
-export type ProductPickerItem = ServiceProductPickerItem;
-export type RelationshipInput = ServiceRelationshipInput;
-export type RelationshipPreview = ServiceRelationshipPreview;
-export type RelationshipProblem = ServiceRelationshipProblem;
 
 export type ActionResult = {
   error?: string;

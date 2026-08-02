@@ -6,10 +6,8 @@ import {
   getPartnerDiscounts as getPartnerDiscountsRecord,
   setPartnerDiscounts as setPartnerDiscountsRecord,
 } from "services";
-import type { PartnerDiscountMap as ServicePartnerDiscountMap } from "services";
+import type { PartnerDiscountMap } from "services";
 import { fail } from "utils";
-
-export type PartnerDiscountMap = ServicePartnerDiscountMap;
 
 export type PartnerDiscountsActionResult = {
   error?: string;

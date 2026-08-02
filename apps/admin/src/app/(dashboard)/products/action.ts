@@ -15,15 +15,14 @@ import {
   updateProduct as updateProductRecord,
 } from "services";
 import type {
-  AddOptionRequest as ServiceAddOptionRequest,
-  AddOptionResult as ServiceAddOptionResult,
-  DisplaySpec as ServiceDisplaySpec,
-  ProductClientFields as ServiceProductClientFields,
-  ProductDetail as ServiceProductDetail,
-  ProductFields as ServiceProductFields,
-  ProductListItem as ServiceProductListItem,
-  ProductListParams as ServiceProductListParams,
-  SelectProducts as ServiceSelectProducts,
+  AddOptionRequest,
+  AddOptionResult,
+  DisplaySpec,
+  ProductClientFields,
+  ProductDetail,
+  ProductListItem,
+  ProductListParams,
+  SelectProducts,
 } from "services";
 import type { PaginatedResult } from "utils";
 import { fail } from "utils";
@@ -31,15 +30,6 @@ import { fail } from "utils";
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases (not `export type { ... } from`, which the RSC compiler would
 // treat as a runtime export) so consumers can keep importing them from here.
-export type ProductFields = ServiceProductFields;
-export type ProductClientFields = ServiceProductClientFields;
-export type ProductListItem = ServiceProductListItem;
-export type ProductListParams = ServiceProductListParams;
-export type ProductDetail = ServiceProductDetail;
-export type SelectProducts = ServiceSelectProducts;
-export type DisplaySpec = ServiceDisplaySpec;
-export type AddOptionRequest = ServiceAddOptionRequest;
-export type AddOptionResult = ServiceAddOptionResult;
 
 export type ProductActionResult = {
   productUuid?: string;

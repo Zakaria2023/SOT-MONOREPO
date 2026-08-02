@@ -11,16 +11,13 @@ import {
   updateClassification as updateClassificationRecord,
 } from "services";
 import type {
-  ClassificationFields as ServiceClassificationFields,
-  ClassificationListItem as ServiceClassificationListItem,
-  SelectClassifications as ServiceSelectClassifications,
+  ClassificationFields,
+  ClassificationListItem,
+  SelectClassifications,
 } from "services";
 
 // A "use server" file may only export async functions; types are re-declared as
 // local aliases so consumers can keep importing them from here.
-export type ClassificationFields = ServiceClassificationFields;
-export type ClassificationListItem = ServiceClassificationListItem;
-export type SelectClassifications = ServiceSelectClassifications;
 
 export type ClassificationActionResult = {
   classificationUuid?: string;
