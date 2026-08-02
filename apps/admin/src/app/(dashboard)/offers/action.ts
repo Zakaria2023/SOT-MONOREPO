@@ -1,22 +1,20 @@
 "use server";
 
-import type { ActionResult, ListParams, PaginatedResult } from "utils";
-import { fail, getReviewerName } from "utils";
 import { requireAdmin } from "@/lib/server/auth";
 import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
+import { approveOffer, listOffers, OfferListItem, rejectOffer } from "services";
 import {
-  approveOffer,
-  listOffers,
-  rejectOffer,
-  type OfferListItem,
-} from "services";
-import { offerRejectionSchema, type OfferRejectionInput } from "validators";
+  ActionResult,
+  fail,
+  getReviewerName,
+  ListParams,
+  PaginatedResult,
+} from "utils";
+import { OfferRejectionInput, offerRejectionSchema } from "validators";
 
 export type OfferRow = OfferListItem;
 
-// Searched + paginated page of offers for the list table. The frontend drives
-// `search`/`page` through URL search params.
 export const getOffersPage = async (
   params: ListParams = {},
 ): Promise<PaginatedResult<OfferRow>> => adminListPage(params, listOffers);

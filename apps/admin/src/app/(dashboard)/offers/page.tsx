@@ -1,37 +1,13 @@
-import { OffersTable } from "@/components/offers/offers-table";
+import { OffersList } from "@/components/offers/offers-list";
+import { AsyncSection } from "@/components/shared/async-section";
 import { ListSearch } from "@/components/shared/list-search";
 import { PageHeader } from "@/components/shared/page-header";
-import { Pagination } from "@/components/shared/pagination";
-import { requireAdmin } from "@/lib/server/auth";
-import { AsyncSection } from "@/components/shared/async-section";
-import { getOffersPage } from "./action";
 
 type Props = {
   searchParams: Promise<{ search?: string; page?: string }>;
 };
 
-type OffersListProps = {
-  search?: string;
-  page?: string;
-};
-
-const OffersList = async ({ search, page }: OffersListProps) => {
-  const result = await getOffersPage({ search, page });
-  return (
-    <>
-      <OffersTable offers={result.items} />
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        total={result.total}
-        pageSize={result.pageSize}
-      />
-    </>
-  );
-};
-
 const OffersPage = async ({ searchParams }: Props) => {
-  await requireAdmin();
   const { search, page } = await searchParams;
 
   return (

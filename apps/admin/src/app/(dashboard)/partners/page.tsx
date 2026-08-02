@@ -2,7 +2,6 @@ import { PartnerRequestsTable } from "@/components/partners/partner-requests-tab
 import { ListSearch } from "@/components/shared/list-search";
 import { PageHeader } from "@/components/shared/page-header";
 import { Pagination } from "@/components/shared/pagination";
-import { requireAdmin } from "@/lib/server/auth";
 import { AsyncSection } from "@/components/shared/async-section";
 import { getPartnerRequestsPage } from "./action";
 
@@ -31,7 +30,6 @@ const PartnersList = async ({ search, page }: PartnersListProps) => {
 };
 
 const PartnersPage = async ({ searchParams }: Props) => {
-  await requireAdmin();
   const { search, page } = await searchParams;
 
   return (
