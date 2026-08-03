@@ -20,7 +20,7 @@ const CompareScreen = () => {
     return fetchProductComparison(uuid, token ?? undefined);
   }, [uuid, getToken]);
 
-  const { data, error, loading, reload } = useAsync(load);
+  const { data, error, loading, reload } = useAsync(load, uuid);
 
   if (loading || error || !data || data.rows.length === 0) {
     return (

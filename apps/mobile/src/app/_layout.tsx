@@ -13,6 +13,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { setUnauthorizedHandler } from "@/lib/api";
 import { CLERK_PUBLISHABLE_KEY } from "@/lib/env";
 import { colors, fonts, spacing , type } from "@/lib/theme";
 import { tokenCache } from "@/lib/token-cache";
@@ -20,23 +21,39 @@ import { tokenCache } from "@/lib/token-cache";
 // Redirect between the authenticated app and the sign-in screen based on the
 // Clerk session, so no signed-out user can land on a protected route.
 const AuthGate = () => {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  const inAuthGroup = segments[0] === "(auth)";
+  const signedOutOnProtectedRoute = isLoaded && !isSignedIn && !inAuthGroup;
+
+  // Any 401 from the API signs out here, which flips isSignedIn and lets the
+  // redirect below carry the user to sign-in. One registration covers every
+  // authenticated call in the app.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      void signOut();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [signOut]);
 
   useEffect(() => {
     if (!isLoaded) {
       return;
     }
-    const inAuthGroup = segments[0] === "(auth)";
-    if (!isSignedIn && !inAuthGroup) {
+    if (signedOutOnProtectedRoute) {
       router.replace("/sign-in");
     } else if (isSignedIn && inAuthGroup) {
       router.replace("/");
     }
-  }, [isLoaded, isSignedIn, segments, router]);
+  }, [isLoaded, isSignedIn, inAuthGroup, signedOutOnProtectedRoute, router]);
 
-  if (!isLoaded) {
+  // Held closed until the session is known AND until a signed-out user has been
+  // moved off a protected route. Rendering the Stack in that window is what put
+  // the profile screen on screen for a signed-out user: the redirect lands a
+  // frame later, so the protected tab painted first and started fetching.
+  if (!isLoaded || signedOutOnProtectedRoute) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />

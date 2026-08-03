@@ -26,7 +26,7 @@ const ProductScreen = () => {
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(() => fetchProduct(uuid), [uuid]);
-  const { data: product, error, loading, reload } = useAsync(load);
+  const { data: product, error, loading, reload } = useAsync(load, uuid);
 
   const addToCart = async () => {
     if (!product) {
