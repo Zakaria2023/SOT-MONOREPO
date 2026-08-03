@@ -1,6 +1,7 @@
 import { CartLink } from "@/components/layout/cart-link";
 import { CategoryMenu } from "@/components/layout/category-menu";
 import { GuestCartSync } from "@/components/layout/guest-cart-sync";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
@@ -37,6 +38,10 @@ export const Navbar = async () => {
             text wrapped inside the fixed h-18 and the labels collided. The
             secondary links drop away first as the viewport narrows, so the
             primary action and the cart always survive. */}
+        {/* `shrink-0` + `whitespace-nowrap` throughout: without them the row's
+            text wrapped inside the fixed h-18 and the labels collided. The
+            secondary links drop away first as the viewport narrows, and what
+            they leave behind is reachable from MobileNav rather than gone. */}
         {user ? (
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <ThemeToggle />
@@ -54,6 +59,7 @@ export const Navbar = async () => {
             </Link>
             <CartLink serverCount={cartCount} />
             <ProfileMenu fullName={user.fullName} />
+            <MobileNav categories={tree} isSignedIn />
             <GuestCartSync />
           </div>
         ) : (
@@ -68,16 +74,17 @@ export const Navbar = async () => {
             </Link>
             <Link
               href="/sign-in"
-              className="font-grotesk hidden rounded-[10px] border border-search-border px-4 py-2.5 text-sm font-medium whitespace-nowrap text-secondary transition-colors hover:bg-surface-2 hover:text-primary sm:block"
+              className="font-grotesk hidden rounded-[10px] border border-search-border px-4 py-2.5 text-sm font-medium whitespace-nowrap text-secondary transition-colors hover:bg-surface-2 hover:text-primary lg:block"
             >
               Sign in
             </Link>
             <Link
               href="/sign-up"
-              className="font-grotesk rounded-[10px] bg-primary-solid px-3.5 py-2.5 text-sm font-bold whitespace-nowrap text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover sm:px-5"
+              className="font-grotesk hidden rounded-[10px] bg-primary-solid px-3.5 py-2.5 text-sm font-bold whitespace-nowrap text-white shadow-[0_8px_20px_-6px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover sm:block sm:px-5"
             >
               Sign up
             </Link>
+            <MobileNav categories={tree} isSignedIn={false} />
           </div>
         )}
       </nav>
