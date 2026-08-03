@@ -34,7 +34,17 @@ type Window = {
  * interface when the limit has to mean one number across the fleet. Nothing
  * above this line changes when that happens.
  */
-export const createMemoryStore = (): CounterStore => {
+export type MemoryStore = CounterStore & {
+  /**
+   * Live key count. Not part of CounterStore: "how many keys" is meaningless for
+   * a shared backend. It exists so the sweep can be asserted — without it a test
+   * cannot tell a swept map from an expired window, and a leak test that cannot
+   * fail is worse than none.
+   */
+  size: () => number;
+};
+
+export const createMemoryStore = (): MemoryStore => {
   const windows = new Map<string, Window>();
   let lastSweep = 0;
 
@@ -54,6 +64,8 @@ export const createMemoryStore = (): CounterStore => {
   };
 
   return {
+    size: () => windows.size,
+
     hit: async (key, windowMs) => {
       const now = Date.now();
       sweep(now);
