@@ -39,11 +39,13 @@ export const ProductCompare = ({
           channel, so the light theme showed no highlighted column at all. An
           alpha composites against whatever is actually behind it, which is what
           makes one value work in both themes. */}
-      <div className="mt-8 overflow-x-auto">
+      <div className="scrollbar-slim mt-8 overflow-x-auto">
         <table className="w-full min-w-160 border-collapse">
           <thead>
             <tr>
-              <th className="w-44" />
+              {/* Sticky so the attribute names stay put while the columns
+                  scroll past them. Opaque, or the scrolled cells show through. */}
+              <th className="sticky left-0 z-10 w-44 bg-page" />
               {products.map((product) => {
                 const isCurrent = product.uuid === current.uuid;
                 return (
@@ -85,7 +87,9 @@ export const ProductCompare = ({
           <tbody>
             {rows.map((row) => (
               <tr key={row.uuid} className="border-t border-hairline">
-                <td className="py-3.5 pr-4 text-sm text-faint">{row.label}</td>
+                <td className="sticky left-0 z-10 bg-page py-3.5 pr-4 text-sm text-faint">
+                  {row.label}
+                </td>
                 {products.map((product) => {
                   const isCurrent = product.uuid === current.uuid;
                   return (

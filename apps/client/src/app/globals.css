@@ -129,6 +129,42 @@
   background-image: var(--gradient-accent);
 }
 
+/**
+ * Slim themed scrollbar for panes that scroll inside the page rather than with
+ * it — the compare table is the one today.
+ *
+ * The platform default is a chunky grey bar drawn from the OS palette, so in
+ * dark mode it appears as a light slab across a near-black panel with no
+ * relation to anything else on screen. Both properties are needed: the
+ * standard two (Firefox, and Chrome 121+) and the -webkit- pseudo-elements for
+ * Safari and older Chromium.
+ *
+ * `transparent` track rather than a tinted one, so a pane that does not
+ * currently overflow shows no furniture at all.
+ */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-faint) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--color-faint);
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-primary);
+}
+
 /* Gradient-clipped text — headlines. */
 .text-accent-gradient {
   background-image: var(--gradient-accent);
