@@ -53,5 +53,12 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next|api/webhooks|.*\\..*).*)"],
+  // Everything but _next and the Clerk webhook, including paths that look like
+  // files. Excluding dotted paths meant clerkMiddleware never ran on them, so
+  // `auth()` threw inside the navbar and any missing URL containing a dot
+  // answered 500 rather than 404 — /nope 404'd, /nope.php did not. Bots probe
+  // /.env and /wp-login.php constantly, and a crawler reads sustained 5xx as a
+  // broken site. The webhook stays out so its raw body reaches the handler
+  // unread.
+  matcher: ["/((?!_next|api/webhooks).*)"],
 };

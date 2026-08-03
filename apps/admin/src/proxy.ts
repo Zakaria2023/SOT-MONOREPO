@@ -59,6 +59,16 @@ const enforceRateLimit = async (
   return decision.allowed ? null : rateLimitResponse(decision);
 };
 
+
+/**
+ * A path whose last segment carries an extension. Middleware still runs on these
+ * so `auth()` is available to whatever renders them — including the 404 page —
+ * but they are not gated: a signed-out visitor has to be able to load the
+ * sign-in page's own favicon and fonts.
+ */
+const isFileRequest = (request: Request): boolean =>
+  /\.[a-zA-Z0-9]+$/.test(new URL(request.url).pathname);
+
 export default clerkMiddleware(async (auth, req) => {
   if (isRateLimited(req) && !isInternalFetch(req)) {
     const { userId } = await auth();
@@ -68,11 +78,17 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  if (!isPublicRoute(req)) {
+  if (!isPublicRoute(req) && !isFileRequest(req)) {
     await auth.protect();
   }
 });
 
 export const config = {
-  matcher: ["/((?!_next|.*\\..*).*)"],
+  // Everything but _next, including paths that look like files. Excluding dotted
+  // paths meant clerkMiddleware never ran on them, so `auth()` threw inside the
+  // root layout and any missing URL with a dot in it answered 500 instead of 404
+  // — /nope 404'd, /nope.php did not. Bots probe /.env and /wp-login.php
+  // constantly, and a crawler reads sustained 5xx as a broken site. Files are
+  // matched but not gated; see isFileRequest above.
+  matcher: ["/((?!_next).*)"],
 };
