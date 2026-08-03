@@ -36,7 +36,7 @@ const nextConfig: NextConfig = {
     // uploads aren't truncated before reaching /api/documents/upload.
     proxyClientMaxBodySize: "25mb",
   },
-  transpilePackages: ["storage", "ui"],
+  transpilePackages: ["rate-limit", "storage", "ui"],
   images: {
     // No remotePatterns any more. The R2 wildcard that used to sit here could
     // never have worked — <Image> pointed at /api/documents/{id}/download, and

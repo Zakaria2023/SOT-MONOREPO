@@ -63,6 +63,9 @@ importers:
       next:
         specifier: 16.2.9
         version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      rate-limit:
+        specifier: workspace:*
+        version: link:../../packages/rate-limit
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -127,6 +130,9 @@ importers:
       next:
         specifier: 16.2.9
         version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      rate-limit:
+        specifier: workspace:*
+        version: link:../../packages/rate-limit
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -188,6 +194,9 @@ importers:
       next:
         specifier: 16.2.9
         version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      rate-limit:
+        specifier: workspace:*
+        version: link:../../packages/rate-limit
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -358,6 +367,9 @@ importers:
       next:
         specifier: 16.2.9
         version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      rate-limit:
+        specifier: workspace:*
+        version: link:../../packages/rate-limit
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -419,6 +431,9 @@ importers:
       next:
         specifier: 16.2.9
         version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      rate-limit:
+        specifier: workspace:*
+        version: link:../../packages/rate-limit
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -461,6 +476,15 @@ importers:
         version: 4.3.2
       typescript:
         specifier: ^5
+        version: 5.9.3
+
+  packages/rate-limit:
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      typescript:
+        specifier: ^5.7.0
         version: 5.9.3
 
   packages/services:

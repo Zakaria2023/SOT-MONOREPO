@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
   experimental: {
     externalDir: true,
   },
-  transpilePackages: ["services", "auth", "ui"],
+  transpilePackages: ["rate-limit", "services", "auth", "ui"],
 };
 
 export default nextConfig;

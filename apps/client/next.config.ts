@@ -47,7 +47,7 @@ const nextConfig: NextConfig = {
     // uploads aren't truncated before reaching /api/documents/upload.
     proxyClientMaxBodySize: "25mb",
   },
-  transpilePackages: ["services", "storage", "auth", "validators"],
+  transpilePackages: ["rate-limit", "services", "storage", "auth", "validators"],
 };
 
 export default nextConfig;
