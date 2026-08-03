@@ -25,6 +25,7 @@
     "server-only": "^0.0.1",
     "services": "workspace:*",
     "rate-limit": "workspace:*",
+    "security-headers": "workspace:*",
     "storage": "workspace:*",
     "ui": "workspace:*",
     "utils": "workspace:*",

@@ -75,6 +75,9 @@ importers:
       react-hook-form:
         specifier: ^7.80.0
         version: 7.80.0(react@19.2.4)
+      security-headers:
+        specifier: workspace:*
+        version: link:../../packages/security-headers
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
@@ -139,6 +142,9 @@ importers:
       react-dom:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
+      security-headers:
+        specifier: workspace:*
+        version: link:../../packages/security-headers
       services:
         specifier: workspace:*
         version: link:../../packages/services
@@ -206,6 +212,9 @@ importers:
       react-hook-form:
         specifier: ^7.80.0
         version: 7.80.0(react@19.2.4)
+      security-headers:
+        specifier: workspace:*
+        version: link:../../packages/security-headers
       services:
         specifier: workspace:*
         version: link:../../packages/services
@@ -379,6 +388,9 @@ importers:
       react-hook-form:
         specifier: ^7.80.0
         version: 7.80.0(react@19.2.4)
+      security-headers:
+        specifier: workspace:*
+        version: link:../../packages/security-headers
       services:
         specifier: workspace:*
         version: link:../../packages/services
@@ -443,6 +455,9 @@ importers:
       react-hook-form:
         specifier: ^7.80.0
         version: 7.80.0(react@19.2.4)
+      security-headers:
+        specifier: workspace:*
+        version: link:../../packages/security-headers
       services:
         specifier: workspace:*
         version: link:../../packages/services
@@ -479,6 +494,15 @@ importers:
         version: 5.9.3
 
   packages/rate-limit:
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/security-headers:
     devDependencies:
       '@types/node':
         specifier: ^20
@@ -1610,11 +1634,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}

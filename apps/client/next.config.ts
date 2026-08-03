@@ -1,5 +1,6 @@
 import fs from "fs";
 import type { NextConfig } from "next";
+import { SECURITY_HEADERS } from "security-headers";
 import path from "path";
 
 // Load the single monorepo-root .env.local into process.env, without
@@ -28,6 +29,9 @@ if (fs.existsSync(rootEnv)) {
 }
 
 const nextConfig: NextConfig = {
+  // Applied to everything, including the static assets and API routes, because a
+  // header that only covers pages leaves the rest of the origin bare.
+  headers: async () => [{ source: "/:path*", headers: SECURITY_HEADERS }],
   outputFileTracingRoot: path.join(__dirname, "../.."),
   images: {
     // Document ids are immutable — uploadDocumentFile mints a fresh randomUUID
@@ -47,7 +51,7 @@ const nextConfig: NextConfig = {
     // uploads aren't truncated before reaching /api/documents/upload.
     proxyClientMaxBodySize: "25mb",
   },
-  transpilePackages: ["rate-limit", "services", "storage", "auth", "validators"],
+  transpilePackages: ["security-headers", "rate-limit", "services", "storage", "auth", "validators"],
 };
 
 export default nextConfig;

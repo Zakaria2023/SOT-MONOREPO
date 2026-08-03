@@ -20,6 +20,7 @@
     "services": "workspace:*",
     "ui": "workspace:*",
     "rate-limit": "workspace:*",
+    "security-headers": "workspace:*",
     "utils": "workspace:*",
     "validators": "workspace:*",
     "zod": "^4.4.3"

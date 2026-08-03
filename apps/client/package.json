@@ -22,6 +22,7 @@
     "react-hook-form": "^7.80.0",
     "services": "workspace:*",
     "rate-limit": "workspace:*",
+    "security-headers": "workspace:*",
     "storage": "workspace:*",
     "svix": "^1.42.0",
     "tailwind-merge": "^3.6.0",

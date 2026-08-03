@@ -19,6 +19,7 @@
     "services": "workspace:*",
     "ui": "workspace:*",
     "rate-limit": "workspace:*",
+    "security-headers": "workspace:*",
     "utils": "workspace:*"
   },
   "devDependencies": {
