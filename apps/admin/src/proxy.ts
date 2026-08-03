@@ -24,6 +24,9 @@ import { buildCsp, createNonce } from "security-headers";
  */
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
+  // Where the role gate sends a signed-in non-admin. Public, or the gate would
+  // gate its own landing page.
+  "/no-access",
   "/api/documents/(.*)/image",
 ]);
 
