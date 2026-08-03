@@ -48,15 +48,17 @@ const HomeScreen = () => {
     >
       <View style={styles.hero}>
         <LinearGradient
-          colors={["rgba(139,123,255,0.22)", "rgba(34,211,238,0.10)", "transparent"]}
+          colors={[
+            "rgba(139,123,255,0.22)",
+            "rgba(34,211,238,0.10)",
+            "transparent",
+          ]}
           start={{ x: 1, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.heroGlow}
         />
         <Eyebrow label="Smart Infrastructure" />
-        <Text style={styles.heroTitle}>
-          Build your network with SOT
-        </Text>
+        <Text style={styles.heroTitle}>Build your network with SOT</Text>
         <Text style={styles.heroSubtitle}>
           Browse products, compare brands and build your cart — all in one
           place.

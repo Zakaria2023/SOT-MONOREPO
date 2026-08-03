@@ -35,9 +35,7 @@ const PartnerScreen = () => {
 
   const toggleCapability = (value: PartnerCapability) => {
     setCapabilities((prev) =>
-      prev.includes(value)
-        ? prev.filter((c) => c !== value)
-        : [...prev, value],
+      prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value],
     );
   };
 

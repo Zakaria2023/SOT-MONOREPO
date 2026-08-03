@@ -1,9 +1,5 @@
 import { useState } from "react";
-import {
-  type KeyboardTypeOptions,
-  StyleSheet,
-  TextInput,
-} from "react-native";
+import { type KeyboardTypeOptions, StyleSheet, TextInput } from "react-native";
 import { colors, fonts, radius, spacing } from "@/lib/theme";
 
 type TextFieldProps = {

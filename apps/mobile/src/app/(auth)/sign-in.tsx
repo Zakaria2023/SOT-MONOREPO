@@ -80,7 +80,11 @@ const SignInScreen = () => {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <LinearGradient
-        colors={["rgba(139,123,255,0.18)", "rgba(34,211,238,0.06)", "transparent"]}
+        colors={[
+          "rgba(139,123,255,0.18)",
+          "rgba(34,211,238,0.06)",
+          "transparent",
+        ]}
         start={{ x: 1, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={styles.glow}
@@ -121,7 +125,9 @@ const SignInScreen = () => {
             label={stage === "email" ? "Send code" : "Verify & sign in"}
             onPress={stage === "email" ? sendCode : verifyCode}
             loading={pending}
-            disabled={stage === "email" ? email.length === 0 : code.length === 0}
+            disabled={
+              stage === "email" ? email.length === 0 : code.length === 0
+            }
           />
 
           {stage === "code" ? (

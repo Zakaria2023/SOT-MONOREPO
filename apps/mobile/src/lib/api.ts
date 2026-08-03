@@ -277,3 +277,16 @@ export const createPartnerRequest = (
     method: "POST",
     body: input,
   });
+
+/**
+ * URL for a document id, for use as an <Image source>.
+ *
+ * The API returns image fields as bare document ids — `image: "c73a19ed-..."` —
+ * because that is what the column holds. Passing one straight to expo-image, as
+ * every screen here did, asks it to load a uuid: not a URL, nothing fetched, no
+ * error, just an empty frame. Mobile images had never rendered.
+ *
+ * The endpoint 302s to a short-lived presigned R2 URL, which expo-image follows.
+ */
+export const documentUrl = (documentId: string): string =>
+  `${API_URL}/api/v1/documents/${documentId}/download`;

@@ -1,3 +1,4 @@
+import { documentUrl } from "@/lib/api";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -19,7 +20,7 @@ export const BrandChip = ({ brand }: BrandChipProps) => (
       <View style={styles.logoTile}>
         {brand.image ? (
           <Image
-            source={brand.image}
+            source={documentUrl(brand.image)}
             style={styles.logo}
             contentFit="contain"
           />

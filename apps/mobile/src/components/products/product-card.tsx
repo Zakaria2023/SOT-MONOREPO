@@ -1,3 +1,4 @@
+import { documentUrl } from "@/lib/api";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { ImageOff } from "lucide-react-native";
@@ -22,7 +23,7 @@ export const ProductCard = ({ product }: ProductCardProps) => (
       <View style={styles.well}>
         {product.image ? (
           <Image
-            source={product.image}
+            source={documentUrl(product.image)}
             style={styles.image}
             contentFit="contain"
             transition={150}

@@ -1,3 +1,4 @@
+import { documentUrl } from "@/lib/api";
 import { Image } from "expo-image";
 import { Minus, Package, Plus, Trash2 } from "lucide-react-native";
 import {
@@ -34,7 +35,7 @@ export const CartRow = ({
         <View style={styles.thumb}>
           {item.image ? (
             <Image
-              source={item.image}
+              source={documentUrl(item.image)}
               style={styles.thumbImage}
               contentFit="contain"
             />

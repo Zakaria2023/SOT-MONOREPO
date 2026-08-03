@@ -103,9 +103,7 @@ export const FilterSheet = ({
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
-        accessibilityLabel={
-          count > 0 ? `Filters, ${count} applied` : "Filters"
-        }
+        accessibilityLabel={count > 0 ? `Filters, ${count} applied` : "Filters"}
         style={({ pressed }) => [
           styles.trigger,
           pressed ? styles.triggerPressed : null,

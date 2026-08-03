@@ -16,7 +16,10 @@ export const Badge = ({ label, tone = "neutral" }: BadgeProps) => (
 
 const TONES = {
   primary: {
-    box: { backgroundColor: colors.primaryTint, borderColor: colors.primaryBorder },
+    box: {
+      backgroundColor: colors.primaryTint,
+      borderColor: colors.primaryBorder,
+    },
     text: { color: colors.primary },
   },
   neutral: {

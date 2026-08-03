@@ -65,7 +65,10 @@ export const CompareTable = ({ products, rows }: CompareTableProps) => (
                 key={row.uuid}
                 style={[styles.row, index > 0 && styles.rowDivided]}
               >
-                <Text style={[styles.labelCell, styles.label]} numberOfLines={3}>
+                <Text
+                  style={[styles.labelCell, styles.label]}
+                  numberOfLines={3}
+                >
                   {row.label}
                 </Text>
                 {products.map((product) => (

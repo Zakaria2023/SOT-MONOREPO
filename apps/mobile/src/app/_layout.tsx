@@ -9,28 +9,35 @@ import { HankenGrotesk_700Bold } from "@expo-google-fonts/hanken-grotesk/700Bold
 import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
 import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk/700Bold";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { CLERK_PUBLISHABLE_KEY } from "@/lib/env";
-import { colors, fonts, spacing , type } from "@/lib/theme";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import { tokenCache } from "@/lib/token-cache";
 
-// Redirect between the authenticated app and the sign-in screen based on the
-// Clerk session, so no signed-out user can land on a protected route.
+/**
+ * Registers the 401 handler and mounts the navigator. It does NOT redirect.
+ *
+ * Holding the Stack back until a signed-out user had been moved off a protected
+ * route looked like the way to stop the profile tab painting without a session,
+ * and it threw: expo-router cannot navigate before a navigator exists, so
+ * router.replace from this effect produced "Attempted to navigate before mounting
+ * the Root Layout component". The navigator has to mount on the first render.
+ *
+ * Guarding therefore lives with the thing being guarded — see (tabs)/_layout,
+ * which renders <Redirect> instead of calling an imperative navigate. Declarative
+ * redirects are resolved by the router itself, so there is no window in which a
+ * protected screen is mounted and fetching.
+ */
 const AuthGate = () => {
-  const { isLoaded, isSignedIn, signOut } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  const inAuthGroup = segments[0] === "(auth)";
-  const signedOutOnProtectedRoute = isLoaded && !isSignedIn && !inAuthGroup;
+  const { isLoaded, signOut } = useAuth();
 
   // Any 401 from the API signs out here, which flips isSignedIn and lets the
-  // redirect below carry the user to sign-in. One registration covers every
-  // authenticated call in the app.
+  // guard in the protected group send the user to sign-in. One registration
+  // covers every authenticated call in the app.
   useEffect(() => {
     setUnauthorizedHandler(() => {
       void signOut();
@@ -38,22 +45,7 @@ const AuthGate = () => {
     return () => setUnauthorizedHandler(null);
   }, [signOut]);
 
-  useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
-    if (signedOutOnProtectedRoute) {
-      router.replace("/sign-in");
-    } else if (isSignedIn && inAuthGroup) {
-      router.replace("/");
-    }
-  }, [isLoaded, isSignedIn, inAuthGroup, signedOutOnProtectedRoute, router]);
-
-  // Held closed until the session is known AND until a signed-out user has been
-  // moved off a protected route. Rendering the Stack in that window is what put
-  // the profile screen on screen for a signed-out user: the redirect lands a
-  // frame later, so the protected tab painted first and started fetching.
-  if (!isLoaded || signedOutOnProtectedRoute) {
+  if (!isLoaded) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
@@ -76,7 +68,7 @@ const AuthGate = () => {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/sign-in" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="product/[uuid]" options={{ title: "Product" }} />
       <Stack.Screen name="category/[uuid]" options={{ title: "Category" }} />
       <Stack.Screen name="brand/[uuid]" options={{ title: "Brand" }} />

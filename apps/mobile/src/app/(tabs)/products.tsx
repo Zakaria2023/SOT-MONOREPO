@@ -134,7 +134,10 @@ const ProductsScreen = () => {
             style={[styles.chip, !category ? styles.chipActive : null]}
           >
             <Text
-              style={[styles.chipText, !category ? styles.chipTextActive : null]}
+              style={[
+                styles.chipText,
+                !category ? styles.chipTextActive : null,
+              ]}
             >
               All
             </Text>

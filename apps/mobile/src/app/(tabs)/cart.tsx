@@ -268,10 +268,17 @@ const CartScreen = () => {
           onChange={setAnswers}
         />
         <View style={styles.summary}>
-          <SummaryRow label="Subtotal" value={formatMoney(subtotal, currency)} />
+          <SummaryRow
+            label="Subtotal"
+            value={formatMoney(subtotal, currency)}
+          />
           <SummaryRow label="VAT (15%)" value={formatMoney(vat, currency)} />
           <View style={styles.divider} />
-          <SummaryRow label="Total" value={formatMoney(total, currency)} emphasis />
+          <SummaryRow
+            label="Total"
+            value={formatMoney(total, currency)}
+            emphasis
+          />
         </View>
 
         {blocked ? (

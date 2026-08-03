@@ -61,11 +61,7 @@ export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
 
   const { blockers, warnings, unknowns } = result;
 
-  if (
-    blockers.length === 0 &&
-    warnings.length === 0 &&
-    unknowns.length === 0
-  ) {
+  if (blockers.length === 0 && warnings.length === 0 && unknowns.length === 0) {
     return (
       <View style={[styles.card, styles.clean]}>
         <CheckCircle2 color={colors.success} size={16} />
@@ -78,7 +74,10 @@ export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
 
   return (
     <View
-      style={[styles.card, blockers.length > 0 ? styles.blocked : styles.warned]}
+      style={[
+        styles.card,
+        blockers.length > 0 ? styles.blocked : styles.warned,
+      ]}
     >
       <Text style={styles.heading}>
         {blockers.length > 0

@@ -1,3 +1,4 @@
+import { documentUrl } from "@/lib/api";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { ChevronRight, LayoutGrid } from "lucide-react-native";
@@ -22,7 +23,7 @@ export const CategoryRow = ({ category }: CategoryRowProps) => (
       <View style={styles.tile}>
         {category.image ? (
           <Image
-            source={category.image}
+            source={documentUrl(category.image)}
             style={styles.image}
             contentFit="cover"
             transition={150}

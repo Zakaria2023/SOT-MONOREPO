@@ -1,19 +1,14 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import {
-  Check,
-  Columns3,
-  ImageOff,
-  ShoppingCart,
-} from "lucide-react-native";
+import { Check, Columns3, ImageOff, ShoppingCart } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListState } from "@/components/ui/list-state";
 import { SpecTable } from "@/components/products/spec-table";
-import { addCartItem, fetchProduct } from "@/lib/api";
+import { addCartItem, fetchProduct, documentUrl } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
@@ -72,10 +67,9 @@ const ProductScreen = () => {
     >
       <Stack.Screen options={{ title: product.name }} />
       <View style={styles.well}>
-        
         {product.image ? (
           <Image
-            source={product.image}
+            source={documentUrl(product.image)}
             style={styles.image}
             contentFit="contain"
             transition={150}
