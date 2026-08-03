@@ -1,47 +1,48 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { FileText, Layers, LayoutDashboard, Search } from "lucide-react";
+import { Layers, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 
-type NavLink = {
+export type NavLink = {
   icon: LucideIcon;
   label: string;
   href: string;
 };
 
-type NavGroup = {
+export type NavGroup = {
   title: string;
   links: NavLink[];
 };
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    title: "Overview",
-    links: [{ icon: LayoutDashboard, label: "Dashboard", href: "/" }],
-  },
-  {
-    title: "Work",
-    links: [{ icon: FileText, label: "Incoming BOQs", href: "/boqs" }],
-  },
-];
+type DashboardSidebarProps = {
+  // The only thing that differed between the partner and pre-seller copies of
+  // this file: one link label. Passed in rather than baked in.
+  groups: NavGroup[];
+};
 
-export const Sidebar = () => {
+export const DashboardSidebar = ({ groups }: DashboardSidebarProps) => {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
 
-  const groups = useMemo(() => {
+  // Filtered by the menu search box, which is why the prop is not rendered
+  // directly.
+  const visibleGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) {
-      return NAV_GROUPS;
+      return groups;
     }
-    return NAV_GROUPS.map((group) => ({
-      ...group,
-      links: group.links.filter((link) => link.label.toLowerCase().includes(q)),
-    })).filter((group) => group.links.length > 0);
-  }, [query]);
+    return groups
+      .map((group) => ({
+        ...group,
+        links: group.links.filter((link) =>
+          link.label.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((group) => group.links.length > 0);
+  }, [groups, query]);
 
   return (
     <aside className="group fixed inset-y-0 left-0 z-40 flex w-18 flex-col overflow-x-hidden border-r border-hairline bg-surface transition-[width] duration-200 ease-out hover:w-64 hover:shadow-[0_20px_50px_-24px_rgba(27,35,51,0.28)]">
@@ -70,7 +71,7 @@ export const Sidebar = () => {
       </div>
 
       <nav className="flex flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-3 py-3">
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.title} className="flex flex-col gap-1">
             <span className="mb-0.5 h-4 px-3 text-[11px] font-bold tracking-wider whitespace-nowrap text-faint uppercase opacity-0 transition-opacity duration-200 group-hover:opacity-100">
               {group.title}

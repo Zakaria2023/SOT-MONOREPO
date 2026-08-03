@@ -1,12 +1,29 @@
-import { Shell } from "@/components/layout/shell";
-import { ReactNode } from "react";
+import { FileText, LayoutDashboard } from "lucide-react";
+import { DashboardShell, type NavGroup } from "ui";
+import type { ReactNode } from "react";
 
+// Always render against live data — never a build-time static snapshot.
 export const dynamic = "force-dynamic";
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: "Overview",
+    links: [{ icon: LayoutDashboard, label: "Dashboard", href: "/" }],
+  },
+  {
+    title: "Work",
+    links: [{ icon: FileText, label: "Incoming BOQs", href: "/boqs" }],
+  },
+];
 
 type Props = {
   children: ReactNode;
 };
 
-const DashboardLayout = ({ children }: Props) => <Shell>{children}</Shell>;
+const DashboardLayout = ({ children }: Props) => (
+  <DashboardShell groups={NAV_GROUPS} labels={{ boqs: "Incoming BOQs" }}>
+    {children}
+  </DashboardShell>
+);
 
 export default DashboardLayout;
