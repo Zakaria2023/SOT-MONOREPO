@@ -10,10 +10,10 @@ import { Check, ImageOff, PackageX, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import type { ProductListItem } from "services";
+import type { ProductSummary } from "services";
 
 type CatalogProductCardProps = {
-  product: ProductListItem;
+  product: ProductSummary;
   view: "grid" | "list";
   // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
   discountPercent?: number;
@@ -27,18 +27,18 @@ type CatalogProductCardProps = {
 };
 
 type ThumbProps = {
-  product: ProductListItem;
+  product: ProductSummary;
   className: string;
   iconSize: number;
   priority: boolean;
 };
 
 type MetaProps = {
-  product: ProductListItem;
+  product: ProductSummary;
 };
 
 type AddButtonProps = {
-  product: ProductListItem;
+  product: ProductSummary;
 };
 
 const Thumb = ({ product, className, iconSize, priority }: ThumbProps) => (

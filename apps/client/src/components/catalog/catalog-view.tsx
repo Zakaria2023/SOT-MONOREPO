@@ -14,13 +14,13 @@ import type {
   BrandListItem,
   CategoryFacet,
   CategoryListItem,
-  ProductListItem,
+  ProductSummary,
   ProductSort,
 } from "services";
 import { Dropdown, useDebouncedCallback, useFocusTrap } from "ui";
 
 type CatalogViewProps = {
-  products: ProductListItem[];
+  products: ProductSummary[];
   categoryTree: TreeNode<CategoryListItem>[];
   brandTree: TreeNode<BrandListItem>[];
   total: number;

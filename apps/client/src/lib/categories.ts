@@ -1,8 +1,8 @@
-import type { CategoryListItem, ProductListItem } from "services";
+import type { CategoryListItem, ProductSummary } from "services";
 
 export type CategoryNode = CategoryListItem & {
   children: CategoryNode[];
-  products: ProductListItem[];
+  products: ProductSummary[];
 };
 
 /**
@@ -11,7 +11,7 @@ export type CategoryNode = CategoryListItem & {
  */
 export const buildCategoryTree = (
   categories: CategoryListItem[],
-  products: ProductListItem[],
+  products: ProductSummary[],
 ): CategoryNode[] => {
   const presentUuids = new Set(categories.map((category) => category.uuid));
   const childrenByParent = new Map<string | null, CategoryListItem[]>();
@@ -27,7 +27,7 @@ export const buildCategoryTree = (
     childrenByParent.set(parentUuid, siblings);
   }
 
-  const productsByCategory = new Map<string, ProductListItem[]>();
+  const productsByCategory = new Map<string, ProductSummary[]>();
   for (const product of products) {
     const list = productsByCategory.get(product.categoryUuid) ?? [];
     list.push(product);

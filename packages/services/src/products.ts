@@ -37,6 +37,29 @@ export type ProductListItem = SelectProducts & {
   brandName: SelectBrands["name"] | null;
 };
 
+/**
+ * A product as a list or card renders it.
+ *
+ * `specValues` and `equivalents` are left out: both are JSON payloads that only a
+ * detail view, the compare table or the rules engine ever opens, and getProducts
+ * feeds the catalog grid, the home page and the navbar mega-menu. Dragging a
+ * per-product attribute map across the wire for a card showing a name and a price
+ * is the whole cost of `getTableColumns`.
+ *
+ * Omitted rather than typed-as-present-but-absent on purpose. A type that claims
+ * specValues is there while the query never selected it is the kind of lie that
+ * surfaces as `undefined` somewhere far away.
+ */
+export type ProductSummary = Omit<ProductListItem, "specValues" | "equivalents">;
+
+// Everything a summary needs, named once. `description` and `images` stay because
+// the mobile /products contract includes them.
+const productSummaryColumns = () => {
+  const { specValues: _specValues, equivalents: _equivalents, ...columns } =
+    getTableColumns(Products);
+  return columns;
+};
+
 export type ProductFields = Omit<
   InsertProducts,
   "id" | "uuid" | "createdAt" | "updatedAt"
@@ -167,7 +190,7 @@ export const generateProductSku = async (input: {
 
 export const getProducts = async (
   filters: ProductFilters = {},
-): Promise<ProductListItem[]> => {
+): Promise<ProductSummary[]> => {
   try {
     const conditions: (SQL | undefined)[] = [];
     if (filters.search) {
@@ -198,7 +221,7 @@ export const getProducts = async (
 
     return await db
       .select({
-        ...getTableColumns(Products),
+        ...productSummaryColumns(),
         categoryName: Categories.name,
         brandName: Brands.name,
       })
