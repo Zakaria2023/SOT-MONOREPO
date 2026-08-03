@@ -82,7 +82,7 @@ export const Sidebar = () => {
           <Layers size={19} strokeWidth={2} />
         </div>
         <span className="font-heading text-xl whitespace-nowrap text-ink opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          Stratum
+          SOT Solutions
         </span>
       </div>
 

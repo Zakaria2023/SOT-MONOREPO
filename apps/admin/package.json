@@ -24,6 +24,7 @@
     "react-hook-form": "^7.80.0",
     "server-only": "^0.0.1",
     "services": "workspace:*",
+    "rate-limit": "workspace:*",
     "storage": "workspace:*",
     "ui": "workspace:*",
     "utils": "workspace:*",

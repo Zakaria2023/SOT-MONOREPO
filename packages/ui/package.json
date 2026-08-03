@@ -8,6 +8,7 @@
     "type-check": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@clerk/nextjs": "*",
     "lucide-react": "*",
     "next": "*",
     "react": "*",
@@ -15,6 +16,7 @@
     "react-hook-form": "*"
   },
   "devDependencies": {
+    "@clerk/nextjs": "^7.5.10",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "lucide-react": "^1.22.0",

@@ -6,17 +6,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 
-const LABELS: Record<string, string> = {
-  boqs: "Assigned BOQs",
+type DashboardNavbarProps = {
+  // Per-app crumb overrides, keyed by path segment. The partner and pre-seller
+  // dashboards were byte-identical apart from this one entry — "Incoming BOQs"
+  // against "Assigned BOQs" — so it is the only thing that needed to vary.
+  labels?: Record<string, string>;
 };
 
 // Dynamic route segments (uuids) aren't shown as their own crumb.
 const isDynamic = (segment: string) => segment.length >= 20;
 
-const toLabel = (segment: string) =>
-  LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
+const toLabel = (segment: string, labels: Record<string, string>) =>
+  labels[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
 
-export const Navbar = () => {
+export const DashboardNavbar = ({ labels = {} }: DashboardNavbarProps) => {
   const pathname = usePathname();
   const segments = pathname
     .split("/")
@@ -53,7 +56,7 @@ export const Navbar = () => {
                     : "text-secondary hover:bg-hover"
                 }`}
               >
-                {toLabel(segment)}
+                {toLabel(segment, labels)}
               </Link>
             </Fragment>
           );

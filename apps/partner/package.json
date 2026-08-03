@@ -19,6 +19,7 @@
     "react-hook-form": "^7.80.0",
     "services": "workspace:*",
     "ui": "workspace:*",
+    "rate-limit": "workspace:*",
     "utils": "workspace:*",
     "validators": "workspace:*",
     "zod": "^4.4.3"

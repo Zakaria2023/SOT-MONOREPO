@@ -1,3 +1,9 @@
+import {
+  checkRateLimit,
+  rateLimitHeaders,
+  rateLimitIdentity,
+  rateLimitResponse,
+} from "rate-limit";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -22,12 +28,45 @@ const withCors = (response: NextResponse): NextResponse => {
   return response;
 };
 
-export const middleware = (request: NextRequest) => {
-  // Answer the CORS preflight before it ever reaches a route handler.
+export const middleware = async (request: NextRequest) => {
+  // Answer the CORS preflight before it ever reaches a route handler. Not
+  // counted against the limit: a preflight is the browser's doing, not the
+  // caller's, and charging for it would halve every browser client's budget.
   if (request.method === "OPTIONS") {
     return withCors(new NextResponse(null, { status: 204 }));
   }
-  return withCors(NextResponse.next());
+
+  // Keyed on IP rather than user. The session token is present in the
+  // Authorization header, but its `sub` is only trustworthy after verification,
+  // and a limiter keyed on an unverified claim is no limiter at all — a caller
+  // would just send a new sub each request for a fresh budget. An IP costs real
+  // network resources to vary. The trade-off is that everyone behind one office
+  // NAT or carrier gateway shares a tally.
+  const decision = await checkRateLimit(rateLimitIdentity(request), {
+    bucket: "api",
+  });
+
+  if (!decision.allowed) {
+    return withCors(NextResponse.json(
+      { error: "Too many requests. Please slow down and try again shortly." },
+      {
+        status: 429,
+        headers: {
+          ...rateLimitHeaders(decision),
+          "Retry-After": String(decision.retryAfter),
+        },
+      },
+    ));
+  }
+
+  const response = withCors(NextResponse.next());
+  // Sent on every response, not only rejections — a client can only back off
+  // before it is cut off if it learns how much room is left while it still has
+  // some.
+  for (const [key, value] of Object.entries(rateLimitHeaders(decision))) {
+    response.headers.set(key, value);
+  }
+  return response;
 };
 
 export const config = {

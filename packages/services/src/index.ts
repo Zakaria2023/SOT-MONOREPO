@@ -9,6 +9,7 @@ export * from "./category-tree";
 export * from "./catalog-model";
 export * from "./categories";
 export * from "./classifications";
+export * from "./document-visibility";
 export * from "./design-check";
 export * from "./design-questions";
 export * from "./errors";

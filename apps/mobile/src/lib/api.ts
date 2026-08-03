@@ -91,6 +91,23 @@ const extractError = async (response: Response): Promise<string> => {
   return `Request failed (${response.status})`;
 };
 
+/**
+ * Called once, from the root layout, with Clerk's signOut.
+ *
+ * Registered centrally rather than handled per screen: a rejected session is
+ * not a failure the caller can do anything about, and offering "Try again" on
+ * a dead token invites exactly the retry storm this app already hit. Seven
+ * screens make authenticated calls; each one wiring its own 401 branch would be
+ * seven chances to forget.
+ */
+let onUnauthorized: (() => void) | null = null;
+
+export const setUnauthorizedHandler = (handler: (() => void) | null) => {
+  onUnauthorized = handler;
+};
+
+const SESSION_EXPIRED = "Your session has expired. Please sign in again.";
+
 const request = async <T>(
   path: string,
   { method = "GET", token, body }: RequestOptions = {},
@@ -110,6 +127,13 @@ const request = async <T>(
   });
 
   if (!response.ok) {
+    // 401 means the token is gone or rejected. Sign out so the auth gate moves
+    // the user to the sign-in screen, and report it as a settled state rather
+    // than something to retry.
+    if (response.status === 401) {
+      onUnauthorized?.();
+      throw new ApiError(401, SESSION_EXPIRED);
+    }
     throw new ApiError(response.status, await extractError(response));
   }
 

@@ -19,7 +19,7 @@ const BrandScreen = () => {
     return { brand, products };
   }, [uuid]);
 
-  const { data, error, loading, reload } = useAsync(load);
+  const { data, error, loading, reload } = useAsync(load, uuid);
 
   if (loading || error || !data) {
     return (

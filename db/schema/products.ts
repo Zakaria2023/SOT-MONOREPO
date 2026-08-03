@@ -95,21 +95,19 @@ export const Products = mysqlTable(
     // immediately applies to every product in it.
     specValues: json("spec_values").$type<ProductValues>(),
 
-    // A frozen snapshot of the pre-migration values: the old string-keyed,
-    // string-valued map, kept only as a safety net now that `specValues` has been
-    // backfilled from it.
+    // `technical_attributes` used to sit here — the pre-migration string-keyed
+    // value map, kept as a safety net after specValues was backfilled from it.
+    // Removed from the schema now that specValues has been in production long
+    // enough: nothing read it, nothing wrote it, and leaving it declared meant
+    // every product query dragged a JSON blob across the wire to render cards
+    // that never opened it.
     //
-    // NOTHING reads it. It is not a fallback and must never become one — two
-    // value maps would be two sources of truth, which is the problem the uuid
-    // keying was introduced to end. Drop it once the storefront has been
-    // verified:
+    // The column is still in the database. Drop it when convenient:
     //
     //   ALTER TABLE Products DROP COLUMN technical_attributes;
     //
-    // then delete this column from the schema.
-    technicalAttributes: json("technical_attributes").$type<
-      Record<string, string>
-    >(),
+    // Until then drizzle-kit will offer to drop it for you — that one is safe to
+    // accept, unlike its enum rewrites.
 
     // State & ordering
     status: mysqlEnum("status", productStatuses).default("in_stock"),

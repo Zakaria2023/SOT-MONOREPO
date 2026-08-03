@@ -1,8 +1,8 @@
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
-import type { ProductListItem } from "services";
+import type { ProductSummary } from "services";
 
 type ProductSectionProps = {
-  products: ProductListItem[];
+  products: ProductSummary[];
   discountPercent?: number;
 };
 

@@ -23,7 +23,12 @@ export const OffersSection = ({
   const [error, setError] = useState<string | undefined>(undefined);
   const [pendingUuid, setPendingUuid] = useState<string | null>(null);
 
-  const selected = offers.find((offer) => offer.status === "selected");
+  // `some`, not `find`: the only question is whether a pick exists, and no field
+  // of the picked offer is read. It also reads as what it is — a check over a
+  // list this component already renders in full — rather than looking like a
+  // lookup that should have been a query. Fetching the selected offer separately
+  // would be a second round trip for a row already in this array.
+  const hasSelection = offers.some((offer) => offer.status === "selected");
 
   const onSelect = (offerUuid: string) => {
     setPendingUuid(offerUuid);
@@ -88,7 +93,7 @@ export const OffersSection = ({
         ))}
       </div>
 
-      {selected ? (
+      {hasSelection ? (
         <div className="mt-8 flex flex-col items-start gap-3 rounded-[18px] border border-search-border bg-hover/40 p-6">
           <p className="font-grotesk text-sm text-secondary">
             You picked{" "}

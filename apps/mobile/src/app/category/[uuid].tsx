@@ -28,7 +28,7 @@ const CategoryScreen = () => {
     return { category, facets, products };
   }, [uuid, getToken]);
 
-  const { data, error, loading, reload } = useAsync(load);
+  const { data, error, loading, reload } = useAsync(load, uuid);
 
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
