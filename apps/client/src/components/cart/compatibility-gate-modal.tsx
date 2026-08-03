@@ -87,7 +87,7 @@ export const CompatibilityGateModal = ({
             <button
               type="button"
               onClick={onContinue}
-              className="font-grotesk inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+              className="font-grotesk inline-flex items-center gap-2 rounded-xl bg-primary-solid px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-solid-hover"
             >
               Continue anyway
               <ArrowRight size={15} />

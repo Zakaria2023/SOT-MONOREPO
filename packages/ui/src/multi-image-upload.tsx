@@ -111,7 +111,10 @@ export const MultiImageUpload = ({
               src={previewFor(documentId)}
               alt="Sub image"
               fill
-              unoptimized
+              sizes="64px"
+              // See image-upload: a blob: URL from the local file picker cannot
+              // be optimized, a stored document can.
+              unoptimized={previewFor(documentId).startsWith("blob:")}
               className="object-cover"
             />
             <button

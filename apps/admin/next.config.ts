@@ -38,12 +38,14 @@ const nextConfig: NextConfig = {
   },
   transpilePackages: ["storage", "ui"],
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.r2.cloudflarestorage.com",
-      },
-    ],
+    // No remotePatterns any more. The R2 wildcard that used to sit here could
+    // never have worked — <Image> pointed at /api/documents/{id}/download, and
+    // next/image refuses to follow that route's 302 regardless of which hosts
+    // are allowed — while leaving our optimizer willing to fetch and re-serve
+    // any bucket on that domain. Images now go through
+    // /api/documents/{id}/image, which is same-origin.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+    formats: ["image/avif", "image/webp"],
   },
 };
 

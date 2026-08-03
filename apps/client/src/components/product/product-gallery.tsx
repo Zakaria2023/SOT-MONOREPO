@@ -1,6 +1,6 @@
 "use client";
 
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { useState, type ReactNode } from "react";
@@ -57,10 +57,13 @@ export const ProductGallery = ({
             // rather than mutating one whose `src` changed — which is what stops
             // the previous picture lingering while the next decodes.
             key={shown}
-            src={documentDownloadUrl(shown)}
+            src={documentImageUrl(shown)}
             alt={name}
             fill
-            unoptimized
+            sizes="(min-width: 1024px) 45vw, 100vw"
+            // The product page's LCP. Lazy-loading it means the largest element
+            // on the page is only requested after layout settles.
+            priority
             className="object-contain p-16"
           />
         ) : (
@@ -91,10 +94,10 @@ export const ProductGallery = ({
                 }`}
               >
                 <Image
-                  src={documentDownloadUrl(imageId)}
+                  src={documentImageUrl(imageId)}
                   alt=""
                   fill
-                  unoptimized
+                  sizes="96px"
                   className="object-contain p-2"
                 />
               </button>

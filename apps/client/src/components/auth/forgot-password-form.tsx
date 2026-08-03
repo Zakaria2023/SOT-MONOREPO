@@ -63,7 +63,7 @@ export const ForgotPasswordForm = () => {
           <button
             type="submit"
             disabled={isPending}
-            className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+            className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
           >
             {isPending ? "Sending…" : "Send reset code"}
             <ArrowRight size={18} />
@@ -123,7 +123,7 @@ export const ForgotPasswordForm = () => {
           <button
             type="submit"
             disabled={isPending}
-            className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+            className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
           >
             {isPending ? "Resetting…" : "Reset password"}
             <ArrowRight size={18} />

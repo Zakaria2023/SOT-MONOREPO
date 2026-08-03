@@ -88,7 +88,7 @@ export const SignInForm = () => {
             className={cn(
               "flex h-5 w-5 items-center justify-center rounded-md border transition-colors",
               keepSignedIn
-                ? "border-primary bg-primary"
+                ? "border-primary bg-primary-solid"
                 : "border-search-border bg-surface",
             )}
           >
@@ -108,7 +108,7 @@ export const SignInForm = () => {
         <button
           type="submit"
           disabled={isPending}
-          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
         >
           {isPending ? "Signing in…" : "Sign in"}
           <ArrowRight size={18} />

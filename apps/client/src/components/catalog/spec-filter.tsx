@@ -53,7 +53,7 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
                   className={cn(
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
                     checked
-                      ? "border-primary bg-primary text-white"
+                      ? "border-primary bg-primary-solid text-white"
                       : "border-[#D6D3E0] bg-surface",
                   )}
                 >

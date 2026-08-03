@@ -2,12 +2,16 @@ import { CartView } from "@/components/cart/cart-view";
 import { GuestCartView } from "@/components/cart/guest-cart-view";
 import { getCurrentUser } from "@/lib/auth";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import { getCart, isProfileComplete } from "services";
 
-export const metadata: Metadata = {
-  title: "Your cart · Stratum",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Your cart",
+  description: "Review the hardware in your cart before checking out.",
+  path: "/cart",
+  noIndex: true,
+});
 
 const CartPage = async () => {
   const user = await getCurrentUser();

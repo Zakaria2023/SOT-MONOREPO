@@ -1,12 +1,16 @@
 import { OffersList } from "@/components/offers/offers-list";
 import { getCurrentUser } from "@/lib/auth";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getOffersForUser } from "services";
 
-export const metadata: Metadata = {
-  title: "Your offers · Stratum",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Your offers",
+  description: "Offers prepared against your bills of quantities.",
+  path: "/offers",
+  noIndex: true,
+});
 
 const OffersPage = async () => {
   const user = await getCurrentUser();

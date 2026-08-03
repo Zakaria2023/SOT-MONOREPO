@@ -1,4 +1,4 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
@@ -58,10 +58,10 @@ export const CategorySection = ({ categories }: CategorySectionProps) => {
                   <div className="relative min-h-0 flex-1 overflow-hidden bg-surface-2">
                     {category.image ? (
                       <Image
-                        src={documentDownloadUrl(category.image)}
+                        src={documentImageUrl(category.image)}
                         alt={category.name}
                         fill
-                        unoptimized
+                        sizes="(min-width: 768px) 33vw, 100vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (

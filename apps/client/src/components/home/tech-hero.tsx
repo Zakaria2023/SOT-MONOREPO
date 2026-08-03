@@ -33,23 +33,20 @@ export const TechHero = () => (
       <div className="absolute inset-0 [background-image:radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
     </div>
 
-    <div className="relative mx-auto grid items-center gap-14 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 xl:px-20">
-      <div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan shadow-[0_0_8px_rgba(34,211,238,0.9)]" />
-          <span className="font-mono text-[11.5px] tracking-[0.06em] text-accent-cyan uppercase">
-            Enterprise Network Deployment
-          </span>
-        </span>
-
-        <h1 className="font-display mt-6 text-[clamp(38px,5vw,58px)] leading-[1.03] font-bold tracking-[-0.03em]">
+    {/* `min-w-0` on both cells: a grid child defaults to min-width:auto, so the
+        canvas could otherwise claim more than its track and squeeze the copy.
+        The lg two-column split itself is left alone — it measures fine at
+        1024. */}
+    <div className="relative mx-auto grid items-center gap-10 px-6 py-14 sm:gap-14 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-12 xl:px-20">
+      <div className="min-w-0">
+        <h1 className="font-display text-[clamp(38px,5vw,58px)] leading-[1.03] font-bold tracking-[-0.03em]">
           <span className="block text-ink">Your enterprise network,</span>
           <span className="text-accent-gradient block">
             quoted and ready to build.
           </span>
         </h1>
 
-        <p className="font-grotesk mt-6 max-w-[30rem] text-[17px] leading-relaxed text-muted">
+        <p className="font-grotesk mt-6 max-w-120 text-base leading-relaxed text-muted sm:text-[17px]">
           Gateway, switching, WiFi 6 and surveillance — configured, delivered
           and installed by SOT Solutions. Review it, accept it, track it.
         </p>
@@ -94,7 +91,9 @@ export const TechHero = () => (
         </div>
       </div>
 
-      <div className="relative h-[440px]">
+      {/* Hidden below lg: on a phone it sits under the copy rather than beside
+          it, and 440px of WebGL is a lot of screen to spend there. */}
+      <div className="relative hidden min-w-0 lg:block lg:h-110">
         <div
           aria-hidden="true"
           className="animate-orb-pulse absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(124,110,255,0.4),transparent_70%)] blur-2xl"

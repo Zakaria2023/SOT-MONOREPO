@@ -61,7 +61,7 @@ export const CompleteProfileForm = ({
                 className={cn(
                   "rounded-lg py-2 text-sm font-semibold capitalize transition-colors",
                   type === option
-                    ? "bg-primary text-white"
+                    ? "bg-primary-solid text-white"
                     : "text-muted hover:text-ink",
                 )}
               >
@@ -201,7 +201,7 @@ export const CompleteProfileForm = ({
         <button
           type="submit"
           disabled={isPending}
-          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-60"
+          className="font-grotesk mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-solid py-3.5 text-base font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.6)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
         >
           {isPending ? "Saving…" : "Save & continue"}
           <ArrowRight size={18} />

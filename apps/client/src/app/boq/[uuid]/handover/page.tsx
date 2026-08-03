@@ -1,14 +1,18 @@
 import { HandoverView } from "@/components/handover/handover-view";
 import { getCurrentUser } from "@/lib/auth";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { getCustomerHandover, getUserBoq } from "services";
 
-export const metadata: Metadata = {
-  title: "Handover · Stratum",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Handover",
+  description: "Installation handover and sign-off for your deployment.",
+  path: "/boq",
+  noIndex: true,
+});
 
 type Props = {
   params: Promise<{ uuid: string }>;

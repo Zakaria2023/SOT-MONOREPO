@@ -1,16 +1,18 @@
 import { ClassificationFilter } from "@/components/category/classification-filter";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { getCategories, getClassifications } from "services";
 
-export const metadata: Metadata = {
-  title: "Solutions · SOT Solutions",
+export const metadata: Metadata = pageMetadata({
+  title: "Solutions",
   description:
     "Shop by solution — add a whole category of networking, infrastructure or security hardware to your deployment.",
-};
+  path: "/categories",
+});
 
 // Reads the live category tree and has no dynamic API of its own, so it would
 // otherwise be prerendered once at build and serve a frozen tree on live —
@@ -67,7 +69,7 @@ const CategoriesPage = async ({ searchParams }: Props) => {
               </p>
             ) : (
               <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {visibleCategories.map((category) => (
+                {visibleCategories.map((category, index) => (
                   <li key={category.uuid}>
                     <Link
                       href={`/products?category=${category.uuid}`}
@@ -76,10 +78,11 @@ const CategoriesPage = async ({ searchParams }: Props) => {
                       <div className="relative h-40 w-full shrink-0 overflow-hidden bg-surface-2">
                         {category.image ? (
                           <Image
-                            src={documentDownloadUrl(category.image)}
+                            src={documentImageUrl(category.image)}
                             alt={category.name}
                             fill
-                            unoptimized
+                            sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
+                            priority={index < 3}
                             className="object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                         ) : (

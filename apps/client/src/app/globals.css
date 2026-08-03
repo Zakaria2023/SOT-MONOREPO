@@ -1,23 +1,50 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Newsreader:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @source "../../../../packages/ui/src";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
+/* Fonts come from next/font (see app/layout.tsx), which self-hosts them and
+   emits the --font-* variables below onto <html>.
+
+   They used to arrive via `@import url(fonts.googleapis.com)` at the top of
+   this file, which is the worst possible place for them: the browser has to
+   fetch and parse this stylesheet before it even learns a second origin is
+   involved, then pay DNS + TCP + TLS to Google, fetch another stylesheet, and
+   only then start on the font files. Four serial round trips ahead of the
+   first paint. Self-hosted, they are same-origin and preloaded.
+
+   `inline` so the generated utilities resolve the chain at use time rather
+   than baking in a literal. */
+@theme inline {
   /* "Twemoji Country Flags" (injected by the flag-emoji polyfill) only contains
      flag glyphs, so listing it first renders flags on Windows while all other
      text falls through to the real family. */
-  --font-sans: "Twemoji Country Flags", "Cairo", sans-serif;
-  --font-heading: "Newsreader", serif;
-  --font-grotesk: "Twemoji Country Flags", "Hanken Grotesk", sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Twemoji Country Flags", var(--font-cairo), sans-serif;
+  --font-heading: var(--font-newsreader), serif;
+  --font-grotesk: "Twemoji Country Flags", var(--font-hanken), sans-serif;
+  --font-display: var(--font-space-grotesk), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+}
 
+@theme {
   /* Accent (shared across themes) */
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
   --color-primary-tint: #f4f1fb;
+
+  /* Primary as a FILL sitting behind white text — buttons, badges, avatars.
+     Separate from --color-primary because that token has to do the opposite
+     job in dark mode, and one value cannot do both:
+
+       as text on the dark page (#060a14), it must be light  -> L >= 0.22
+       as a fill under white text, it must be dark           -> L <= 0.18
+
+     Dark mode lightens --color-primary to #8b7bff to satisfy the first, which
+     drops white-on-violet to 3.29:1 and fails WCAG AA. These stay at the light
+     -theme violet in both themes: 5.70:1 with white, and still 3.47:1 against
+     the dark page, so the button is identifiable as a control. */
+  --color-primary-solid: #7c3aed;
+  --color-primary-solid-hover: #6d28d9;
   --color-accent-cyan: #22d3ee;
   --color-accent-violet: #8b7bff;
   --color-success: #34e29b;
@@ -50,6 +77,19 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --animate-orb-pulse: orb-pulse 6s ease-in-out infinite;
+
+  /* Mobile drawer. The easing is deliberately asymmetric: entering uses an
+     out-quint-ish curve that decelerates hard, which reads as the panel being
+     pulled in, while leaving is quicker and linear-ish because nobody wants to
+     wait on a dismissal.
+
+     The two exits hold their last frame with `forwards`. Without it the
+     animation's end state is discarded the instant it finishes and the panel
+     snaps back to fully open for the frame before it unmounts. */
+  --animate-drawer-in: drawer-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-drawer-out: drawer-out 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  --animate-scrim-in: scrim-in 260ms ease-out;
+  --animate-scrim-out: scrim-out 180ms ease-in forwards;
 }
 
 /* Dark theme — token overrides applied when <html> has the .dark class. */
@@ -89,12 +129,95 @@
   background-image: var(--gradient-accent);
 }
 
+/**
+ * Slim themed scrollbar for panes that scroll inside the page rather than with
+ * it — the compare table is the one today.
+ *
+ * The platform default is a chunky grey bar drawn from the OS palette, so in
+ * dark mode it appears as a light slab across a near-black panel with no
+ * relation to anything else on screen. Both properties are needed: the
+ * standard two (Firefox, and Chrome 121+) and the -webkit- pseudo-elements for
+ * Safari and older Chromium.
+ *
+ * `transparent` track rather than a tinted one, so a pane that does not
+ * currently overflow shows no furniture at all.
+ */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-faint) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--color-faint);
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-primary);
+}
+
 /* Gradient-clipped text — headlines. */
 .text-accent-gradient {
   background-image: var(--gradient-accent);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* The drawer's unmount is driven by a timer, not by animationend, so cutting
+   the motion here cannot strand it on screen. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-drawer-in,
+  .animate-drawer-out,
+  .animate-scrim-in,
+  .animate-scrim-out {
+    animation: none;
+  }
 }
 
 @keyframes orb-pulse {

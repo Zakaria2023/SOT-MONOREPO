@@ -10,7 +10,7 @@ import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import type { FormField } from "@/components/products/specification-composer";
 import {
   ArrowUpDown,
@@ -262,7 +262,7 @@ export const ProductForm = (props: ProductFormProps) => {
           submittedRef={hasSubmittedRef}
           previewUrl={
             mode === "edit" && props.product.image
-              ? documentDownloadUrl(props.product.image)
+              ? documentImageUrl(props.product.image)
               : null
           }
         />
@@ -275,7 +275,7 @@ export const ProductForm = (props: ProductFormProps) => {
               label="Sub images"
               value={field.value ?? []}
               onChange={field.onChange}
-              getPreviewUrl={documentDownloadUrl}
+              getPreviewUrl={documentImageUrl}
               onUploadingChange={setIsUploadingSubImages}
             />
           )}

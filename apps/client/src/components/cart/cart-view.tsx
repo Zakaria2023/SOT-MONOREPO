@@ -11,7 +11,7 @@ import { CompatibilityGateModal } from "@/components/cart/compatibility-gate-mod
 import { DesignCheck } from "@/components/cart/design-check";
 import { ProjectQuestions } from "@/components/cart/project-questions";
 import { ProfileGateModal } from "@/components/profile/profile-gate-modal";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import {
   ArrowLeft,
   ArrowRight,
@@ -64,10 +64,10 @@ const CartRow = ({ item, currency, onQuantity, onRemove }: CartRowProps) => (
     <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-primary-tint">
       {item.image ? (
         <Image
-          src={documentDownloadUrl(item.image)}
+          src={documentImageUrl(item.image)}
           alt={item.name}
           fill
-          unoptimized
+          sizes="64px"
           className="object-contain p-2"
         />
       ) : (
@@ -201,7 +201,7 @@ const BoqSubmitButton = () => {
     <button
       type="submit"
       disabled={pending}
-      className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-70"
+      className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary-solid px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-70"
     >
       {pending ? (
         <>

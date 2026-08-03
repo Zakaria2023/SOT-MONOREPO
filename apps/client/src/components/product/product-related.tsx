@@ -1,4 +1,4 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { formatPrice } from "utils";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
@@ -37,10 +37,10 @@ export const ProductRelated = ({ products }: ProductRelatedProps) => {
               {product.image ? (
                 <div className="relative h-10 w-10">
                   <Image
-                    src={documentDownloadUrl(product.image)}
+                    src={documentImageUrl(product.image)}
                     alt={product.name}
                     fill
-                    unoptimized
+                    sizes="40px"
                     className="object-contain"
                   />
                 </div>

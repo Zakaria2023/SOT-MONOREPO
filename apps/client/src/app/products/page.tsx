@@ -2,6 +2,7 @@ import { CatalogView } from "@/components/catalog/catalog-view";
 import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
 import { parseSpecParams } from "utils";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import {
   getBrands,
@@ -13,11 +14,23 @@ import {
   type CategoryFacet,
 } from "services";
 
-export const metadata: Metadata = {
-  title: "Catalog · SOT Solutions",
+// The canonical is the bare /products on purpose. Every facet and sort
+// combination renders a reshuffle of the same catalog, and left self-canonical
+// they would compete with each other as thousands of near-duplicates.
+export const metadata: Metadata = pageMetadata({
+  title: "Catalog",
   description:
-    "Browse the full range of networking, passive infrastructure and security hardware.",
-};
+    "Browse the full range of networking, passive infrastructure and security hardware — filter by category, brand and technical specification.",
+  path: "/products",
+  keywords: [
+    "network switches",
+    "wireless access points",
+    "structured cabling",
+    "racks and enclosures",
+    "CCTV cameras",
+    "access control",
+  ],
+});
 
 type Props = {
   searchParams: Promise<{

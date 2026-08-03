@@ -1,15 +1,17 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { getBrands } from "services";
 
-export const metadata: Metadata = {
-  title: "Brands · SOT Solutions",
+export const metadata: Metadata = pageMetadata({
+  title: "Brands",
   description:
     "Shop by brand — explore hardware from the industry's leading manufacturers, unified under a single platform.",
-};
+  path: "/brands",
+});
 
 const BrandsPage = async () => {
   const brands = await getBrands();
@@ -34,7 +36,7 @@ const BrandsPage = async () => {
           </p>
         ) : (
           <ul className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {brands.map((brand) => (
+            {brands.map((brand, index) => (
               <li key={brand.uuid}>
                 <Link
                   href={`/brands/${brand.uuid}`}
@@ -51,10 +53,11 @@ const BrandsPage = async () => {
                     <div className="flex h-18 w-18 items-center justify-center overflow-hidden rounded-2xl border border-hairline bg-surface shadow-md ring-4 ring-surface">
                       {brand.image ? (
                         <Image
-                          src={documentDownloadUrl(brand.image)}
+                          src={documentImageUrl(brand.image)}
                           alt={brand.name}
                           fill
-                          unoptimized
+                          sizes="72px"
+                          priority={index < 3}
                           className="object-contain p-2.5"
                         />
                       ) : (

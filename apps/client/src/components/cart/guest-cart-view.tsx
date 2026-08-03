@@ -4,7 +4,7 @@ import { previewGuestCart } from "@/app/cart/actions";
 import { useCompatibility } from "@/app/cart/use-compatibility";
 import { DesignCheck } from "@/components/cart/design-check";
 import { ProjectQuestions } from "@/components/cart/project-questions";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import {
   removeFromGuestCart,
   setGuestCartQuantity,
@@ -124,10 +124,10 @@ export const GuestCartView = () => {
                     <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-primary-tint">
                       {item.image ? (
                         <Image
-                          src={documentDownloadUrl(item.image)}
+                          src={documentImageUrl(item.image)}
                           alt={item.name}
                           fill
-                          unoptimized
+                          sizes="64px"
                           className="object-contain p-2"
                         />
                       ) : (
@@ -225,7 +225,7 @@ export const GuestCartView = () => {
 
                 <Link
                   href="/sign-in"
-                  className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-hover"
+                  className="font-grotesk inline-flex items-center justify-center gap-2 rounded-xl bg-primary-solid px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_30px_-8px_rgba(124,58,237,0.5)] transition-all hover:-translate-y-0.5 hover:bg-primary-solid-hover"
                 >
                   Sign in to checkout
                   <ArrowRight size={17} />

@@ -1,6 +1,6 @@
 import { BusinessLineChips } from "@/components/catalog/business-line-chips";
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { Tag } from "lucide-react";
 import Image from "next/image";
 import type { ProductListItem, SelectBrands } from "services";
@@ -26,10 +26,11 @@ export const BrandProducts = ({
         <div className="relative flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-hairline bg-surface-2">
           {brand.image ? (
             <Image
-              src={documentDownloadUrl(brand.image)}
+              src={documentImageUrl(brand.image)}
               alt={brand.name}
               fill
-              unoptimized
+              sizes="96px"
+              priority
               className="object-contain p-3"
             />
           ) : (

@@ -107,7 +107,12 @@ export const ImageUpload = ({
               src={preview}
               alt="Preview"
               fill
-              unoptimized
+              sizes="64px"
+              // Only the just-picked file skips the optimizer: `preview` is a
+              // blob: URL until the upload finishes, and next/image cannot
+              // resize one. Once it is a stored document the URL is a real
+              // endpoint, so let it through.
+              unoptimized={preview.startsWith("blob:")}
               className="object-cover"
             />
           ) : (

@@ -49,8 +49,11 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
       .find((node) => node.uuid === activeLeafUuid) ?? null;
 
   return (
-    <div className="hidden md:block">
-      <div className="flex items-center gap-9">
+    // Appears at xl, not md. At 768-1279 the category row and the action
+    // buttons together exceed the bar, and both wrapped inside its fixed
+    // height — the labels overlapped the theme toggle.
+    <div className="hidden xl:block">
+      <div className="flex items-center gap-6 2xl:gap-9">
         {categories.map((parent) => (
           <button
             key={parent.uuid}
@@ -66,7 +69,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
           >
             {parent.name}
             {activeTopUuid === parent.uuid && (
-              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-solid" />
             )}
           </button>
         ))}

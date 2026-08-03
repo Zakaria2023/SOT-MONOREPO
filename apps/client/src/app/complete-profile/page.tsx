@@ -1,13 +1,17 @@
 import { AuthShell } from "@/components/auth/auth-shell";
 import { CompleteProfileForm } from "@/components/profile/complete-profile-form";
 import { getCurrentUser } from "@/lib/auth";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isProfileComplete } from "services";
 
-export const metadata: Metadata = {
-  title: "Complete your profile · Stratum",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Complete your profile",
+  description: "Add the details we need before your first order.",
+  path: "/complete-profile",
+  noIndex: true,
+});
 
 type Props = {
   searchParams: Promise<{ next?: string }>;

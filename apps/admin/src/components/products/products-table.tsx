@@ -4,7 +4,7 @@ import type { ProductListItem } from "services";
 import { ProductRowActions } from "@/components/products/product-row-actions";
 import type { ProductStatus } from "@/db/enum";
 import { PRODUCT_STATUS_LABELS } from "@/db/label";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
 import type { TableColumn } from "ui";
@@ -32,11 +32,10 @@ const columns: TableColumn<ProductListItem>[] = [
     render: (product) =>
       product.image ? (
         <Image
-          src={documentDownloadUrl(product.image)}
+          src={documentImageUrl(product.image)}
           alt={product.name}
           width={40}
           height={40}
-          unoptimized
           className="h-10 w-10 rounded-control object-cover"
         />
       ) : (

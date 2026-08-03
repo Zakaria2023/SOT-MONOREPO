@@ -1,4 +1,4 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -32,26 +32,35 @@ export const ProductCompare = ({
         {current.categoryName ?? "the same category"}.
       </p>
 
-      <div className="mt-8 overflow-x-auto">
+      {/* The highlight is an alpha of --color-primary rather than
+          --color-primary-tint. That token is a solid #f4f1fb built to sit on
+          bg-surface (white); against bg-page (#f5f4fa) it resolves to
+          (244,242,250) versus the page's (245,244,250) — off by one or two per
+          channel, so the light theme showed no highlighted column at all. An
+          alpha composites against whatever is actually behind it, which is what
+          makes one value work in both themes. */}
+      <div className="scrollbar-slim mt-8 overflow-x-auto">
         <table className="w-full min-w-160 border-collapse">
           <thead>
             <tr>
-              <th className="w-44" />
+              {/* Sticky so the attribute names stay put while the columns
+                  scroll past them. Opaque, or the scrolled cells show through. */}
+              <th className="sticky left-0 z-10 w-44 bg-page" />
               {products.map((product) => {
                 const isCurrent = product.uuid === current.uuid;
                 return (
                   <th
                     key={product.uuid}
-                    className={`p-5 align-bottom ${isCurrent ? "rounded-t-card bg-primary-tint/50" : ""}`}
+                    className={`p-5 align-bottom ${isCurrent ? "rounded-t-card bg-primary/10" : ""}`}
                   >
                     <div className="flex flex-col items-center gap-2">
                       <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-control border border-hairline bg-surface">
                         {product.image ? (
                           <Image
-                            src={documentDownloadUrl(product.image)}
+                            src={documentImageUrl(product.image)}
                             alt={product.name}
                             fill
-                            unoptimized
+                            sizes="48px"
                             className="object-contain p-1.5"
                           />
                         ) : (
@@ -65,7 +74,7 @@ export const ProductCompare = ({
                         {product.name}
                       </Link>
                       {isCurrent && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">
+                        <span className="rounded-full bg-primary-solid px-2 py-0.5 text-xs font-semibold text-white">
                           This product
                         </span>
                       )}
@@ -78,13 +87,15 @@ export const ProductCompare = ({
           <tbody>
             {rows.map((row) => (
               <tr key={row.uuid} className="border-t border-hairline">
-                <td className="py-3.5 pr-4 text-sm text-faint">{row.label}</td>
+                <td className="sticky left-0 z-10 bg-page py-3.5 pr-4 text-sm text-faint">
+                  {row.label}
+                </td>
                 {products.map((product) => {
                   const isCurrent = product.uuid === current.uuid;
                   return (
                     <td
                       key={product.uuid}
-                      className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary-tint/30 font-semibold text-ink" : "text-muted"}`}
+                      className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary/6 font-semibold text-ink" : "text-muted"}`}
                     >
                       {row.values[product.uuid] ?? "—"}
                     </td>

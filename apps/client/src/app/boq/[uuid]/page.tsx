@@ -1,13 +1,17 @@
 import { BoqView } from "@/components/boq/boq-view";
 import { OffersSection } from "@/components/boq/offers-section";
 import { getCurrentUser } from "@/lib/auth";
+import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getApprovedOffersForUser, getUserBoq } from "services";
 
-export const metadata: Metadata = {
-  title: "Your BOQ · Stratum",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Your bill of quantities",
+  description: "The hardware list for your deployment, and the offers on it.",
+  path: "/boq",
+  noIndex: true,
+});
 
 type Props = {
   params: Promise<{ uuid: string }>;
