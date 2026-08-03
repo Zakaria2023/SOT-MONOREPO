@@ -30,7 +30,9 @@ const BrandsScreen = () => {
       contentContainerStyle={styles.content}
       data={data}
       keyExtractor={(item) => item.uuid}
-      renderItem={({ item }) => <BrandRow brand={item} />}
+      renderItem={({ item, index }) => (
+        <BrandRow brand={item} last={index === (data?.length ?? 0) - 1} />
+      )}
     />
   );
 };

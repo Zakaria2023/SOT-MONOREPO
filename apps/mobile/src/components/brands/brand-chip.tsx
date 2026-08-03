@@ -2,22 +2,26 @@ import { documentUrl } from "@/lib/api";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, spacing, tabular, type } from "@/lib/theme";
 import type { Brand } from "@/lib/types";
 
 type BrandChipProps = {
   brand: Brand;
 };
 
-// Logo tile overlapping a gradient band, centered name — the client's brand
-// card, condensed for a horizontal scroller.
+/**
+ * A brand in a horizontal scroller: bordered square well, name beneath.
+ *
+ * The gold band and the overlapping tile are gone. A filled colour block was the
+ * loudest thing in any row it appeared in, and it repeated — six of them across a
+ * scroller read as a toolbar rather than a list of makers.
+ */
 export const BrandChip = ({ brand }: BrandChipProps) => (
   <Link href={`/brand/${brand.uuid}`} asChild>
     <Pressable
       style={({ pressed }) => [styles.chip, pressed ? styles.pressed : null]}
     >
-      <View style={[styles.band, { backgroundColor: colors.primary }]} />
-      <View style={styles.logoTile}>
+      <View style={styles.well}>
         {brand.image ? (
           <Image
             source={documentUrl(brand.image)}
@@ -28,59 +32,51 @@ export const BrandChip = ({ brand }: BrandChipProps) => (
           <Text style={styles.initial}>{brand.name.charAt(0)}</Text>
         )}
       </View>
+
       <Text style={styles.name} numberOfLines={1}>
         {brand.name}
       </Text>
+      {typeof brand.productCount === "number" ? (
+        <Text style={styles.count}>{brand.productCount}</Text>
+      ) : null}
     </Pressable>
   </Link>
 );
 
 const styles = StyleSheet.create({
   chip: {
-    width: 130,
+    width: 104,
     alignItems: "center",
-    paddingBottom: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-    ...shadow.card,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  pressed: {
-    opacity: 0.92,
-  },
-  band: {
-    height: 26,
-    width: "100%",
-  },
-  logoTile: {
-    width: 60,
-    height: 60,
-    marginTop: -22,
-    borderRadius: radius.card,
-    backgroundColor: colors.surfaceAlt,
+  pressed: { backgroundColor: colors.hover },
+  well: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
+    padding: spacing.md,
   },
-  logo: {
-    width: "100%",
-    height: "100%",
-  },
+  logo: { width: "100%", height: "100%" },
   initial: {
     color: colors.primary,
-    fontFamily: fonts.bold,
-    fontSize: 26,
+    fontFamily: fonts.display,
+    fontSize: 28,
   },
   name: {
     color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    paddingHorizontal: spacing.sm,
+    fontFamily: fonts.heading,
+    fontSize: type.body.size,
     textAlign: "center",
+  },
+  count: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    ...tabular,
   },
 });

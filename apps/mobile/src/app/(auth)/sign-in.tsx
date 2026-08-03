@@ -1,6 +1,4 @@
 import { useSignIn } from "@clerk/clerk-expo";
-import { LinearGradient } from "expo-linear-gradient";
-import { Zap } from "lucide-react-native";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -13,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { TextField } from "@/components/ui/text-field";
 import { clerkErrorMessage } from "@/lib/clerk-error";
-import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, spacing, tracking } from "@/lib/theme";
 
 type Stage = "email" | "code";
 
@@ -79,19 +77,12 @@ const SignInScreen = () => {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient
-        colors={[
-          "rgba(139,123,255,0.18)",
-          "rgba(34,211,238,0.06)",
-          "transparent",
-        ]}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.glow}
-      />
       <View style={styles.inner}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-          <Zap color={colors.onAccent} size={28} />
+        {/* An outlined mark with the wordmark inside it. The filled gold square
+            was the only solid colour block left in the app, and at 64px it was
+            also the first thing the eye landed on. */}
+        <View style={styles.logo}>
+          <Text style={styles.logoMark}>SOT</Text>
         </View>
 
         <Eyebrow label={stage === "email" ? "Welcome back" : "Verify"} />
@@ -152,13 +143,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  glow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 360,
-  },
   inner: {
     flex: 1,
     justifyContent: "center",
@@ -166,18 +150,25 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   logo: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.card,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.md,
-    ...shadow.glow,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignSelf: "flex-start",
+    marginBottom: spacing.lg,
+  },
+  logoMark: {
+    color: colors.primary,
+    fontFamily: fonts.heading,
+    fontSize: 13,
+    letterSpacing: tracking.wordmark,
+    textTransform: "uppercase",
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.monoBold,
-    fontSize: 32,
+    fontFamily: fonts.display,
+    fontSize: 34,
     letterSpacing: -0.5,
   },
   subtitle: {

@@ -1,4 +1,3 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -6,10 +5,10 @@ import { BrandChip } from "@/components/brands/brand-chip";
 import { CategoryRow } from "@/components/categories/category-row";
 import { ProductCard } from "@/components/products/product-card";
 import { SectionHeader } from "@/components/home/section-header";
-import { Eyebrow } from "@/components/ui/eyebrow";
+import { Kicker, Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
 import { fetchBrands, fetchCategories, fetchProducts } from "@/lib/api";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tracking, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const HomeScreen = () => {
@@ -46,22 +45,22 @@ const HomeScreen = () => {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* A masthead, not a hero. The wordmark and a kicker sit either side of a
+          hairline, the way a title page carries a running head. */}
+      <View style={styles.masthead}>
+        <Text style={styles.wordmark}>SOT</Text>
+        <Text style={styles.mastheadKicker}>Catalogue</Text>
+      </View>
+      <Rule />
+
       <View style={styles.hero}>
-        <LinearGradient
-          colors={[
-            "rgba(139,123,255,0.22)",
-            "rgba(34,211,238,0.10)",
-            "transparent",
-          ]}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.heroGlow}
-        />
-        <Eyebrow label="Smart Infrastructure" />
-        <Text style={styles.heroTitle}>Build your network with SOT</Text>
+        <Kicker label="Smart Infrastructure" />
+        <Text style={styles.heroTitle}>
+          Build your network,{"\n"}
+          <Text style={styles.heroTitleItalic}>piece by piece</Text>
+        </Text>
         <Text style={styles.heroSubtitle}>
-          Browse products, compare brands and build your cart — all in one
-          place.
+          Browse products, compare brands and build your cart — all in one place.
         </Text>
       </View>
 
@@ -94,8 +93,13 @@ const HomeScreen = () => {
             onSeeAll={() => router.push("/categories")}
           />
           <View style={styles.categoryList}>
-            {data.categories.slice(0, 4).map((category) => (
-              <CategoryRow key={category.uuid} category={category} />
+            {data.categories.slice(0, 4).map((category, index, shown) => (
+              <CategoryRow
+                key={category.uuid}
+                category={category}
+                index={index}
+                last={index === shown.length - 1}
+              />
             ))}
           </View>
         </View>
@@ -129,35 +133,53 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    paddingVertical: spacing.lg,
+    paddingBottom: spacing.xxxl,
     gap: spacing.xxl,
-    paddingBottom: spacing.xxl,
   },
+  masthead: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  wordmark: {
+    color: colors.text,
+    fontFamily: fonts.heading,
+    fontSize: 13,
+    letterSpacing: tracking.wordmark,
+    textTransform: "uppercase",
+  },
+  mastheadKicker: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+  },
+  // No card, no border, no fill. The hero is type on the paper.
   hero: {
-    marginHorizontal: spacing.lg,
-    padding: spacing.xl,
-    borderRadius: radius.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    overflow: "hidden",
+    paddingHorizontal: spacing.lg,
     gap: spacing.md,
-  },
-  heroGlow: {
-    ...StyleSheet.absoluteFillObject,
   },
   heroTitle: {
     color: colors.text,
-    fontFamily: fonts.monoBold,
-    fontSize: 32,
-    lineHeight: 36,
-    letterSpacing: -0.5,
+    fontFamily: fonts.display,
+    fontSize: type.displayLarge.size,
+    lineHeight: type.displayLarge.line,
+  },
+  // Emphasis by italic, because nothing here is bold.
+  heroTitleItalic: {
+    fontFamily: fonts.displayItalic,
+    color: colors.primary,
   },
   heroSubtitle: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
+    maxWidth: 300,
   },
   section: {
     paddingHorizontal: spacing.lg,
@@ -170,8 +192,11 @@ const styles = StyleSheet.create({
   tile: {
     width: 168,
   },
+  // No gap: the rows draw their own hairlines, and a gap between them would
+  // leave the rules floating apart instead of reading as one ruled list.
   categoryList: {
-    gap: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
 });
 

@@ -1,37 +1,44 @@
-import { documentUrl } from "@/lib/api";
-import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { ChevronRight, LayoutGrid } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, fonts, radius, shadow, spacing, type } from "@/lib/theme";
+import { Numeral } from "@/components/ui/editorial";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import type { Category } from "@/lib/types";
 
 type CategoryRowProps = {
   category: Category;
+  /** Position in the list, rendered as a gold 01/02/03 numeral. */
+  index?: number;
+  last?: boolean;
 };
 
-// A horizontal row with a small image tile, not a full-bleed photo card with
-// white text on a dark scrim. Category art here is inconsistent — logos,
-// product shots, sometimes nothing — and the old overlay was only legible
-// because the dark theme could hide it under near-black. On paper the label
-// belongs beside the image, where it always reads.
-export const CategoryRow = ({ category }: CategoryRowProps) => (
+/**
+ * A hairline-divided row: gold tabular numeral, serif name, quiet meta line.
+ *
+ * The image tile is gone. Category art here is inconsistent — logos, product
+ * shots, often nothing — so a 56px thumbnail column was mostly an empty grey
+ * square with an icon in it, repeated down the page. A numbered index is honest
+ * about what these are (an ordered contents list) and gives the eye something
+ * regular to travel down.
+ */
+export const CategoryRow = ({
+  category,
+  index,
+  last = false,
+}: CategoryRowProps) => (
   <Link href={`/category/${category.uuid}`} asChild>
     <Pressable
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.row,
+        last ? null : styles.divided,
+        pressed ? styles.pressed : null,
+      ]}
     >
-      <View style={styles.tile}>
-        {category.image ? (
-          <Image
-            source={documentUrl(category.image)}
-            style={styles.image}
-            contentFit="cover"
-            transition={150}
-          />
-        ) : (
-          <LayoutGrid color={colors.faint} size={22} />
-        )}
-      </View>
+      {typeof index === "number" ? (
+        <View style={styles.numeral}>
+          <Numeral value={index + 1} />
+        </View>
+      ) : null}
 
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={1}>
@@ -44,7 +51,7 @@ export const CategoryRow = ({ category }: CategoryRowProps) => (
         </Text>
       </View>
 
-      <ChevronRight color={colors.faint} size={18} />
+      <ChevronRight color={colors.faint} size={16} />
     </Pressable>
   </Link>
 );
@@ -54,34 +61,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.card,
+    minHeight: 44,
+    paddingVertical: spacing.md,
+  },
+  divided: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   pressed: { backgroundColor: colors.hover },
-  tile: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.control,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  image: { width: "100%", height: "100%" },
-  body: { flex: 1, gap: 2 },
+  // Fixed width so the names align down the page regardless of the numeral.
+  numeral: { width: 22 },
+  body: { flex: 1, gap: 3 },
   name: {
     color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: type.body.size,
-    lineHeight: type.body.line,
+    fontFamily: fonts.heading,
+    fontSize: type.title.size,
+    lineHeight: type.title.line,
   },
   meta: {
     color: colors.faint,
-    fontFamily: fonts.regular,
+    fontFamily: fonts.body,
     fontSize: type.caption.size,
     lineHeight: type.caption.line,
   },

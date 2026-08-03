@@ -30,7 +30,13 @@ const CategoriesScreen = () => {
       contentContainerStyle={styles.content}
       data={data}
       keyExtractor={(item) => item.uuid}
-      renderItem={({ item }) => <CategoryRow category={item} />}
+      renderItem={({ item, index }) => (
+        <CategoryRow
+          category={item}
+          index={index}
+          last={index === (data?.length ?? 0) - 1}
+        />
+      )}
     />
   );
 };

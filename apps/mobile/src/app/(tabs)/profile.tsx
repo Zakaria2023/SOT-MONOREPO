@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Handshake,
   Layers,
+  LogOut,
   Package,
   ReceiptText,
 } from "lucide-react-native";
@@ -11,39 +12,90 @@ import { useCallback } from "react";
 import type { ComponentType } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
+import { Kicker, Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
 import { fetchMe } from "@/lib/api";
-import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
+import {
+  colors,
+  fonts,
+  radius,
+  spacing,
+  tabular,
+  tracking,
+  type,
+} from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
-type ProfileRowProps = {
+type DetailRowProps = {
   label: string;
   value: string | null;
+  /** Shown beside an empty value, so a gap reads as an invitation not a blank. */
+  addLabel?: string;
+  last?: boolean;
 };
 
 type LinkRowProps = {
   href: "/brands" | "/offers" | "/orders" | "/partner";
   label: string;
   icon: ComponentType<{ color: string; size: number }>;
+  last?: boolean;
 };
 
-const ProfileRow = ({ label, value }: ProfileRowProps) => (
-  <View style={styles.field}>
-    <Text style={styles.label}>{label}</Text>
-    <Text style={styles.value}>{value ?? "—"}</Text>
+/**
+ * A detail row: uppercase letterspaced label above its value, hairline beneath.
+ *
+ * No card, no shadow. The old version wrapped these three in a white panel, which
+ * made them look like a form — and there is nothing here to submit.
+ *
+ * A missing value reads as italic grey "Not provided" with a small gold "Add"
+ * beside it. An empty row that says nothing looks like a bug; one that offers the
+ * fix reads as a prompt.
+ */
+const DetailRow = ({
+  label,
+  value,
+  addLabel,
+  last = false,
+}: DetailRowProps) => (
+  <View style={[styles.detailRow, last ? null : styles.divided]}>
+    <View style={styles.detailBody}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      {value ? (
+        <Text style={styles.detailValue}>{value}</Text>
+      ) : (
+        <Text style={styles.detailEmpty}>Not provided</Text>
+      )}
+    </View>
+
+    {!value && addLabel ? (
+      <Pressable
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={`${addLabel} ${label.toLowerCase()}`}
+        style={({ pressed }) => [
+          styles.addWrap,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        <Text style={styles.addText}>{addLabel}</Text>
+      </Pressable>
+    ) : null}
   </View>
 );
 
-const LinkRow = ({ href, label, icon: Icon }: LinkRowProps) => (
+/** An account link: gold outline icon, serif label, grey chevron. No tinted tile. */
+const LinkRow = ({ href, label, icon: Icon, last = false }: LinkRowProps) => (
   <Link href={href} asChild>
     <Pressable
-      style={({ pressed }) => [styles.linkRow, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.linkRow,
+        last ? null : styles.divided,
+        pressed ? styles.pressed : null,
+      ]}
     >
-      <View style={styles.linkIcon}>
-        <Icon color={colors.primary} size={18} />
-      </View>
+      <Icon color={colors.primary} size={18} />
       <Text style={styles.linkLabel}>{label}</Text>
-      <ChevronRight color={colors.faint} size={18} />
+      <ChevronRight color={colors.faint} size={16} />
     </Pressable>
   </Link>
 );
@@ -78,6 +130,12 @@ const ProfileScreen = () => {
 
   const name = data.fullName ?? user?.fullName ?? "SOT customer";
   const initial = name.charAt(0).toUpperCase();
+  const email = data.email ?? user?.primaryEmailAddress?.emailAddress ?? null;
+  // Clerk's createdAt is the only join date available — the profile row carries
+  // none, so the line is omitted rather than invented if it is missing.
+  const memberSince = user?.createdAt
+    ? new Date(user.createdAt).getFullYear()
+    : null;
 
   return (
     <ScrollView
@@ -85,134 +143,188 @@ const ProfileScreen = () => {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.header}>
+        <Text style={styles.wordmark}>SOT</Text>
+        <Text style={styles.headerKicker}>Account</Text>
+      </View>
+      <Rule />
+
+      {/* The initial in a gold OUTLINE circle, not a filled disc — 82px of solid
+          gold would be the loudest thing in the app by a distance. */}
       <View style={styles.identity}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{initial}</Text>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarLetter}>{initial}</Text>
         </View>
         <Text style={styles.name}>{name}</Text>
-        {data.company ? (
-          <Text style={styles.company}>{data.company}</Text>
+        {memberSince ? (
+          <Text style={styles.since}>Member since {memberSince}</Text>
         ) : null}
       </View>
+      <Rule />
 
-      <View style={styles.card}>
-        <ProfileRow
-          label="Email"
-          value={data.email ?? user?.primaryEmailAddress?.emailAddress ?? null}
+      <View style={styles.details}>
+        <DetailRow label="Email" value={email} addLabel="Add" />
+        <DetailRow label="Phone" value={data.phone} addLabel="Add" />
+        <DetailRow label="Company" value={data.company} addLabel="Add" last />
+      </View>
+      <Rule />
+
+      <View style={styles.section}>
+        <Kicker label="Your account" />
+        <View style={styles.links}>
+          <LinkRow href="/brands" label="Browse brands" icon={Layers} />
+          <LinkRow href="/offers" label="Your offers" icon={ReceiptText} />
+          <LinkRow href="/orders" label="Your orders" icon={Package} />
+          <LinkRow
+            href="/partner"
+            label="Become a partner"
+            icon={Handshake}
+            last
+          />
+        </View>
+      </View>
+
+      <View style={styles.signOut}>
+        <Button
+          label="Sign out"
+          variant="outline"
+          icon={LogOut}
+          onPress={() => signOut()}
         />
-        <View style={styles.divider} />
-        <ProfileRow label="Phone" value={data.phone} />
-        <View style={styles.divider} />
-        <ProfileRow label="Company" value={data.company} />
       </View>
-
-      <View style={styles.links}>
-        <LinkRow href="/brands" label="Browse brands" icon={Layers} />
-        <LinkRow href="/offers" label="Your offers" icon={ReceiptText} />
-        <LinkRow href="/orders" label="Your orders" icon={Package} />
-        <LinkRow href="/partner" label="Become a partner" icon={Handshake} />
-      </View>
-
-      <Button label="Sign out" variant="outline" onPress={() => signOut()} />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { paddingBottom: spacing.xxxl },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  content: {
-    padding: spacing.lg,
-    gap: spacing.xl,
-    paddingBottom: spacing.xxl,
+  wordmark: {
+    color: colors.text,
+    fontFamily: fonts.heading,
+    fontSize: 13,
+    letterSpacing: tracking.wordmark,
+    textTransform: "uppercase",
   },
+  headerKicker: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+  },
+
   identity: {
     alignItems: "center",
-    gap: spacing.sm,
-    paddingTop: spacing.md,
+    gap: spacing.md,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   avatar: {
-    width: 84,
-    height: 84,
+    width: 82,
+    height: 82,
     borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
     alignItems: "center",
     justifyContent: "center",
-    ...shadow.glow,
   },
-  avatarText: {
-    color: colors.onAccent,
-    fontFamily: fonts.monoBold,
+  avatarLetter: {
+    color: colors.primary,
+    fontFamily: fonts.display,
     fontSize: 34,
+    // The serif's optical centre sits above its metric one at this size.
+    marginTop: 4,
   },
   name: {
     color: colors.text,
-    fontFamily: fonts.bold,
-    fontSize: 26,
+    fontFamily: fonts.display,
+    fontSize: type.display.size,
+    lineHeight: type.display.line,
+    textAlign: "center",
   },
-  company: {
-    color: colors.muted,
+  since: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+    ...tabular,
+  },
+
+  details: { paddingHorizontal: spacing.lg },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.lg,
+    minHeight: 44,
+    paddingVertical: spacing.md,
+  },
+  divided: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailBody: { flex: 1, gap: 4 },
+  detailLabel: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: 9,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
+  },
+  detailValue: {
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
+  },
+  detailEmpty: {
+    color: colors.faint,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
+  },
+  addWrap: { paddingBottom: 2, justifyContent: "flex-end", minHeight: 44 },
+  addText: {
+    color: colors.primary,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primaryBorder,
+    paddingBottom: 3,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    ...shadow.card,
+
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    gap: spacing.lg,
   },
-  links: {
-    gap: spacing.md,
-  },
+  links: { borderTopWidth: 1, borderTopColor: colors.border },
   linkRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  linkIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.control,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primaryTint,
-  },
-  pressed: {
-    opacity: 0.9,
+    minHeight: 44,
+    paddingVertical: spacing.md,
   },
   linkLabel: {
     flex: 1,
     color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 15,
+    fontFamily: fonts.heading,
+    fontSize: type.title.size,
   },
-  field: {
-    gap: 3,
-  },
-  label: {
-    color: colors.faint,
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  value: {
-    color: colors.text,
-    fontFamily: fonts.medium,
-    fontSize: 17,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.md,
+  pressed: { backgroundColor: colors.hover },
+
+  signOut: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xxl,
   },
 });
 
