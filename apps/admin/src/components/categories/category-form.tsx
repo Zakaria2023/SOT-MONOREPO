@@ -10,7 +10,7 @@ import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectClassifications } from "@/db/schema/classifications";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { Layers, Tags } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
@@ -105,7 +105,7 @@ export const CategoryForm = (props: CategoryFormProps) => {
         submittedRef={hasSubmittedRef}
         previewUrl={
           mode === "edit" && props.category.image
-            ? documentDownloadUrl(props.category.image)
+            ? documentImageUrl(props.category.image)
             : null
         }
       />

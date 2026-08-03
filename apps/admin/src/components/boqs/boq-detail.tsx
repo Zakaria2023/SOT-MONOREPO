@@ -1,4 +1,4 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import {
   BOQ_ITEM_ROLE_LABELS,
   BOQ_LINE_TYPE_LABELS,
@@ -26,11 +26,10 @@ const ItemCard = ({ item, currency }: ItemCardProps) => (
     <div className="shrink-0">
       {item.productImage ? (
         <Image
-          src={documentDownloadUrl(item.productImage)}
+          src={documentImageUrl(item.productImage)}
           alt={item.name}
           width={64}
           height={64}
-          unoptimized
           className="h-16 w-16 rounded-control object-cover"
         />
       ) : (

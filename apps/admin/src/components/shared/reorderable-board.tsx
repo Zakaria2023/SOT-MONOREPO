@@ -30,7 +30,7 @@ import {
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 
 // The minimal shape the board needs from a category/brand list item — both
 // satisfy it, so one board serves both pages. `childCount` is the card's own
@@ -157,11 +157,10 @@ const CardContent = <T extends BoardItem>({
 
       {item.image ? (
         <Image
-          src={documentDownloadUrl(item.image)}
+          src={documentImageUrl(item.image)}
           alt={item.name}
           width={40}
           height={40}
-          unoptimized
           className="h-10 w-10 shrink-0 rounded-control border border-hairline object-cover"
         />
       ) : (

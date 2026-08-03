@@ -1,6 +1,6 @@
 import type { BoqItemRole, ProductStatus } from "@/db/enum";
 import { BOQ_ITEM_ROLE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { ArrowLeft, FileText, ImageOff, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -100,11 +100,10 @@ export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
             <div className="overflow-hidden rounded-card border border-hairline bg-page">
               {product.image ? (
                 <Image
-                  src={documentDownloadUrl(product.image)}
+                  src={documentImageUrl(product.image)}
                   alt={product.name}
                   width={640}
                   height={640}
-                  unoptimized
                   className="h-72 w-full object-contain"
                 />
               ) : (
@@ -118,11 +117,10 @@ export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
                 {gallery.map((image) => (
                   <Image
                     key={image}
-                    src={documentDownloadUrl(image)}
+                    src={documentImageUrl(image)}
                     alt={product.name}
                     width={64}
                     height={64}
-                    unoptimized
                     className="h-16 w-16 rounded-control border border-hairline object-cover"
                   />
                 ))}
@@ -243,7 +241,7 @@ export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
                 value={
                   product.datasheet ? (
                     <a
-                      href={documentDownloadUrl(product.datasheet)}
+                      href={documentImageUrl(product.datasheet)}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 text-primary hover:underline"

@@ -9,7 +9,7 @@ import { ImageUpload } from "ui";
 import { Input } from "ui";
 import { Textarea } from "ui";
 import type { SelectBrands } from "@/db/schema/brands";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { Award } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
@@ -99,7 +99,7 @@ export const BrandForm = (props: BrandFormProps) => {
         submittedRef={hasSubmittedRef}
         previewUrl={
           mode === "edit" && props.brand.image
-            ? documentDownloadUrl(props.brand.image)
+            ? documentImageUrl(props.brand.image)
             : null
         }
       />
