@@ -7,7 +7,7 @@ import { ProductsGrid } from "@/components/products/products-grid";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ListState } from "@/components/ui/list-state";
 import { fetchCategory, fetchCategoryFacets, fetchProducts } from "@/lib/api";
-import { colors, fonts, spacing, type } from "@/lib/theme";
+import { colors, fonts, spacing, tabular, tracking, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 import type { Product } from "@/lib/types";
 
@@ -127,29 +127,40 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.bold,
+    fontFamily: fonts.display,
     fontSize: type.display.size,
     lineHeight: type.display.line,
   },
+  // Italic, because the parent is an aside about where you are — the same
+  // mechanism the hero uses for emphasis, only quieter.
   parent: {
     color: colors.muted,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.bodyItalic,
     fontSize: type.body.size,
   },
+  // The toolbar sits between two hairlines, so the filters read as apparatus
+  // belonging to the list below rather than as part of the title above.
   tools: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
   },
   count: {
     color: colors.faint,
-    fontFamily: fonts.medium,
-    fontSize: type.caption.size,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+    ...tabular,
   },
 });
 

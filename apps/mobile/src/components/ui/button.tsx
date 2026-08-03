@@ -18,6 +18,8 @@ type ButtonProps = {
   variant?: "primary" | "outline" | "ghost" | "danger";
   size?: "md" | "lg";
   icon?: IconType;
+  /** Where the icon sits. Forward actions read better with it trailing. */
+  iconSide?: "leading" | "trailing";
   full?: boolean;
 };
 
@@ -41,6 +43,7 @@ export const Button = ({
   variant = "primary",
   size = "lg",
   icon: Icon,
+  iconSide = "leading",
   full = true,
 }: ButtonProps) => {
   const isDisabled = disabled || loading;
@@ -78,8 +81,13 @@ export const Button = ({
         <ActivityIndicator color={contentColor} size="small" />
       ) : (
         <View style={styles.content}>
-          {Icon ? <Icon color={contentColor} size={17} /> : null}
+          {Icon && iconSide === "leading" ? (
+            <Icon color={contentColor} size={17} />
+          ) : null}
           <Text style={[styles.label, { color: contentColor }]}>{label}</Text>
+          {Icon && iconSide === "trailing" ? (
+            <Icon color={contentColor} size={17} />
+          ) : null}
         </View>
       )}
     </Pressable>

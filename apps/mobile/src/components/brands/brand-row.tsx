@@ -21,38 +21,46 @@ type BrandRowProps = {
  */
 export const BrandRow = ({ brand, last = false }: BrandRowProps) => (
   <Link href={`/brand/${brand.uuid}`} asChild>
-    <Pressable
-      style={({ pressed }) => [
-        styles.row,
-        last ? null : styles.divided,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <View style={styles.well}>
-        {brand.image ? (
-          <Image
-            source={documentUrl(brand.image)}
-            style={styles.logo}
-            contentFit="contain"
-          />
-        ) : (
-          <Text style={styles.initial}>{brand.name.charAt(0)}</Text>
-        )}
-      </View>
+    {/* No style prop on the Pressable: under asChild the web build assigns the
+          cloned child's style straight onto the DOM node, so a style function is
+          dropped and a style array throws. Everything visual lives on the View
+          inside, and the press state arrives through the children function. */}
+    <Pressable>
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.row,
+            last ? null : styles.divided,
+            pressed ? styles.pressed : null,
+          ]}
+        >
+          <View style={styles.well}>
+            {brand.image ? (
+              <Image
+                source={documentUrl(brand.image)}
+                style={styles.logo}
+                contentFit="contain"
+              />
+            ) : (
+              <Text style={styles.initial}>{brand.name.charAt(0)}</Text>
+            )}
+          </View>
 
-      <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={1}>
-          {brand.name}
-        </Text>
-        {typeof brand.productCount === "number" ? (
-          <Text style={styles.count}>
-            {brand.productCount}{" "}
-            {brand.productCount === 1 ? "product" : "products"}
-          </Text>
-        ) : null}
-      </View>
+          <View style={styles.body}>
+            <Text style={styles.name} numberOfLines={1}>
+              {brand.name}
+            </Text>
+            {typeof brand.productCount === "number" ? (
+              <Text style={styles.count}>
+                {brand.productCount}{" "}
+                {brand.productCount === 1 ? "product" : "products"}
+              </Text>
+            ) : null}
+          </View>
 
-      <ChevronRight color={colors.faint} size={16} />
+          <ChevronRight color={colors.faint} size={16} />
+        </View>
+      )}
     </Pressable>
   </Link>
 );

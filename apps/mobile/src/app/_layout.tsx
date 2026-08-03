@@ -57,10 +57,17 @@ const AuthGate = () => {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
+        // The navigation bar is the same paper as the page — a half-step lighter
+        // surface behind it drew a band across the top of every pushed screen.
+        headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
+        // A serif running head. This is the one piece of chrome every pushed
+        // screen shares, so a grotesk bold here undid the editorial voice before
+        // the page below had a chance. React Navigation accepts only family,
+        // size, weight and colour here, so the wordmark's letterspacing cannot
+        // follow it up into the bar.
         headerTitleStyle: {
-          fontFamily: fonts.bold,
+          fontFamily: fonts.heading,
           fontSize: type.title.size,
           color: colors.text,
         },

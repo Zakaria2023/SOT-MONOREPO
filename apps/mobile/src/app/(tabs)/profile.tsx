@@ -14,6 +14,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Kicker, Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
+import { Masthead } from "@/components/ui/masthead";
 import { fetchMe } from "@/lib/api";
 import {
   colors,
@@ -86,16 +87,24 @@ const DetailRow = ({
 /** An account link: gold outline icon, serif label, grey chevron. No tinted tile. */
 const LinkRow = ({ href, label, icon: Icon, last = false }: LinkRowProps) => (
   <Link href={href} asChild>
-    <Pressable
-      style={({ pressed }) => [
-        styles.linkRow,
-        last ? null : styles.divided,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <Icon color={colors.primary} size={18} />
-      <Text style={styles.linkLabel}>{label}</Text>
-      <ChevronRight color={colors.faint} size={16} />
+    {/* No style prop on the Pressable: under asChild the web build assigns the
+          cloned child's style straight onto the DOM node, so a style function is
+          dropped and a style array throws. Everything visual lives on the View
+          inside, and the press state arrives through the children function. */}
+    <Pressable>
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.linkRow,
+            last ? null : styles.divided,
+            pressed ? styles.pressed : null,
+          ]}
+        >
+          <Icon color={colors.primary} size={18} />
+          <Text style={styles.linkLabel}>{label}</Text>
+          <ChevronRight color={colors.faint} size={16} />
+        </View>
+      )}
     </Pressable>
   </Link>
 );
@@ -143,10 +152,7 @@ const ProfileScreen = () => {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
-        <Text style={styles.wordmark}>SOT</Text>
-        <Text style={styles.headerKicker}>Account</Text>
-      </View>
+      <Masthead label="Account" />
       <Rule />
 
       {/* The initial in a gold OUTLINE circle, not a filled disc — 82px of solid
@@ -199,28 +205,6 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { paddingBottom: spacing.xxxl },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  wordmark: {
-    color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 13,
-    letterSpacing: tracking.wordmark,
-    textTransform: "uppercase",
-  },
-  headerKicker: {
-    color: colors.faint,
-    fontFamily: fonts.body,
-    fontSize: type.kicker.size,
-    letterSpacing: tracking.label,
-    textTransform: "uppercase",
-  },
 
   identity: {
     alignItems: "center",

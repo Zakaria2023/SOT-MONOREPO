@@ -115,6 +115,9 @@ const TabsLayout = () => {
         name="index"
         options={{
           title: "Home",
+          // The screens below carry their own masthead, so the navigation header
+          // would be a second title for the same page.
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Home color={color} size={22} strokeWidth={2} />
           ),
@@ -124,6 +127,7 @@ const TabsLayout = () => {
         name="products"
         options={{
           title: "Products",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Package color={color} size={22} strokeWidth={2} />
           ),
@@ -133,6 +137,7 @@ const TabsLayout = () => {
         name="categories"
         options={{
           title: "Categories",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <LayoutGrid color={color} size={22} strokeWidth={2} />
           ),
@@ -150,7 +155,8 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "Account",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <User color={color} size={22} strokeWidth={2} />
           ),

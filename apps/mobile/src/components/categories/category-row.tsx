@@ -27,31 +27,39 @@ export const CategoryRow = ({
   last = false,
 }: CategoryRowProps) => (
   <Link href={`/category/${category.uuid}`} asChild>
-    <Pressable
-      style={({ pressed }) => [
-        styles.row,
-        last ? null : styles.divided,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      {typeof index === "number" ? (
-        <View style={styles.numeral}>
-          <Numeral value={index + 1} />
+    {/* No style prop on the Pressable: under asChild the web build assigns the
+          cloned child's style straight onto the DOM node, so a style function is
+          dropped and a style array throws. Everything visual lives on the View
+          inside, and the press state arrives through the children function. */}
+    <Pressable>
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.row,
+            last ? null : styles.divided,
+            pressed ? styles.pressed : null,
+          ]}
+        >
+          {typeof index === "number" ? (
+            <View style={styles.numeral}>
+              <Numeral value={index + 1} />
+            </View>
+          ) : null}
+
+          <View style={styles.body}>
+            <Text style={styles.name} numberOfLines={1}>
+              {category.name}
+            </Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {category.productCount}{" "}
+              {category.productCount === 1 ? "product" : "products"}
+              {category.parentName ? ` · ${category.parentName}` : ""}
+            </Text>
+          </View>
+
+          <ChevronRight color={colors.faint} size={16} />
         </View>
-      ) : null}
-
-      <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={1}>
-          {category.name}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {category.productCount}{" "}
-          {category.productCount === 1 ? "product" : "products"}
-          {category.parentName ? ` · ${category.parentName}` : ""}
-        </Text>
-      </View>
-
-      <ChevronRight color={colors.faint} size={16} />
+      )}
     </Pressable>
   </Link>
 );

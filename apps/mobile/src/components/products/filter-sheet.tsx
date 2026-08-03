@@ -8,7 +8,16 @@ import {
   View,
 } from "react-native";
 import { Button } from "@/components/ui/button";
-import { colors, fonts, radius, shadow, spacing, type } from "@/lib/theme";
+import { Kicker } from "@/components/ui/editorial";
+import {
+  colors,
+  fonts,
+  radius,
+  spacing,
+  tabular,
+  tracking,
+  type,
+} from "@/lib/theme";
 import type { SpecFacet } from "@/lib/types";
 
 type FilterSheetProps = {
@@ -45,7 +54,11 @@ const FacetBlock = ({ facet, chosen, onToggle }: FacetBlockProps) => (
           <Pressable
             key={option.value}
             onPress={() => onToggle(option.value)}
-            style={[styles.chip, active ? styles.chipActive : null]}
+            style={({ pressed }) => [
+              styles.chip,
+              active ? styles.chipActive : null,
+              pressed ? styles.chipPressed : null,
+            ]}
             // Colour alone does not tell a screen reader which values are
             // chosen, and these are toggles rather than links.
             accessibilityRole="checkbox"
@@ -109,13 +122,9 @@ export const FilterSheet = ({
           pressed ? styles.triggerPressed : null,
         ]}
       >
-        <SlidersHorizontal color={colors.text} size={16} />
+        <SlidersHorizontal color={colors.primary} size={15} />
         <Text style={styles.triggerText}>Filters</Text>
-        {count > 0 ? (
-          <View style={styles.countPill}>
-            <Text style={styles.countText}>{count}</Text>
-          </View>
-        ) : null}
+        {count > 0 ? <Text style={styles.triggerCount}>{count}</Text> : null}
       </Pressable>
 
       <Modal
@@ -133,7 +142,10 @@ export const FilterSheet = ({
         <View style={styles.sheet}>
           <View style={styles.grabber} />
           <View style={styles.sheetHead}>
-            <Text style={styles.sheetTitle}>Filters</Text>
+            <View style={styles.sheetHeadText}>
+              <Kicker label="Refine" />
+              <Text style={styles.sheetTitle}>Filters</Text>
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={12}
@@ -184,85 +196,89 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     alignSelf: "flex-start",
-    paddingHorizontal: spacing.lg,
-    height: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    minHeight: 44,
+    borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: colors.border,
   },
   triggerPressed: { backgroundColor: colors.hover },
   triggerText: {
     color: colors.text,
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.medium,
     fontSize: type.caption.size,
   },
-  countPill: {
-    minWidth: 20,
-    paddingHorizontal: 6,
-    height: 20,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
+  // A filled gold pill was the loudest thing on the list screen. The tally is
+  // just a gold numeral — tabular, so 1 and 11 do not shift the label.
+  triggerCount: {
+    color: colors.primary,
+    fontFamily: fonts.medium,
+    fontSize: type.caption.size,
+    ...tabular,
   },
-  countText: {
-    color: colors.onAccent,
-    fontFamily: fonts.semibold,
-    fontSize: type.micro.size,
-  },
+  // Warm ink, not the old blue-black: a cool scrim over warm paper reads as a
+  // different app dimming a screenshot of this one.
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(13,17,23,0.35)",
+    backgroundColor: "rgba(32, 31, 29, 0.4)",
   },
+  // Paper, square, and separated from the scrim by a hairline rather than a
+  // shadow — the sheet is a page sliding up, not a card floating over one.
   sheet: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     maxHeight: "80%",
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.panel,
-    borderTopRightRadius: radius.panel,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderStrong,
     paddingBottom: spacing.xxl,
-    ...shadow.raised,
   },
   grabber: {
     alignSelf: "center",
     width: 36,
-    height: 4,
-    borderRadius: radius.pill,
+    height: 1,
     backgroundColor: colors.borderStrong,
     marginTop: spacing.md,
   },
   sheetHead: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
+  sheetHeadText: { gap: spacing.xs },
   sheetTitle: {
     color: colors.text,
-    fontFamily: fonts.bold,
-    fontSize: type.title.size,
+    fontFamily: fonts.display,
+    fontSize: type.heading.size,
+    lineHeight: type.heading.line,
   },
   sheetBody: {
     paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     gap: spacing.xl,
   },
   facet: { gap: spacing.sm },
+  // The same uppercase letterspaced label the profile details use, so a field
+  // name looks like a field name wherever it turns up.
   facetLabel: {
-    color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: type.body.size,
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: 9,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
   },
-  unit: { color: colors.faint, fontFamily: fonts.regular },
+  unit: { color: colors.faint, fontFamily: fonts.bodyItalic },
   hint: {
     color: colors.faint,
-    fontFamily: fonts.regular,
+    fontFamily: fonts.bodyItalic,
     fontSize: type.caption.size,
     marginTop: -2,
   },
@@ -274,28 +290,28 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    justifyContent: "center",
+    minHeight: 44,
     borderRadius: radius.control,
-    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chipActive: {
-    backgroundColor: colors.primaryTint,
-    borderColor: colors.primary,
-  },
+  // Border and label only. The gold tint belongs to hover; using it for the
+  // chosen state as well leaves no way to tell the two apart under a finger.
+  chipActive: { borderColor: colors.primaryBorder },
+  chipPressed: { backgroundColor: colors.pressed },
   chipText: {
     color: colors.muted,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.body,
     fontSize: type.caption.size,
   },
-  chipTextActive: { color: colors.primary, fontFamily: fonts.semibold },
+  chipTextActive: { color: colors.primary, fontFamily: fonts.medium },
   sheetFoot: {
     flexDirection: "row",
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   footGrow: { flex: 1 },

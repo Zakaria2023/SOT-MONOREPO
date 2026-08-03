@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Kicker } from "@/components/ui/editorial";
 import { colors, fonts, spacing, tracking, type } from "@/lib/theme";
 
 type SectionHeaderProps = {
@@ -9,11 +8,15 @@ type SectionHeaderProps = {
 };
 
 /**
- * A section opener: gold kicker, serif title, and a quiet "ALL" link.
+ * A section opener: a grey letterspaced label, a serif title, and a quiet "ALL".
  *
- * The link lost its arrow icon and its bold. In this language a call to action is
- * an underlined uppercase word — an icon beside it competes with the gold kicker
- * two lines above for the same small amount of attention.
+ * The label is grey and ruleless, unlike the gold Kicker that opens a screen. With
+ * every section leading on a gold rule, four of them stacked down the home screen
+ * and the accent stopped being one — the gold that matters here is the "ALL" you
+ * can actually press.
+ *
+ * The link has no arrow and no bold. In this language a call to action is an
+ * underlined uppercase word.
  */
 export const SectionHeader = ({
   eyebrow,
@@ -23,12 +26,15 @@ export const SectionHeader = ({
   <View style={styles.wrap}>
     <View style={styles.row}>
       <View style={styles.headings}>
-        <Kicker label={eyebrow} />
+        <Text style={styles.eyebrow}>{eyebrow}</Text>
         <Text style={styles.title}>{title}</Text>
       </View>
       {onSeeAll ? (
         <Pressable
-          style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [
+            styles.link,
+            pressed ? styles.pressed : null,
+          ]}
           onPress={onSeeAll}
           hitSlop={12}
           accessibilityRole="button"
@@ -49,11 +55,19 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   headings: { flex: 1, gap: spacing.sm },
+  eyebrow: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    lineHeight: type.kicker.line,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
+  },
   title: {
     color: colors.text,
     fontFamily: fonts.display,
-    fontSize: type.heading.size,
-    lineHeight: type.heading.line,
+    fontSize: type.display.size,
+    lineHeight: type.display.line,
   },
   link: {
     minHeight: 44,

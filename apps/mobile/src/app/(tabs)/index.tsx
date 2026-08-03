@@ -1,14 +1,17 @@
-import { useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
+import { ArrowRight, Search, ShoppingCart } from "lucide-react-native";
 import { useCallback } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BrandChip } from "@/components/brands/brand-chip";
 import { CategoryRow } from "@/components/categories/category-row";
-import { ProductCard } from "@/components/products/product-card";
 import { SectionHeader } from "@/components/home/section-header";
+import { ProductCard } from "@/components/products/product-card";
+import { Button } from "@/components/ui/button";
 import { Kicker, Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
+import { Masthead } from "@/components/ui/masthead";
 import { fetchBrands, fetchCategories, fetchProducts } from "@/lib/api";
-import { colors, fonts, spacing, tracking, type } from "@/lib/theme";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const HomeScreen = () => {
@@ -45,29 +48,79 @@ const HomeScreen = () => {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* A masthead, not a hero. The wordmark and a kicker sit either side of a
-          hairline, the way a title page carries a running head. */}
-      <View style={styles.masthead}>
-        <Text style={styles.wordmark}>SOT</Text>
-        <Text style={styles.mastheadKicker}>Catalogue</Text>
-      </View>
+      {/* A title page, not a hero banner: wordmark and standing line to the left,
+          the two things you can do from here to the right. */}
+      <Masthead tagline="Est. network supply">
+        <Link href="/products" asChild>
+          <Pressable
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Search the catalogue"
+          >
+            {({ pressed }) => (
+              <View
+                style={[styles.action, pressed ? styles.actionPressed : null]}
+              >
+                <Search color={colors.text} size={19} strokeWidth={1.6} />
+              </View>
+            )}
+          </Pressable>
+        </Link>
+        <Link href="/cart" asChild>
+          <Pressable
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Your cart"
+          >
+            {({ pressed }) => (
+              <View
+                style={[styles.action, pressed ? styles.actionPressed : null]}
+              >
+                <ShoppingCart color={colors.text} size={19} strokeWidth={1.6} />
+              </View>
+            )}
+          </Pressable>
+        </Link>
+      </Masthead>
       <Rule />
 
       <View style={styles.hero}>
         <Kicker label="Smart Infrastructure" />
         <Text style={styles.heroTitle}>
-          Build your network,{"\n"}
-          <Text style={styles.heroTitleItalic}>piece by piece</Text>
+          Build your network{"\n"}
+          <Text style={styles.heroTitleItalic}>with</Text> SOT
         </Text>
         <Text style={styles.heroSubtitle}>
-          Browse products, compare brands and build your cart — all in one place.
+          Browse products, compare brands and build your cart — all in one
+          place.
         </Text>
+
+        {/* Two outlines, gold and grey: which hairline is gold is the only thing
+            separating the primary action from the secondary one. */}
+        <View style={styles.heroActions}>
+          <Button
+            label="Browse catalogue"
+            icon={ArrowRight}
+            iconSide="trailing"
+            size="md"
+            full={false}
+            onPress={() => router.push("/products")}
+          />
+          <Button
+            label="Request a quote"
+            variant="outline"
+            size="md"
+            full={false}
+            onPress={() => router.push("/cart")}
+          />
+        </View>
       </View>
+      <Rule />
 
       {data.products.length > 0 ? (
         <View style={styles.section}>
           <SectionHeader
-            eyebrow="Catalog"
+            eyebrow="Catalogue"
             title="Featured products"
             onSeeAll={() => router.push("/products")}
           />
@@ -134,33 +187,19 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: spacing.xxxl,
-    gap: spacing.xxl,
   },
-  masthead: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+  action: {
+    minHeight: 44,
+    minWidth: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  wordmark: {
-    color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 13,
-    letterSpacing: tracking.wordmark,
-    textTransform: "uppercase",
-  },
-  mastheadKicker: {
-    color: colors.faint,
-    fontFamily: fonts.body,
-    fontSize: type.kicker.size,
-    letterSpacing: tracking.label,
-    textTransform: "uppercase",
-  },
+  actionPressed: { opacity: 0.5 },
   // No card, no border, no fill. The hero is type on the paper.
   hero: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
     gap: spacing.md,
   },
   heroTitle: {
@@ -169,10 +208,10 @@ const styles = StyleSheet.create({
     fontSize: type.displayLarge.size,
     lineHeight: type.displayLarge.line,
   },
-  // Emphasis by italic, because nothing here is bold.
+  // Emphasis by italic, because nothing here is bold. The italic falls on "with"
+  // rather than the wordmark: SOT is a name and reads wrong leaning.
   heroTitleItalic: {
     fontFamily: fonts.displayItalic,
-    color: colors.primary,
   },
   heroSubtitle: {
     color: colors.muted,
@@ -181,8 +220,15 @@ const styles = StyleSheet.create({
     lineHeight: type.body.line,
     maxWidth: 300,
   },
+  heroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
   section: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
   },
   hScroll: {
     gap: spacing.md,

@@ -1,7 +1,6 @@
 import { documentUrl } from "@/lib/api";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { ImageOff } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Price } from "@/components/ui/editorial";
 import { formatPrice } from "@/lib/format";
@@ -23,40 +22,56 @@ type ProductCardProps = {
  * see the note on `plate`.
  */
 export const ProductCard = ({ product }: ProductCardProps) => (
-  <Link href={`/product/${product.uuid}`} asChild>
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
-    >
-      <View style={styles.mat}>
-        <View style={styles.plate}>
-          {product.image ? (
-            <Image
-              source={documentUrl(product.image)}
-              style={styles.image}
-              contentFit="contain"
-              transition={150}
-            />
-          ) : (
-            <ImageOff color={colors.faint} size={22} />
-          )}
-        </View>
-      </View>
+  // The flex sizing lives on this wrapper, not on the Pressable. Under asChild the
+  // web build renders the Link as an <a> and the child's flex never reaches it, so
+  // each card measured to its longest word and the second grid column ran off the
+  // screen. A plain View outside the link is immune to that.
+  <View style={styles.card}>
+    <Link href={`/product/${product.uuid}`} asChild>
+      {/* No style prop on the Pressable: under asChild the web build assigns the
+          cloned child's style straight onto the DOM node, so a style function is
+          dropped and a style array throws. Everything visual lives on the View
+          inside, and the press state arrives through the children function. */}
+      <Pressable>
+        {({ pressed }) => (
+          <View style={[styles.pressable, pressed ? styles.pressed : null]}>
+            <View style={styles.mat}>
+              <View style={styles.plate}>
+                {product.image ? (
+                  <Image
+                    source={documentUrl(product.image)}
+                    style={styles.image}
+                    contentFit="contain"
+                    transition={150}
+                  />
+                ) : (
+                  <Text style={styles.plateEmpty}>No plate</Text>
+                )}
+              </View>
+            </View>
 
-      <View style={styles.body}>
-        <Text style={styles.kicker} numberOfLines={1}>
-          {product.brandName ?? product.categoryName ?? " "}
-        </Text>
-        <Text style={styles.name} numberOfLines={2}>
-          {product.name}
-        </Text>
-        <Price>{formatPrice(product.price, product.currency)}</Price>
-      </View>
-    </Pressable>
-  </Link>
+            <View style={styles.body}>
+              <Text style={styles.kicker} numberOfLines={1}>
+                {product.brandName ?? product.categoryName ?? " "}
+              </Text>
+              <Text style={styles.name} numberOfLines={2}>
+                {product.name}
+              </Text>
+              <Price>{formatPrice(product.price, product.currency)}</Price>
+            </View>
+          </View>
+        )}
+      </Pressable>
+    </Link>
+  </View>
 );
 
 const styles = StyleSheet.create({
-  card: { flex: 1 },
+  // minWidth 0 next to flex 1: a flex item defaults to min-width auto, so the
+  // longest product name would otherwise become the card's floor and two cards
+  // would measure wider than the screen between them.
+  card: { flex: 1, minWidth: 0 },
+  pressable: { flex: 1 },
   pressed: { backgroundColor: colors.hover },
   // The mat: paper, a half step off the page, 6px on every side.
   mat: {
@@ -75,6 +90,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   image: { width: "100%", height: "100%" },
+  plateEmpty: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
+  },
   body: {
     paddingTop: spacing.md,
     gap: spacing.xs,
