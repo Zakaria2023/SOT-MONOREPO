@@ -11,7 +11,7 @@ import { CompatibilityGateModal } from "@/components/cart/compatibility-gate-mod
 import { DesignCheck } from "@/components/cart/design-check";
 import { ProjectQuestions } from "@/components/cart/project-questions";
 import { ProfileGateModal } from "@/components/profile/profile-gate-modal";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import {
   ArrowLeft,
   ArrowRight,
@@ -64,10 +64,10 @@ const CartRow = ({ item, currency, onQuantity, onRemove }: CartRowProps) => (
     <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-primary-tint">
       {item.image ? (
         <Image
-          src={documentDownloadUrl(item.image)}
+          src={documentImageUrl(item.image)}
           alt={item.name}
           fill
-          unoptimized
+          sizes="64px"
           className="object-contain p-2"
         />
       ) : (

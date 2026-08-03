@@ -1,4 +1,4 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -42,10 +42,10 @@ export const BrandSection = ({ brands }: BrandSectionProps) => (
                 <div className="flex h-18 w-18 items-center justify-center overflow-hidden rounded-2xl border border-hairline bg-surface shadow-md ring-4 ring-surface">
                   {brand.image ? (
                     <Image
-                      src={documentDownloadUrl(brand.image)}
+                      src={documentImageUrl(brand.image)}
                       alt={brand.name}
                       fill
-                      unoptimized
+                      sizes="72px"
                       className="object-contain p-2.5"
                     />
                   ) : (

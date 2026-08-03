@@ -1,7 +1,7 @@
 import { BrandProducts } from "@/components/brand/brand-products";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getCachedBrand } from "@/lib/data";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { clampDescription, pageMetadata } from "@/lib/seo";
 import { breadcrumbNode, collectionNode, graph } from "@/lib/structured-data";
@@ -30,7 +30,7 @@ export const generateMetadata = async ({
         `${brand.name} networking, infrastructure and security hardware, supplied and installed by SOT Solutions in Saudi Arabia.`,
     ),
     path: `/brands/${brand.uuid}`,
-    image: brand.image ? documentDownloadUrl(brand.image) : null,
+    image: brand.image ? documentImageUrl(brand.image) : null,
     imageAlt: brand.name,
     keywords: [brand.name, `${brand.name} Saudi Arabia`],
   });

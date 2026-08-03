@@ -4,7 +4,7 @@ import { previewGuestCart } from "@/app/cart/actions";
 import { useCompatibility } from "@/app/cart/use-compatibility";
 import { DesignCheck } from "@/components/cart/design-check";
 import { ProjectQuestions } from "@/components/cart/project-questions";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import {
   removeFromGuestCart,
   setGuestCartQuantity,
@@ -124,10 +124,10 @@ export const GuestCartView = () => {
                     <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-primary-tint">
                       {item.image ? (
                         <Image
-                          src={documentDownloadUrl(item.image)}
+                          src={documentImageUrl(item.image)}
                           alt={item.name}
                           fill
-                          unoptimized
+                          sizes="64px"
                           className="object-contain p-2"
                         />
                       ) : (

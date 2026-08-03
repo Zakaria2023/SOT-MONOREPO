@@ -2,7 +2,7 @@
 
 import { addProductToCart } from "@/app/cart/actions";
 import { ProductPrice } from "@/components/shared/product-price";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { addToGuestCart } from "@/lib/guest-cart";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@clerk/nextjs";
@@ -17,12 +17,20 @@ type CatalogProductCardProps = {
   view: "grid" | "list";
   // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
   discountPercent?: number;
+  /**
+   * Set on the cards that start above the fold. It preloads the thumbnail rather
+   * than lazy-loading it, which is what lets one of these be the LCP instead of
+   * something the browser only discovers after layout. Leave it off further down
+   * the grid — priority on everything is the same as priority on nothing.
+   */
+  priority?: boolean;
 };
 
 type ThumbProps = {
   product: ProductListItem;
   className: string;
   iconSize: number;
+  priority: boolean;
 };
 
 type MetaProps = {
@@ -33,7 +41,7 @@ type AddButtonProps = {
   product: ProductListItem;
 };
 
-const Thumb = ({ product, className, iconSize }: ThumbProps) => (
+const Thumb = ({ product, className, iconSize, priority }: ThumbProps) => (
   <div
     className={cn(
       "relative flex items-center justify-center overflow-hidden bg-surface-2",
@@ -46,10 +54,11 @@ const Thumb = ({ product, className, iconSize }: ThumbProps) => (
     />
     {product.image ? (
       <Image
-        src={documentDownloadUrl(product.image)}
+        src={documentImageUrl(product.image)}
         alt={product.name}
         fill
-        unoptimized
+        sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
+        priority={priority}
         className="object-contain p-4"
       />
     ) : (
@@ -128,6 +137,7 @@ export const CatalogProductCard = ({
   product,
   view,
   discountPercent = 0,
+  priority = false,
 }: CatalogProductCardProps) => {
   const price = (
     <ProductPrice
@@ -150,6 +160,7 @@ export const CatalogProductCard = ({
           product={product}
           className="h-24 w-24 shrink-0 rounded-xl"
           iconSize={28}
+          priority={priority}
         />
         <div className="min-w-0 flex-1">
           <Meta product={product} />
@@ -177,7 +188,12 @@ export const CatalogProductCard = ({
         aria-label={`View ${product.name}`}
         className="absolute inset-0 z-10 rounded-2xl focus:outline-none"
       />
-      <Thumb product={product} className="h-44" iconSize={36} />
+      <Thumb
+        product={product}
+        className="h-44"
+        iconSize={36}
+        priority={priority}
+      />
       <div className="flex flex-1 flex-col p-5">
         <Meta product={product} />
         <h3 className="font-heading mt-2 text-lg leading-snug font-bold text-ink">

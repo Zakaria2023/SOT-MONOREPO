@@ -1,4 +1,4 @@
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -48,10 +48,10 @@ export const ProductCompare = ({
                       <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-control border border-hairline bg-surface">
                         {product.image ? (
                           <Image
-                            src={documentDownloadUrl(product.image)}
+                            src={documentImageUrl(product.image)}
                             alt={product.name}
                             fill
-                            unoptimized
+                            sizes="48px"
                             className="object-contain p-1.5"
                           />
                         ) : (

@@ -2,7 +2,7 @@ import { CategorySolution } from "@/components/category/category-solution";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getCurrentUser } from "@/lib/auth";
 import { getCachedCategory } from "@/lib/data";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { clampDescription, pageMetadata } from "@/lib/seo";
 import { breadcrumbNode, collectionNode, graph } from "@/lib/structured-data";
@@ -31,7 +31,7 @@ export const generateMetadata = async ({
         `${category.name} hardware from SOT Solutions — compare specifications, check compatibility, and add a complete ${category.name.toLowerCase()} system to your deployment.`,
     ),
     path: `/categories/${category.uuid}`,
-    image: category.image ? documentDownloadUrl(category.image) : null,
+    image: category.image ? documentImageUrl(category.image) : null,
     imageAlt: category.name,
     keywords: [category.name],
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { type TreeNode } from "@/lib/catalog";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import Image from "next/image";
@@ -62,10 +62,10 @@ const CategoryTreeItem = ({
             >
               {node.image ? (
                 <Image
-                  src={documentDownloadUrl(node.image)}
+                  src={documentImageUrl(node.image)}
                   alt={node.name}
                   fill
-                  unoptimized
+                  sizes="28px"
                   className="object-contain p-0.5"
                 />
               ) : (

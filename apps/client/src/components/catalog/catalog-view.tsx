@@ -302,12 +302,16 @@ export const CatalogView = ({
                   isFiltering && "opacity-60",
                 )}
               >
-                {products.map((product) => (
+                {products.map((product, index) => (
                   <li key={product.uuid}>
                     <CatalogProductCard
                       product={product}
                       view={view}
                       discountPercent={discountPercent}
+                      // Roughly the first grid row at the widest layout. These
+                      // are on screen before any scroll, so they preload rather
+                      // than waiting to be discovered.
+                      priority={index < 3}
                     />
                   </li>
                 ))}

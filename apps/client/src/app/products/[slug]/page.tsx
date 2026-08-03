@@ -5,7 +5,7 @@ import { ProductHero } from "@/components/product/product-hero";
 import { ProductRelated } from "@/components/product/product-related";
 import { ProductSpecs } from "@/components/product/product-specs";
 import { getCachedProductBySlug } from "@/lib/data";
-import { documentDownloadUrl } from "@/lib/documents";
+import { documentImageUrl } from "@/lib/documents";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { clampDescription, pageMetadata } from "@/lib/seo";
 import { breadcrumbNode, graph, productNode } from "@/lib/structured-data";
@@ -71,7 +71,7 @@ export const generateMetadata = async ({
     title: productTitle(product),
     description: productDescription(product),
     path: `/products/${product.slug}`,
-    image: product.image ? documentDownloadUrl(product.image) : null,
+    image: product.image ? documentImageUrl(product.image) : null,
     imageAlt: product.name,
     keywords: [
       product.name,

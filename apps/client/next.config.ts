@@ -29,6 +29,17 @@ if (fs.existsSync(rootEnv)) {
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
+  images: {
+    // Document ids are immutable — uploadDocumentFile mints a fresh randomUUID
+    // and the key is `documents/{id}`, so a body is never rewritten under an
+    // existing id. The optimizer's output can therefore be held for a month
+    // instead of Next's short default, which would otherwise re-fetch and
+    // re-encode the same photo repeatedly.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+    // AVIF first, WebP as the fallback. Supplier photos are large PNGs where the
+    // saving is the difference between a 1.6MB download and single-digit KB.
+    formats: ["image/avif", "image/webp"],
+  },
   experimental: {
     externalDir: true,
     // Requests pass through proxy.ts (Clerk), where Next buffers the body with a
