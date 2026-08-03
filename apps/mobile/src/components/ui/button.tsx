@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { colors, fonts, radius, shadow, spacing, type } from "@/lib/theme";
+import { colors, fonts, radius, spacing, type } from "@/lib/theme";
 
 type IconType = ComponentType<{ color: string; size: number }>;
 
@@ -21,10 +21,18 @@ type ButtonProps = {
   full?: boolean;
 };
 
-// A flat, solid primary. The old one was a three-stop gradient carrying a
-// coloured glow, which drew more attention than whatever it sat beside — on a
-// light UI one confident block of accent reads louder than a gradient, not
-// quieter.
+/**
+ * Every button is a 1px outline on the paper. Nothing is filled.
+ *
+ * `primary` is the gold outline — the only thing separating it from a secondary
+ * action is which colour the hairline and the label are. A solid block of gold
+ * would be the loudest thing on any screen it appeared on, which is the opposite
+ * of what an accent is for, and it would be the only filled shape in a language
+ * built entirely from rules.
+ *
+ * `danger` is likewise an outline. A filled red button in this palette reads as
+ * an error state that has already happened rather than an action you may take.
+ */
 export const Button = ({
   label,
   onPress,
@@ -38,11 +46,13 @@ export const Button = ({
   const isDisabled = disabled || loading;
 
   const contentColor =
-    variant === "primary" || variant === "danger"
-      ? colors.onAccent
-      : variant === "ghost"
-        ? colors.muted
-        : colors.text;
+    variant === "primary"
+      ? colors.primary
+      : variant === "danger"
+        ? colors.danger
+        : variant === "ghost"
+          ? colors.muted
+          : colors.text;
 
   return (
     <Pressable
@@ -58,7 +68,8 @@ export const Button = ({
         variant === "danger" ? styles.dangerVariant : null,
         variant === "outline" ? styles.outline : null,
         variant === "ghost" ? styles.ghost : null,
-        variant === "primary" && !isDisabled ? shadow.glow : null,
+        // Pressed is one ramp step darker, not an opacity fade: fading an outline
+        // makes the hairline disappear rather than respond.
         pressed && !isDisabled ? styles.pressed : null,
         isDisabled ? styles.disabled : null,
       ]}
@@ -67,7 +78,7 @@ export const Button = ({
         <ActivityIndicator color={contentColor} size="small" />
       ) : (
         <View style={styles.content}>
-          {Icon ? <Icon color={contentColor} size={18} /> : null}
+          {Icon ? <Icon color={contentColor} size={17} /> : null}
           <Text style={[styles.label, { color: contentColor }]}>{label}</Text>
         </View>
       )}
@@ -78,34 +89,31 @@ export const Button = ({
 const styles = StyleSheet.create({
   base: {
     borderRadius: radius.control,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xl,
+    backgroundColor: "transparent",
   },
   full: { alignSelf: "stretch" },
   auto: { alignSelf: "flex-start" },
-  lg: { height: 52 },
-  md: { height: 42, paddingHorizontal: spacing.lg },
-  primary: { backgroundColor: colors.primary },
-  dangerVariant: { backgroundColor: colors.danger },
-  outline: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  ghost: { backgroundColor: "transparent" },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
-  // Flat when disabled — a shadow under something you cannot press reads as a
-  // rendering bug.
-  disabled: { opacity: 0.45, shadowOpacity: 0, elevation: 0 },
+  // 48/44 — the spec's 44px floor, with the larger size still comfortable.
+  lg: { height: 48 },
+  md: { height: 44, paddingHorizontal: spacing.lg },
+  primary: { borderColor: colors.primaryBorder },
+  dangerVariant: { borderColor: colors.danger },
+  outline: { borderColor: colors.border },
+  ghost: { borderColor: "transparent" },
+  pressed: { backgroundColor: colors.pressed },
+  disabled: { opacity: 0.4 },
   content: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
   },
   label: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.medium,
     fontSize: type.body.size,
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
   },
 });

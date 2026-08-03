@@ -2,12 +2,14 @@ import { ClerkLoaded, ClerkProvider, useAuth } from "@clerk/clerk-expo";
 // Import each weight from its own subpath rather than the package barrel: the
 // barrel's index.js eagerly requires all 18 weights, which Metro (SDK 52 +
 // pnpm) fails to resolve. The per-weight modules pull a single TTF each.
-import { HankenGrotesk_400Regular } from "@expo-google-fonts/hanken-grotesk/400Regular";
-import { HankenGrotesk_500Medium } from "@expo-google-fonts/hanken-grotesk/500Medium";
-import { HankenGrotesk_600SemiBold } from "@expo-google-fonts/hanken-grotesk/600SemiBold";
-import { HankenGrotesk_700Bold } from "@expo-google-fonts/hanken-grotesk/700Bold";
-import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
-import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk/700Bold";
+import { CormorantGaramond_400Regular } from "@expo-google-fonts/cormorant-garamond/400Regular";
+import { CormorantGaramond_400Regular_Italic } from "@expo-google-fonts/cormorant-garamond/400Regular_Italic";
+import { CormorantGaramond_500Medium } from "@expo-google-fonts/cormorant-garamond/500Medium";
+import { CormorantGaramond_600SemiBold } from "@expo-google-fonts/cormorant-garamond/600SemiBold";
+import { Lora_400Regular } from "@expo-google-fonts/lora/400Regular";
+import { Lora_400Regular_Italic } from "@expo-google-fonts/lora/400Regular_Italic";
+import { Lora_500Medium } from "@expo-google-fonts/lora/500Medium";
+import { Lora_500Medium_Italic } from "@expo-google-fonts/lora/500Medium_Italic";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -91,13 +93,17 @@ const MissingKey = () => (
 );
 
 const RootLayout = () => {
+  // Cormorant Garamond for display, Lora for everything else, each with its
+  // italic — italics carry emphasis here because nothing is bold.
   const [fontsLoaded] = useFonts({
-    HankenGrotesk_400Regular,
-    HankenGrotesk_500Medium,
-    HankenGrotesk_600SemiBold,
-    HankenGrotesk_700Bold,
-    SpaceGrotesk_500Medium,
-    SpaceGrotesk_700Bold,
+    CormorantGaramond_400Regular,
+    CormorantGaramond_400Regular_Italic,
+    CormorantGaramond_500Medium,
+    CormorantGaramond_600SemiBold,
+    Lora_400Regular,
+    Lora_400Regular_Italic,
+    Lora_500Medium,
+    Lora_500Medium_Italic,
   });
 
   if (!fontsLoaded) {
