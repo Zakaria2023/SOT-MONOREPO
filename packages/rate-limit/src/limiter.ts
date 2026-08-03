@@ -1,4 +1,5 @@
 import { createMemoryStore, type CounterStore } from "./store";
+import { createUpstashStore } from "./upstash-store";
 
 export type RateLimitDecision = {
   allowed: boolean;
@@ -24,7 +25,30 @@ export const DEFAULT_LIMIT = 100;
 
 export const DEFAULT_WINDOW_MS = 60_000;
 
-const store: CounterStore = createMemoryStore();
+/**
+ * Shared Redis when it is configured, in-process otherwise.
+ *
+ * Chosen once at module load rather than per request: reading env on every hit
+ * buys nothing, and the choice cannot change while the process lives.
+ *
+ * Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to make the limit
+ * global. Without them the limiter still works and still stops a client looping
+ * — it just counts per instance, so on Vercel the real ceiling is roughly
+ * instances x limit. Enough for a runaway client, not enough for a quota.
+ */
+const selectStore = (): CounterStore => {
+  const memory = createMemoryStore();
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (!url || !token) {
+    return memory;
+  }
+
+  return createUpstashStore({ url, token, fallback: memory });
+};
+
+const store: CounterStore = selectStore();
 
 /**
  * Counts one request against `identity` and says whether to serve it.
