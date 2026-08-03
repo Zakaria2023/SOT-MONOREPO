@@ -10,6 +10,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import type { ListQuery } from "utils";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqStatus } from "../../../db/enum";
@@ -382,19 +383,13 @@ const attachBoqTotals = async <T extends { uuid: string }>(
   });
 };
 
-export type BoqsListParams = {
-  search?: string;
-  limit: number;
-  offset: number;
-};
-
 /**
  * A searched + paginated page of BOQs, each with the customer's name and
  * totals (newest first), plus the unfiltered total for that search. Search
  * matches the BOQ reference or the customer name.
  */
 export const getAllBoqs = async (
-  params: BoqsListParams,
+  params: ListQuery,
 ): Promise<{ items: BoqListItem[]; total: number }> => {
   const term = params.search?.trim();
   const where = term

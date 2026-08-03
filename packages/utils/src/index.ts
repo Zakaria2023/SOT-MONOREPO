@@ -85,12 +85,28 @@ export const buildPaginatedResult = <T>(
  * page's rows and the unfiltered total), and wraps the result. Removes the
  * resolve/build boilerplate repeated across every paginated action.
  */
+/**
+ * A list query after the URL has been resolved into SQL bounds — the other half
+ * of ListParams above, which is what arrives from a query string.
+ *
+ * Named separately and deliberately: ListParams carries `page`/`pageSize` and
+ * this carries `limit`/`offset`, and the two were previously spelled
+ * `BoqListParams` and `BoqsListParams` — one letter apart, different meanings,
+ * both offered by autocomplete. This shape was also redeclared verbatim in four
+ * service files, so a change to one was a change to none of the others.
+ */
+export type ListQuery = {
+  search?: string;
+  limit: number;
+  offset: number;
+};
+
 export const paginate = async <T>(
   params: { page?: number | string | null; pageSize?: number | string | null },
-  fetcher: (args: {
-    limit: number;
-    offset: number;
-  }) => Promise<{ items: T[]; total: number }>,
+  fetcher: (args: Pick<ListQuery, "limit" | "offset">) => Promise<{
+    items: T[];
+    total: number;
+  }>,
 ): Promise<PaginatedResult<T>> => {
   const { page, pageSize, offset } = resolvePagination(
     params.page,

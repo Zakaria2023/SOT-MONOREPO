@@ -9,6 +9,7 @@ import {
   lte,
   or,
 } from "drizzle-orm";
+import type { ListQuery } from "utils";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
@@ -204,19 +205,13 @@ export const createOrUpdateOffer = async (
   return created;
 };
 
-export type OffersListParams = {
-  search?: string;
-  limit: number;
-  offset: number;
-};
-
 /**
  * A searched + paginated page of offers, each with its BOQ reference and
  * customer name (admin review), plus the unfiltered total for that search.
  * Search matches the BOQ reference or the customer name.
  */
 export const listOffers = async (
-  params: OffersListParams,
+  params: ListQuery,
 ): Promise<{ items: OfferListItem[]; total: number }> => {
   const term = params.search?.trim();
   const where = term

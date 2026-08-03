@@ -8,6 +8,7 @@ import {
   like,
   or,
 } from "drizzle-orm";
+import type { ListQuery } from "utils";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import { BoqPartners } from "../../../db/schema/boq-partners";
@@ -152,19 +153,13 @@ export const createPartnerRequest = async (
   return request;
 };
 
-export type PartnerRequestsListParams = {
-  search?: string;
-  limit: number;
-  offset: number;
-};
-
 /**
  * A searched + paginated page of partner requests, newest first (admin review
  * queue), plus the unfiltered total for that search. Search matches the company
  * name, contact full name, or email.
  */
 export const listPartnerRequests = async (
-  params: PartnerRequestsListParams,
+  params: ListQuery,
 ): Promise<{ items: SelectPartnerRequests[]; total: number }> => {
   const term = params.search?.trim();
   const where = term

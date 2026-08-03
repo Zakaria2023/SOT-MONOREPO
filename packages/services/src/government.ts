@@ -1,4 +1,5 @@
 import { and, count, desc, eq, inArray, like, or } from "drizzle-orm";
+import type { ListQuery } from "utils";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
 import {
@@ -89,19 +90,13 @@ export const createGovernmentRequest = async (
   return request;
 };
 
-export type GovernmentRequestsListParams = {
-  search?: string;
-  limit: number;
-  offset: number;
-};
-
 /**
  * A searched + paginated page of government requests, newest first (admin
  * review queue), plus the unfiltered total for that search. Search matches the
  * entity name, contact full name, or official email.
  */
 export const listGovernmentRequests = async (
-  params: GovernmentRequestsListParams,
+  params: ListQuery,
 ): Promise<{ items: SelectGovernmentRequests[]; total: number }> => {
   const term = params.search?.trim();
   const where = term
