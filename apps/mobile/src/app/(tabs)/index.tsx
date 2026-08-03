@@ -9,7 +9,7 @@ import { SectionHeader } from "@/components/home/section-header";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ListState } from "@/components/ui/list-state";
 import { fetchBrands, fetchCategories, fetchProducts } from "@/lib/api";
-import { colors, fonts, gradient, radius, spacing } from "@/lib/theme";
+import { colors, fonts, radius, spacing } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const HomeScreen = () => {

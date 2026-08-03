@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { FilterSheet } from "@/components/products/filter-sheet";
 import { ProductsGrid } from "@/components/products/products-grid";
@@ -35,13 +35,19 @@ const CategoryScreen = () => {
   const [filtered, setFiltered] = useState<Product[] | null>(null);
   const signature = JSON.stringify(selected);
 
+  // Read through a ref so the effect keys on `signature` rather than on the
+  // identity of `selected`, without silencing exhaustive-deps.
+  const latestSelected = useRef(selected);
+  latestSelected.current = selected;
+
   useEffect(() => {
-    if (Object.keys(selected).length === 0) {
+    const chosen = latestSelected.current;
+    if (Object.keys(chosen).length === 0) {
       setFiltered(null);
       return;
     }
     let cancelled = false;
-    fetchProducts({ categoryUuids: [uuid], specValues: selected })
+    fetchProducts({ categoryUuids: [uuid], specValues: chosen })
       .then((rows) => {
         if (!cancelled) {
           setFiltered(rows);

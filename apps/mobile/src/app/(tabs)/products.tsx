@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-expo";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -69,11 +69,18 @@ const ProductsScreen = () => {
     };
   }, [categoryUuid, getToken]);
 
+  // Read through a ref for the same reason as the cart: the effect keys on
+  // `signature`, and depending on the identity of `data` or `selected` would
+  // re-fetch on every render that rebuilt an equal object.
+  const latest = useRef({ data, selected });
+  latest.current = { data, selected };
+
   useEffect(() => {
-    if (!data) {
+    const { data: tree, selected: chosen } = latest.current;
+    if (!tree) {
       return;
     }
-    if (!categoryUuid && Object.keys(selected).length === 0) {
+    if (!categoryUuid && Object.keys(chosen).length === 0) {
       setRows(null);
       return;
     }
@@ -82,11 +89,11 @@ const ProductsScreen = () => {
       // The whole subtree, because products sit in the leaves — filtering to
       // "Networking" alone would come back empty.
       categoryUuids: categoryUuid
-        ? subtreeUuids(data.categories, categoryUuid)
+        ? subtreeUuids(tree.categories, categoryUuid)
         : undefined,
       // …but the facets are the picked category's, so name it separately.
       facetCategoryUuid: categoryUuid ?? undefined,
-      specValues: selected,
+      specValues: chosen,
     })
       .then((next) => {
         if (!cancelled) {
@@ -102,7 +109,7 @@ const ProductsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [categoryUuid, signature, data]);
+  }, [categoryUuid, signature]);
 
   if (loading || error || !data) {
     return (

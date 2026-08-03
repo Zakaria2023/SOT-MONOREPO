@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { CartRow } from "@/components/cart/cart-row";
 import { DesignCheck } from "@/components/cart/design-check";
@@ -73,19 +73,29 @@ const CartScreen = () => {
     .map(([uuid, value]) => `${uuid}=${value}`)
     .join(",");
 
+  // `data` and `answers` are read through refs so the effect can depend on their
+  // signatures instead of their identity. Listing them directly would re-run the
+  // check on every render that produced an equal-but-new array — which is the
+  // shape that had the profile screen firing ~1950 requests at one endpoint.
+  // Refs are not reactive, so exhaustive-deps is satisfied honestly rather than
+  // silenced with a disable comment.
+  const latest = useRef({ data, answers });
+  latest.current = { data, answers };
+
   useEffect(() => {
-    if (!data || data.length === 0) {
+    const { data: lines, answers: currentAnswers } = latest.current;
+    if (!lines || lines.length === 0) {
       setDesign(null);
       return;
     }
     let cancelled = false;
     setChecking(true);
     fetchDesignCheck(
-      data.map((item) => ({
+      lines.map((item) => ({
         productUuid: item.productUuid,
         quantity: item.quantity,
       })),
-      answers,
+      currentAnswers,
     )
       .then((result) => {
         if (!cancelled) {

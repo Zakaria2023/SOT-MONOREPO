@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { TextField } from "@/components/ui/text-field";
 import { clerkErrorMessage } from "@/lib/clerk-error";
-import { colors, fonts, gradient, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
 
 type Stage = "email" | "code";
 
