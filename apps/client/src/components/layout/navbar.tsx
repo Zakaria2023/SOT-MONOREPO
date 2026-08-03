@@ -28,7 +28,7 @@ export const Navbar = async () => {
             <Menu size={20} strokeWidth={2.5} />
           </span>
           <span className="font-heading text-xl text-ink sm:text-2xl">
-            Stratum
+            SOT Solutions
           </span>
         </Link>
 

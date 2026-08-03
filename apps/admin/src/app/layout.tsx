@@ -4,8 +4,8 @@ import { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Stratum Admin",
-  description: "Stratum admin dashboard",
+  title: "SOT Solutions Admin",
+  description: "SOT Solutions admin dashboard",
 };
 
 // Always render against live data — never a build-time static snapshot.

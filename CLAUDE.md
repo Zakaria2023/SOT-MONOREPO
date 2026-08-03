@@ -14,11 +14,14 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 
 **Packages**
 
-- `packages/services` — all business logic lives here as plain, framework-agnostic async functions. No `"use server"`, no request/response objects, no auth checks inside these functions. Every operation (create user, place order, etc.) exists as exactly one function here, called by both Server Actions and Route Handlers.
-- `packages/database` — the only place Drizzle is imported and the only place a DB connection is opened. Nothing outside this package — not the client browser code, not the mobile app — ever talks to the database directly.
+- `packages/services` — all business logic lives here as plain, framework-agnostic async functions. No `"use server"`, no request/response objects, no auth checks inside these functions, and no framework imports at all — that last one is why `next/cache` cannot be used here, so anything that needs caching or revalidation is wrapped in the app layer. Every operation (create user, place order, etc.) exists as exactly one function here, called by both Server Actions and Route Handlers. It is also the only place Drizzle is imported: services own database access, and nothing outside them — not client browser code, not the mobile app — talks to the database directly.
 - `packages/validators` — zod schemas shared between Server Actions and Route Handlers so input validation never drifts between the two.
-- `packages/types` — shared TypeScript types/DTOs.
-- `packages/utils` — framework-agnostic helper functions (formatters, `slugify`, `generateUuid`, etc.) shared across apps, imported from `"utils"`.
+- `packages/utils` — framework-agnostic helper functions (formatters, `slugify`, `generateUuid`, pagination shapes like `ListParams`/`ListQuery`/`PaginatedResult`) shared across apps, imported from `"utils"`. Browser code imports this, so nothing server-only may go here.
+- `packages/storage` — Cloudflare R2 access plus the shared Route Handler bodies for document upload/download/image, so each app's `route.ts` only imports and calls them.
+- `packages/ui` — shared React components (`Dropdown`, `Table`, `ImageUpload`, `useFocusTrap`, …) used by the dashboard apps.
+- `packages/rate-limit` — the request ceiling every app's `proxy.ts`/`middleware.ts` enforces, behind a `CounterStore` interface so the in-process counter can be swapped for a shared one.
+
+The schema and connection live in the repo-root `db/` folder, not in a package — services import it by relative path (`../../../db`). There is no `packages/database` and no `packages/types`; shared types are exported from the package that owns them, usually `services` or `utils`.
 
 **Calling convention**
 
@@ -37,7 +40,7 @@ This is a pnpm + Turborepo monorepo built on Next.js 16.
 **Hard rules**
 
 - No business logic inside a Server Action or Route Handler — only in `packages/services`.
-- No direct database access from client components, the mobile app, or anywhere outside `packages/database`.
+- No direct database access from client components, the mobile app, or anywhere outside `packages/services`.
 - Mobile never touches Drizzle or the database — only the versioned REST API.
 - Never modify `db/index.ts` (the database connection/pool setup). Leave this file exactly as-is under all circumstances unless the user explicitly asks to change it.
 

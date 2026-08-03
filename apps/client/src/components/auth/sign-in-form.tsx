@@ -28,7 +28,7 @@ export const SignInForm = () => {
       <div>
         <h1 className="font-heading text-3xl text-ink">Welcome back</h1>
         <p className="font-grotesk mt-2 text-sm text-muted">
-          New to Stratum?{" "}
+          New to SOT Solutions?{" "}
           <Link href="/sign-up" className="font-bold text-primary">
             Create one
           </Link>
