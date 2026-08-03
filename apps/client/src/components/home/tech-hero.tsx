@@ -91,9 +91,9 @@ export const TechHero = () => (
         </div>
       </div>
 
-      {/* 440px of WebGL is a lot of screen on a phone, where it sits below the
-          copy rather than beside it. */}
-      <div className="relative h-72 min-w-0 sm:h-96 lg:h-110">
+      {/* Hidden below lg: on a phone it sits under the copy rather than beside
+          it, and 440px of WebGL is a lot of screen to spend there. */}
+      <div className="relative hidden min-w-0 lg:block lg:h-110">
         <div
           aria-hidden="true"
           className="animate-orb-pulse absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(124,110,255,0.4),transparent_70%)] blur-2xl"
