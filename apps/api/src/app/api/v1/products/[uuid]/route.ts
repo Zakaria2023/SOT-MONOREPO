@@ -37,11 +37,6 @@ export const GET = async (request: Request, { params }: Params) => {
 
   return NextResponse.json({
     ...product,
-    // The retired slug-keyed column never reaches a caller. Nothing resolves it
-    // any more, so it is not audience-filtered, and spreading it would walk every
-    // value it holds straight past the gate directly above. JSON omits an
-    // undefined key, so this removes the field rather than nulling it.
-    technicalAttributes: undefined,
     specValues,
     specs,
   });
