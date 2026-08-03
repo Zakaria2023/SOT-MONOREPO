@@ -24,9 +24,20 @@ overrides:
   tar: ">=7.5.21"
   # uncontrolled recursion in XML serialization
   "@xmldom/xmldom": ">=0.8.13"
-  # DoS via unbounded intermediate arrays. Pinned to 5.0.9 rather than 2.1.4:
-  # the loose pin resolved to 5.0.7, which a later advisory covers as well.
-  brace-expansion: ">=5.0.9"
+  # DoS via unbounded intermediate arrays, in the 2.x and 4.x lines.
+  #
+  # Scoped per range rather than pinned outright. A blanket ">=5.0.9" also dragged
+  # v1 consumers to v5, and minimatch@3 calls brace-expansion's v1 API — eslint
+  # died with "expand is not a function". The advisory never covered 1.x, so
+  # forcing it there was both breaking and pointless.
+  # Each replacement is caret-bounded to its own major line. ">=1.1.12" looks like
+  # a patch bump and is not: pnpm satisfies it with the highest matching version,
+  # which is 5.0.9, so minimatch@3 was handed a v5 whose export shape it does not
+  # know and eslint died on "expand is not a function". A lower bound alone is not
+  # a pin.
+  "brace-expansion@>=4.0.0 <5.0.9": "^5.0.9"
+  "brace-expansion@>=2.0.0 <2.1.4": "^2.1.4"
+  "brace-expansion@<1.1.12": "^1.1.12"
   # host confusion via a literal backslash
   fast-uri: ">=3.1.4"
   postcss: ">=8.5.23"
@@ -37,3 +48,6 @@ overrides:
   # inherited libvips CVEs. Next's optional image optimizer, so image
   # optimization is verified after this pin rather than assumed.
   sharp: ">=0.35.0"
+  # Expo's CLI fetch implementation. Build tooling — it never reaches a device or
+  # a Vercel runtime — but a pin costs nothing and keeps the audit honest.
+  undici: "^6.28.0"
