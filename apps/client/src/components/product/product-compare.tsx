@@ -32,6 +32,13 @@ export const ProductCompare = ({
         {current.categoryName ?? "the same category"}.
       </p>
 
+      {/* The highlight is an alpha of --color-primary rather than
+          --color-primary-tint. That token is a solid #f4f1fb built to sit on
+          bg-surface (white); against bg-page (#f5f4fa) it resolves to
+          (244,242,250) versus the page's (245,244,250) — off by one or two per
+          channel, so the light theme showed no highlighted column at all. An
+          alpha composites against whatever is actually behind it, which is what
+          makes one value work in both themes. */}
       <div className="mt-8 overflow-x-auto">
         <table className="w-full min-w-160 border-collapse">
           <thead>
@@ -42,7 +49,7 @@ export const ProductCompare = ({
                 return (
                   <th
                     key={product.uuid}
-                    className={`p-5 align-bottom ${isCurrent ? "rounded-t-card bg-primary-tint/50" : ""}`}
+                    className={`p-5 align-bottom ${isCurrent ? "rounded-t-card bg-primary/10" : ""}`}
                   >
                     <div className="flex flex-col items-center gap-2">
                       <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-control border border-hairline bg-surface">
@@ -84,7 +91,7 @@ export const ProductCompare = ({
                   return (
                     <td
                       key={product.uuid}
-                      className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary-tint/30 font-semibold text-ink" : "text-muted"}`}
+                      className={`py-3.5 text-center text-sm ${isCurrent ? "bg-primary/6 font-semibold text-ink" : "text-muted"}`}
                     >
                       {row.values[product.uuid] ?? "—"}
                     </td>
