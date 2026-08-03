@@ -1,4 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { buildCsp, createNonce } from "security-headers";
 import {
   checkRateLimit,
   rateLimitIdentity,
@@ -44,12 +46,39 @@ const enforceRateLimit = async (
   return decision.allowed ? null : rateLimitResponse(decision);
 };
 
+/**
+ * CSP is set here rather than in next.config because the nonce has to be fresh
+ * per request. Next picks the nonce out of this header and applies it to its own
+ * scripts; `x-nonce` on the REQUEST is how a server component can read it to
+ * stamp any inline script it writes by hand.
+ */
+const withCsp = (request: NextRequest): Headers => {
+  const nonce = createNonce();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set(
+    "content-security-policy",
+    buildCsp(nonce, process.env.NODE_ENV !== "production"),
+  );
+  return requestHeaders;
+};
+
 export default clerkMiddleware(async (auth, req) => {
-  if (!isRateLimited(req) || isInternalFetch(req)) {
-    return;
+  if (isRateLimited(req) && !isInternalFetch(req)) {
+    const { userId } = await auth();
+    const limited = await enforceRateLimit(req, userId);
+    if (limited) {
+      return limited;
+    }
   }
-  const { userId } = await auth();
-  return (await enforceRateLimit(req, userId)) ?? undefined;
+
+  const requestHeaders = withCsp(req);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const csp = requestHeaders.get("content-security-policy");
+  if (csp) {
+    response.headers.set("content-security-policy", csp);
+  }
+  return response;
 });
 
 export const config = {

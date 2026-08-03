@@ -11,6 +11,7 @@ import {
 } from "@/lib/seo";
 import { graph, organizationNode, webSiteNode } from "@/lib/structured-data";
 import { ClerkProvider } from "@clerk/nextjs";
+import { headers } from "next/headers";
 import type { Metadata, Viewport } from "next";
 import {
   Cairo,
@@ -147,25 +148,40 @@ type Props = {
 // Applies the saved (or system) theme before first paint to avoid a flash.
 const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
-const RootLayout = ({ children }: Props) => (
-  <ClerkProvider>
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`h-full antialiased ${FONT_VARIABLES}`}
-    >
-      <body className="min-h-full flex flex-col font-sans">
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-        {/* Site-wide identity: every page inherits it, and per-page nodes
+// Async so it can read the nonce the middleware put on the request. Both inline
+// scripts below are hand-written, so Next does not stamp them for us.
+const RootLayout = async ({ children }: Props) => {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
+  return (
+    // Clerk injects clerk-js as a <script src>, and under `strict-dynamic` a host
+    // allowlist is ignored — only nonce-approved scripts load, and whatever they
+    // load in turn. Handing Clerk the nonce is what lets it bootstrap; without it
+    // the script is refused and sign-in never initialises.
+    <ClerkProvider nonce={nonce}>
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={`h-full antialiased ${FONT_VARIABLES}`}
+      >
+        <body className="min-h-full flex flex-col font-sans">
+          <script
+            nonce={nonce}
+            dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+          />
+          {/* Site-wide identity: every page inherits it, and per-page nodes
             reference these by @id rather than repeating them. */}
-        <JsonLd data={graph([organizationNode(), webSiteNode()])} />
-        <FlagEmojiPolyfill />
-        <Navbar />
-        <Breadcrumbs />
-        {children}
-      </body>
-    </html>
-  </ClerkProvider>
-);
+          <JsonLd
+            data={graph([organizationNode(), webSiteNode()])}
+          />
+          <FlagEmojiPolyfill />
+          <Navbar />
+          <Breadcrumbs />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
+  );
+};
 
 export default RootLayout;
