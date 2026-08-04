@@ -4,6 +4,10 @@ import {
   rateLimitIdentity,
   rateLimitResponse,
 } from "rate-limit";
+// The shared 429 is a plain Response, and every reply out of this middleware has
+// to carry the CORS headers below, so it is re-wrapped rather than returned as-is.
+// Duplicating the body and the Retry-After header here instead would let the
+// rejection this API sends drift from the one the other apps send.
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -47,16 +51,13 @@ export const middleware = async (request: NextRequest) => {
   });
 
   if (!decision.allowed) {
-    return withCors(NextResponse.json(
-      { error: "Too many requests. Please slow down and try again shortly." },
-      {
-        status: 429,
-        headers: {
-          ...rateLimitHeaders(decision),
-          "Retry-After": String(decision.retryAfter),
-        },
-      },
-    ));
+    const rejection = rateLimitResponse(decision);
+    return withCors(
+      new NextResponse(rejection.body, {
+        status: rejection.status,
+        headers: rejection.headers,
+      }),
+    );
   }
 
   const response = withCors(NextResponse.next());
