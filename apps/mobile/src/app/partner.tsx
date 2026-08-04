@@ -1,11 +1,11 @@
-import { Check, CircleCheckBig } from "lucide-react-native";
+import { Check } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { TextField } from "@/components/ui/text-field";
 import { createPartnerRequest } from "@/lib/api";
-import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, radius, spacing, tracking, type } from "@/lib/theme";
 import type { PartnerCapability } from "@/lib/types";
 
 type CapabilityOption = {
@@ -35,9 +35,7 @@ const PartnerScreen = () => {
 
   const toggleCapability = (value: PartnerCapability) => {
     setCapabilities((prev) =>
-      prev.includes(value)
-        ? prev.filter((c) => c !== value)
-        : [...prev, value],
+      prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value],
     );
   };
 
@@ -73,9 +71,7 @@ const PartnerScreen = () => {
   if (done) {
     return (
       <View style={styles.doneContainer}>
-        <View style={[styles.doneBadge, { backgroundColor: colors.primary }]}>
-          <CircleCheckBig color={colors.onAccent} size={36} />
-        </View>
+        <View style={styles.doneRule} />
         <Text style={styles.doneTitle}>Request submitted</Text>
         <Text style={styles.doneText}>
           Thanks — our team will review your application and be in touch by
@@ -186,15 +182,18 @@ const styles = StyleSheet.create({
   lead: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
   },
+  // The same uppercase letterspaced field label the profile and the filter sheet
+  // use, so a form field looks like a form field everywhere.
   label: {
-    color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 15,
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: 9,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
     marginTop: spacing.lg,
-    marginBottom: spacing.xs,
   },
   chips: {
     flexDirection: "row",
@@ -204,31 +203,25 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    minHeight: 44,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
-  chipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryTint,
-  },
+  chipActive: { borderColor: colors.primaryBorder },
   chipText: {
     color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
   },
-  chipTextActive: {
-    color: colors.text,
-    fontFamily: fonts.semibold,
-  },
+  chipTextActive: { color: colors.primary, fontFamily: fonts.medium },
   error: {
     color: colors.danger,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
     marginTop: spacing.md,
   },
   submit: {
@@ -242,25 +235,24 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.lg,
   },
-  doneBadge: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadow.glow,
-  },
+  // A gold rule, not an 80px filled disc with a glow behind it. Nothing else in
+  // the app is a solid colour that size, and a confirmation does not need to
+  // shout — it needs to be unmistakable, which one line of serif already is.
+  doneRule: { width: 22, height: 1, backgroundColor: colors.primary },
   doneTitle: {
     color: colors.text,
-    fontFamily: fonts.bold,
-    fontSize: 26,
+    fontFamily: fonts.display,
+    fontSize: type.display.size,
+    lineHeight: type.display.line,
+    textAlign: "center",
   },
   doneText: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 15,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
     textAlign: "center",
-    lineHeight: 23,
+    maxWidth: 300,
   },
 });
 

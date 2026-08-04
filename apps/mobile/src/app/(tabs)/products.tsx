@@ -1,19 +1,30 @@
 import { useAuth } from "@clerk/clerk-expo";
-import { useCallback, useEffect, useState } from "react";
+import { Search, X } from "lucide-react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { FilterSheet } from "@/components/products/filter-sheet";
 import { ProductCard } from "@/components/products/product-card";
+import { Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
 import { fetchCategories, fetchCategoryFacets, fetchProducts } from "@/lib/api";
 import { rootCategories, subtreeUuids } from "@/lib/categories";
-import { colors, fonts, radius, spacing, type } from "@/lib/theme";
+import {
+  colors,
+  fonts,
+  radius,
+  spacing,
+  tabular,
+  tracking,
+  type,
+} from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 import type { Category, Product, SpecFacet } from "@/lib/types";
 
@@ -37,21 +48,45 @@ const ProductsScreen = () => {
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [rows, setRows] = useState<Product[] | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [term, setTerm] = useState("");
 
   const signature = JSON.stringify(selected);
   const categoryUuid = category?.uuid ?? null;
+
+  // Clerk returns a new getToken on every render, so an effect that lists it as a
+  // dependency runs on every render too. Held in a ref, it stays callable without
+  // being a dependency — the same fix use-async needed for its loader.
+  const tokenRef = useRef(getToken);
+  tokenRef.current = getToken;
+
+  // Typing is debounced into `term`, which is what the query keys on. Without
+  // this every keystroke is a round trip, and the list flickers through the
+  // results of prefixes nobody wanted.
+  useEffect(() => {
+    const timer = setTimeout(() => setTerm(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Changing category invalidates the chosen facets — a value from Copper
   // Cables means nothing under IP Cameras, and leaving it set would filter the
   // new list down to nothing for no visible reason.
   useEffect(() => {
-    setSelected({});
+    // Functional update returning `current`: setSelected({}) with a fresh object
+    // is never Object.is-equal, so it re-rendered even when nothing was chosen —
+    // and with getToken in the deps below, that render re-ran this effect. The
+    // two together were an infinite loop that refetched facets each pass.
+    setSelected((current) =>
+      Object.keys(current).length === 0 ? current : {},
+    );
     if (!categoryUuid) {
       setFacets([]);
       return;
     }
     let cancelled = false;
-    getToken()
+    tokenRef
+      .current()
       .catch(() => null)
       .then((token) => fetchCategoryFacets(categoryUuid, token ?? undefined))
       .then((next) => {
@@ -67,13 +102,20 @@ const ProductsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [categoryUuid, getToken]);
+  }, [categoryUuid]);
+
+  // Read through a ref for the same reason as the cart: the effect keys on
+  // `signature`, and depending on the identity of `data` or `selected` would
+  // re-fetch on every render that rebuilt an equal object.
+  const latest = useRef({ data, selected });
+  latest.current = { data, selected };
 
   useEffect(() => {
-    if (!data) {
+    const { data: tree, selected: chosen } = latest.current;
+    if (!tree) {
       return;
     }
-    if (!categoryUuid && Object.keys(selected).length === 0) {
+    if (!categoryUuid && !term && Object.keys(chosen).length === 0) {
       setRows(null);
       return;
     }
@@ -82,11 +124,12 @@ const ProductsScreen = () => {
       // The whole subtree, because products sit in the leaves — filtering to
       // "Networking" alone would come back empty.
       categoryUuids: categoryUuid
-        ? subtreeUuids(data.categories, categoryUuid)
+        ? subtreeUuids(tree.categories, categoryUuid)
         : undefined,
       // …but the facets are the picked category's, so name it separately.
       facetCategoryUuid: categoryUuid ?? undefined,
-      specValues: selected,
+      specValues: chosen,
+      search: term || undefined,
     })
       .then((next) => {
         if (!cancelled) {
@@ -102,7 +145,7 @@ const ProductsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [categoryUuid, signature, data]);
+  }, [categoryUuid, signature, term]);
 
   if (loading || error || !data) {
     return (
@@ -121,8 +164,49 @@ const ProductsScreen = () => {
   const products = rows ?? data.products;
   const roots = rootCategories(data.categories);
 
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearch("");
+  };
+
   return (
     <View style={styles.container}>
+      <View style={styles.head}>
+        <Text style={styles.heading}>Products</Text>
+        <Pressable
+          onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={searchOpen ? "Close search" : "Search products"}
+          style={({ pressed }) => [
+            styles.action,
+            pressed ? styles.actionPressed : null,
+          ]}
+        >
+          {searchOpen ? (
+            <X color={colors.muted} size={19} strokeWidth={1.6} />
+          ) : (
+            <Search color={colors.text} size={19} strokeWidth={1.6} />
+          )}
+        </Pressable>
+      </View>
+
+      {searchOpen ? (
+        <View style={styles.searchRow}>
+          {/* A ruled line to write on, not a filled input. The rule is the field. */}
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            autoFocus
+            placeholder="Search by name, SKU or brand"
+            placeholderTextColor={colors.placeholder}
+            returnKeyType="search"
+            style={styles.searchInput}
+            accessibilityLabel="Search products"
+          />
+        </View>
+      ) : null}
+
       <View style={styles.tools}>
         <ScrollView
           horizontal
@@ -134,7 +218,10 @@ const ProductsScreen = () => {
             style={[styles.chip, !category ? styles.chipActive : null]}
           >
             <Text
-              style={[styles.chipText, !category ? styles.chipTextActive : null]}
+              style={[
+                styles.chipText,
+                !category ? styles.chipTextActive : null,
+              ]}
             >
               All
             </Text>
@@ -178,14 +265,22 @@ const ProductsScreen = () => {
           </Text>
         </View>
       </View>
+      <Rule />
 
       {products.length === 0 ? (
         <ListState
           loading={false}
           error={null}
           empty
-          emptyLabel="Nothing matches those filters."
-          onRetry={() => setSelected({})}
+          emptyLabel={
+            term
+              ? `Nothing matches “${term}”.`
+              : "Nothing matches those filters."
+          }
+          onRetry={() => {
+            setSelected({});
+            setSearch("");
+          }}
         />
       ) : (
         <FlatList
@@ -203,40 +298,78 @@ const ProductsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // overflow hidden, because the horizontal chip scroller otherwise widens this
+  // container to the width of all its chips — which then dragged the two-column
+  // grid off the right edge of the screen with it.
   container: {
     flex: 1,
+    overflow: "hidden",
     backgroundColor: colors.background,
   },
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    minHeight: 44,
+  },
+  heading: {
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: type.display.size,
+    lineHeight: type.display.line,
+  },
+  action: {
+    minHeight: 44,
+    minWidth: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionPressed: { opacity: 0.5 },
+  searchRow: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  searchInput: {
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primaryBorder,
+    minHeight: 44,
+  },
+  // The toolbar is on the paper, separated by a hairline — not a raised bar in a
+  // different fill.
   tools: {
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   chips: {
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
+  // Outlines on the paper at 4px. The pill shape and the grey fill were the two
+  // things that made these read as app chrome rather than as marginalia.
   chip: {
     paddingHorizontal: spacing.lg,
-    height: 36,
+    minHeight: 44,
     justifyContent: "center",
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  // Inverted rather than tinted: the accent is reserved for actions, so the
-  // current filter reads as state without competing with the buttons.
-  chipActive: { backgroundColor: colors.text, borderColor: colors.text },
+  // Selected is a gold hairline and a gold label — never an inverted block, which
+  // would be the only filled shape on the screen and would read as a button.
+  chipActive: { borderColor: colors.primaryBorder },
   chipText: {
     color: colors.muted,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.body,
     fontSize: type.caption.size,
   },
-  chipTextActive: { color: colors.surface, fontFamily: fonts.semibold },
+  chipTextActive: { color: colors.primary, fontFamily: fonts.medium },
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -245,13 +378,16 @@ const styles = StyleSheet.create({
   },
   hint: {
     color: colors.faint,
-    fontFamily: fonts.regular,
+    fontFamily: fonts.bodyItalic,
     fontSize: type.caption.size,
   },
   count: {
     color: colors.faint,
-    fontFamily: fonts.medium,
-    fontSize: type.caption.size,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+    ...tabular,
   },
   content: {
     padding: spacing.lg,

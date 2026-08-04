@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { ProductSpec } from "@/lib/types";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tracking, type } from "@/lib/theme";
 
 type SpecTableProps = {
   specs: ProductSpec[];
+  /** Omit the section heading where the screen already announced the table. */
+  heading?: string | null;
 };
 
 type Group = {
@@ -33,7 +35,17 @@ const groupSpecs = (specs: ProductSpec[]): Group[] =>
     return groups;
   }, []);
 
-export const SpecTable = ({ specs }: SpecTableProps) => {
+/**
+ * The specification table: a group heading, then label/value rows on hairlines.
+ *
+ * Each group was a bordered card with a fill, which turned a five-group product
+ * into five stacked panels. A specification table is the most table-like thing in
+ * the app and it wants ruled rows, the way a datasheet prints them.
+ */
+export const SpecTable = ({
+  specs,
+  heading = "Specifications",
+}: SpecTableProps) => {
   const groups = groupSpecs(specs);
   if (groups.length === 0) {
     return null;
@@ -41,22 +53,25 @@ export const SpecTable = ({ specs }: SpecTableProps) => {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.heading}>Specifications</Text>
+      {heading ? <Text style={styles.heading}>{heading}</Text> : null}
       {groups.map((group) => (
         <View key={group.name ?? "ungrouped"} style={styles.group}>
           {group.name ? (
             <Text style={styles.groupName}>{group.name}</Text>
           ) : null}
-          <View style={styles.card}>
+          <View style={styles.rows}>
             {group.rows.map((row, index) => (
               <View
                 key={row.label}
-                style={[styles.row, index > 0 && styles.rowDivided]}
+                style={[
+                  styles.row,
+                  index === group.rows.length - 1 ? null : styles.divided,
+                ]}
               >
                 <Text style={styles.label} numberOfLines={2}>
                   {row.label}
                 </Text>
-                <Text style={styles.value} numberOfLines={2}>
+                <Text style={styles.value} numberOfLines={3}>
                   {row.value}
                 </Text>
               </View>
@@ -69,51 +84,44 @@ export const SpecTable = ({ specs }: SpecTableProps) => {
 };
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.md, marginTop: spacing.xl },
+  wrap: { gap: spacing.lg },
   heading: {
     color: colors.text,
-    fontFamily: fonts.bold,
-    fontSize: 20,
+    fontFamily: fonts.display,
+    fontSize: type.heading.size,
+    lineHeight: type.heading.line,
   },
   group: { gap: spacing.sm },
   groupName: {
     color: colors.faint,
-    fontFamily: fonts.semibold,
-    fontSize: 11,
-    letterSpacing: 1.2,
+    fontFamily: fonts.body,
+    fontSize: 9,
+    letterSpacing: tracking.kicker,
     textTransform: "uppercase",
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
+  rows: { borderTopWidth: 1, borderTopColor: colors.border },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.lg,
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  rowDivided: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
+  divided: { borderBottomWidth: 1, borderBottomColor: colors.border },
   label: {
     flex: 1,
-    color: colors.muted,
+    color: colors.faint,
     fontFamily: fonts.body,
-    fontSize: 15,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
   value: {
     flexShrink: 0,
-    maxWidth: "55%",
+    maxWidth: "58%",
     color: colors.text,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
     textAlign: "right",
   },
 });

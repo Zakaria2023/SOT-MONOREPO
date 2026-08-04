@@ -1,7 +1,6 @@
-import { PackageOpen, TriangleAlert } from "lucide-react-native";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/ui/button";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tracking, type } from "@/lib/theme";
 
 type ListStateProps = {
   loading: boolean;
@@ -11,8 +10,14 @@ type ListStateProps = {
   onRetry: () => void;
 };
 
-// Renders the loading / error / empty placeholder for a data screen, or null
-// when there is data to show.
+/**
+ * The loading / error / empty placeholder for a data screen, or null when there is
+ * data to show.
+ *
+ * The 64px circled icon is gone. A crossed-out box in a ring is app furniture, and
+ * on a page made of type and rules it was the only illustration in the product — a
+ * short gold rule over one line of type says the same thing in the page's voice.
+ */
 export const ListState = ({
   loading,
   error,
@@ -30,20 +35,22 @@ export const ListState = ({
   if (error) {
     return (
       <View style={styles.center}>
-        <View style={styles.iconWell}>
-          <TriangleAlert color={colors.danger} size={26} />
-        </View>
+        <View style={[styles.rule, styles.ruleBad]} />
+        <Text style={styles.kickerBad}>Something went wrong</Text>
         <Text style={styles.error}>{error}</Text>
-        <Button label="Try again" variant="outline" onPress={onRetry} />
+        <Button
+          label="Try again"
+          variant="outline"
+          full={false}
+          onPress={onRetry}
+        />
       </View>
     );
   }
   if (empty) {
     return (
       <View style={styles.center}>
-        <View style={styles.iconWell}>
-          <PackageOpen color={colors.faint} size={26} />
-        </View>
+        <View style={styles.rule} />
         <Text style={styles.muted}>{emptyLabel}</Text>
       </View>
     );
@@ -59,27 +66,28 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.lg,
   },
-  iconWell: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  rule: { width: 22, height: 1, backgroundColor: colors.primary },
+  ruleBad: { backgroundColor: colors.danger },
+  kickerBad: {
+    color: colors.danger,
+    fontFamily: fonts.medium,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
   },
   error: {
     color: colors.text,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
     textAlign: "center",
-    lineHeight: 22,
   },
+  // Italic, because an empty list is an aside rather than a statement.
   muted: {
     color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
     textAlign: "center",
   },
 });

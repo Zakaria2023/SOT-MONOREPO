@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { ProductCard } from "@/components/products/product-card";
-import { colors, fonts, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import type { Product } from "@/lib/types";
 
 type ProductsGridProps = {
@@ -51,7 +51,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
   },
 });

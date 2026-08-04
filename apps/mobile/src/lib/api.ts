@@ -196,11 +196,20 @@ export const fetchProductComparison = (
 ): Promise<ProductComparison> =>
   request<ProductComparison>(`/products/${uuid}/compare`, { token });
 
+/**
+ * Other devices in the same range — the web page's "Pairs well with".
+ *
+ * Same service behind it, so a product recommends the same siblings on both
+ * surfaces. Fetched separately from the detail so a cart or a grid reading a
+ * product never pays for six more.
+ */
+export const fetchRelatedProducts = (uuid: string): Promise<Product[]> =>
+  request<Product[]>(`/products/${uuid}/related`);
+
 export const fetchCategory = (uuid: string): Promise<Category> =>
   request<Category>(`/categories/${uuid}`);
 
-export const fetchBrands = (): Promise<Brand[]> =>
-  request<Brand[]>("/brands");
+export const fetchBrands = (): Promise<Brand[]> => request<Brand[]>("/brands");
 
 export const fetchBrand = (uuid: string): Promise<Brand> =>
   request<Brand>(`/brands/${uuid}`);
@@ -277,3 +286,16 @@ export const createPartnerRequest = (
     method: "POST",
     body: input,
   });
+
+/**
+ * URL for a document id, for use as an <Image source>.
+ *
+ * The API returns image fields as bare document ids — `image: "c73a19ed-..."` —
+ * because that is what the column holds. Passing one straight to expo-image, as
+ * every screen here did, asks it to load a uuid: not a URL, nothing fetched, no
+ * error, just an empty frame. Mobile images had never rendered.
+ *
+ * The endpoint 302s to a short-lived presigned R2 URL, which expo-image follows.
+ */
+export const documentUrl = (documentId: string): string =>
+  `${API_URL}/api/v1/documents/${documentId}/download`;

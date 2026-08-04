@@ -1,9 +1,10 @@
 import { useCallback } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { BrandRow } from "@/components/brands/brand-row";
+import { Kicker } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
 import { fetchBrands } from "@/lib/api";
-import { colors, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tabular, tracking, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const BrandsScreen = () => {
@@ -30,7 +31,17 @@ const BrandsScreen = () => {
       contentContainerStyle={styles.content}
       data={data}
       keyExtractor={(item) => item.uuid}
-      renderItem={({ item }) => <BrandRow brand={item} />}
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <Kicker label="Partners" />
+          <Text style={styles.count}>
+            {data.length} {data.length === 1 ? "brand" : "brands"}
+          </Text>
+        </View>
+      }
+      renderItem={({ item, index }) => (
+        <BrandRow brand={item} last={index === (data?.length ?? 0) - 1} />
+      )}
     />
   );
 };
@@ -41,9 +52,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxxl,
+  },
+  header: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  count: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+    ...tabular,
   },
 });
 

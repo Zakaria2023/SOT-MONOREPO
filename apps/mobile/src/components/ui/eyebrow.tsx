@@ -1,36 +1,14 @@
-import { StyleSheet, Text, View } from "react-native";
-import { colors, fonts, spacing } from "@/lib/theme";
+import { Kicker } from "@/components/ui/editorial";
 
 type EyebrowProps = {
   label: string;
 };
 
-// The client's signature section label: a glowing accent dot + an uppercase,
-// wide-tracked, primary-colored micro-heading above every section.
-export const Eyebrow = ({ label }: EyebrowProps) => (
-  <View style={styles.row}>
-    <View style={styles.dot} />
-    <Text style={styles.label}>{label}</Text>
-  </View>
-);
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.primary,
-  },
-  label: {
-    color: colors.primary,
-    fontFamily: fonts.bold,
-    fontSize: 13,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-});
+/**
+ * Kept as a name so the screens that already say `Eyebrow` keep reading, but it
+ * is the editorial Kicker now: a short gold rule and letterspaced gold caps.
+ *
+ * The old version was a filled accent dot beside 13px bold uppercase — a dot is a
+ * bullet, and it read as a list item rather than as a section opening.
+ */
+export const Eyebrow = ({ label }: EyebrowProps) => <Kicker label={label} />;

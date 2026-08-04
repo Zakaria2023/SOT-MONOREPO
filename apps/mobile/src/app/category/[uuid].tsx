@@ -1,13 +1,13 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { FilterSheet } from "@/components/products/filter-sheet";
 import { ProductsGrid } from "@/components/products/products-grid";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ListState } from "@/components/ui/list-state";
 import { fetchCategory, fetchCategoryFacets, fetchProducts } from "@/lib/api";
-import { colors, fonts, spacing, type } from "@/lib/theme";
+import { colors, fonts, spacing, tabular, tracking, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 import type { Product } from "@/lib/types";
 
@@ -35,13 +35,19 @@ const CategoryScreen = () => {
   const [filtered, setFiltered] = useState<Product[] | null>(null);
   const signature = JSON.stringify(selected);
 
+  // Read through a ref so the effect keys on `signature` rather than on the
+  // identity of `selected`, without silencing exhaustive-deps.
+  const latestSelected = useRef(selected);
+  latestSelected.current = selected;
+
   useEffect(() => {
-    if (Object.keys(selected).length === 0) {
+    const chosen = latestSelected.current;
+    if (Object.keys(chosen).length === 0) {
       setFiltered(null);
       return;
     }
     let cancelled = false;
-    fetchProducts({ categoryUuids: [uuid], specValues: selected })
+    fetchProducts({ categoryUuids: [uuid], specValues: chosen })
       .then((rows) => {
         if (!cancelled) {
           setFiltered(rows);
@@ -121,29 +127,40 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.bold,
+    fontFamily: fonts.display,
     fontSize: type.display.size,
     lineHeight: type.display.line,
   },
+  // Italic, because the parent is an aside about where you are — the same
+  // mechanism the hero uses for emphasis, only quieter.
   parent: {
     color: colors.muted,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.bodyItalic,
     fontSize: type.body.size,
   },
+  // The toolbar sits between two hairlines, so the filters read as apparatus
+  // belonging to the list below rather than as part of the title above.
   tools: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
   },
   count: {
     color: colors.faint,
-    fontFamily: fonts.medium,
-    fontSize: type.caption.size,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
+    ...tabular,
   },
 });
 

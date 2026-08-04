@@ -5,7 +5,7 @@ import { ProductsGrid } from "@/components/products/products-grid";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { ListState } from "@/components/ui/list-state";
 import { fetchBrand, fetchProducts } from "@/lib/api";
-import { colors, fonts, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const BrandScreen = () => {
@@ -62,19 +62,22 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.bold,
-    fontSize: 32,
-    lineHeight: 32,
+    fontFamily: fonts.display,
+    fontSize: type.displayLarge.size,
+    lineHeight: type.displayLarge.line,
   },
   description: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
   },
 });
 

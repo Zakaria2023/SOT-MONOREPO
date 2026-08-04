@@ -1,11 +1,13 @@
 import { StyleSheet, Text, View } from "react-native";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/format";
-import { colors, fonts, radius, shadow, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tabular, tracking, type } from "@/lib/theme";
 import type { Offer } from "@/lib/types";
 
 type OfferCardProps = {
   offer: Offer;
+  /** Last in the list — no rule beneath, so the list does not end on a line. */
+  last?: boolean;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -13,12 +15,13 @@ const STATUS_LABELS: Record<string, string> = {
   selected: "Selected",
 };
 
-export const OfferCard = ({ offer }: OfferCardProps) => {
+/** A quote, as a ruled entry: reference, state, description, total. */
+export const OfferCard = ({ offer, last = false }: OfferCardProps) => {
   const total =
     Number(offer.productPrice ?? 0) + Number(offer.installPrice ?? 0);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.row, last ? null : styles.divided]}>
       <View style={styles.top}>
         <Text style={styles.reference} numberOfLines={1}>
           {offer.boqReference ?? "BOQ offer"}
@@ -33,7 +36,6 @@ export const OfferCard = ({ offer }: OfferCardProps) => {
           {offer.description}
         </Text>
       ) : null}
-      <View style={styles.divider} />
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total</Text>
         <Text style={styles.total}>{formatMoney(total)}</Text>
@@ -43,15 +45,11 @@ export const OfferCard = ({ offer }: OfferCardProps) => {
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.md,
-    ...shadow.card,
+  row: {
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
   },
+  divided: { borderBottomWidth: 1, borderBottomColor: colors.border },
   top: {
     flexDirection: "row",
     alignItems: "center",
@@ -61,32 +59,34 @@ const styles = StyleSheet.create({
   reference: {
     flex: 1,
     color: colors.text,
-    fontFamily: fonts.bold,
-    fontSize: 17,
+    fontFamily: fonts.heading,
+    fontSize: type.title.size,
+    lineHeight: type.title.line,
   },
   description: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
   totalRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
+    marginTop: spacing.xs,
   },
   totalLabel: {
-    color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
   },
   total: {
     color: colors.text,
-    fontFamily: fonts.monoBold,
-    fontSize: 20,
+    fontFamily: fonts.display,
+    fontSize: type.heading.size,
+    lineHeight: type.heading.line,
+    ...tabular,
   },
 });

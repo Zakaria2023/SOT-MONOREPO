@@ -2,35 +2,44 @@ import { ClerkLoaded, ClerkProvider, useAuth } from "@clerk/clerk-expo";
 // Import each weight from its own subpath rather than the package barrel: the
 // barrel's index.js eagerly requires all 18 weights, which Metro (SDK 52 +
 // pnpm) fails to resolve. The per-weight modules pull a single TTF each.
-import { HankenGrotesk_400Regular } from "@expo-google-fonts/hanken-grotesk/400Regular";
-import { HankenGrotesk_500Medium } from "@expo-google-fonts/hanken-grotesk/500Medium";
-import { HankenGrotesk_600SemiBold } from "@expo-google-fonts/hanken-grotesk/600SemiBold";
-import { HankenGrotesk_700Bold } from "@expo-google-fonts/hanken-grotesk/700Bold";
-import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
-import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk/700Bold";
+import { CormorantGaramond_400Regular } from "@expo-google-fonts/cormorant-garamond/400Regular";
+import { CormorantGaramond_400Regular_Italic } from "@expo-google-fonts/cormorant-garamond/400Regular_Italic";
+import { CormorantGaramond_500Medium } from "@expo-google-fonts/cormorant-garamond/500Medium";
+import { CormorantGaramond_600SemiBold } from "@expo-google-fonts/cormorant-garamond/600SemiBold";
+import { Lora_400Regular } from "@expo-google-fonts/lora/400Regular";
+import { Lora_400Regular_Italic } from "@expo-google-fonts/lora/400Regular_Italic";
+import { Lora_500Medium } from "@expo-google-fonts/lora/500Medium";
+import { Lora_500Medium_Italic } from "@expo-google-fonts/lora/500Medium_Italic";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { CLERK_PUBLISHABLE_KEY } from "@/lib/env";
-import { colors, fonts, spacing , type } from "@/lib/theme";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import { tokenCache } from "@/lib/token-cache";
 
-// Redirect between the authenticated app and the sign-in screen based on the
-// Clerk session, so no signed-out user can land on a protected route.
+/**
+ * Registers the 401 handler and mounts the navigator. It does NOT redirect.
+ *
+ * Holding the Stack back until a signed-out user had been moved off a protected
+ * route looked like the way to stop the profile tab painting without a session,
+ * and it threw: expo-router cannot navigate before a navigator exists, so
+ * router.replace from this effect produced "Attempted to navigate before mounting
+ * the Root Layout component". The navigator has to mount on the first render.
+ *
+ * Guarding therefore lives with the thing being guarded — see (tabs)/_layout,
+ * which renders <Redirect> instead of calling an imperative navigate. Declarative
+ * redirects are resolved by the router itself, so there is no window in which a
+ * protected screen is mounted and fetching.
+ */
 const AuthGate = () => {
-  const { isLoaded, isSignedIn, signOut } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  const inAuthGroup = segments[0] === "(auth)";
-  const signedOutOnProtectedRoute = isLoaded && !isSignedIn && !inAuthGroup;
+  const { isLoaded, signOut } = useAuth();
 
   // Any 401 from the API signs out here, which flips isSignedIn and lets the
-  // redirect below carry the user to sign-in. One registration covers every
-  // authenticated call in the app.
+  // guard in the protected group send the user to sign-in. One registration
+  // covers every authenticated call in the app.
   useEffect(() => {
     setUnauthorizedHandler(() => {
       void signOut();
@@ -38,22 +47,7 @@ const AuthGate = () => {
     return () => setUnauthorizedHandler(null);
   }, [signOut]);
 
-  useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
-    if (signedOutOnProtectedRoute) {
-      router.replace("/sign-in");
-    } else if (isSignedIn && inAuthGroup) {
-      router.replace("/");
-    }
-  }, [isLoaded, isSignedIn, inAuthGroup, signedOutOnProtectedRoute, router]);
-
-  // Held closed until the session is known AND until a signed-out user has been
-  // moved off a protected route. Rendering the Stack in that window is what put
-  // the profile screen on screen for a signed-out user: the redirect lands a
-  // frame later, so the protected tab painted first and started fetching.
-  if (!isLoaded || signedOutOnProtectedRoute) {
+  if (!isLoaded) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
@@ -63,10 +57,17 @@ const AuthGate = () => {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
+        // The navigation bar is the same paper as the page — a half-step lighter
+        // surface behind it drew a band across the top of every pushed screen.
+        headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
+        // A serif running head. This is the one piece of chrome every pushed
+        // screen shares, so a grotesk bold here undid the editorial voice before
+        // the page below had a chance. React Navigation accepts only family,
+        // size, weight and colour here, so the wordmark's letterspacing cannot
+        // follow it up into the bar.
         headerTitleStyle: {
-          fontFamily: fonts.bold,
+          fontFamily: fonts.heading,
           fontSize: type.title.size,
           color: colors.text,
         },
@@ -76,7 +77,7 @@ const AuthGate = () => {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/sign-in" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="product/[uuid]" options={{ title: "Product" }} />
       <Stack.Screen name="category/[uuid]" options={{ title: "Category" }} />
       <Stack.Screen name="brand/[uuid]" options={{ title: "Brand" }} />
@@ -99,13 +100,17 @@ const MissingKey = () => (
 );
 
 const RootLayout = () => {
+  // Cormorant Garamond for display, Lora for everything else, each with its
+  // italic — italics carry emphasis here because nothing is bold.
   const [fontsLoaded] = useFonts({
-    HankenGrotesk_400Regular,
-    HankenGrotesk_500Medium,
-    HankenGrotesk_600SemiBold,
-    HankenGrotesk_700Bold,
-    SpaceGrotesk_500Medium,
-    SpaceGrotesk_700Bold,
+    CormorantGaramond_400Regular,
+    CormorantGaramond_400Regular_Italic,
+    CormorantGaramond_500Medium,
+    CormorantGaramond_600SemiBold,
+    Lora_400Regular,
+    Lora_400Regular_Italic,
+    Lora_500Medium,
+    Lora_500Medium_Italic,
   });
 
   if (!fontsLoaded) {

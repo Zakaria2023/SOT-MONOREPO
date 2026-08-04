@@ -1,4 +1,5 @@
 import type { JsonLd as JsonLdData } from "@/lib/structured-data";
+import { headers } from "next/headers";
 
 type JsonLdProps = {
   data: JsonLdData;
@@ -13,9 +14,23 @@ type JsonLdProps = {
 const serialize = (data: JsonLdData): string =>
   JSON.stringify(data).replace(/</g, "\\u003c");
 
-export const JsonLd = ({ data }: JsonLdProps) => (
-  <script
-    type="application/ld+json"
-    dangerouslySetInnerHTML={{ __html: serialize(data) }}
-  />
-);
+/**
+ * Reads the CSP nonce itself rather than taking it as a prop.
+ *
+ * Four pages render structured data, and a missing nonce does not fail loudly:
+ * CSP blocks the tag, the JSON-LD quietly stops reaching crawlers, and the only
+ * symptom is rich results vanishing weeks later. Threading a prop through four
+ * call sites is four chances to forget one. Reading the header here cannot be
+ * forgotten.
+ */
+export const JsonLd = async ({ data }: JsonLdProps) => {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
+  return (
+    <script
+      type="application/ld+json"
+      nonce={nonce}
+      dangerouslySetInnerHTML={{ __html: serialize(data) }}
+    />
+  );
+};

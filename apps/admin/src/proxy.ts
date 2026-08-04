@@ -1,9 +1,11 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse, type NextRequest } from "next/server";
 import {
   checkRateLimit,
   rateLimitIdentity,
   rateLimitResponse,
 } from "rate-limit";
+import { buildCsp, createNonce } from "security-headers";
 
 /**
  * `/api/documents/:id/image` is exempt because next/image's optimizer fetches it
@@ -22,9 +24,11 @@ import {
  */
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
+  // Where the role gate sends a signed-in non-admin. Public, or the gate would
+  // gate its own landing page.
+  "/no-access",
   "/api/documents/(.*)/image",
 ]);
-
 
 /**
  * Applied to /api/* only, deliberately.
@@ -59,7 +63,6 @@ const enforceRateLimit = async (
   return decision.allowed ? null : rateLimitResponse(decision);
 };
 
-
 /**
  * A path whose last segment carries an extension. Middleware still runs on these
  * so `auth()` is available to whatever renders them — including the 404 page —
@@ -68,6 +71,33 @@ const enforceRateLimit = async (
  */
 const isFileRequest = (request: Request): boolean =>
   /\.[a-zA-Z0-9]+$/.test(new URL(request.url).pathname);
+
+/**
+ * CSP is set here rather than in next.config because the nonce must be fresh per
+ * request. Next reads the nonce out of this header and stamps it onto its own
+ * scripts; `x-nonce` on the REQUEST lets a server component read it for anything
+ * it writes inline by hand.
+ */
+const withCsp = (request: NextRequest): Headers => {
+  const requestHeaders = new Headers(request.headers);
+  const nonce = createNonce();
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set(
+    "content-security-policy",
+    buildCsp(nonce, process.env.NODE_ENV !== "production"),
+  );
+  return requestHeaders;
+};
+
+const cspResponse = (request: NextRequest): NextResponse => {
+  const requestHeaders = withCsp(request);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const csp = requestHeaders.get("content-security-policy");
+  if (csp) {
+    response.headers.set("content-security-policy", csp);
+  }
+  return response;
+};
 
 export default clerkMiddleware(async (auth, req) => {
   if (isRateLimited(req) && !isInternalFetch(req)) {
@@ -81,6 +111,8 @@ export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req) && !isFileRequest(req)) {
     await auth.protect();
   }
+
+  return cspResponse(req);
 });
 
 export const config = {

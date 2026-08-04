@@ -1,10 +1,6 @@
 import { useState } from "react";
-import {
-  type KeyboardTypeOptions,
-  StyleSheet,
-  TextInput,
-} from "react-native";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { type KeyboardTypeOptions, StyleSheet, TextInput } from "react-native";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 
 type TextFieldProps = {
   value: string;
@@ -15,6 +11,13 @@ type TextFieldProps = {
   editable?: boolean;
 };
 
+/**
+ * A ruled line to write on.
+ *
+ * The filled box with a 1px border was the only inset control in the app, and on
+ * focus it turned gold-tinted — a field that changes colour when you touch it reads
+ * as a validation state. Now the rule under it thickens to gold instead.
+ */
 export const TextField = ({
   value,
   onChangeText,
@@ -43,18 +46,14 @@ export const TextField = ({
 
 const styles = StyleSheet.create({
   input: {
-    height: 52,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
+    minHeight: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.sm,
     color: colors.text,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
   },
-  focused: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryTint,
-  },
+  focused: { borderBottomColor: colors.primary },
 });

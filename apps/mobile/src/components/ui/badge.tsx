@@ -1,13 +1,19 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, fonts, radius, spacing, type } from "@/lib/theme";
+import { colors, fonts, radius, spacing, tracking, type } from "@/lib/theme";
 
 type BadgeProps = {
   label: string;
   tone?: "primary" | "neutral" | "success" | "danger" | "warning";
 };
 
-// A small tinted label. Squarer than a full pill — at this size a pill reads
-// as decoration, a soft rectangle reads as data.
+/**
+ * A state, set in letterspaced caps inside a hairline.
+ *
+ * It was a tinted block, and a screen listing eight orders showed eight coloured
+ * chips — which made the state the loudest thing in every row rather than the
+ * reference the buyer was looking for. The tint is gone; the hairline and the
+ * label carry the colour.
+ */
 export const Badge = ({ label, tone = "neutral" }: BadgeProps) => (
   <View style={[styles.badge, TONES[tone].box]}>
     <Text style={[styles.text, TONES[tone].text]}>{label}</Text>
@@ -16,23 +22,23 @@ export const Badge = ({ label, tone = "neutral" }: BadgeProps) => (
 
 const TONES = {
   primary: {
-    box: { backgroundColor: colors.primaryTint, borderColor: colors.primaryBorder },
+    box: { borderColor: colors.primaryBorder },
     text: { color: colors.primary },
   },
   neutral: {
-    box: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+    box: { borderColor: colors.border },
     text: { color: colors.muted },
   },
   success: {
-    box: { backgroundColor: colors.successTint, borderColor: "transparent" },
+    box: { borderColor: colors.success },
     text: { color: colors.success },
   },
   danger: {
-    box: { backgroundColor: colors.dangerTint, borderColor: "transparent" },
+    box: { borderColor: colors.danger },
     text: { color: colors.danger },
   },
   warning: {
-    box: { backgroundColor: colors.warningTint, borderColor: "transparent" },
+    box: { borderColor: colors.warning },
     text: { color: colors.warning },
   },
 } as const;
@@ -46,9 +52,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   text: {
-    fontFamily: fonts.semibold,
-    fontSize: type.micro.size,
-    lineHeight: type.micro.line,
-    letterSpacing: 0.2,
+    fontFamily: fonts.medium,
+    fontSize: type.kicker.size,
+    lineHeight: type.kicker.line,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
   },
 });

@@ -1,15 +1,17 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
+import { ArrowRight, Search, ShoppingCart } from "lucide-react-native";
 import { useCallback } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BrandChip } from "@/components/brands/brand-chip";
 import { CategoryRow } from "@/components/categories/category-row";
-import { ProductCard } from "@/components/products/product-card";
 import { SectionHeader } from "@/components/home/section-header";
-import { Eyebrow } from "@/components/ui/eyebrow";
+import { ProductCard } from "@/components/products/product-card";
+import { Button } from "@/components/ui/button";
+import { Kicker, Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
+import { Masthead } from "@/components/ui/masthead";
 import { fetchBrands, fetchCategories, fetchProducts } from "@/lib/api";
-import { colors, fonts, gradient, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
 const HomeScreen = () => {
@@ -46,27 +48,79 @@ const HomeScreen = () => {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* A title page, not a hero banner: wordmark and standing line to the left,
+          the two things you can do from here to the right. */}
+      <Masthead tagline="Est. network supply">
+        <Link href="/products" asChild>
+          <Pressable
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Search the catalogue"
+          >
+            {({ pressed }) => (
+              <View
+                style={[styles.action, pressed ? styles.actionPressed : null]}
+              >
+                <Search color={colors.text} size={19} strokeWidth={1.6} />
+              </View>
+            )}
+          </Pressable>
+        </Link>
+        <Link href="/cart" asChild>
+          <Pressable
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Your cart"
+          >
+            {({ pressed }) => (
+              <View
+                style={[styles.action, pressed ? styles.actionPressed : null]}
+              >
+                <ShoppingCart color={colors.text} size={19} strokeWidth={1.6} />
+              </View>
+            )}
+          </Pressable>
+        </Link>
+      </Masthead>
+      <Rule />
+
       <View style={styles.hero}>
-        <LinearGradient
-          colors={["rgba(139,123,255,0.22)", "rgba(34,211,238,0.10)", "transparent"]}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.heroGlow}
-        />
-        <Eyebrow label="Smart Infrastructure" />
+        <Kicker label="Smart Infrastructure" />
         <Text style={styles.heroTitle}>
-          Build your network with SOT
+          Build your network{"\n"}
+          <Text style={styles.heroTitleItalic}>with</Text> SOT
         </Text>
         <Text style={styles.heroSubtitle}>
           Browse products, compare brands and build your cart — all in one
           place.
         </Text>
+
+        {/* Two outlines, gold and grey: which hairline is gold is the only thing
+            separating the primary action from the secondary one. */}
+        <View style={styles.heroActions}>
+          <Button
+            label="Browse catalogue"
+            icon={ArrowRight}
+            iconSide="trailing"
+            size="md"
+            full={false}
+            onPress={() => router.push("/products")}
+          />
+          <Button
+            label="Request a quote"
+            variant="outline"
+            size="md"
+            full={false}
+            onPress={() => router.push("/cart")}
+          />
+        </View>
       </View>
+      <Rule />
 
       {data.products.length > 0 ? (
         <View style={styles.section}>
           <SectionHeader
-            eyebrow="Catalog"
+            eyebrow="Catalogue"
             title="Featured products"
             onSeeAll={() => router.push("/products")}
           />
@@ -92,8 +146,13 @@ const HomeScreen = () => {
             onSeeAll={() => router.push("/categories")}
           />
           <View style={styles.categoryList}>
-            {data.categories.slice(0, 4).map((category) => (
-              <CategoryRow key={category.uuid} category={category} />
+            {data.categories.slice(0, 4).map((category, index, shown) => (
+              <CategoryRow
+                key={category.uuid}
+                category={category}
+                index={index}
+                last={index === shown.length - 1}
+              />
             ))}
           </View>
         </View>
@@ -127,38 +186,49 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    paddingVertical: spacing.lg,
-    gap: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxxl,
   },
+  action: {
+    minHeight: 44,
+    minWidth: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionPressed: { opacity: 0.5 },
+  // No card, no border, no fill. The hero is type on the paper.
   hero: {
-    marginHorizontal: spacing.lg,
-    padding: spacing.xl,
-    borderRadius: radius.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    overflow: "hidden",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
     gap: spacing.md,
-  },
-  heroGlow: {
-    ...StyleSheet.absoluteFillObject,
   },
   heroTitle: {
     color: colors.text,
-    fontFamily: fonts.monoBold,
-    fontSize: 32,
-    lineHeight: 36,
-    letterSpacing: -0.5,
+    fontFamily: fonts.display,
+    fontSize: type.displayLarge.size,
+    lineHeight: type.displayLarge.line,
+  },
+  // Emphasis by italic, because nothing here is bold. The italic falls on "with"
+  // rather than the wordmark: SOT is a name and reads wrong leaning.
+  heroTitleItalic: {
+    fontFamily: fonts.displayItalic,
   },
   heroSubtitle: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
+    maxWidth: 300,
+  },
+  heroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   section: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
   },
   hScroll: {
     gap: spacing.md,
@@ -168,8 +238,11 @@ const styles = StyleSheet.create({
   tile: {
     width: 168,
   },
+  // No gap: the rows draw their own hairlines, and a gap between them would
+  // leave the rules floating apart instead of reading as one ruled list.
   categoryList: {
-    gap: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
 });
 

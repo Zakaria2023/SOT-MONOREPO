@@ -1,12 +1,14 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { CartRow } from "@/components/cart/cart-row";
 import { DesignCheck } from "@/components/cart/design-check";
 import { ProjectQuestions } from "@/components/cart/project-questions";
 import { Button } from "@/components/ui/button";
+import { Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
+import { Masthead } from "@/components/ui/masthead";
 import {
   ApiError,
   createBoq,
@@ -17,7 +19,7 @@ import {
   updateCartItem,
 } from "@/lib/api";
 import { formatMoney, summarizeCart } from "@/lib/format";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tabular, tracking, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 import type {
   CartLineItem,
@@ -31,6 +33,13 @@ type SummaryRowProps = {
   emphasis?: boolean;
 };
 
+/**
+ * A line of the tally: letterspaced label left, tabular figure right.
+ *
+ * The total is the same row one size up in the serif — not a bolder grotesk. It
+ * is the last line of the column, and a column's last line earns its weight from
+ * position, not from ink.
+ */
 const SummaryRow = ({ label, value, emphasis }: SummaryRowProps) => (
   <View style={styles.summaryRow}>
     <Text style={[styles.summaryLabel, emphasis ? styles.summaryStrong : null]}>
@@ -73,19 +82,29 @@ const CartScreen = () => {
     .map(([uuid, value]) => `${uuid}=${value}`)
     .join(",");
 
+  // `data` and `answers` are read through refs so the effect can depend on their
+  // signatures instead of their identity. Listing them directly would re-run the
+  // check on every render that produced an equal-but-new array — which is the
+  // shape that had the profile screen firing ~1950 requests at one endpoint.
+  // Refs are not reactive, so exhaustive-deps is satisfied honestly rather than
+  // silenced with a disable comment.
+  const latest = useRef({ data, answers });
+  latest.current = { data, answers };
+
   useEffect(() => {
-    if (!data || data.length === 0) {
+    const { data: lines, answers: currentAnswers } = latest.current;
+    if (!lines || lines.length === 0) {
       setDesign(null);
       return;
     }
     let cancelled = false;
     setChecking(true);
     fetchDesignCheck(
-      data.map((item) => ({
+      lines.map((item) => ({
         productUuid: item.productUuid,
         quantity: item.quantity,
       })),
-      answers,
+      currentAnswers,
     )
       .then((result) => {
         if (!cancelled) {
@@ -197,6 +216,8 @@ const CartScreen = () => {
   if (loading || error || !data || data.length === 0) {
     return (
       <View style={styles.container}>
+        <Masthead label="Cart" />
+        <Rule />
         <ListState
           loading={loading}
           error={error}
@@ -228,15 +249,18 @@ const CartScreen = () => {
 
   return (
     <View style={styles.container}>
+      <Masthead label="Cart" />
+      <Rule />
       <FlatList
         contentContainerStyle={styles.content}
         data={data}
         keyExtractor={(item) => item.uuid}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <CartRow
             item={item}
             busy={busyUuid === item.uuid}
+            last={index === data.length - 1}
             onIncrement={() => mutate(item, "inc")}
             onDecrement={() => mutate(item, "dec")}
             onRemove={() =>
@@ -268,10 +292,17 @@ const CartScreen = () => {
           onChange={setAnswers}
         />
         <View style={styles.summary}>
-          <SummaryRow label="Subtotal" value={formatMoney(subtotal, currency)} />
+          <SummaryRow
+            label="Subtotal"
+            value={formatMoney(subtotal, currency)}
+          />
           <SummaryRow label="VAT (15%)" value={formatMoney(vat, currency)} />
           <View style={styles.divider} />
-          <SummaryRow label="Total" value={formatMoney(total, currency)} emphasis />
+          <SummaryRow
+            label="Total"
+            value={formatMoney(total, currency)}
+            emphasis
+          />
         </View>
 
         {blocked ? (
@@ -313,20 +344,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // No gap: the lines draw their own hairlines, so a gap would leave the rules
+  // floating apart instead of reading as one ledger.
   content: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
+  // The footer is the same paper as the list, separated by a hairline. It was a
+  // rounded panel on a lighter fill, which read as a sheet half-covering the cart.
   footer: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.overlay,
     gap: spacing.lg,
-    borderTopLeftRadius: radius.panel,
-    borderTopRightRadius: radius.panel,
   },
   summary: {
     gap: spacing.sm,
@@ -335,31 +366,35 @@ const styles = StyleSheet.create({
   // reads as a broken screen.
   gate: {
     color: colors.danger,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
   summaryRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
   },
   summaryLabel: {
-    color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 15,
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    letterSpacing: tracking.label,
+    textTransform: "uppercase",
   },
   summaryStrong: {
     color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 15,
   },
   summaryValue: {
     color: colors.text,
-    fontFamily: fonts.monoBold,
-    fontSize: 15,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
+    ...tabular,
   },
   totalValue: {
-    fontSize: 20,
+    fontFamily: fonts.display,
+    fontSize: type.heading.size,
+    lineHeight: type.heading.line,
   },
   divider: {
     height: 1,
