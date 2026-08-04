@@ -19,6 +19,14 @@ export type Product = {
 };
 
 export type ProductDetail = Product & {
+  // Catalogue identity and lifecycle, all straight off the product row. The web
+  // product page shows the same five under "Product details".
+  sku: string | null;
+  model: string | null;
+  status: string | null;
+  warrantyPeriod: string | null;
+  countryOfOrigin: string | null;
+  datasheet: string | null;
   category: Category | null;
   brandBusinessLines: string[] | null;
   // Raw values the API decided this viewer may read — already filtered by

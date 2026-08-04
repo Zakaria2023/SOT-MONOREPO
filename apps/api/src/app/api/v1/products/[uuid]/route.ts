@@ -1,6 +1,9 @@
 import { getViewerFromRequest } from "@/lib/helpers";
 import { NextResponse } from "next/server";
-import { getProduct, getProductSpecsForDisplay } from "services";
+import {
+  getProductDetailByUuid,
+  getProductSpecsForDisplay,
+} from "services";
 
 type Params = {
   params: Promise<{ uuid: string }>;
@@ -8,7 +11,11 @@ type Params = {
 
 export const GET = async (request: Request, { params }: Params) => {
   const { uuid } = await params;
-  const product = await getProduct(uuid);
+  // getProductDetailByUuid, not getProduct: the bare row carries brand_uuid and
+  // category_uuid but no names, so the app was rendering a detail screen with no
+  // brand and no category — the fields were declared in its DTO and never sent.
+  // This is the same read the web product page and the compare endpoint use.
+  const product = await getProductDetailByUuid(uuid);
 
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });

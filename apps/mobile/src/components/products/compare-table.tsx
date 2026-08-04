@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { formatPrice } from "@/lib/format";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tabular, tracking, type } from "@/lib/theme";
 import type { ComparisonRow, ProductComparison } from "@/lib/types";
 
 type CompareTableProps = {
@@ -33,6 +33,14 @@ const groupRows = (rows: ComparisonRow[]): Section[] =>
     return sections;
   }, []);
 
+/**
+ * The comparison, as a ruled table that scrolls sideways.
+ *
+ * Each row was a rounded filled card with a gap beneath it, so the table read as a
+ * stack of separate cards rather than as columns to compare down. Hairlines put the
+ * values back into alignment, which is the one thing a compare table has to get
+ * right.
+ */
 export const CompareTable = ({ products, rows }: CompareTableProps) => (
   <ScrollView
     style={styles.page}
@@ -63,7 +71,10 @@ export const CompareTable = ({ products, rows }: CompareTableProps) => (
             {section.rows.map((row, index) => (
               <View
                 key={row.uuid}
-                style={[styles.row, index > 0 && styles.rowDivided]}
+                style={[
+                  styles.row,
+                  index === section.rows.length - 1 ? null : styles.rowDivided,
+                ]}
               >
                 <Text
                   style={[styles.labelCell, styles.label]}
@@ -106,51 +117,54 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: spacing.sm,
     paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderStrong,
   },
   headerCell: {
     width: COLUMN_WIDTH,
-    gap: 2,
+    gap: 3,
   },
   headerName: {
     color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 14,
+    fontFamily: fonts.heading,
+    fontSize: type.body.size,
     lineHeight: 19,
   },
   headerPrice: {
     color: colors.primary,
-    fontFamily: fonts.monoBold,
-    fontSize: 14,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+    ...tabular,
   },
-  section: { marginTop: spacing.md },
+  section: { marginTop: spacing.lg },
   sectionName: {
     color: colors.faint,
-    fontFamily: fonts.semibold,
-    fontSize: 11,
-    letterSpacing: 1.2,
+    fontFamily: fonts.body,
+    fontSize: 9,
+    letterSpacing: tracking.kicker,
     textTransform: "uppercase",
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.sm,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    paddingHorizontal: spacing.md,
   },
-  rowDivided: { marginTop: spacing.xs },
+  rowDivided: { borderBottomWidth: 1, borderBottomColor: colors.border },
   labelCell: { width: LABEL_WIDTH },
   label: {
-    color: colors.muted,
+    color: colors.faint,
     fontFamily: fonts.body,
-    fontSize: 13,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
   value: {
     width: COLUMN_WIDTH,
     color: colors.text,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
+    ...tabular,
   },
 });

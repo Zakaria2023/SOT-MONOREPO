@@ -196,11 +196,20 @@ export const fetchProductComparison = (
 ): Promise<ProductComparison> =>
   request<ProductComparison>(`/products/${uuid}/compare`, { token });
 
+/**
+ * Other devices in the same range — the web page's "Pairs well with".
+ *
+ * Same service behind it, so a product recommends the same siblings on both
+ * surfaces. Fetched separately from the detail so a cart or a grid reading a
+ * product never pays for six more.
+ */
+export const fetchRelatedProducts = (uuid: string): Promise<Product[]> =>
+  request<Product[]>(`/products/${uuid}/related`);
+
 export const fetchCategory = (uuid: string): Promise<Category> =>
   request<Category>(`/categories/${uuid}`);
 
-export const fetchBrands = (): Promise<Brand[]> =>
-  request<Brand[]>("/brands");
+export const fetchBrands = (): Promise<Brand[]> => request<Brand[]>("/brands");
 
 export const fetchBrand = (uuid: string): Promise<Brand> =>
   request<Brand>(`/brands/${uuid}`);
