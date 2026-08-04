@@ -1,7 +1,7 @@
-import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react-native";
+import { AlertTriangle, Check, ShieldAlert } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 import type { DesignCheckResult, DesignFinding } from "@/lib/types";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { colors, fonts, spacing, tracking, type } from "@/lib/theme";
 
 type DesignCheckProps = {
   result: DesignCheckResult | null;
@@ -10,16 +10,22 @@ type DesignCheckProps = {
 
 type FindingRowProps = {
   finding: DesignFinding;
+  last?: boolean;
 };
 
-const FindingRow = ({ finding }: FindingRowProps) => {
+const FindingRow = ({ finding, last = false }: FindingRowProps) => {
   const blocking = finding.tone === "block";
   const Icon = blocking ? ShieldAlert : AlertTriangle;
   const accent = blocking ? colors.danger : colors.primary;
 
   return (
-    <View style={styles.finding}>
-      <Icon color={accent} size={16} style={styles.findingIcon} />
+    <View style={[styles.finding, last ? null : styles.divided]}>
+      <Icon
+        color={accent}
+        size={15}
+        strokeWidth={1.6}
+        style={styles.findingIcon}
+      />
       <View style={styles.findingBody}>
         <Text style={[styles.findingTitle, { color: accent }]}>
           {finding.title}
@@ -43,14 +49,18 @@ const FindingRow = ({ finding }: FindingRowProps) => {
 /**
  * What the engines make of this basket, shown before the buyer commits.
  *
- * Blockers lead, because they are what stops the order. A clean basket still
- * says so — silence would read as "not checked", and the point of the check is
- * the confidence it gives, not only the errors it catches.
+ * Blockers lead, because they are what stops the order. A clean basket still says
+ * so — silence would read as "not checked", and the point of the check is the
+ * confidence it gives, not only the errors it catches.
+ *
+ * No card and no tint. The old panel carried leftover blue and green borders from
+ * the previous palette, two colours that exist nowhere else in the app now.
+ * Severity is carried by the kicker's rule and the icon beside each finding.
  */
 export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
   if (checking && !result) {
     return (
-      <View style={styles.card}>
+      <View style={styles.block}>
         <Text style={styles.checking}>Checking your design…</Text>
       </View>
     );
@@ -63,8 +73,8 @@ export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
 
   if (blockers.length === 0 && warnings.length === 0 && unknowns.length === 0) {
     return (
-      <View style={[styles.card, styles.clean]}>
-        <CheckCircle2 color={colors.success} size={16} />
+      <View style={styles.clean}>
+        <Check color={colors.success} size={15} strokeWidth={1.8} />
         <Text style={styles.cleanText}>
           This design checks out — nothing missing, nothing over capacity.
         </Text>
@@ -72,83 +82,94 @@ export const DesignCheck = ({ result, checking }: DesignCheckProps) => {
     );
   }
 
+  const findings = [...blockers, ...warnings, ...unknowns];
+  const blocked = blockers.length > 0;
+
   return (
-    <View
-      style={[
-        styles.card,
-        blockers.length > 0 ? styles.blocked : styles.warned,
-      ]}
-    >
-      <Text style={styles.heading}>
-        {blockers.length > 0
-          ? `${blockers.length} problem${blockers.length === 1 ? "" : "s"} to fix`
-          : warnings.length > 0
-            ? `${warnings.length} thing${warnings.length === 1 ? "" : "s"} to check`
-            : `${unknowns.length} check${unknowns.length === 1 ? "" : "s"} we could not run`}
-      </Text>
-      {/* Unknowns last, and never counted as problems — but never dropped
-          either. A check we could not make must not read as one that passed. */}
-      {[...blockers, ...warnings, ...unknowns].map((finding) => (
-        <FindingRow key={finding.id} finding={finding} />
+    <View style={styles.block}>
+      <View style={styles.kickerRow}>
+        <View
+          style={[styles.kickerRule, blocked ? styles.kickerRuleBad : null]}
+        />
+        <Text style={[styles.kicker, blocked ? styles.kickerBad : null]}>
+          {blocked
+            ? `${blockers.length} problem${blockers.length === 1 ? "" : "s"} to fix`
+            : warnings.length > 0
+              ? `${warnings.length} thing${warnings.length === 1 ? "" : "s"} to check`
+              : `${unknowns.length} check${unknowns.length === 1 ? "" : "s"} we could not run`}
+        </Text>
+      </View>
+      {/* Unknowns last, and never counted as problems — but never dropped either.
+          A check we could not make must not read as one that passed. */}
+      {findings.map((finding, index) => (
+        <FindingRow
+          key={finding.id}
+          finding={finding}
+          last={index === findings.length - 1}
+        />
       ))}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  blocked: { borderColor: "rgba(239,68,68,0.35)" },
-  warned: { borderColor: "rgba(34,211,238,0.30)" },
-  clean: {
+  block: { gap: spacing.md },
+  kickerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    borderColor: "rgba(52,226,155,0.30)",
+  },
+  kickerRule: { width: 22, height: 1, backgroundColor: colors.primary },
+  kickerRuleBad: { backgroundColor: colors.danger },
+  kicker: {
+    color: colors.primary,
+    fontFamily: fonts.medium,
+    fontSize: type.kicker.size,
+    lineHeight: type.kicker.line,
+    letterSpacing: tracking.kicker,
+    textTransform: "uppercase",
+  },
+  kickerBad: { color: colors.danger },
+  checking: {
+    color: colors.faint,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+  },
+  clean: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
   },
   cleanText: {
     flex: 1,
     color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  checking: {
-    color: colors.faint,
-    fontFamily: fonts.medium,
-    fontSize: 13,
-  },
-  heading: {
-    color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 15,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
   finding: {
     flexDirection: "row",
     gap: spacing.sm,
+    paddingBottom: spacing.md,
   },
-  findingIcon: { marginTop: 2 },
-  findingBody: { flex: 1, gap: 2 },
+  divided: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  findingIcon: { marginTop: 3 },
+  findingBody: { flex: 1, minWidth: 0, gap: 3 },
   findingTitle: {
-    fontFamily: fonts.semibold,
-    fontSize: 13,
+    fontFamily: fonts.heading,
+    fontSize: type.lead.size,
   },
   findingMessage: {
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
   },
   suggestions: {
     color: colors.faint,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
     marginTop: 2,
   },
 });

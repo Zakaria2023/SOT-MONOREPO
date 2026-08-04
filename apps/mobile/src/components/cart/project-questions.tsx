@@ -1,6 +1,6 @@
-import { MessageCircleQuestion } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { colors, fonts, radius, spacing } from "@/lib/theme";
+import { Kicker } from "@/components/ui/editorial";
+import { colors, fonts, radius, spacing, tabular, type } from "@/lib/theme";
 import type { DesignQuestion, ProjectAnswers } from "@/lib/types";
 
 type ProjectQuestionsProps = {
@@ -13,10 +13,16 @@ type QuestionRowProps = {
   question: DesignQuestion;
   answer: number | boolean | undefined;
   onAnswer: (value: number | boolean | undefined) => void;
+  last?: boolean;
 };
 
-const QuestionRow = ({ question, answer, onAnswer }: QuestionRowProps) => (
-  <View style={styles.question}>
+const QuestionRow = ({
+  question,
+  answer,
+  onAnswer,
+  last = false,
+}: QuestionRowProps) => (
+  <View style={[styles.question, last ? null : styles.divided]}>
     <Text style={styles.label}>
       {question.label}
       {question.unit ? (
@@ -40,7 +46,11 @@ const QuestionRow = ({ question, answer, onAnswer }: QuestionRowProps) => (
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => onAnswer(active ? undefined : option.value)}
-              style={[styles.choice, active ? styles.choiceActive : null]}
+              style={({ pressed }) => [
+                styles.choice,
+                active ? styles.choiceActive : null,
+                pressed ? styles.choicePressed : null,
+              ]}
             >
               <Text
                 style={[
@@ -59,7 +69,7 @@ const QuestionRow = ({ question, answer, onAnswer }: QuestionRowProps) => (
         keyboardType="number-pad"
         value={typeof answer === "number" ? String(answer) : ""}
         placeholder="—"
-        placeholderTextColor={colors.faint}
+        placeholderTextColor={colors.placeholder}
         // An emptied field un-answers the question rather than answering zero,
         // which is a real number a rule would happily compare against.
         onChangeText={(text) => {
@@ -67,6 +77,7 @@ const QuestionRow = ({ question, answer, onAnswer }: QuestionRowProps) => (
           onAnswer(digits === "" ? undefined : Number(digits));
         }}
         style={styles.input}
+        accessibilityLabel={question.label}
       />
     )}
   </View>
@@ -79,6 +90,10 @@ const QuestionRow = ({ question, answer, onAnswer }: QuestionRowProps) => (
  * Only what a rule touching THIS cart reads: the library may hold a dozen inputs,
  * and asking a buyer with three cameras about PBX capacity teaches them to skip
  * the block. Each answer re-runs the check, so a finding clears in front of them.
+ *
+ * The gold-tinted card is gone. It was the only filled panel left on the screen,
+ * and a block asking for input does not need a highlight to be found — it needs
+ * the ruled rows that make it obvious there are fields here.
  */
 export const ProjectQuestions = ({
   questions,
@@ -100,104 +115,97 @@ export const ProjectQuestions = ({
   };
 
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <MessageCircleQuestion color={colors.primary} size={16} />
-        <Text style={styles.heading}>
-          {questions.length === 1
+    <View style={styles.block}>
+      <Kicker
+        label={
+          questions.length === 1
             ? "One question about your project"
-            : `${questions.length} questions about your project`}
-        </Text>
-      </View>
+            : `${questions.length} questions about your project`
+        }
+      />
       <Text style={styles.hint}>
         About the site, not the products. Answering lets us finish the checks.
       </Text>
-      {questions.map((question) => (
-        <QuestionRow
-          key={question.uuid}
-          question={question}
-          answer={answers[question.uuid]}
-          onAnswer={(value) => answer(question.uuid, value)}
-        />
-      ))}
+      <View style={styles.rows}>
+        {questions.map((question, index) => (
+          <QuestionRow
+            key={question.uuid}
+            question={question}
+            answer={answers[question.uuid]}
+            onAnswer={(value) => answer(question.uuid, value)}
+            last={index === questions.length - 1}
+          />
+        ))}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.primaryBorder,
-    // Tinted, so a block asking for input does not read as one more panel
-    // reporting something.
-    backgroundColor: colors.primaryTint,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  heading: {
-    flex: 1,
-    color: colors.text,
-    fontFamily: fonts.semibold,
-    fontSize: 15,
-  },
+  block: { gap: spacing.sm },
   hint: {
     color: colors.faint,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    lineHeight: 17,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+    lineHeight: type.caption.line,
+  },
+  rows: {
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   question: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
-    marginTop: spacing.xs,
+    minHeight: 44,
+    paddingVertical: spacing.sm,
   },
+  divided: { borderBottomWidth: 1, borderBottomColor: colors.border },
   label: {
     flex: 1,
     color: colors.muted,
     fontFamily: fonts.body,
-    fontSize: 14,
+    fontSize: type.body.size,
+    lineHeight: type.body.line,
   },
-  unit: { color: colors.faint },
+  unit: { color: colors.faint, fontFamily: fonts.bodyItalic },
   choices: {
     flexDirection: "row",
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
+  // Outlines at 4px, and the chosen one is gold hairline plus gold label — a
+  // filled gold Yes was the loudest thing in the cart.
   choice: {
+    minWidth: 52,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: radius.control,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  choiceActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
+  choiceActive: { borderColor: colors.primaryBorder },
+  choicePressed: { backgroundColor: colors.pressed },
   choiceLabel: {
     color: colors.muted,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
   },
-  choiceLabelActive: { color: colors.onAccent },
+  choiceLabelActive: { color: colors.primary, fontFamily: fonts.medium },
+  // A ruled line to write on, like the catalogue search field.
   input: {
     width: 96,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
+    minHeight: 40,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primaryBorder,
     color: colors.text,
-    fontFamily: fonts.medium,
-    fontSize: 14,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
     textAlign: "right",
+    ...tabular,
   },
 });

@@ -147,6 +147,7 @@ const TabsLayout = () => {
         name="cart"
         options={{
           title: "Cart",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <ShoppingCart color={color} size={22} strokeWidth={2} />
           ),
