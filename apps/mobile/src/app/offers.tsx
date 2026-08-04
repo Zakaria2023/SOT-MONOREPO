@@ -40,7 +40,9 @@ const OffersScreen = () => {
       contentContainerStyle={styles.content}
       data={data}
       keyExtractor={(item) => item.uuid}
-      renderItem={({ item }) => <OfferCard offer={item} />}
+      renderItem={({ item, index }) => (
+        <OfferCard offer={item} last={index === (data?.length ?? 0) - 1} />
+      )}
     />
   );
 };
@@ -50,9 +52,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // No gap: the entries draw their own hairlines, and a gap would leave the rules
+  // floating apart instead of reading as one list.
   content: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
   },
 });

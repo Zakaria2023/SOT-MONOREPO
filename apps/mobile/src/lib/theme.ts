@@ -120,16 +120,13 @@ export const fonts = {
   medium: "Lora_500Medium",
   mediumItalic: "Lora_500Medium_Italic",
 
-  // Aliases so a screen mid-migration still compiles and still looks like the
-  // rest of the app, rather than reintroducing a grotesk.
-  regular: "Lora_400Regular",
-  semibold: "Lora_500Medium",
-  bold: "Lora_500Medium",
-  mono: "Lora_500Medium",
-  monoBold: "Lora_500Medium",
-  headingExtra: "CormorantGaramond_600SemiBold",
-  displayMedium: "CormorantGaramond_500Medium",
 } as const;
+
+// The migration aliases (regular/semibold/bold/mono/monoBold/headingExtra/
+// displayMedium) are deliberately gone now that no screen reads them. They existed
+// so a half-converted screen still rendered in the new faces, and leaving them
+// would make `fonts.bold` compile forever — in a language whose first rule is that
+// nothing is bold.
 
 /**
  * Tabular figures, for anything in a column or compared: kickers, counts, prices,
