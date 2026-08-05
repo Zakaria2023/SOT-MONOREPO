@@ -6,19 +6,18 @@ import { ProfileMenu } from "@/components/layout/profile-menu";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 import { buildCategoryTree } from "@/lib/categories";
-import { getCachedCategories, getCachedProducts } from "@/lib/data";
+import { getCachedCategories } from "@/lib/data";
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { getCartItemCount } from "services";
 
 export const Navbar = async () => {
   const user = await getCurrentUser();
-  const [categories, products, cartCount] = await Promise.all([
+  const [categories, cartCount] = await Promise.all([
     getCachedCategories(),
-    getCachedProducts(),
     user ? getCartItemCount(user.uuid) : Promise.resolve(0),
   ]);
-  const tree = buildCategoryTree(categories, products);
+  const tree = buildCategoryTree(categories);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-hairline bg-page/80 shadow-[0_1px_3px_rgba(20,22,27,0.06)] backdrop-blur-xl">

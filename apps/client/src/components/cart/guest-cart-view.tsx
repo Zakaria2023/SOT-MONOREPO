@@ -83,8 +83,10 @@ export const GuestCartView = () => {
   return (
     <main className="min-h-screen w-full bg-page">
       <div className="px-6 py-12 lg:px-12 xl:px-20">
+        {/* Back to the catalogue, not to the home page: shopping continues
+            where the products are. */}
         <Link
-          href="/"
+          href="/products"
           className="font-grotesk inline-flex items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-primary"
         >
           <ArrowLeft size={16} />

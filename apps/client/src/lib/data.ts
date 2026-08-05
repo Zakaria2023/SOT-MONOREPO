@@ -1,6 +1,7 @@
 import { cache } from "react";
 import {
   getBrand,
+  getBrands,
   getCategories,
   getCategory,
   getProductDetailBySlug,
@@ -18,6 +19,9 @@ export const getCachedCategories = cache(() => getCategories());
  * page's product grid.
  */
 export const getCachedProducts = cache(() => getProducts());
+
+/** Request-scoped brands fetch, for the pages that list and filter by them. */
+export const getCachedBrands = cache(() => getBrands());
 
 /**
  * The detail reads below exist because `generateMetadata` and the page body

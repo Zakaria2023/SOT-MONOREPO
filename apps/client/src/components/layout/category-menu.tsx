@@ -1,5 +1,6 @@
 "use client";
 
+import { getMenuProducts } from "@/app/products/actions";
 import type { CategoryNode } from "@/lib/categories";
 import { documentImageUrl } from "@/lib/documents";
 import { formatPrice } from "utils";
@@ -27,11 +28,11 @@ type ProductTileProps = {
   product: ProductSummary;
 };
 
-// Every product under a node, not just the ones filed directly against it:
-// products sit in the leaves, so a family would otherwise preview as empty.
-const subtreeProducts = (node: CategoryNode): ProductSummary[] => [
-  ...node.products,
-  ...node.children.flatMap(subtreeProducts),
+// Every uuid under a node, because products sit in the leaves: a query for the
+// family alone comes back empty.
+const subtreeUuids = (node: CategoryNode): string[] => [
+  node.uuid,
+  ...node.children.flatMap(subtreeUuids),
 ];
 
 // Products under a node AND under everything beneath it, for the count beside
@@ -247,7 +248,30 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
   const [activeTopUuid, setActiveTopUuid] = useState<string | null>(null);
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
   const [openUuids, setOpenUuids] = useState<Set<string>>(() => new Set());
+  // Products per category, filled the first time a category is looked at and kept
+  // for the rest of the visit — hovering back and forth must not re-query.
+  const [productsByUuid, setProductsByUuid] = useState<
+    Record<string, ProductSummary[]>
+  >({});
+  const [loadingUuid, setLoadingUuid] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showCategory = (node: CategoryNode) => {
+    setSelectedUuid(node.uuid);
+    if (productsByUuid[node.uuid]) {
+      return;
+    }
+    setLoadingUuid(node.uuid);
+    getMenuProducts(subtreeUuids(node))
+      .then((rows) =>
+        setProductsByUuid((current) => ({ ...current, [node.uuid]: rows })),
+      )
+      // A preview that fails is an empty panel, never a broken menu.
+      .catch(() =>
+        setProductsByUuid((current) => ({ ...current, [node.uuid]: [] })),
+      )
+      .finally(() => setLoadingUuid(null));
+  };
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -262,9 +286,9 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
     // first one: a menu whose whole right-hand side reads "nothing listed here
     // yet" the moment it opens teaches the shopper to stop opening it.
     const stocked = parent.children.find((child) => subtreeCount(child) > 0);
-    const landing = stocked ?? parent.children[0];
-    setSelectedUuid(landing?.uuid ?? parent.uuid);
-    setOpenUuids(landing ? new Set([landing.uuid]) : new Set());
+    const landing = stocked ?? parent.children[0] ?? parent;
+    showCategory(landing);
+    setOpenUuids(landing === parent ? new Set() : new Set([landing.uuid]));
   };
 
   const scheduleClose = () => {
@@ -272,16 +296,13 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
     closeTimer.current = setTimeout(() => setActiveTopUuid(null), 120);
   };
 
+  // One branch open at a time. Leaving them all open pushed the panel past the
+  // bottom of the screen, so the products it exists to show scrolled out of view
+  // behind a column of category names.
   const toggle = (uuid: string) =>
-    setOpenUuids((current) => {
-      const next = new Set(current);
-      if (next.has(uuid)) {
-        next.delete(uuid);
-      } else {
-        next.add(uuid);
-      }
-      return next;
-    });
+    setOpenUuids((current) =>
+      current.has(uuid) ? new Set() : new Set([uuid]),
+    );
 
   const activeTop = categories.find((c) => c.uuid === activeTopUuid) ?? null;
 
@@ -298,7 +319,10 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
     return null;
   };
   const selected = activeTop ? (findNode([activeTop]) ?? activeTop) : null;
-  const products = selected ? subtreeProducts(selected).slice(0, 6) : [];
+  const products = selected
+    ? (productsByUuid[selected.uuid] ?? []).slice(0, 6)
+    : [];
+  const loading = selected ? loadingUuid === selected.uuid : false;
 
   return (
     // Appears at xl, not md. At 768-1279 the category row and the action
@@ -331,7 +355,10 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
         <div
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
-          className="fixed inset-x-0 top-18 z-40 border-b border-hairline bg-surface-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)]"
+          // A ceiling and a scroll of its own: a family with several open
+          // branches is taller than the viewport, and a menu that grows past the
+          // bottom of the screen cannot be read to the end.
+          className="fixed inset-x-0 top-18 z-40 flex max-h-[calc(100vh-4.5rem)] flex-col overflow-hidden border-b border-hairline bg-surface-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)]"
         >
           {/* The masthead is a band, and the selected category's photograph is
               the thing on it: once in a white disc beside the name, and once
@@ -394,7 +421,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
             </div>
           </div>
 
-          <div className="mx-auto grid grid-cols-[260px_1fr] gap-8 px-6 pt-8 pb-6 lg:px-12 xl:px-20">
+          <div className="scrollbar-slim mx-auto grid min-h-0 flex-1 grid-cols-[260px_1fr] gap-8 overflow-y-auto px-6 pt-8 pb-6 lg:px-12 xl:px-20">
             <div>
               <p className="font-grotesk px-3 text-xs font-semibold tracking-widest text-faint uppercase">
                 Categories
@@ -407,7 +434,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
                     depth={0}
                     selectedUuid={selected.uuid}
                     openUuids={openUuids}
-                    onSelect={(node) => setSelectedUuid(node.uuid)}
+                    onSelect={showCategory}
                     onToggle={toggle}
                   />
                 ))}
@@ -418,7 +445,18 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
               <p className="font-grotesk text-xs font-semibold tracking-widest text-faint uppercase">
                 In {selected.name}
               </p>
-              {products.length > 0 ? (
+              {loading ? (
+                // Three empty plates in the grid the products will land in, so
+                // the panel does not jump when they arrive.
+                <div className="mt-3 grid grid-cols-3 gap-4">
+                  {[0, 1, 2].map((slot) => (
+                    <div
+                      key={slot}
+                      className="h-44 animate-pulse rounded-2xl border border-hairline bg-surface"
+                    />
+                  ))}
+                </div>
+              ) : products.length > 0 ? (
                 <div className="mt-3 grid grid-cols-3 gap-4">
                   {products.map((product) => (
                     <ProductTile key={product.uuid} product={product} />

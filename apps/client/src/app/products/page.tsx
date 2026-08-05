@@ -1,12 +1,11 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
+import { getCachedBrands, getCachedCategories } from "@/lib/data";
 import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
 import { parseSpecParams } from "utils";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import {
-  getBrands,
-  getCategories,
   expandFacetChoices,
   facetSelectionValues,
   getCategoryFacets,
@@ -51,15 +50,23 @@ const toArray = (value: string | string[] | undefined): string[] => {
 
 const ProductsPage = async ({ searchParams }: Props) => {
   const params = await searchParams;
+  // The cached wrappers, not the services directly: the navbar in the layout
+  // reads the same two lists on every render, and React's request-scoped cache
+  // collapses the pair into one query each. Measured warm, getCategories alone is
+  // ~430ms against the shared Aiven pool — paying it twice per page view is the
+  // single largest avoidable cost on this screen. This is per-request
+  // deduplication, not a data cache: nothing survives the response.
   const [categories, brands, viewerPricing] = await Promise.all([
-    getCategories(),
-    getBrands(),
+    getCachedCategories(),
+    getCachedBrands(),
     getViewerPartnerPricing(),
   ]);
 
   const categoryTree = buildTree(
     categories,
-    new Map(categories.map((category) => [category.uuid, category.productCount])),
+    new Map(
+      categories.map((category) => [category.uuid, category.productCount]),
+    ),
   );
   const brandTree = buildTree(
     brands,
@@ -98,35 +105,57 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // Resolved twice on purpose. The first pass gives the facets that are always
   // offered; the second re-resolves with what the shopper has actually ticked, so
   // a conditional facet (PoE Budget) appears once its trigger (PoE = Yes) is set.
-  const baseFacets: CategoryFacet[] = selectedCategory
-    ? await getCategoryFacets(selectedCategory, viewer)
-    : [];
-  const facets: CategoryFacet[] = selectedCategory
-    ? await getCategoryFacets(
-        selectedCategory,
-        viewer,
-        facetSelectionValues(selectedSpecs, baseFacets),
-      )
-    : [];
+  const resolveFacets = async (): Promise<CategoryFacet[]> => {
+    if (!selectedCategory) {
+      return [];
+    }
+    const baseFacets = await getCategoryFacets(selectedCategory, viewer);
+    return getCategoryFacets(
+      selectedCategory,
+      viewer,
+      facetSelectionValues(selectedSpecs, baseFacets),
+    );
+  };
 
-  // Ignore any spec param the current category doesn't actually offer — a
-  // stale key left over from a previous category must not silently filter
-  // every product away.
+  const facetsPromise = resolveFacets();
+
+  // The product query only needs the facets when there is a spec choice to
+  // expand, and most changes — a category, a brand, the sort — carry none. Made
+  // to wait anyway, every one of those clicks paid for a facet resolution before
+  // its own round trip could start.
+  const productsPromise =
+    Object.keys(selectedSpecs).length === 0
+      ? getProducts({ search, categoryUuids, brandUuids, sort })
+      : facetsPromise.then((facets) =>
+          getProducts({
+            search,
+            categoryUuids,
+            brandUuids,
+            // Ignore any spec param the current category doesn't actually offer —
+            // a stale key left over from a previous category must not silently
+            // filter every product away. An ordered facet is a ceiling, so the
+            // choice expands to everything at or below it before querying.
+            specValues: expandFacetChoices(
+              facets,
+              Object.fromEntries(
+                Object.entries(selectedSpecs).filter(([key]) =>
+                  facets.some((facet) => facet.key === key),
+                ),
+              ),
+            ),
+            sort,
+          }),
+        );
+
+  const [facets, products] = await Promise.all([
+    facetsPromise,
+    productsPromise,
+  ]);
+
   const offeredKeys = new Set(facets.map((facet) => facet.key));
   const chosen = Object.fromEntries(
     Object.entries(selectedSpecs).filter(([key]) => offeredKeys.has(key)),
   );
-  // An ordered facet is a ceiling, not an exact match — expand the choice to
-  // everything at or below it before querying.
-  const specValues = expandFacetChoices(facets, chosen);
-
-  const products = await getProducts({
-    search,
-    categoryUuids,
-    brandUuids,
-    specValues,
-    sort,
-  });
 
   const total = categories.reduce(
     (sum, category) => sum + category.productCount,
