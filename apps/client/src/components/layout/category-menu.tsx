@@ -374,15 +374,16 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
           // bottom of the screen cannot be read to the end.
           className="fixed inset-x-0 top-18 z-40 flex max-h-[calc(100vh-4.5rem)] flex-col overflow-hidden border-b border-hairline bg-surface-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)]"
         >
-          {/* The masthead is a band, and the selected category's photograph is
-              the thing on it: once in a white disc beside the name, and once
-              large, hanging past the band's bottom edge. */}
-          <div className="relative bg-category-hero">
+          {/* The masthead sits on the panel's own surface, divided from the
+              columns below by a hairline rather than by a colour. A violet
+              field across the full width of the screen was louder than
+              anything in the menu it was introducing. */}
+          <div className="relative border-b border-hairline">
             {/* Low and to the right, hanging past the band the way a product
                 shot overlaps a banner edge. The band therefore cannot clip its
                 overflow, so the image is pointer-events-none and the copy is
-                capped away from it. No drop shadow: these are cut-outs on a
-                coloured field, and a shadow haloes the bounding box. */}
+                capped away from it. No drop shadow: these are cut-outs, and a
+                shadow haloes the bounding box. */}
             {selected.image && (
               <div
                 aria-hidden="true"
@@ -401,8 +402,8 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
               </div>
             )}
 
-            <div className="relative flex w-full items-start gap-4 px-6 py-12 lg:px-12 xl:px-20">
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+            <div className="relative flex w-full items-start gap-4 px-6 py-8 lg:px-12 xl:px-20">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-hairline bg-surface">
                 {selected.image ? (
                   <Image
                     src={documentImageUrl(selected.image)}
@@ -420,14 +421,14 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
 
               {/* Capped, so the copy never runs under the photograph. */}
               <div className="min-w-0 max-w-md">
-                <h2 className="font-heading text-3xl text-white">
+                <h2 className="font-heading text-3xl text-ink">
                   {selected.name}
                 </h2>
-                <p className="font-grotesk text-sm text-white/70">
+                <p className="font-grotesk text-sm text-faint">
                   {subtreeCount(selected)} products
                 </p>
                 {selected.description && (
-                  <p className="mt-3 text-sm leading-relaxed text-white/85">
+                  <p className="mt-3 text-sm leading-relaxed text-muted">
                     {selected.description}
                   </p>
                 )}
