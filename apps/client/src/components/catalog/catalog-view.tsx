@@ -152,9 +152,14 @@ export const CatalogView = ({
           </div>
         )}
 
-        <div className="mt-10 flex flex-col gap-8 lg:flex-row">
-          {/* Desktop sidebar */}
-          <aside className="hidden shrink-0 flex-col gap-4 lg:flex lg:w-80 xl:w-96">
+        {/* items-start, or the sidebar is stretched to the grid's height by the
+            flex default and sticky has nothing left to stick. */}
+        <div className="mt-10 flex flex-col gap-8 lg:flex-row lg:items-start">
+          {/* Desktop sidebar. It sticks below the navbar and scrolls inside
+              itself: the filters are taller than the viewport once a category is
+              open, and scrolling to reach the specifications used to drag the
+              whole product grid off the screen with them. */}
+          <aside className="scrollbar-slim hidden shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:w-80 lg:overflow-y-auto lg:pr-1 xl:w-96">
             <CategoryFilter
               tree={categoryTree}
               total={total}
