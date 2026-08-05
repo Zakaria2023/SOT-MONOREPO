@@ -87,28 +87,71 @@ const TreeItem = ({
   const isOpen = openUuids.has(node.uuid);
   const hasChildren = node.children.length > 0;
 
-  return (
-    <li>
-      <div
-        className={cn(
-          "flex items-center gap-1 rounded-xl border transition-colors",
-          isSelected
-            ? "border-primary/40 bg-primary-tint"
-            : "border-transparent hover:border-hairline hover:bg-surface",
-        )}
-      >
-        <button
-          type="button"
+  // A family is a card; everything under it is a bulleted line inside that card's
+  // block. Rendering all levels as identical rows made a three-deep tree read as
+  // one long list of equals.
+  if (depth > 0) {
+    return (
+      <li>
+        <Link
+          href={`/products?category=${node.uuid}`}
           onMouseEnter={() => onSelect(node)}
-          onClick={() => onSelect(node)}
-          style={{ paddingLeft: depth === 0 ? 12 : 12 + depth * 14 }}
-          className="flex flex-1 items-center gap-3 py-2.5 pr-2 text-left"
+          className={cn(
+            "font-grotesk flex items-center gap-2.5 rounded-lg py-1.5 pr-2 pl-4 text-sm transition-colors",
+            isSelected ? "text-primary" : "text-secondary hover:text-primary",
+          )}
         >
-          {depth === 0 ? <CategoryPlate node={node} size={34} /> : null}
+          <span
+            className={cn(
+              "h-1.5 w-1.5 shrink-0 rounded-full",
+              isSelected ? "bg-primary-solid" : "bg-hairline",
+            )}
+          />
+          <span className="truncate">{node.name}</span>
+        </Link>
+
+        {hasChildren && (
+          <ul className="space-y-0.5 pl-4">
+            {node.children.map((child) => (
+              <TreeItem
+                key={child.uuid}
+                node={child}
+                depth={depth + 1}
+                selectedUuid={selectedUuid}
+                openUuids={openUuids}
+                onSelect={onSelect}
+                onToggle={onToggle}
+              />
+            ))}
+          </ul>
+        )}
+      </li>
+    );
+  }
+
+  return (
+    <li
+      className={cn(
+        "rounded-2xl border transition-colors",
+        isSelected
+          ? "border-primary/40 bg-primary-tint"
+          : "border-hairline bg-surface hover:border-primary/30",
+      )}
+    >
+      <div className="flex items-center gap-1">
+        {/* The row is a link, not a button: clicking a family opens the catalogue
+            already filtered to it, which is what a shopper who clicked a category
+            was asking for. Hovering still previews it in the panel. */}
+        <Link
+          href={`/products?category=${node.uuid}`}
+          onMouseEnter={() => onSelect(node)}
+          className="flex flex-1 items-center gap-3 py-2.5 pr-1 pl-3 text-left"
+        >
+          <CategoryPlate node={node} size={36} />
           <span className="min-w-0">
             <span
               className={cn(
-                "font-grotesk block truncate text-sm",
+                "font-grotesk block truncate text-sm font-medium",
                 isSelected ? "text-primary" : "text-ink",
               )}
             >
@@ -118,7 +161,7 @@ const TreeItem = ({
               {subtreeCount(node)} products
             </span>
           </span>
-        </button>
+        </Link>
 
         {hasChildren && (
           <button
@@ -139,7 +182,7 @@ const TreeItem = ({
       </div>
 
       {isOpen && hasChildren && (
-        <ul className="mt-0.5 space-y-0.5">
+        <ul className="space-y-0.5 px-3 pb-3">
           {node.children.map((child) => (
             <TreeItem
               key={child.uuid}
@@ -292,37 +335,37 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
         >
           {/* The masthead is a band, and the selected category's photograph is
               the thing on it: once in a white disc beside the name, and once
-              large, bleeding off the right edge. A 64px thumbnail told the
-              shopper nothing about which family they were standing in. */}
-          <div className="relative overflow-hidden bg-accent-gradient">
+              large, hanging past the band's bottom edge. */}
+          <div className="relative bg-category-hero">
+            {/* Low and to the right, hanging past the band the way a product
+                shot overlaps a banner edge. The band therefore cannot clip its
+                overflow, so the image is pointer-events-none and the copy is
+                capped away from it. No drop shadow: these are cut-outs on a
+                coloured field, and a shadow haloes the bounding box. */}
             {selected.image && (
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block"
+                className="pointer-events-none absolute right-12 -bottom-5 hidden h-36 w-80 lg:block xl:right-20"
               >
                 <Image
                   src={documentImageUrl(selected.image)}
                   alt=""
                   fill
-                  sizes="700px"
-                  // object-right and no padding, so the photograph runs to the
-                  // edge of the band the way a product shot sits on a banner.
-                  // No drop shadow: these are cut-outs on a coloured field, and a
-                  // shadow under a transparent PNG haloes its bounding box.
-                  className="object-contain object-right"
+                  sizes="500px"
+                  className="object-contain object-bottom"
                 />
               </div>
             )}
 
-            <div className="relative mx-auto flex items-center gap-5 px-6 py-10 lg:px-12 xl:px-20">
-              <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+            <div className="relative mx-auto flex items-start gap-4 px-6 py-12 lg:px-12 xl:px-20">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
                 {selected.image ? (
                   <Image
                     src={documentImageUrl(selected.image)}
                     alt=""
                     fill
-                    sizes="64px"
-                    className="object-contain p-3"
+                    sizes="56px"
+                    className="object-contain p-2.5"
                   />
                 ) : (
                   <span className="font-heading text-xl font-bold text-primary-solid">
@@ -332,35 +375,28 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
               </span>
 
               {/* Capped, so the copy never runs under the photograph. */}
-              <div className="min-w-0 max-w-lg flex-1">
+              <div className="min-w-0 max-w-md">
                 <h2 className="font-heading text-3xl text-white">
                   {selected.name}
                 </h2>
-                <p className="font-grotesk text-xs text-white/75">
+                <p className="font-grotesk text-sm text-white/70">
                   {subtreeCount(selected)} products
                 </p>
                 {selected.description && (
-                  <p className="mt-2 text-sm text-white/85">
+                  <p className="mt-3 text-sm leading-relaxed text-white/85">
                     {selected.description}
                   </p>
                 )}
               </div>
-
-              <Link
-                href={`/products?category=${selected.uuid}`}
-                className="font-grotesk shrink-0 rounded-xl border border-white/50 bg-white/10 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-              >
-                Browse {selected.name}
-              </Link>
             </div>
           </div>
 
-          <div className="mx-auto grid grid-cols-[260px_1fr] gap-8 px-6 py-6 lg:px-12 xl:px-20">
+          <div className="mx-auto grid grid-cols-[260px_1fr] gap-8 px-6 pt-8 pb-6 lg:px-12 xl:px-20">
             <div>
               <p className="font-grotesk px-3 text-xs font-semibold tracking-widest text-faint uppercase">
                 Categories
               </p>
-              <ul className="mt-3 space-y-0.5">
+              <ul className="mt-3 space-y-2">
                 {activeTop.children.map((child) => (
                   <TreeItem
                     key={child.uuid}
