@@ -305,15 +305,28 @@ const adminProductSearchFilter = (search?: string) => {
   );
 };
 
-/** A searched + paginated page of products for the admin list table. */
+/** What the admin list can narrow by, beyond the search box and the page. */
+export type AdminProductFilters = ListParams & {
+  /** Exactly this category, not its subtree: the admin is looking at rows. */
+  categoryUuid?: string;
+  brandUuid?: string;
+};
+
+/** A searched + filtered + paginated page of products for the admin list. */
 export const getProductsPage = async (
-  params: ListParams = {},
+  params: AdminProductFilters = {},
 ): Promise<PaginatedResult<ProductListItem>> => {
   const { page, pageSize, offset } = resolvePagination(
     params.page,
     params.pageSize,
   );
-  const where = adminProductSearchFilter(params.search);
+  const where = and(
+    adminProductSearchFilter(params.search),
+    params.categoryUuid
+      ? eq(Products.categoryUuid, params.categoryUuid)
+      : undefined,
+    params.brandUuid ? eq(Products.brandUuid, params.brandUuid) : undefined,
+  );
 
   try {
     const [rows, [totals]] = await Promise.all([
