@@ -1,7 +1,7 @@
 import { CatalogView } from "@/components/catalog/catalog-view";
 import { getCachedBrands, getCachedCategories } from "@/lib/data";
 import { buildTree, normalizeSort, subtreeMap } from "@/lib/catalog";
-import { parseSpecParams } from "utils";
+import { parseSpecParams, parseSpecRangeParams } from "utils";
 import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
@@ -42,6 +42,7 @@ type Props = {
     category?: string;
     brand?: string | string[];
     spec?: string | string[];
+    range?: string | string[];
     sort?: string;
     page?: string;
   }>;
@@ -107,6 +108,11 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // once a category is chosen — an attribute assigned at Networking has nothing
   // to narrow on an all-categories view.
   const selectedSpecs = selectedCategory ? parseSpecParams(params.spec) : {};
+  // Numeric facets are bounds rather than values, so they travel in their own
+  // param — and like the rest, they only mean anything inside a category.
+  const selectedRanges = selectedCategory
+    ? parseSpecRangeParams(params.range)
+    : {};
   // A signed-in partner is a different shopper from a regular user, not a wider
   // one — each sees "everyone" plus their own side.
   const viewer = viewerPricing.isPartner ? "partner" : "user";
@@ -132,6 +138,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // expand, and most changes — a category, a brand, the sort — carry none. Made
   // to wait anyway, every one of those clicks paid for a facet resolution before
   // its own round trip could start.
+  const asked =
+    Object.keys(selectedSpecs).length > 0 ||
+    Object.keys(selectedRanges).length > 0;
   const baseFilters: ProductFilters = {
     search,
     categoryUuids,
@@ -148,26 +157,28 @@ const ProductsPage = async ({ searchParams }: Props) => {
       countProducts(filters),
     ]);
 
-  const pageDataPromise =
-    Object.keys(selectedSpecs).length === 0
-      ? queryFor(baseFilters)
-      : facetsPromise.then((facets) =>
-          queryFor({
-            ...baseFilters,
-            // Ignore any spec param the current category doesn't actually offer —
-            // a stale key left over from a previous category must not silently
-            // filter every product away. An ordered facet is a ceiling, so the
-            // choice expands to everything at or below it before querying.
-            specValues: expandFacetChoices(
-              facets,
-              Object.fromEntries(
-                Object.entries(selectedSpecs).filter(([key]) =>
-                  facets.some((facet) => facet.key === key),
-                ),
-              ),
+  const pageDataPromise = !asked
+    ? queryFor(baseFilters)
+    : facetsPromise.then((facets) => {
+        const offered = (key: string) =>
+          facets.some((facet) => facet.key === key);
+        return queryFor({
+          ...baseFilters,
+          // Ignore any spec param the current category doesn't actually offer —
+          // a stale key left over from a previous category must not silently
+          // filter every product away. An ordered facet is a ceiling, so the
+          // choice expands to everything at or below it before querying.
+          specValues: expandFacetChoices(
+            facets,
+            Object.fromEntries(
+              Object.entries(selectedSpecs).filter(([key]) => offered(key)),
             ),
-          }),
-        );
+          ),
+          specRanges: Object.fromEntries(
+            Object.entries(selectedRanges).filter(([key]) => offered(key)),
+          ),
+        });
+      });
 
   const [facets, [products, matching]] = await Promise.all([
     facetsPromise,
@@ -197,6 +208,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
       selectedBrands={selectedBrands}
       facets={facets}
       selectedSpecs={chosen}
+      selectedRanges={Object.fromEntries(
+        Object.entries(selectedRanges).filter(([key]) => offeredKeys.has(key)),
+      )}
       sort={sort}
       search={search ?? ""}
       discountPercent={viewerPricing.discountPercent}

@@ -6,7 +6,13 @@ import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { CategoryFilter } from "@/components/catalog/category-filter";
 import { SpecFilter } from "@/components/catalog/spec-filter";
 import { SORT_OPTIONS, type TreeNode } from "@/lib/catalog";
-import { SPEC_PARAM, encodeSpecParam } from "utils";
+import {
+  SPEC_PARAM,
+  SPEC_RANGE_PARAM,
+  encodeSpecParam,
+  encodeSpecRangeParam,
+  type SpecRange,
+} from "utils";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,6 +42,7 @@ type CatalogViewProps = {
   // a category is chosen, since a facet belongs to a place in the tree.
   facets: CategoryFacet[];
   selectedSpecs: Record<string, string[]>;
+  selectedRanges: Record<string, SpecRange>;
   sort: ProductSort;
   search: string;
   // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
@@ -54,6 +61,7 @@ export const CatalogView = ({
   selectedBrands,
   facets,
   selectedSpecs,
+  selectedRanges,
   sort,
   search,
   discountPercent,
@@ -97,6 +105,7 @@ export const CatalogView = ({
       // Carrying "Cat6" from Copper Cables into IP Cameras would filter the
       // new category down to nothing for no visible reason.
       params.delete(SPEC_PARAM);
+      params.delete(SPEC_RANGE_PARAM);
     });
 
   const toggleSpec = (key: string, value: string) =>
@@ -108,6 +117,20 @@ export const CatalogView = ({
         ? current.filter((item) => item !== entry)
         : [...current, entry];
       next.forEach((item) => params.append(SPEC_PARAM, item));
+    });
+
+  const setRange = (key: string, range: SpecRange) =>
+    updateParams((params) => {
+      const others = params
+        .getAll(SPEC_RANGE_PARAM)
+        .filter((entry) => !entry.startsWith(`${key}:`));
+      params.delete(SPEC_RANGE_PARAM);
+      others.forEach((entry) => params.append(SPEC_RANGE_PARAM, entry));
+      // An empty range is no filter at all — leaving `range=ports::` in the URL
+      // would carry a bound of nothing from screen to screen.
+      if (range.min !== undefined || range.max !== undefined) {
+        params.append(SPEC_RANGE_PARAM, encodeSpecRangeParam(key, range));
+      }
     });
 
   const toggleBrand = (uuid: string) =>
@@ -188,6 +211,8 @@ export const CatalogView = ({
               facets={facets}
               selected={selectedSpecs}
               onToggle={toggleSpec}
+              ranges={selectedRanges}
+              onRange={setRange}
             />
           </aside>
 
@@ -232,6 +257,8 @@ export const CatalogView = ({
                   facets={facets}
                   selected={selectedSpecs}
                   onToggle={toggleSpec}
+                  ranges={selectedRanges}
+                  onRange={setRange}
                 />
               </div>
             </div>

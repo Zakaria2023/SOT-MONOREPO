@@ -42,6 +42,12 @@ export type ProductDetail = Product & {
 /** The orders `getProducts` understands, mirrored from the service's ProductSort. */
 export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
 
+/** Bounds for a numeric facet. Either end may be left open. */
+export type SpecRange = {
+  min?: number;
+  max?: number;
+};
+
 export type ProductSpec = {
   uuid: string;
   label: string;
@@ -55,6 +61,9 @@ export type ProductSpec = {
 export type SpecFacet = {
   key: string;
   label: string;
+  // A "number" facet is a range with no options to tick — the app renders two
+  // bounds for it. Every other type is a list of values.
+  type: string;
   unit: string | null;
   ordered: boolean;
   options: { value: string; label: string; rank: number | null }[];

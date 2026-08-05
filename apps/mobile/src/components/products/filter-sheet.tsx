@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { FilterTree } from "@/components/products/filter-tree";
@@ -20,7 +21,13 @@ import {
   type,
 } from "@/lib/theme";
 import type { TreeNode } from "@/lib/tree";
-import type { Brand, Category, ProductSort, SpecFacet } from "@/lib/types";
+import type {
+  Brand,
+  Category,
+  ProductSort,
+  SpecFacet,
+  SpecRange,
+} from "@/lib/types";
 
 /**
  * The four orders the catalogue offers, in the same words the web catalogue uses.
@@ -56,6 +63,9 @@ type FilterSheetProps = {
   onToggleBrand?: (uuid: string) => void;
   sort?: ProductSort;
   onSort?: (value: ProductSort) => void;
+  /** Bounds per numeric facet, and the setter the screen filters by. */
+  ranges?: Record<string, SpecRange>;
+  onRange?: (key: string, range: SpecRange) => void;
   facets: SpecFacet[];
   selected: Record<string, string[]>;
   open: boolean;
@@ -68,6 +78,56 @@ type FacetBlockProps = {
   facet: SpecFacet;
   chosen: string[];
   onToggle: (value: string) => void;
+};
+
+type RangeBlockProps = {
+  facet: SpecFacet;
+  range: SpecRange;
+  onChange: (range: SpecRange) => void;
+};
+
+/**
+ * A numeric facet: two bounds on a ruled line each, either left open.
+ *
+ * A number attribute carries no options — "48 ports or more" is the question —
+ * so it had no facet to render and was dropped from the sheet entirely, along
+ * with whatever the catalogue team meant by switching the filter on.
+ */
+const RangeBlock = ({ facet, range, onChange }: RangeBlockProps) => {
+  const bound = (value: string): number | undefined => {
+    const parsed = Number(value);
+    return value.trim() !== "" && Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  return (
+    <View style={styles.facet}>
+      <Text style={styles.facetLabel}>
+        {facet.label}
+        {facet.unit ? <Text style={styles.unit}> ({facet.unit})</Text> : null}
+      </Text>
+      <View style={styles.rangeRow}>
+        <TextInput
+          keyboardType="number-pad"
+          defaultValue={range.min?.toString() ?? ""}
+          placeholder="Min"
+          placeholderTextColor={colors.placeholder}
+          onChangeText={(text) => onChange({ ...range, min: bound(text) })}
+          accessibilityLabel={`${facet.label} minimum`}
+          style={styles.rangeInput}
+        />
+        <Text style={styles.rangeTo}>to</Text>
+        <TextInput
+          keyboardType="number-pad"
+          defaultValue={range.max?.toString() ?? ""}
+          placeholder="Max"
+          placeholderTextColor={colors.placeholder}
+          onChangeText={(text) => onChange({ ...range, max: bound(text) })}
+          accessibilityLabel={`${facet.label} maximum`}
+          style={styles.rangeInput}
+        />
+      </View>
+    </View>
+  );
 };
 
 const FacetBlock = ({ facet, chosen, onToggle }: FacetBlockProps) => (
@@ -134,6 +194,8 @@ export const FilterSheet = ({
   onToggleBrand,
   sort = "featured",
   onSort,
+  ranges = {},
+  onRange,
   facets,
   selected,
   open,
@@ -141,10 +203,14 @@ export const FilterSheet = ({
   onClose,
   onChange,
 }: FilterSheetProps) => {
-  const specCount = Object.values(selected).reduce(
-    (total, values) => total + values.length,
-    0,
-  );
+  const specCount =
+    Object.values(selected).reduce(
+      (total, values) => total + values.length,
+      0,
+    ) +
+    Object.values(ranges).filter(
+      (range) => range.min !== undefined || range.max !== undefined,
+    ).length;
   const showCategories = Boolean(categories && categories.length > 0);
   const showBrands = Boolean(brands && brands.length > 0);
   const chosenBrands = selectedBrands ?? [];
@@ -305,14 +371,23 @@ export const FilterSheet = ({
               </View>
             ) : null}
 
-            {facets.map((facet) => (
-              <FacetBlock
-                key={facet.key}
-                facet={facet}
-                chosen={selected[facet.key] ?? []}
-                onToggle={(value) => toggle(facet.key, value)}
-              />
-            ))}
+            {facets.map((facet) =>
+              facet.type === "number" ? (
+                <RangeBlock
+                  key={facet.key}
+                  facet={facet}
+                  range={ranges[facet.key] ?? {}}
+                  onChange={(range) => onRange?.(facet.key, range)}
+                />
+              ) : (
+                <FacetBlock
+                  key={facet.key}
+                  facet={facet}
+                  chosen={selected[facet.key] ?? []}
+                  onToggle={(value) => toggle(facet.key, value)}
+                />
+              ),
+            )}
           </ScrollView>
 
           <View style={styles.sheetFoot}>
@@ -452,6 +527,29 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyItalic,
     fontSize: type.caption.size,
     marginTop: -2,
+  },
+  rangeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  rangeTo: {
+    color: colors.faint,
+    fontFamily: fonts.bodyItalic,
+    fontSize: type.caption.size,
+  },
+  // A ruled line to write on, like the catalogue search field.
+  rangeInput: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primaryBorder,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: type.body.size,
+    ...tabular,
   },
   options: {
     flexDirection: "row",

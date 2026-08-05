@@ -1,6 +1,5 @@
 import { API_URL } from "./env";
 import type {
-  ProductSort,
   AuthUser,
   Boq,
   Brand,
@@ -13,8 +12,10 @@ import type {
   Product,
   ProductComparison,
   ProductDetail,
+  ProductSort,
   ProjectAnswers,
   SpecFacet,
+  SpecRange,
 } from "./types";
 
 export class ApiError extends Error {
@@ -42,6 +43,9 @@ type ProductsQuery = {
   // the same encoding the web catalog uses, so a shared link means the same
   // thing on both.
   specValues?: Record<string, string[]>;
+  // Numeric facets, as bounds rather than values — sent as `range=key:min:max`
+  // with either end blank, the same encoding the web catalogue uses.
+  specRanges?: Record<string, SpecRange>;
   // Which category the chosen facets belong to. Needed because categoryUuids
   // is usually a whole subtree — the facets are the picked category's, but the
   // products sit in its leaves.
@@ -69,6 +73,12 @@ const buildQuery = (query: ProductsQuery): string => {
     for (const value of values) {
       params.append("spec", `${key}:${value}`);
     }
+  }
+  for (const [key, range] of Object.entries(query.specRanges ?? {})) {
+    if (range.min === undefined && range.max === undefined) {
+      continue;
+    }
+    params.append("range", `${key}:${range.min ?? ""}:${range.max ?? ""}`);
   }
   const qs = params.toString();
   return qs.length > 0 ? `?${qs}` : "";

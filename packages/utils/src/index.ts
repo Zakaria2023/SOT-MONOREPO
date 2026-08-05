@@ -238,6 +238,62 @@ export const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+/** One numeric facet's bounds. Either end may be left open. */
+export type SpecRange = {
+  min?: number;
+  max?: number;
+};
+
+/**
+ * A numeric facet is a range, not a set of values to tick, so it travels in its
+ * own param: `range=key:min:max`, with either end blank for "no bound"
+ * (`range=ports:24:` is "24 or more").
+ *
+ * Kept apart from `spec` deliberately. Folding a range into that encoding would
+ * make `spec=speed:1000` ambiguous — a stored value of exactly 1000, or a floor of
+ * 1000 — and the two filter completely differently.
+ */
+export const SPEC_RANGE_PARAM = "range";
+
+export const encodeSpecRangeParam = (key: string, range: SpecRange): string =>
+  `${key}:${range.min ?? ""}:${range.max ?? ""}`;
+
+/** Parse repeated `range` params into the map getProducts filters by. */
+export const parseSpecRangeParams = (
+  values: string | string[] | undefined,
+): Record<string, SpecRange> => {
+  const raw = values === undefined ? [] : [values].flat();
+  const parsed: Record<string, SpecRange> = {};
+
+  for (const entry of raw) {
+    const parts = entry.split(":");
+    // key, min, max — exactly three. Anything else is a hand-edited URL.
+    if (parts.length !== 3) {
+      continue;
+    }
+    const [key, rawMin, rawMax] = parts;
+    if (!key) {
+      continue;
+    }
+    const min = rawMin === "" ? undefined : Number(rawMin);
+    const max = rawMax === "" ? undefined : Number(rawMax);
+    // A bound that is not a finite number is dropped rather than treated as 0,
+    // which would filter the list to nothing and look like a broken catalogue.
+    const range: SpecRange = {};
+    if (min !== undefined && Number.isFinite(min)) {
+      range.min = min;
+    }
+    if (max !== undefined && Number.isFinite(max)) {
+      range.max = max;
+    }
+    if (range.min === undefined && range.max === undefined) {
+      continue;
+    }
+    parsed[key] = range;
+  }
+  return parsed;
+};
+
 // ---------------------------------------------------------------------------
 // Attribute values
 //

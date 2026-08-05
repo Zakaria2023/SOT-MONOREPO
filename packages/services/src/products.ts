@@ -94,6 +94,12 @@ export type ProductFilters = {
    * black), which is what a shopper means by ticking several boxes.
    */
   specValues?: Record<string, string[]>;
+  /**
+   * Numeric facets, as bounds rather than values to match. A `number` attribute
+   * marked as a filter has no option list — "48 ports or more" is the only
+   * question worth asking of it.
+   */
+  specRanges?: Record<string, { min?: number; max?: number }>;
   /** Page size. Omitted, the query returns every match. */
   limit?: number;
   /** Rows to skip — `(page - 1) * limit`. Only read when `limit` is set. */
@@ -126,6 +132,33 @@ const specValueCondition = (
         sql`json_contains(json_extract(${Products.specValues}, ${path}), json_quote(${value}))`,
     ),
   );
+};
+
+/**
+ * Match one numeric spec against a product's `specValues` JSON.
+ *
+ * The stored value is a JSON number, so it is unquoted out of the document and
+ * cast before comparing — `json_extract` alone compares as JSON, where 9 sorts
+ * after 48 because it compares them as text.
+ *
+ * A product with no value for the attribute drops out, which is the honest
+ * answer: "48 ports or more" cannot include a switch whose port count nobody has
+ * recorded.
+ */
+const specRangeCondition = (
+  attrUuid: string,
+  range: { min?: number; max?: number },
+): SQL | undefined => {
+  const bounds: SQL[] = [];
+  const path = `$."${attrUuid}"`;
+  const value = sql`cast(json_unquote(json_extract(${Products.specValues}, ${path})) as decimal(20, 4))`;
+  if (range.min !== undefined) {
+    bounds.push(sql`${value} >= ${range.min}`);
+  }
+  if (range.max !== undefined) {
+    bounds.push(sql`${value} <= ${range.max}`);
+  }
+  return bounds.length > 0 ? and(...bounds) : undefined;
 };
 
 // SQL ordering for each sort option.
@@ -230,6 +263,9 @@ const catalogConditions = (filters: ProductFilters): (SQL | undefined)[] => {
   }
   for (const [key, values] of Object.entries(filters.specValues ?? {})) {
     conditions.push(specValueCondition(key, values));
+  }
+  for (const [key, range] of Object.entries(filters.specRanges ?? {})) {
+    conditions.push(specRangeCondition(key, range));
   }
   return conditions;
 };

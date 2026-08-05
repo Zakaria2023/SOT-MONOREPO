@@ -32,7 +32,7 @@ import {
 } from "@/lib/theme";
 import { buildTree, findNode, subtreeMap } from "@/lib/tree";
 import { useAsync } from "@/lib/use-async";
-import type { Product, ProductSort, SpecFacet } from "@/lib/types";
+import type { Product, ProductSort, SpecFacet, SpecRange } from "@/lib/types";
 
 const ProductsScreen = () => {
   const { getToken } = useAuth();
@@ -53,6 +53,7 @@ const ProductsScreen = () => {
   const [categoryUuid, setCategoryUuid] = useState<string | null>(null);
   const [facets, setFacets] = useState<SpecFacet[]>([]);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [ranges, setRanges] = useState<Record<string, SpecRange>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [rows, setRows] = useState<Product[] | null>(null);
   const [brandUuids, setBrandUuids] = useState<string[]>([]);
@@ -62,6 +63,7 @@ const ProductsScreen = () => {
   const [term, setTerm] = useState("");
 
   const signature = JSON.stringify(selected);
+  const rangeSignature = JSON.stringify(ranges);
 
   // The category list arrives flat with parentUuid on each row; the shape and the
   // rolled-up counts are assembled here, once per load.
@@ -126,6 +128,7 @@ const ProductsScreen = () => {
     setSelected((current) =>
       Object.keys(current).length === 0 ? current : {},
     );
+    setRanges((current) => (Object.keys(current).length === 0 ? current : {}));
   }, [categoryUuid]);
 
   // Facets are re-resolved as the shopper ticks, not once per category: a
@@ -179,14 +182,15 @@ const ProductsScreen = () => {
   // Read through a ref for the same reason as the cart: the effect keys on
   // `signature`, and depending on the identity of `data` or `selected` would
   // re-fetch on every render that rebuilt an equal object.
-  const latest = useRef({ data, selected, brandQuery });
-  latest.current = { data, selected, brandQuery };
+  const latest = useRef({ data, selected, brandQuery, ranges });
+  latest.current = { data, selected, brandQuery, ranges };
 
   useEffect(() => {
     const {
       data: tree,
       selected: chosen,
       brandQuery: brandsChosen,
+      ranges: bounds,
     } = latest.current;
     if (!tree) {
       return;
@@ -198,7 +202,8 @@ const ProductsScreen = () => {
       !term &&
       sort === "featured" &&
       brandsChosen.length === 0 &&
-      Object.keys(chosen).length === 0
+      Object.keys(chosen).length === 0 &&
+      Object.keys(bounds).length === 0
     ) {
       setRows(null);
       return;
@@ -213,6 +218,7 @@ const ProductsScreen = () => {
       // …but the facets are the picked category's, so name it separately.
       facetCategoryUuid: categoryUuid ?? undefined,
       specValues: chosen,
+      specRanges: bounds,
       search: term || undefined,
       brandUuids: brandsChosen.length > 0 ? brandsChosen : undefined,
       sort,
@@ -232,7 +238,7 @@ const ProductsScreen = () => {
       cancelled = true;
     };
     // Keyed on the joined uuids rather than the array, which is rebuilt each render.
-  }, [categoryUuid, signature, term, brandSignature, sort]);
+  }, [categoryUuid, signature, term, brandSignature, sort, rangeSignature]);
 
   if (loading || error || !data) {
     return (
@@ -343,6 +349,20 @@ const ProductsScreen = () => {
             selectedBrands={brandUuids}
             sort={sort}
             onSort={setSort}
+            ranges={ranges}
+            onRange={(key, range) =>
+              setRanges((current) => {
+                // An empty range is not a filter — drop the key rather than
+                // sending "no bound at all" to the API on every keystroke.
+                const next = { ...current };
+                if (range.min === undefined && range.max === undefined) {
+                  delete next[key];
+                } else {
+                  next[key] = range;
+                }
+                return next;
+              })
+            }
             onToggleBrand={(uuid) =>
               setBrandUuids((current) =>
                 current.includes(uuid)
@@ -381,6 +401,7 @@ const ProductsScreen = () => {
             setSelected({});
             setSearch("");
             setBrandUuids([]);
+            setRanges({});
           }}
         />
       ) : (
