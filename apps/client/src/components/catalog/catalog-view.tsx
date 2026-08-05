@@ -175,7 +175,6 @@ export const CatalogView = ({
               facets={facets}
               selected={selectedSpecs}
               onToggle={toggleSpec}
-              categorySelected={selectedCategory !== null}
             />
           </aside>
 
@@ -220,7 +219,6 @@ export const CatalogView = ({
                   facets={facets}
                   selected={selectedSpecs}
                   onToggle={toggleSpec}
-                  categorySelected={selectedCategory !== null}
                 />
               </div>
             </div>

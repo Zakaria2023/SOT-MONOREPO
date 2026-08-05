@@ -12,9 +12,6 @@ type SpecFilterProps = {
   // Chosen values per spec key.
   selected: Record<string, string[]>;
   onToggle: (key: string, value: string) => void;
-  // Whether a category is chosen at all. Facets belong to a place in the tree, so
-  // the block has three states, and "no category picked" has to be one of them.
-  categorySelected: boolean;
 };
 
 type SpecFacetGroupProps = {
@@ -77,38 +74,31 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
 /**
  * The specification filters, under a heading of their own.
  *
- * The block used to vanish whenever it had no facets, which is most of the time —
- * facets belong to a category, and the catalogue opens on all of them. A shopper
- * had no way to learn that filtering by PoE budget or port count exists at all,
- * and when it did appear it arrived as unlabelled rows below Brands rather than as
- * a third filter.
+ * Nothing at all when there are no facets — no placeholder card, no invitation.
+ * Facets belong to a category, so the catalogue opens without them, and an empty
+ * panel sitting under Brands on every unfiltered visit is furniture. The heading
+ * exists because when the facets DO arrive they were reading as unlabelled rows
+ * below Brands rather than as a third filter.
  */
-export const SpecFilter = ({
-  facets,
-  selected,
-  onToggle,
-  categorySelected,
-}: SpecFilterProps) => (
-  <div className="flex flex-col gap-5 rounded-2xl border border-hairline bg-surface p-5 shadow-sm">
-    <p className="font-grotesk text-xs font-semibold tracking-widest text-faint uppercase">
-      Specifications
-    </p>
+export const SpecFilter = ({ facets, selected, onToggle }: SpecFilterProps) => {
+  if (facets.length === 0) {
+    return null;
+  }
 
-    {facets.length > 0 ? (
-      facets.map((facet) => (
+  return (
+    <div className="flex flex-col gap-5 rounded-2xl border border-hairline bg-surface p-5 shadow-sm">
+      <p className="font-grotesk text-xs font-semibold tracking-widest text-faint uppercase">
+        Specifications
+      </p>
+
+      {facets.map((facet) => (
         <SpecFacetGroup
           key={facet.key}
           facet={facet}
           selected={selected[facet.key] ?? []}
           onToggle={onToggle}
         />
-      ))
-    ) : (
-      <p className="text-sm text-muted">
-        {categorySelected
-          ? "This category has no specification filters yet."
-          : "Pick a category to filter by specification — ports, PoE, media type and the rest."}
-      </p>
-    )}
-  </div>
-);
+      ))}
+    </div>
+  );
+};
