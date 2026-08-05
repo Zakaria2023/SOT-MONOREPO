@@ -69,6 +69,9 @@ export type DesignFinding = {
   // project question the buyer has not answered. Surfaced, never treated as a
   // pass: a check we could not run must not look like one that succeeded.
   tone: "block" | "warn" | "unknown";
+  // What the check could not read, per product. The message says the same thing
+  // in one sentence; the parts are what a list can be built from.
+  skipped?: { productUuid: string; name: string; missing: string[] }[];
   corrections: {
     shape: "add_supply" | "reduce_demand" | "swap";
     message: string;
