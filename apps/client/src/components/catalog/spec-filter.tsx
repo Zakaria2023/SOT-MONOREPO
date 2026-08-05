@@ -12,6 +12,9 @@ type SpecFilterProps = {
   // Chosen values per spec key.
   selected: Record<string, string[]>;
   onToggle: (key: string, value: string) => void;
+  // Whether a category is chosen at all. Facets belong to a place in the tree, so
+  // the block has three states, and "no category picked" has to be one of them.
+  categorySelected: boolean;
 };
 
 type SpecFacetGroupProps = {
@@ -59,7 +62,9 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
                 >
                   {checked && <Check size={13} />}
                 </span>
-                <span className="flex-1 text-left text-ink">{option.label}</span>
+                <span className="flex-1 text-left text-ink">
+                  {option.label}
+                </span>
               </button>
             </li>
           );
@@ -69,21 +74,41 @@ const SpecFacetGroup = ({ facet, selected, onToggle }: SpecFacetGroupProps) => {
   );
 };
 
-export const SpecFilter = ({ facets, selected, onToggle }: SpecFilterProps) => {
-  if (facets.length === 0) {
-    return null;
-  }
+/**
+ * The specification filters, under a heading of their own.
+ *
+ * The block used to vanish whenever it had no facets, which is most of the time —
+ * facets belong to a category, and the catalogue opens on all of them. A shopper
+ * had no way to learn that filtering by PoE budget or port count exists at all,
+ * and when it did appear it arrived as unlabelled rows below Brands rather than as
+ * a third filter.
+ */
+export const SpecFilter = ({
+  facets,
+  selected,
+  onToggle,
+  categorySelected,
+}: SpecFilterProps) => (
+  <div className="flex flex-col gap-5 rounded-2xl border border-hairline bg-surface p-5 shadow-sm">
+    <p className="font-grotesk text-xs font-semibold tracking-widest text-faint uppercase">
+      Specifications
+    </p>
 
-  return (
-    <div className="flex flex-col gap-5 rounded-2xl border border-hairline bg-surface p-5 shadow-sm">
-      {facets.map((facet) => (
+    {facets.length > 0 ? (
+      facets.map((facet) => (
         <SpecFacetGroup
           key={facet.key}
           facet={facet}
           selected={selected[facet.key] ?? []}
           onToggle={onToggle}
         />
-      ))}
-    </div>
-  );
-};
+      ))
+    ) : (
+      <p className="text-sm text-muted">
+        {categorySelected
+          ? "This category has no specification filters yet."
+          : "Pick a category to filter by specification — ports, PoE, media type and the rest."}
+      </p>
+    )}
+  </div>
+);
