@@ -345,14 +345,17 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
             {selected.image && (
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute right-12 -bottom-5 hidden h-36 w-80 lg:block xl:right-20"
+                className="pointer-events-none absolute right-0 -bottom-8 hidden h-52 w-1/2 lg:block"
               >
                 <Image
                   src={documentImageUrl(selected.image)}
                   alt=""
                   fill
                   sizes="500px"
-                  className="object-contain object-bottom"
+                  // Anchored to the bottom-right corner so the photograph runs
+                  // off the edge of the band instead of sitting in a box inset
+                  // from it.
+                  className="object-contain object-right-bottom"
                 />
               </div>
             )}
