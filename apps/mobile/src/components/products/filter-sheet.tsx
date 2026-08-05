@@ -20,7 +20,7 @@ import {
   type,
 } from "@/lib/theme";
 import type { TreeNode } from "@/lib/tree";
-import type { Category, SpecFacet } from "@/lib/types";
+import type { Brand, Category, SpecFacet } from "@/lib/types";
 
 type FilterSheetProps = {
   /**
@@ -34,6 +34,14 @@ type FilterSheetProps = {
   onSelectCategory?: (uuid: string | null) => void;
   /** Products across the whole catalogue, shown against "All products". */
   totalProducts?: number;
+  /**
+   * Brands as a tree, with each maker's own products plus its houses'. Several
+   * may be chosen at once — unlike category, where two families at once is a
+   * question nobody asks.
+   */
+  brands?: TreeNode<Brand>[];
+  selectedBrands?: string[];
+  onToggleBrand?: (uuid: string) => void;
   facets: SpecFacet[];
   selected: Record<string, string[]>;
   open: boolean;
@@ -107,6 +115,9 @@ export const FilterSheet = ({
   selectedCategory = null,
   onSelectCategory,
   totalProducts = 0,
+  brands,
+  selectedBrands,
+  onToggleBrand,
   facets,
   selected,
   open,
@@ -119,12 +130,17 @@ export const FilterSheet = ({
     0,
   );
   const showCategories = Boolean(categories && categories.length > 0);
-  // The category counts as an applied filter on the trigger, because from the
-  // outside it is one — the tally has to match what the shopper narrowed by.
-  const count = specCount + (showCategories && selectedCategory ? 1 : 0);
+  const showBrands = Boolean(brands && brands.length > 0);
+  const chosenBrands = selectedBrands ?? [];
+  // Category and brands count as applied filters on the trigger, because from the
+  // outside they are — the tally has to match what the shopper narrowed by.
+  const count =
+    specCount +
+    (showCategories && selectedCategory ? 1 : 0) +
+    (showBrands ? chosenBrands.length : 0);
 
   // Nothing to offer at all: no tree to pick from and no facets to narrow by.
-  if (!showCategories && facets.length === 0) {
+  if (!showCategories && !showBrands && facets.length === 0) {
     return null;
   }
 
@@ -224,6 +240,18 @@ export const FilterSheet = ({
               </View>
             ) : null}
 
+            {showBrands && brands ? (
+              <View style={styles.section}>
+                <Text style={styles.facetLabel}>Brand</Text>
+                <FilterTree
+                  roots={brands}
+                  mode="multi"
+                  isSelected={(uuid) => chosenBrands.includes(uuid)}
+                  onSelect={(uuid) => onToggleBrand?.(uuid)}
+                />
+              </View>
+            ) : null}
+
             {facets.map((facet) => (
               <FacetBlock
                 key={facet.key}
@@ -244,6 +272,7 @@ export const FilterSheet = ({
                 onPress={() => {
                   onChange({});
                   onSelectCategory?.(null);
+                  chosenBrands.forEach((uuid) => onToggleBrand?.(uuid));
                 }}
               />
             ) : null}

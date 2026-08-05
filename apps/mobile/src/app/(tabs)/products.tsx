@@ -14,7 +14,12 @@ import { FilterSheet } from "@/components/products/filter-sheet";
 import { ProductCard } from "@/components/products/product-card";
 import { Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
-import { fetchCategories, fetchCategoryFacets, fetchProducts } from "@/lib/api";
+import {
+  fetchBrands,
+  fetchCategories,
+  fetchCategoryFacets,
+  fetchProducts,
+} from "@/lib/api";
 import { subtreeUuids } from "@/lib/categories";
 import {
   colors,
@@ -25,7 +30,7 @@ import {
   tracking,
   type,
 } from "@/lib/theme";
-import { buildTree, findNode } from "@/lib/tree";
+import { buildTree, findNode, subtreeMap } from "@/lib/tree";
 import { useAsync } from "@/lib/use-async";
 import type { Product, SpecFacet } from "@/lib/types";
 
@@ -33,11 +38,12 @@ const ProductsScreen = () => {
   const { getToken } = useAuth();
 
   const load = useCallback(async () => {
-    const [categories, products] = await Promise.all([
+    const [categories, brands, products] = await Promise.all([
       fetchCategories(),
+      fetchBrands(),
       fetchProducts(),
     ]);
-    return { categories, products };
+    return { categories, brands, products };
   }, []);
 
   const { data, error, loading, reload } = useAsync(load);
@@ -49,6 +55,7 @@ const ProductsScreen = () => {
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [rows, setRows] = useState<Product[] | null>(null);
+  const [brandUuids, setBrandUuids] = useState<string[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [term, setTerm] = useState("");
@@ -65,6 +72,24 @@ const ProductsScreen = () => {
     () => roots.reduce((sum, root) => sum + root.count, 0),
     [roots],
   );
+  // Brands nest too — a house brand under its maker — and the count on a maker
+  // has to include what its houses sell or the number contradicts the list.
+  const brandRoots = useMemo(
+    () => buildTree(data?.brands ?? [], (brand) => brand.productCount ?? 0),
+    [data],
+  );
+  const brandSubtrees = useMemo(() => subtreeMap(brandRoots), [brandRoots]);
+  // Chosen makers expanded to their houses, deduplicated: picking a parent and
+  // one of its children would otherwise send the child's uuid twice.
+  const brandQuery = useMemo(
+    () => [
+      ...new Set(
+        brandUuids.flatMap((uuid) => brandSubtrees.get(uuid) ?? [uuid]),
+      ),
+    ],
+    [brandUuids, brandSubtrees],
+  );
+  const brandSignature = brandQuery.join(",");
   // Which family the chips should mark. Choosing a sub-category in the sheet has
   // to light its family up here, or the two controls contradict each other.
   const activeRoot = useMemo(
@@ -127,15 +152,24 @@ const ProductsScreen = () => {
   // Read through a ref for the same reason as the cart: the effect keys on
   // `signature`, and depending on the identity of `data` or `selected` would
   // re-fetch on every render that rebuilt an equal object.
-  const latest = useRef({ data, selected });
-  latest.current = { data, selected };
+  const latest = useRef({ data, selected, brandQuery });
+  latest.current = { data, selected, brandQuery };
 
   useEffect(() => {
-    const { data: tree, selected: chosen } = latest.current;
+    const {
+      data: tree,
+      selected: chosen,
+      brandQuery: brandsChosen,
+    } = latest.current;
     if (!tree) {
       return;
     }
-    if (!categoryUuid && !term && Object.keys(chosen).length === 0) {
+    if (
+      !categoryUuid &&
+      !term &&
+      brandsChosen.length === 0 &&
+      Object.keys(chosen).length === 0
+    ) {
       setRows(null);
       return;
     }
@@ -150,6 +184,7 @@ const ProductsScreen = () => {
       facetCategoryUuid: categoryUuid ?? undefined,
       specValues: chosen,
       search: term || undefined,
+      brandUuids: brandsChosen.length > 0 ? brandsChosen : undefined,
     })
       .then((next) => {
         if (!cancelled) {
@@ -165,7 +200,8 @@ const ProductsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [categoryUuid, signature, term]);
+    // Keyed on the joined uuids rather than the array, which is rebuilt each render.
+  }, [categoryUuid, signature, term, brandSignature]);
 
   if (loading || error || !data) {
     return (
@@ -272,6 +308,15 @@ const ProductsScreen = () => {
             selectedCategory={categoryUuid}
             onSelectCategory={setCategoryUuid}
             totalProducts={total}
+            brands={brandRoots}
+            selectedBrands={brandUuids}
+            onToggleBrand={(uuid) =>
+              setBrandUuids((current) =>
+                current.includes(uuid)
+                  ? current.filter((entry) => entry !== uuid)
+                  : [...current, uuid],
+              )
+            }
             facets={facets}
             selected={selected}
             open={sheetOpen}
@@ -302,6 +347,7 @@ const ProductsScreen = () => {
           onRetry={() => {
             setSelected({});
             setSearch("");
+            setBrandUuids([]);
           }}
         />
       ) : (

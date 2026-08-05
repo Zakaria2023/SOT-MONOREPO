@@ -178,6 +178,9 @@ export type Brand = {
   description: string | null;
   image: string | null;
   businessLines: string[] | null;
+  // Brands nest the same way categories do — a house brand under its maker. The
+  // filter needs the link to offer the parent as a whole.
+  parentUuid?: string | null;
   // Present on the list endpoint, absent on the single-brand endpoint.
   parentName?: string | null;
   productCount?: number;
