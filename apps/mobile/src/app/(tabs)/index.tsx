@@ -11,6 +11,7 @@ import { Kicker, Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
 import { Masthead } from "@/components/ui/masthead";
 import { fetchBrands, fetchCategories, fetchProducts } from "@/lib/api";
+import { rootCategories } from "@/lib/categories";
 import { colors, fonts, spacing, type } from "@/lib/theme";
 import { useAsync } from "@/lib/use-async";
 
@@ -145,15 +146,20 @@ const HomeScreen = () => {
             title="Shop by category"
             onSeeAll={() => router.push("/categories")}
           />
+          {/* Families only. The list arrives flat, so slicing it took the first
+              four rows of the tree — which put a leaf beside a family and showed
+              "0 products" against a parent holding forty. */}
           <View style={styles.categoryList}>
-            {data.categories.slice(0, 4).map((category, index, shown) => (
-              <CategoryRow
-                key={category.uuid}
-                category={category}
-                index={index}
-                last={index === shown.length - 1}
-              />
-            ))}
+            {rootCategories(data.categories)
+              .slice(0, 4)
+              .map((category, index, shown) => (
+                <CategoryRow
+                  key={category.uuid}
+                  category={category}
+                  index={index}
+                  last={index === shown.length - 1}
+                />
+              ))}
           </View>
         </View>
       ) : null}
