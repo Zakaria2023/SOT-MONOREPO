@@ -7,7 +7,6 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 import { buildCategoryTree } from "@/lib/categories";
 import { getCachedCategories } from "@/lib/data";
-import { Menu } from "lucide-react";
 import Link from "next/link";
 import { getCartItemCount } from "services";
 
@@ -22,13 +21,11 @@ export const Navbar = async () => {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-hairline bg-page/80 shadow-[0_1px_3px_rgba(20,22,27,0.06)] backdrop-blur-xl">
       <nav className="mx-auto flex h-18 items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-12 xl:px-20">
-        <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-solid text-white">
-            <Menu size={20} strokeWidth={2.5} />
-          </span>
-          <span className="font-heading text-xl text-ink sm:text-2xl">
-            SOT Solutions
-          </span>
+        <Link
+          href="/"
+          className="font-heading shrink-0 text-xl text-ink sm:text-2xl"
+        >
+          SOT Solutions
         </Link>
 
         <CategoryMenu categories={tree} />
