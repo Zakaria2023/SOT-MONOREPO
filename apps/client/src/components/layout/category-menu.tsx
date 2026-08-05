@@ -290,27 +290,65 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
           onMouseLeave={scheduleClose}
           className="fixed inset-x-0 top-18 z-40 border-b border-hairline bg-surface-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)]"
         >
-          {/* The masthead carries the selected category's own photograph, large.
-              It is the one picture that tells the shopper what this branch is. */}
-          <div className="border-b border-hairline bg-surface">
-            <div className="mx-auto flex items-center gap-6 px-6 py-6 lg:px-12 xl:px-20">
-              <CategoryPlate node={selected} size={64} />
-              <div className="min-w-0 flex-1">
-                <h2 className="font-heading text-2xl text-ink">
+          {/* The masthead is a band, and the selected category's photograph is
+              the thing on it: once in a white disc beside the name, and once
+              large, bleeding off the right edge. A 64px thumbnail told the
+              shopper nothing about which family they were standing in. */}
+          <div className="relative overflow-hidden bg-accent-gradient">
+            {selected.image && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block"
+              >
+                <Image
+                  src={documentImageUrl(selected.image)}
+                  alt=""
+                  fill
+                  sizes="700px"
+                  // object-right and no padding, so the photograph runs to the
+                  // edge of the band the way a product shot sits on a banner.
+                  // No drop shadow: these are cut-outs on a coloured field, and a
+                  // shadow under a transparent PNG haloes its bounding box.
+                  className="object-contain object-right"
+                />
+              </div>
+            )}
+
+            <div className="relative mx-auto flex items-center gap-5 px-6 py-10 lg:px-12 xl:px-20">
+              <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+                {selected.image ? (
+                  <Image
+                    src={documentImageUrl(selected.image)}
+                    alt=""
+                    fill
+                    sizes="64px"
+                    className="object-contain p-3"
+                  />
+                ) : (
+                  <span className="font-heading text-xl font-bold text-primary-solid">
+                    {selected.name.charAt(0)}
+                  </span>
+                )}
+              </span>
+
+              {/* Capped, so the copy never runs under the photograph. */}
+              <div className="min-w-0 max-w-lg flex-1">
+                <h2 className="font-heading text-3xl text-white">
                   {selected.name}
                 </h2>
-                <p className="font-grotesk text-xs text-faint">
+                <p className="font-grotesk text-xs text-white/75">
                   {subtreeCount(selected)} products
                 </p>
                 {selected.description && (
-                  <p className="mt-2 max-w-2xl text-sm text-muted">
+                  <p className="mt-2 text-sm text-white/85">
                     {selected.description}
                   </p>
                 )}
               </div>
+
               <Link
                 href={`/products?category=${selected.uuid}`}
-                className="font-grotesk shrink-0 rounded-xl border border-primary/40 px-4 py-2 text-sm text-primary transition-colors hover:bg-primary-tint"
+                className="font-grotesk shrink-0 rounded-xl border border-white/50 bg-white/10 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-white/20"
               >
                 Browse {selected.name}
               </Link>
