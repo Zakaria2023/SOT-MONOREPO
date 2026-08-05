@@ -65,7 +65,8 @@ export const ImageUpload = ({
         method: "POST",
         body: formData,
       });
-      const result: { documentId: string; fileName: string } | { error: string } =
+      const result:
+        { documentId: string; fileName: string } | { error: string } =
         await response.json();
 
       if (!response.ok || "error" in result) {
@@ -100,24 +101,29 @@ export const ImageUpload = ({
         className="hidden"
       />
 
-      <div className="flex items-center gap-3">
-        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-control border border-hairline bg-hover">
+      {/* A 64px square cropped to fill was not a preview — a wide product shot
+          showed as a slice of its own middle, which is no way to tell whether the
+          right file was picked or whether it has the background it should. The
+          plate is 176px and the image is contained inside it, so what is on screen
+          is the whole picture. */}
+      <div className="flex items-start gap-3">
+        <div className="relative h-44 w-44 shrink-0 overflow-hidden rounded-control border border-hairline bg-hover">
           {preview ? (
             <Image
               src={preview}
               alt="Preview"
               fill
-              sizes="64px"
+              sizes="176px"
               // Only the just-picked file skips the optimizer: `preview` is a
               // blob: URL until the upload finishes, and next/image cannot
               // resize one. Once it is a stored document the URL is a real
               // endpoint, so let it through.
               unoptimized={preview.startsWith("blob:")}
-              className="object-cover"
+              className="object-contain p-2"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-faint">
-              <ImageOff size={18} />
+              <ImageOff size={22} />
             </div>
           )}
         </div>

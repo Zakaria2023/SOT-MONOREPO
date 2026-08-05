@@ -50,13 +50,19 @@ export type ProductListItem = SelectProducts & {
  * specValues is there while the query never selected it is the kind of lie that
  * surfaces as `undefined` somewhere far away.
  */
-export type ProductSummary = Omit<ProductListItem, "specValues" | "equivalents">;
+export type ProductSummary = Omit<
+  ProductListItem,
+  "specValues" | "equivalents"
+>;
 
 // Everything a summary needs, named once. `description` and `images` stay because
 // the mobile /products contract includes them.
 const productSummaryColumns = () => {
-  const { specValues: _specValues, equivalents: _equivalents, ...columns } =
-    getTableColumns(Products);
+  const {
+    specValues: _specValues,
+    equivalents: _equivalents,
+    ...columns
+  } = getTableColumns(Products);
   return columns;
 };
 
@@ -88,6 +94,16 @@ export type ProductFilters = {
    * black), which is what a shopper means by ticking several boxes.
    */
   specValues?: Record<string, string[]>;
+  /**
+   * Numeric facets, as bounds rather than values to match. A `number` attribute
+   * marked as a filter has no option list — "48 ports or more" is the only
+   * question worth asking of it.
+   */
+  specRanges?: Record<string, { min?: number; max?: number }>;
+  /** Page size. Omitted, the query returns every match. */
+  limit?: number;
+  /** Rows to skip — `(page - 1) * limit`. Only read when `limit` is set. */
+  offset?: number;
   /** Column ordering applied in SQL. */
   sort?: ProductSort;
 };
@@ -116,6 +132,33 @@ const specValueCondition = (
         sql`json_contains(json_extract(${Products.specValues}, ${path}), json_quote(${value}))`,
     ),
   );
+};
+
+/**
+ * Match one numeric spec against a product's `specValues` JSON.
+ *
+ * The stored value is a JSON number, so it is unquoted out of the document and
+ * cast before comparing — `json_extract` alone compares as JSON, where 9 sorts
+ * after 48 because it compares them as text.
+ *
+ * A product with no value for the attribute drops out, which is the honest
+ * answer: "48 ports or more" cannot include a switch whose port count nobody has
+ * recorded.
+ */
+const specRangeCondition = (
+  attrUuid: string,
+  range: { min?: number; max?: number },
+): SQL | undefined => {
+  const bounds: SQL[] = [];
+  const path = `$."${attrUuid}"`;
+  const value = sql`cast(json_unquote(json_extract(${Products.specValues}, ${path})) as decimal(20, 4))`;
+  if (range.min !== undefined) {
+    bounds.push(sql`${value} >= ${range.min}`);
+  }
+  if (range.max !== undefined) {
+    bounds.push(sql`${value} <= ${range.max}`);
+  }
+  return bounds.length > 0 ? and(...bounds) : undefined;
 };
 
 // SQL ordering for each sort option.
@@ -188,38 +231,52 @@ export const generateProductSku = async (input: {
   return `${prefix}-${String(seq).padStart(2, "0")}`;
 };
 
+/**
+ * The WHERE for a catalogue query, built once and used by both the page of rows
+ * and its count. Two copies of this would eventually disagree, and the symptom —
+ * a total that does not match the list under it — is the kind a shopper notices
+ * long before we do.
+ */
+const catalogConditions = (filters: ProductFilters): (SQL | undefined)[] => {
+  const conditions: (SQL | undefined)[] = [];
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    // Flexible match across every field a product might be found by.
+    conditions.push(
+      or(
+        like(Products.name, term),
+        like(Products.model, term),
+        like(Products.sku, term),
+        like(Products.seriesCode, term),
+        like(Products.shortDescription, term),
+        like(Products.description, term),
+        like(Brands.name, term),
+        like(Categories.name, term),
+      ),
+    );
+  }
+  if (filters.categoryUuids && filters.categoryUuids.length > 0) {
+    conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
+  }
+  if (filters.brandUuids && filters.brandUuids.length > 0) {
+    conditions.push(inArray(Products.brandUuid, filters.brandUuids));
+  }
+  for (const [key, values] of Object.entries(filters.specValues ?? {})) {
+    conditions.push(specValueCondition(key, values));
+  }
+  for (const [key, range] of Object.entries(filters.specRanges ?? {})) {
+    conditions.push(specRangeCondition(key, range));
+  }
+  return conditions;
+};
+
 export const getProducts = async (
   filters: ProductFilters = {},
 ): Promise<ProductSummary[]> => {
   try {
-    const conditions: (SQL | undefined)[] = [];
-    if (filters.search) {
-      const term = `%${filters.search}%`;
-      // Flexible match across every field a product might be found by.
-      conditions.push(
-        or(
-          like(Products.name, term),
-          like(Products.model, term),
-          like(Products.sku, term),
-          like(Products.seriesCode, term),
-          like(Products.shortDescription, term),
-          like(Products.description, term),
-          like(Brands.name, term),
-          like(Categories.name, term),
-        ),
-      );
-    }
-    if (filters.categoryUuids && filters.categoryUuids.length > 0) {
-      conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
-    }
-    if (filters.brandUuids && filters.brandUuids.length > 0) {
-      conditions.push(inArray(Products.brandUuid, filters.brandUuids));
-    }
-    for (const [key, values] of Object.entries(filters.specValues ?? {})) {
-      conditions.push(specValueCondition(key, values));
-    }
+    const conditions = catalogConditions(filters);
 
-    return await db
+    const query = db
       .select({
         ...productSummaryColumns(),
         categoryName: Categories.name,
@@ -229,10 +286,45 @@ export const getProducts = async (
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(...productOrder(filters.sort));
+      .orderBy(...productOrder(filters.sort))
+      .$dynamic();
+
+    // Paged in SQL, not sliced after the fact: a catalogue page asking for nine
+    // products should not drag every matching row across the wire to throw all
+    // but nine of them away.
+    if (filters.limit !== undefined) {
+      query.limit(filters.limit).offset(filters.offset ?? 0);
+    }
+
+    return await query;
   } catch (error) {
     console.error("getProducts failed:", error);
     throw new Error("Failed to fetch products", { cause: error });
+  }
+};
+
+/**
+ * How many products match, ignoring limit and offset.
+ *
+ * Its own query because a paged SELECT cannot also report the size of what it
+ * paged. Run it beside getProducts, never after: they share no data and the round
+ * trip to the database is the whole cost.
+ */
+export const countProducts = async (
+  filters: ProductFilters = {},
+): Promise<number> => {
+  try {
+    const conditions = catalogConditions(filters);
+    const [row] = await db
+      .select({ total: sql<number>`count(*)` })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return Number(row?.total ?? 0);
+  } catch (error) {
+    console.error("countProducts failed:", error);
+    throw new Error("Failed to count products", { cause: error });
   }
 };
 
@@ -249,15 +341,28 @@ const adminProductSearchFilter = (search?: string) => {
   );
 };
 
-/** A searched + paginated page of products for the admin list table. */
+/** What the admin list can narrow by, beyond the search box and the page. */
+export type AdminProductFilters = ListParams & {
+  /** Exactly this category, not its subtree: the admin is looking at rows. */
+  categoryUuid?: string;
+  brandUuid?: string;
+};
+
+/** A searched + filtered + paginated page of products for the admin list. */
 export const getProductsPage = async (
-  params: ListParams = {},
+  params: AdminProductFilters = {},
 ): Promise<PaginatedResult<ProductListItem>> => {
   const { page, pageSize, offset } = resolvePagination(
     params.page,
     params.pageSize,
   );
-  const where = adminProductSearchFilter(params.search);
+  const where = and(
+    adminProductSearchFilter(params.search),
+    params.categoryUuid
+      ? eq(Products.categoryUuid, params.categoryUuid)
+      : undefined,
+    params.brandUuid ? eq(Products.brandUuid, params.brandUuid) : undefined,
+  );
 
   try {
     const [rows, [totals]] = await Promise.all([

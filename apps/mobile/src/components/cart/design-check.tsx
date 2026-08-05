@@ -30,7 +30,18 @@ const FindingRow = ({ finding, last = false }: FindingRowProps) => {
         <Text style={[styles.findingTitle, { color: accent }]}>
           {finding.title}
         </Text>
-        <Text style={styles.findingMessage}>{finding.message}</Text>
+        {/* A line per product beats the engine's semicolon-joined sentence, which
+            at phone width wraps into a paragraph the buyer has to parse. The
+            sentence still stands in where the skip names no product. */}
+        {finding.skipped && finding.skipped.length > 0 ? (
+          finding.skipped.map((item) => (
+            <Text key={item.productUuid} style={styles.findingMessage}>
+              {item.name} — no value for {item.missing.join(", ")}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.findingMessage}>{finding.message}</Text>
+        )}
         {/* Every correction is add supply, reduce demand, or swap — the buyer is
             never told only that something is wrong. */}
         {finding.corrections.map((correction, index) => (

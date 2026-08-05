@@ -42,12 +42,12 @@ export const getCategoryFacets = async (
           rank: option.rank,
         })),
       }))
-      // A facet with nothing to tick cannot be filtered on. A `number` marked as
-      // a filter has no option list at all, and it was rendering as a heading
-      // over an empty box — a control the shopper cannot use and cannot be told
-      // why. Dropped here rather than in each surface, so the client, the API and
-      // mobile agree.
-      .filter((facet) => facet.options.length > 0)
+      // A facet with nothing to tick and no other way to be answered cannot be
+      // filtered on. A `number` is the exception: it has no option list by
+      // design, because the question it answers is "48 ports or more", and every
+      // surface renders it as a pair of bounds. Decided here rather than in each
+      // one, so the client, the API and mobile agree on what is offered.
+      .filter((facet) => facet.type === "number" || facet.options.length > 0)
   );
 };
 

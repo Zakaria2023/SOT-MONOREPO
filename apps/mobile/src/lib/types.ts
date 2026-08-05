@@ -39,6 +39,15 @@ export type ProductDetail = Product & {
   specs: ProductSpec[] | null;
 };
 
+/** The orders `getProducts` understands, mirrored from the service's ProductSort. */
+export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
+
+/** Bounds for a numeric facet. Either end may be left open. */
+export type SpecRange = {
+  min?: number;
+  max?: number;
+};
+
 export type ProductSpec = {
   uuid: string;
   label: string;
@@ -52,6 +61,9 @@ export type ProductSpec = {
 export type SpecFacet = {
   key: string;
   label: string;
+  // A "number" facet is a range with no options to tick — the app renders two
+  // bounds for it. Every other type is a list of values.
+  type: string;
   unit: string | null;
   ordered: boolean;
   options: { value: string; label: string; rank: number | null }[];
@@ -66,6 +78,9 @@ export type DesignFinding = {
   // project question the buyer has not answered. Surfaced, never treated as a
   // pass: a check we could not run must not look like one that succeeded.
   tone: "block" | "warn" | "unknown";
+  // What the check could not read, per product. The message says the same thing
+  // in one sentence; the parts are what a list can be built from.
+  skipped?: { productUuid: string; name: string; missing: string[] }[];
   corrections: {
     shape: "add_supply" | "reduce_demand" | "swap";
     message: string;
@@ -178,6 +193,9 @@ export type Brand = {
   description: string | null;
   image: string | null;
   businessLines: string[] | null;
+  // Brands nest the same way categories do — a house brand under its maker. The
+  // filter needs the link to offer the parent as a whole.
+  parentUuid?: string | null;
   // Present on the list endpoint, absent on the single-brand endpoint.
   parentName?: string | null;
   productCount?: number;

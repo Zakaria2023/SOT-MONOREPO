@@ -1,3 +1,4 @@
+import { Pagination } from "@/components/common/pagination";
 import { documentImageUrl } from "@/lib/documents";
 import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
@@ -13,8 +14,23 @@ export const metadata: Metadata = pageMetadata({
   path: "/brands",
 });
 
-const BrandsPage = async () => {
-  const brands = await getBrands();
+/** Nine to a page, the same as the catalogue — three rows of the three-up grid. */
+const PAGE_SIZE = 9;
+
+type Props = {
+  searchParams: Promise<{ page?: string }>;
+};
+
+const BrandsPage = async ({ searchParams }: Props) => {
+  const [{ page: pageParam }, allBrands] = await Promise.all([
+    searchParams,
+    getBrands(),
+  ]);
+
+  // Sliced here rather than in SQL: the whole list is one small read the page
+  // already makes, and it is what the total has to be counted from anyway.
+  const page = Math.max(1, Number(pageParam) || 1);
+  const brands = allBrands.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <main className="min-h-screen bg-page">
@@ -91,6 +107,14 @@ const BrandsPage = async () => {
             ))}
           </ul>
         )}
+
+        <Pagination
+          page={page}
+          totalPages={Math.max(1, Math.ceil(allBrands.length / PAGE_SIZE))}
+          total={allBrands.length}
+          pageSize={PAGE_SIZE}
+          noun="brands"
+        />
       </div>
     </main>
   );

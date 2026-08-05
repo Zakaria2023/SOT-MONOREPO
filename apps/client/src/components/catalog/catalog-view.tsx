@@ -1,11 +1,18 @@
 "use client";
 
 import { BrandFilter } from "@/components/catalog/brand-filter";
+import { Pagination } from "@/components/common/pagination";
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { CategoryFilter } from "@/components/catalog/category-filter";
 import { SpecFilter } from "@/components/catalog/spec-filter";
 import { SORT_OPTIONS, type TreeNode } from "@/lib/catalog";
-import { SPEC_PARAM, encodeSpecParam } from "utils";
+import {
+  SPEC_PARAM,
+  SPEC_RANGE_PARAM,
+  encodeSpecParam,
+  encodeSpecRangeParam,
+  type SpecRange,
+} from "utils";
 import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -23,13 +30,19 @@ type CatalogViewProps = {
   products: ProductSummary[];
   categoryTree: TreeNode<CategoryListItem>[];
   brandTree: TreeNode<BrandListItem>[];
+  /** Every product in the catalogue, for the "All products" row. */
   total: number;
+  /** How many match the current filters, across all pages. */
+  matching: number;
+  page: number;
+  pageSize: number;
   selectedCategory: string | null;
   selectedBrands: string[];
   // Specification facets the selected category offers this viewer. Empty until
   // a category is chosen, since a facet belongs to a place in the tree.
   facets: CategoryFacet[];
   selectedSpecs: Record<string, string[]>;
+  selectedRanges: Record<string, SpecRange>;
   sort: ProductSort;
   search: string;
   // The signed-in partner's stacked discount (0 = MSRP for guests/clients).
@@ -41,10 +54,14 @@ export const CatalogView = ({
   categoryTree,
   brandTree,
   total,
+  matching,
+  page,
+  pageSize,
   selectedCategory,
   selectedBrands,
   facets,
   selectedSpecs,
+  selectedRanges,
   sort,
   search,
   discountPercent,
@@ -67,6 +84,10 @@ export const CatalogView = ({
   const updateParams = (mutate: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(window.location.search);
     mutate(params);
+    // Any change to the filters puts the shopper back on page 1. Narrowing from
+    // 40 products to 6 while standing on page 3 otherwise lands them on an empty
+    // grid that looks like the filter matched nothing.
+    params.delete("page");
     const query = params.toString();
     startNavigation(() => {
       router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
@@ -84,6 +105,7 @@ export const CatalogView = ({
       // Carrying "Cat6" from Copper Cables into IP Cameras would filter the
       // new category down to nothing for no visible reason.
       params.delete(SPEC_PARAM);
+      params.delete(SPEC_RANGE_PARAM);
     });
 
   const toggleSpec = (key: string, value: string) =>
@@ -95,6 +117,20 @@ export const CatalogView = ({
         ? current.filter((item) => item !== entry)
         : [...current, entry];
       next.forEach((item) => params.append(SPEC_PARAM, item));
+    });
+
+  const setRange = (key: string, range: SpecRange) =>
+    updateParams((params) => {
+      const others = params
+        .getAll(SPEC_RANGE_PARAM)
+        .filter((entry) => !entry.startsWith(`${key}:`));
+      params.delete(SPEC_RANGE_PARAM);
+      others.forEach((entry) => params.append(SPEC_RANGE_PARAM, entry));
+      // An empty range is no filter at all — leaving `range=ports::` in the URL
+      // would carry a bound of nothing from screen to screen.
+      if (range.min !== undefined || range.max !== undefined) {
+        params.append(SPEC_RANGE_PARAM, encodeSpecRangeParam(key, range));
+      }
     });
 
   const toggleBrand = (uuid: string) =>
@@ -152,9 +188,14 @@ export const CatalogView = ({
           </div>
         )}
 
-        <div className="mt-10 flex flex-col gap-8 lg:flex-row">
-          {/* Desktop sidebar */}
-          <aside className="hidden shrink-0 flex-col gap-4 lg:flex lg:w-80 xl:w-96">
+        {/* items-start, or the sidebar is stretched to the grid's height by the
+            flex default and sticky has nothing left to stick. */}
+        <div className="mt-10 flex flex-col gap-8 lg:flex-row lg:items-start">
+          {/* Desktop sidebar. It sticks below the navbar and scrolls inside
+              itself: the filters are taller than the viewport once a category is
+              open, and scrolling to reach the specifications used to drag the
+              whole product grid off the screen with them. */}
+          <aside className="scrollbar-slim hidden shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:w-72 lg:overflow-y-auto lg:pr-1 xl:w-80">
             <CategoryFilter
               tree={categoryTree}
               total={total}
@@ -170,6 +211,8 @@ export const CatalogView = ({
               facets={facets}
               selected={selectedSpecs}
               onToggle={toggleSpec}
+              ranges={selectedRanges}
+              onRange={setRange}
             />
           </aside>
 
@@ -214,6 +257,8 @@ export const CatalogView = ({
                   facets={facets}
                   selected={selectedSpecs}
                   onToggle={toggleSpec}
+                  ranges={selectedRanges}
+                  onRange={setRange}
                 />
               </div>
             </div>
@@ -283,9 +328,12 @@ export const CatalogView = ({
               </div>
             </div>
 
+            {/* The count is what MATCHES, not what is on this page: "9 products"
+                above a grid of nine, on page two of forty, is a lie the shopper
+                can see. */}
             <p className="font-grotesk mt-4 text-sm text-muted">
-              <span className="font-bold text-ink">{products.length}</span>{" "}
-              {products.length === 1 ? "product" : "products"}
+              <span className="font-bold text-ink">{matching}</span>{" "}
+              {matching === 1 ? "product" : "products"}
             </p>
 
             {products.length === 0 ? (
@@ -317,6 +365,14 @@ export const CatalogView = ({
                 ))}
               </ul>
             )}
+
+            <Pagination
+              page={page}
+              totalPages={Math.max(1, Math.ceil(matching / pageSize))}
+              total={matching}
+              pageSize={pageSize}
+              noun="products"
+            />
           </div>
         </div>
       </div>

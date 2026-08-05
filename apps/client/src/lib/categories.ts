@@ -1,17 +1,19 @@
-import type { CategoryListItem, ProductSummary } from "services";
+import type { CategoryListItem } from "services";
 
 export type CategoryNode = CategoryListItem & {
   children: CategoryNode[];
-  products: ProductSummary[];
 };
 
 /**
- * Turns the flat category + product lists into a nested tree: each node carries
- * its child categories and the products that belong directly to it.
+ * Turns the flat category list into a nested tree.
+ *
+ * Products used to be threaded through here so the navbar could hand the menu
+ * every product in the catalogue. That made a ~500ms read a precondition for
+ * rendering ANY page, for a panel most visits never open — the menu now asks for
+ * one family's products when that family is opened.
  */
 export const buildCategoryTree = (
   categories: CategoryListItem[],
-  products: ProductSummary[],
 ): CategoryNode[] => {
   const presentUuids = new Set(categories.map((category) => category.uuid));
   const childrenByParent = new Map<string | null, CategoryListItem[]>();
@@ -27,18 +29,10 @@ export const buildCategoryTree = (
     childrenByParent.set(parentUuid, siblings);
   }
 
-  const productsByCategory = new Map<string, ProductSummary[]>();
-  for (const product of products) {
-    const list = productsByCategory.get(product.categoryUuid) ?? [];
-    list.push(product);
-    productsByCategory.set(product.categoryUuid, list);
-  }
-
   const build = (parentUuid: string | null): CategoryNode[] =>
     (childrenByParent.get(parentUuid) ?? []).map((category) => ({
       ...category,
       children: build(category.uuid),
-      products: productsByCategory.get(category.uuid) ?? [],
     }));
 
   return build(null);

@@ -130,6 +130,27 @@
 }
 
 /**
+ * The catalogue menu's masthead: one deep violet field, not the cyan-to-violet
+ * accent. The accent gradient reads as a button at button size and as a beach
+ * towel across a 1400px band, and the cyan end fought every product photograph
+ * placed on it.
+ *
+ * The second layer is the faint diagonal sheen the design calls for — a wide,
+ * low-contrast highlight rather than a pattern, so it survives being scaled to
+ * any width without tiling.
+ */
+.bg-category-hero {
+  background-color: #4c1d95;
+  background-image:
+    linear-gradient(
+      118deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0) 42%
+    ),
+    linear-gradient(103deg, #3b1580 0%, #5b21b6 46%, #7c3aed 100%);
+}
+
+/**
  * Slim themed scrollbar for panes that scroll inside the page rather than with
  * it — the compare table is the one today.
  *

@@ -27,9 +27,13 @@ export const JsonLd = async ({ data }: JsonLdProps) => {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
+    // suppressHydrationWarning for the same reason as the theme script in the
+    // root layout: the browser hides the nonce attribute after parsing, so
+    // hydration sees nonce="" where the server sent a value.
     <script
       type="application/ld+json"
       nonce={nonce}
+      suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: serialize(data) }}
     />
   );

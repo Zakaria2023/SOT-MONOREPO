@@ -1,3 +1,4 @@
+import { buildTree, findNode, subtreeUuids as nodeSubtree } from "./tree";
 import type { Category } from "./types";
 
 /**
@@ -12,31 +13,14 @@ export const subtreeUuids = (
   categories: Category[],
   rootUuid: string,
 ): string[] => {
-  const childrenOf = new Map<string, string[]>();
-  for (const category of categories) {
-    if (!category.parentUuid) {
-      continue;
-    }
-    const list = childrenOf.get(category.parentUuid) ?? [];
-    list.push(category.uuid);
-    childrenOf.set(category.parentUuid, list);
-  }
-
-  const collected: string[] = [];
-  const seen = new Set<string>();
-  const walk = (uuid: string) => {
-    // `seen` also guards against a cycle from bad parent data.
-    if (seen.has(uuid)) {
-      return;
-    }
-    seen.add(uuid);
-    collected.push(uuid);
-    for (const child of childrenOf.get(uuid) ?? []) {
-      walk(child);
-    }
-  };
-  walk(rootUuid);
-  return collected;
+  const node = findNode(
+    buildTree(categories, (category) => category.productCount),
+    rootUuid,
+  );
+  // An uuid that is not in the list still filters by itself: the caller asked for
+  // that category, and returning nothing would quietly widen the query to
+  // everything instead of narrowing it.
+  return node ? nodeSubtree(node) : [rootUuid];
 };
 
 /** Top-level categories, in the order the API returned them. */

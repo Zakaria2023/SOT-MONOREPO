@@ -165,8 +165,17 @@ const RootLayout = async ({ children }: Props) => {
         className={`h-full antialiased ${FONT_VARIABLES}`}
       >
         <body className="min-h-full flex flex-col font-sans">
+          {/* suppressHydrationWarning because the browser HIDES the nonce as soon
+              as it has parsed the tag: the value moves to the element's `nonce`
+              property and getAttribute("nonce") answers "", so a CSP nonce cannot
+              be stolen through a CSS attribute selector. React then compares
+              server HTML that has the nonce against a DOM that appears not to,
+              and reports a mismatch it says it will not patch — correctly, since
+              the browser has already applied it. Dropping the nonce instead would
+              silence the warning by getting the script blocked. */}
           <script
             nonce={nonce}
+            suppressHydrationWarning
             dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
           />
           {/* Site-wide identity: every page inherits it, and per-page nodes

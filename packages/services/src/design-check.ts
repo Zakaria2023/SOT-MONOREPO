@@ -39,6 +39,11 @@ export type DesignFinding = {
   }[];
   // Named so the buyer can see which line the problem is on.
   failingProductUuids: string[];
+  // The items the check could not read, and what was missing from each. The
+  // message already says this in a sentence, but a sentence that joins three
+  // products with semicolons is not readable at cart width — a surface that wants
+  // to list them a line each needs the parts, not the prose.
+  skipped: { productUuid: string; name: string; missing: string[] }[];
 };
 
 export type DesignCheckResult = {
@@ -80,6 +85,7 @@ const toFinding = (finding: Finding): DesignFinding => ({
         : "unknown",
   corrections: finding.corrections,
   failingProductUuids: finding.failingItems.map((item) => item.productUuid),
+  skipped: finding.skipped,
 });
 
 const EMPTY: DesignCheckResult = {

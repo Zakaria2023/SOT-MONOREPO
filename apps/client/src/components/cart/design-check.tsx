@@ -69,6 +69,49 @@ const FindingRow = ({ finding, tone }: FindingRowProps) => (
   </div>
 );
 
+/**
+ * One check that could not run: the rule's name, then a line per product with
+ * what was missing from it.
+ *
+ * The engine's own sentence joins the products with semicolons, which at cart
+ * width becomes a paragraph the buyer has to parse to find out that three
+ * switches are each missing one value. The parts are on the finding, so the list
+ * is built from them and the sentence is used only when a check was skipped for a
+ * reason that names no product at all (a unit mismatch in the library, say).
+ */
+const UnknownRow = ({ finding }: { finding: DesignFinding }) => (
+  <div className="font-grotesk text-sm">
+    <p className="font-semibold text-sky-900">{finding.title}</p>
+
+    {finding.skipped.length > 0 ? (
+      <>
+        <p className="mt-0.5 text-sky-800">
+          Missing data on{" "}
+          {finding.skipped.length === 1
+            ? "one product"
+            : `${finding.skipped.length} products`}
+          , so this check was left out:
+        </p>
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {finding.skipped.map((item) => (
+            <li
+              key={item.productUuid}
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg bg-sky-100/70 px-3 py-2"
+            >
+              <span className="font-medium text-sky-900">{item.name}</span>
+              <span className="text-sky-700">
+                no value for {item.missing.join(", ")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      <p className="mt-0.5 text-sky-800">{finding.message}</p>
+    )}
+  </div>
+);
+
 // The customer-facing design check. Groups what the design breaks into blockers
 // (must fix to order — a camera with no recorder, an over-budget switch) and
 // heads-up warnings (can proceed) so the buyer always knows where they stand.
@@ -139,15 +182,14 @@ export const DesignCheck = ({
               could not run
             </h2>
           </div>
-          <div className="mt-3 flex flex-col gap-3">
+
+          <div className="mt-4 flex flex-col gap-4">
             {unknowns.map((finding) => (
-              <div key={finding.id} className="font-grotesk text-sm">
-                <p className="font-semibold text-sky-900">{finding.title}</p>
-                <p className="mt-0.5 text-sky-800">{finding.message}</p>
-              </div>
+              <UnknownRow key={finding.id} finding={finding} />
             ))}
           </div>
-          <p className="font-grotesk mt-3 text-xs text-sky-700">
+
+          <p className="font-grotesk mt-4 border-t border-sky-200 pt-3 text-xs text-sky-700">
             You can still order. Ask us to confirm these before you install.
           </p>
         </section>

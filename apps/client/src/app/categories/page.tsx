@@ -1,4 +1,5 @@
 import { ClassificationFilter } from "@/components/category/classification-filter";
+import { Pagination } from "@/components/common/pagination";
 import { documentImageUrl } from "@/lib/documents";
 import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
@@ -19,23 +20,31 @@ export const metadata: Metadata = pageMetadata({
 // new/reparented categories would never appear. Render per request instead.
 export const dynamic = "force-dynamic";
 
+/** Nine to a page, the same as the catalogue and the brands list. */
+const PAGE_SIZE = 9;
+
 type Props = {
-  searchParams: Promise<{ classification?: string }>;
+  searchParams: Promise<{ classification?: string; page?: string }>;
 };
 
 const CategoriesPage = async ({ searchParams }: Props) => {
-  const [{ classification }, categories, classifications] = await Promise.all([
-    searchParams,
-    getCategories(),
-    getClassifications(),
-  ]);
+  const [{ classification, page: pageParam }, categories, classifications] =
+    await Promise.all([searchParams, getCategories(), getClassifications()]);
 
   const selectedClassification = classification ?? null;
-  const visibleCategories = selectedClassification
+  const matching = selectedClassification
     ? categories.filter(
         (category) => category.classificationUuid === selectedClassification,
       )
     : categories;
+
+  // Sliced in memory: the classification filter above already runs on the whole
+  // list, so the page is a window onto something this request holds anyway.
+  const page = Math.max(1, Number(pageParam) || 1);
+  const visibleCategories = matching.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   return (
     <main className="min-h-screen bg-page">
@@ -47,8 +56,8 @@ const CategoriesPage = async ({ searchParams }: Props) => {
           Deploy by the whole solution
         </h1>
         <p className="font-grotesk mt-4 max-w-xl text-base leading-relaxed text-muted">
-          Pick a category and add the entire solution to your cart in one click —
-          then send it as a BOQ for review.
+          Pick a category and add the entire solution to your cart in one click
+          — then send it as a BOQ for review.
         </p>
 
         <div className="mt-10 flex flex-col gap-8 lg:flex-row">
@@ -126,6 +135,14 @@ const CategoriesPage = async ({ searchParams }: Props) => {
                 ))}
               </ul>
             )}
+
+            <Pagination
+              page={page}
+              totalPages={Math.max(1, Math.ceil(matching.length / PAGE_SIZE))}
+              total={matching.length}
+              pageSize={PAGE_SIZE}
+              noun="solutions"
+            />
           </div>
         </div>
       </div>

@@ -12,8 +12,10 @@ import type {
   Product,
   ProductComparison,
   ProductDetail,
+  ProductSort,
   ProjectAnswers,
   SpecFacet,
+  SpecRange,
 } from "./types";
 
 export class ApiError extends Error {
@@ -36,11 +38,14 @@ type ProductsQuery = {
   search?: string;
   categoryUuids?: string[];
   brandUuids?: string[];
-  sort?: "featured" | "price-asc" | "price-desc" | "name";
+  sort?: ProductSort;
   // Chosen facet values per attribute key. Sent as repeated `spec=key:value`,
   // the same encoding the web catalog uses, so a shared link means the same
   // thing on both.
   specValues?: Record<string, string[]>;
+  // Numeric facets, as bounds rather than values — sent as `range=key:min:max`
+  // with either end blank, the same encoding the web catalogue uses.
+  specRanges?: Record<string, SpecRange>;
   // Which category the chosen facets belong to. Needed because categoryUuids
   // is usually a whole subtree — the facets are the picked category's, but the
   // products sit in its leaves.
@@ -68,6 +73,12 @@ const buildQuery = (query: ProductsQuery): string => {
     for (const value of values) {
       params.append("spec", `${key}:${value}`);
     }
+  }
+  for (const [key, range] of Object.entries(query.specRanges ?? {})) {
+    if (range.min === undefined && range.max === undefined) {
+      continue;
+    }
+    params.append("range", `${key}:${range.min ?? ""}:${range.max ?? ""}`);
   }
   const qs = params.toString();
   return qs.length > 0 ? `?${qs}` : "";
@@ -159,12 +170,29 @@ export const fetchCategories = (): Promise<Category[]> =>
  * assignments, so the app never needs to know the attribute library, the
  * category tree, or who is allowed to see what. Pass the token when signed in:
  * a partner is offered facets a plain user is not.
+ *
+ * `chosen` sends back what the shopper has already ticked, so the API can reveal a
+ * conditional facet: PoE Budget is not offered until PoE = Yes is set. Same
+ * `spec=key:value` encoding as the catalogue query, so one screen speaks one
+ * language to both endpoints.
  */
 export const fetchCategoryFacets = (
   uuid: string,
   token?: string,
-): Promise<SpecFacet[]> =>
-  request<SpecFacet[]>(`/categories/${uuid}/facets`, { token });
+  chosen?: Record<string, string[]>,
+): Promise<SpecFacet[]> => {
+  const params = new URLSearchParams();
+  for (const [key, values] of Object.entries(chosen ?? {})) {
+    for (const value of values) {
+      params.append("spec", `${key}:${value}`);
+    }
+  }
+  const query = params.toString();
+  return request<SpecFacet[]>(
+    `/categories/${uuid}/facets${query ? `?${query}` : ""}`,
+    { token },
+  );
+};
 
 /**
  * Check a basket before the buyer commits to it: missing companions and
