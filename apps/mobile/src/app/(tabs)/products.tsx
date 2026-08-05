@@ -126,19 +126,42 @@ const ProductsScreen = () => {
     setSelected((current) =>
       Object.keys(current).length === 0 ? current : {},
     );
+  }, [categoryUuid]);
+
+  // Facets are re-resolved as the shopper ticks, not once per category: a
+  // conditional attribute is only offered after its trigger is set, so PoE Budget
+  // appears the moment PoE = Yes does. The web catalog resolves them twice for the
+  // same reason; here the second pass is the next fetch.
+  useEffect(() => {
     if (!categoryUuid) {
       setFacets([]);
       return;
     }
     let cancelled = false;
+    const chosen: Record<string, string[]> = JSON.parse(signature);
     tokenRef
       .current()
       .catch(() => null)
-      .then((token) => fetchCategoryFacets(categoryUuid, token ?? undefined))
+      .then((token) =>
+        fetchCategoryFacets(categoryUuid, token ?? undefined, chosen),
+      )
       .then((next) => {
-        if (!cancelled) {
-          setFacets(next);
+        if (cancelled) {
+          return;
         }
+        setFacets(next);
+        // Drop anything the category no longer offers. Un-ticking PoE takes PoE
+        // Budget off the sheet, and a value left behind for a filter nobody can
+        // see would go on narrowing the list invisibly.
+        const offered = new Set(next.map((facet) => facet.key));
+        setSelected((current) => {
+          const kept = Object.entries(current).filter(([key]) =>
+            offered.has(key),
+          );
+          return kept.length === Object.keys(current).length
+            ? current
+            : Object.fromEntries(kept);
+        });
       })
       .catch(() => {
         if (!cancelled) {
@@ -148,7 +171,10 @@ const ProductsScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [categoryUuid]);
+    // Keyed on the chosen values, not the object identity — `signature` is the
+    // JSON of `selected`, and it is parsed back rather than read from state so the
+    // effect cannot fire on a render that rebuilt an equal object.
+  }, [categoryUuid, signature]);
 
   // Read through a ref for the same reason as the cart: the effect keys on
   // `signature`, and depending on the identity of `data` or `selected` would

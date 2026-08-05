@@ -160,12 +160,29 @@ export const fetchCategories = (): Promise<Category[]> =>
  * assignments, so the app never needs to know the attribute library, the
  * category tree, or who is allowed to see what. Pass the token when signed in:
  * a partner is offered facets a plain user is not.
+ *
+ * `chosen` sends back what the shopper has already ticked, so the API can reveal a
+ * conditional facet: PoE Budget is not offered until PoE = Yes is set. Same
+ * `spec=key:value` encoding as the catalogue query, so one screen speaks one
+ * language to both endpoints.
  */
 export const fetchCategoryFacets = (
   uuid: string,
   token?: string,
-): Promise<SpecFacet[]> =>
-  request<SpecFacet[]>(`/categories/${uuid}/facets`, { token });
+  chosen?: Record<string, string[]>,
+): Promise<SpecFacet[]> => {
+  const params = new URLSearchParams();
+  for (const [key, values] of Object.entries(chosen ?? {})) {
+    for (const value of values) {
+      params.append("spec", `${key}:${value}`);
+    }
+  }
+  const query = params.toString();
+  return request<SpecFacet[]>(
+    `/categories/${uuid}/facets${query ? `?${query}` : ""}`,
+    { token },
+  );
+};
 
 /**
  * Check a basket before the buyer commits to it: missing companions and
