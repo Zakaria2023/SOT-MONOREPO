@@ -36,45 +36,54 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const status = product.status ?? "in_stock";
 
   return (
-    <article className="relative flex flex-col overflow-hidden rounded-panel border border-hairline bg-surface transition-colors hover:border-primary/40">
-      <div className="relative flex h-40 items-center justify-center border-b border-hairline bg-hover">
+    <article className="group relative flex flex-col gap-4 rounded-card border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(27,35,51,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_12px_28px_-12px_rgba(27,35,51,0.18)]">
+      {/* The picture sits in its own rounded well inside the card, not edge to
+          edge against a hard divider. A photographed switch on a white product
+          shot needs a soft field behind it or the card reads as two rectangles
+          stacked. */}
+      <div className="relative flex h-44 items-center justify-center overflow-hidden rounded-control bg-hover">
         {product.image ? (
           <Image
             src={documentImageUrl(product.image)}
             alt={product.name}
             fill
             sizes="320px"
-            className="object-contain p-4"
+            className="object-contain p-5 transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <ImageOff size={26} className="text-faint" />
         )}
 
         <span
-          className={`absolute top-3 left-3 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASSES[status]}`}
+          className={`absolute top-2.5 left-2.5 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE_CLASSES[status]}`}
         >
           {PRODUCT_STATUS_LABELS[status]}
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-1 flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="line-clamp-2 font-semibold text-ink">
+            <h3 className="line-clamp-2 leading-snug font-semibold text-ink">
               {product.name}
             </h3>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1.5 line-clamp-1 text-sm text-muted">
               {product.categoryName ?? "No category"}
               {product.brandName ? ` · ${product.brandName}` : ""}
             </p>
           </div>
-          {/* Above the stretched link below, or the card would swallow the menu. */}
-          <div className="relative z-10 shrink-0">
+          {/* Above the stretched link below, or the card would swallow the menu.
+              Revealed on hover so three outlined buttons are not the loudest
+              thing in a grid of twelve cards — always present for keyboards. */}
+          <div className="relative z-10 shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
             <ProductRowActions uuid={product.uuid} name={product.name} />
           </div>
         </div>
 
-        <div className="mt-auto flex items-end justify-between gap-2 border-t border-hairline pt-3">
+        {/* Price only. The sort key was a column in the table because a table
+            shows what it has; on a card it was a number with no meaning to anyone
+            reading the grid. */}
+        <div className="mt-auto border-t border-hairline-soft pt-3">
           <span className="font-semibold text-ink">
             {product.price ? (
               formatPrice(product.price, product.currency)
@@ -84,7 +93,6 @@ export const ProductCard = ({ product }: ProductCardProps) => {
               </span>
             )}
           </span>
-          <span className="text-xs text-faint">Order {product.order}</span>
         </div>
       </div>
 
