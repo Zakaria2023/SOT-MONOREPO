@@ -29,6 +29,9 @@ export const ClassificationFilter = ({
     } else {
       params.delete("classification");
     }
+    // Back to page 1: narrowing the list while standing on page 3 would land the
+    // shopper on an empty grid that reads as "nothing matched".
+    params.delete("page");
     const query = params.toString();
     startNavigation(() => {
       router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });

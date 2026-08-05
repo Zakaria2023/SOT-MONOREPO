@@ -6,12 +6,17 @@ import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import {
+  countProducts,
   expandFacetChoices,
   facetSelectionValues,
   getCategoryFacets,
   getProducts,
   type CategoryFacet,
+  type ProductFilters,
 } from "services";
+
+/** Nine to a page — three rows of three in the grid this page renders. */
+const PAGE_SIZE = 9;
 
 // The canonical is the bare /products on purpose. Every facet and sort
 // combination renders a reshuffle of the same catalog, and left self-canonical
@@ -38,6 +43,7 @@ type Props = {
     brand?: string | string[];
     spec?: string | string[];
     sort?: string;
+    page?: string;
   }>;
 };
 
@@ -77,6 +83,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
   const selectedBrands = toArray(params.brand);
   const sort = normalizeSort(params.sort);
   const search = params.search?.trim() ? params.search.trim() : undefined;
+  // An out-of-range or junk page reads as page 1 rather than as an empty grid:
+  // the URL is user-editable and the shopper did not ask for nothing.
+  const page = Math.max(1, Number(params.page) || 1);
 
   // Expand a selected category/brand to its whole subtree so choosing a parent
   // includes everything under it.
@@ -123,14 +132,28 @@ const ProductsPage = async ({ searchParams }: Props) => {
   // expand, and most changes — a category, a brand, the sort — carry none. Made
   // to wait anyway, every one of those clicks paid for a facet resolution before
   // its own round trip could start.
-  const productsPromise =
+  const baseFilters: ProductFilters = {
+    search,
+    categoryUuids,
+    brandUuids,
+    sort,
+  };
+  const paging = { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE };
+
+  // The page of rows and the total run together — they share nothing but their
+  // filters, and each is a round trip to the database.
+  const queryFor = (filters: ProductFilters) =>
+    Promise.all([
+      getProducts({ ...filters, ...paging }),
+      countProducts(filters),
+    ]);
+
+  const pageDataPromise =
     Object.keys(selectedSpecs).length === 0
-      ? getProducts({ search, categoryUuids, brandUuids, sort })
+      ? queryFor(baseFilters)
       : facetsPromise.then((facets) =>
-          getProducts({
-            search,
-            categoryUuids,
-            brandUuids,
+          queryFor({
+            ...baseFilters,
             // Ignore any spec param the current category doesn't actually offer —
             // a stale key left over from a previous category must not silently
             // filter every product away. An ordered facet is a ceiling, so the
@@ -143,13 +166,12 @@ const ProductsPage = async ({ searchParams }: Props) => {
                 ),
               ),
             ),
-            sort,
           }),
         );
 
-  const [facets, products] = await Promise.all([
+  const [facets, [products, matching]] = await Promise.all([
     facetsPromise,
-    productsPromise,
+    pageDataPromise,
   ]);
 
   const offeredKeys = new Set(facets.map((facet) => facet.key));
@@ -168,6 +190,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
       categoryTree={categoryTree}
       brandTree={brandTree}
       total={total}
+      matching={matching}
+      page={page}
+      pageSize={PAGE_SIZE}
       selectedCategory={selectedCategory}
       selectedBrands={selectedBrands}
       facets={facets}

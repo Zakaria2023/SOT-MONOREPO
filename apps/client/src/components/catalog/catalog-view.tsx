@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandFilter } from "@/components/catalog/brand-filter";
+import { Pagination } from "@/components/common/pagination";
 import { CatalogProductCard } from "@/components/catalog/catalog-product-card";
 import { CategoryFilter } from "@/components/catalog/category-filter";
 import { SpecFilter } from "@/components/catalog/spec-filter";
@@ -23,7 +24,12 @@ type CatalogViewProps = {
   products: ProductSummary[];
   categoryTree: TreeNode<CategoryListItem>[];
   brandTree: TreeNode<BrandListItem>[];
+  /** Every product in the catalogue, for the "All products" row. */
   total: number;
+  /** How many match the current filters, across all pages. */
+  matching: number;
+  page: number;
+  pageSize: number;
   selectedCategory: string | null;
   selectedBrands: string[];
   // Specification facets the selected category offers this viewer. Empty until
@@ -41,6 +47,9 @@ export const CatalogView = ({
   categoryTree,
   brandTree,
   total,
+  matching,
+  page,
+  pageSize,
   selectedCategory,
   selectedBrands,
   facets,
@@ -67,6 +76,10 @@ export const CatalogView = ({
   const updateParams = (mutate: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(window.location.search);
     mutate(params);
+    // Any change to the filters puts the shopper back on page 1. Narrowing from
+    // 40 products to 6 while standing on page 3 otherwise lands them on an empty
+    // grid that looks like the filter matched nothing.
+    params.delete("page");
     const query = params.toString();
     startNavigation(() => {
       router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
@@ -288,9 +301,12 @@ export const CatalogView = ({
               </div>
             </div>
 
+            {/* The count is what MATCHES, not what is on this page: "9 products"
+                above a grid of nine, on page two of forty, is a lie the shopper
+                can see. */}
             <p className="font-grotesk mt-4 text-sm text-muted">
-              <span className="font-bold text-ink">{products.length}</span>{" "}
-              {products.length === 1 ? "product" : "products"}
+              <span className="font-bold text-ink">{matching}</span>{" "}
+              {matching === 1 ? "product" : "products"}
             </p>
 
             {products.length === 0 ? (
@@ -322,6 +338,14 @@ export const CatalogView = ({
                 ))}
               </ul>
             )}
+
+            <Pagination
+              page={page}
+              totalPages={Math.max(1, Math.ceil(matching / pageSize))}
+              total={matching}
+              pageSize={pageSize}
+              noun="products"
+            />
           </div>
         </div>
       </div>

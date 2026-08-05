@@ -50,13 +50,19 @@ export type ProductListItem = SelectProducts & {
  * specValues is there while the query never selected it is the kind of lie that
  * surfaces as `undefined` somewhere far away.
  */
-export type ProductSummary = Omit<ProductListItem, "specValues" | "equivalents">;
+export type ProductSummary = Omit<
+  ProductListItem,
+  "specValues" | "equivalents"
+>;
 
 // Everything a summary needs, named once. `description` and `images` stay because
 // the mobile /products contract includes them.
 const productSummaryColumns = () => {
-  const { specValues: _specValues, equivalents: _equivalents, ...columns } =
-    getTableColumns(Products);
+  const {
+    specValues: _specValues,
+    equivalents: _equivalents,
+    ...columns
+  } = getTableColumns(Products);
   return columns;
 };
 
@@ -88,6 +94,10 @@ export type ProductFilters = {
    * black), which is what a shopper means by ticking several boxes.
    */
   specValues?: Record<string, string[]>;
+  /** Page size. Omitted, the query returns every match. */
+  limit?: number;
+  /** Rows to skip — `(page - 1) * limit`. Only read when `limit` is set. */
+  offset?: number;
   /** Column ordering applied in SQL. */
   sort?: ProductSort;
 };
@@ -188,38 +198,49 @@ export const generateProductSku = async (input: {
   return `${prefix}-${String(seq).padStart(2, "0")}`;
 };
 
+/**
+ * The WHERE for a catalogue query, built once and used by both the page of rows
+ * and its count. Two copies of this would eventually disagree, and the symptom —
+ * a total that does not match the list under it — is the kind a shopper notices
+ * long before we do.
+ */
+const catalogConditions = (filters: ProductFilters): (SQL | undefined)[] => {
+  const conditions: (SQL | undefined)[] = [];
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    // Flexible match across every field a product might be found by.
+    conditions.push(
+      or(
+        like(Products.name, term),
+        like(Products.model, term),
+        like(Products.sku, term),
+        like(Products.seriesCode, term),
+        like(Products.shortDescription, term),
+        like(Products.description, term),
+        like(Brands.name, term),
+        like(Categories.name, term),
+      ),
+    );
+  }
+  if (filters.categoryUuids && filters.categoryUuids.length > 0) {
+    conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
+  }
+  if (filters.brandUuids && filters.brandUuids.length > 0) {
+    conditions.push(inArray(Products.brandUuid, filters.brandUuids));
+  }
+  for (const [key, values] of Object.entries(filters.specValues ?? {})) {
+    conditions.push(specValueCondition(key, values));
+  }
+  return conditions;
+};
+
 export const getProducts = async (
   filters: ProductFilters = {},
 ): Promise<ProductSummary[]> => {
   try {
-    const conditions: (SQL | undefined)[] = [];
-    if (filters.search) {
-      const term = `%${filters.search}%`;
-      // Flexible match across every field a product might be found by.
-      conditions.push(
-        or(
-          like(Products.name, term),
-          like(Products.model, term),
-          like(Products.sku, term),
-          like(Products.seriesCode, term),
-          like(Products.shortDescription, term),
-          like(Products.description, term),
-          like(Brands.name, term),
-          like(Categories.name, term),
-        ),
-      );
-    }
-    if (filters.categoryUuids && filters.categoryUuids.length > 0) {
-      conditions.push(inArray(Products.categoryUuid, filters.categoryUuids));
-    }
-    if (filters.brandUuids && filters.brandUuids.length > 0) {
-      conditions.push(inArray(Products.brandUuid, filters.brandUuids));
-    }
-    for (const [key, values] of Object.entries(filters.specValues ?? {})) {
-      conditions.push(specValueCondition(key, values));
-    }
+    const conditions = catalogConditions(filters);
 
-    return await db
+    const query = db
       .select({
         ...productSummaryColumns(),
         categoryName: Categories.name,
@@ -229,10 +250,45 @@ export const getProducts = async (
       .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
       .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(...productOrder(filters.sort));
+      .orderBy(...productOrder(filters.sort))
+      .$dynamic();
+
+    // Paged in SQL, not sliced after the fact: a catalogue page asking for nine
+    // products should not drag every matching row across the wire to throw all
+    // but nine of them away.
+    if (filters.limit !== undefined) {
+      query.limit(filters.limit).offset(filters.offset ?? 0);
+    }
+
+    return await query;
   } catch (error) {
     console.error("getProducts failed:", error);
     throw new Error("Failed to fetch products", { cause: error });
+  }
+};
+
+/**
+ * How many products match, ignoring limit and offset.
+ *
+ * Its own query because a paged SELECT cannot also report the size of what it
+ * paged. Run it beside getProducts, never after: they share no data and the round
+ * trip to the database is the whole cost.
+ */
+export const countProducts = async (
+  filters: ProductFilters = {},
+): Promise<number> => {
+  try {
+    const conditions = catalogConditions(filters);
+    const [row] = await db
+      .select({ total: sql<number>`count(*)` })
+      .from(Products)
+      .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
+      .leftJoin(Brands, eq(Products.brandUuid, Brands.uuid))
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return Number(row?.total ?? 0);
+  } catch (error) {
+    console.error("countProducts failed:", error);
+    throw new Error("Failed to count products", { cause: error });
   }
 };
 
