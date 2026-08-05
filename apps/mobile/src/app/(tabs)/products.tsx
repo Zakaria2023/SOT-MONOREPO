@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-expo";
 import { Search, X } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -15,7 +15,7 @@ import { ProductCard } from "@/components/products/product-card";
 import { Rule } from "@/components/ui/editorial";
 import { ListState } from "@/components/ui/list-state";
 import { fetchCategories, fetchCategoryFacets, fetchProducts } from "@/lib/api";
-import { rootCategories, subtreeUuids } from "@/lib/categories";
+import { subtreeUuids } from "@/lib/categories";
 import {
   colors,
   fonts,
@@ -25,8 +25,9 @@ import {
   tracking,
   type,
 } from "@/lib/theme";
+import { buildTree, findNode } from "@/lib/tree";
 import { useAsync } from "@/lib/use-async";
-import type { Category, Product, SpecFacet } from "@/lib/types";
+import type { Product, SpecFacet } from "@/lib/types";
 
 const ProductsScreen = () => {
   const { getToken } = useAuth();
@@ -43,7 +44,7 @@ const ProductsScreen = () => {
 
   // Spec facets belong to a place in the tree, so they only exist once a
   // category is picked — the same rule the web catalog follows.
-  const [category, setCategory] = useState<Category | null>(null);
+  const [categoryUuid, setCategoryUuid] = useState<string | null>(null);
   const [facets, setFacets] = useState<SpecFacet[]>([]);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -53,7 +54,26 @@ const ProductsScreen = () => {
   const [term, setTerm] = useState("");
 
   const signature = JSON.stringify(selected);
-  const categoryUuid = category?.uuid ?? null;
+
+  // The category list arrives flat with parentUuid on each row; the shape and the
+  // rolled-up counts are assembled here, once per load.
+  const roots = useMemo(
+    () => buildTree(data?.categories ?? [], (item) => item.productCount),
+    [data],
+  );
+  const total = useMemo(
+    () => roots.reduce((sum, root) => sum + root.count, 0),
+    [roots],
+  );
+  // Which family the chips should mark. Choosing a sub-category in the sheet has
+  // to light its family up here, or the two controls contradict each other.
+  const activeRoot = useMemo(
+    () =>
+      categoryUuid
+        ? (roots.find((root) => findNode([root], categoryUuid))?.uuid ?? null)
+        : null,
+    [roots, categoryUuid],
+  );
 
   // Clerk returns a new getToken on every render, so an effect that lists it as a
   // dependency runs on every render too. Held in a ref, it stays callable without
@@ -162,7 +182,6 @@ const ProductsScreen = () => {
   }
 
   const products = rows ?? data.products;
-  const roots = rootCategories(data.categories);
 
   const closeSearch = () => {
     setSearchOpen(false);
@@ -214,24 +233,24 @@ const ProductsScreen = () => {
           contentContainerStyle={styles.chips}
         >
           <Pressable
-            onPress={() => setCategory(null)}
-            style={[styles.chip, !category ? styles.chipActive : null]}
+            onPress={() => setCategoryUuid(null)}
+            style={[styles.chip, !categoryUuid ? styles.chipActive : null]}
           >
             <Text
               style={[
                 styles.chipText,
-                !category ? styles.chipTextActive : null,
+                !categoryUuid ? styles.chipTextActive : null,
               ]}
             >
               All
             </Text>
           </Pressable>
           {roots.map((root) => {
-            const active = category?.uuid === root.uuid;
+            const active = activeRoot === root.uuid;
             return (
               <Pressable
                 key={root.uuid}
-                onPress={() => setCategory(active ? null : root)}
+                onPress={() => setCategoryUuid(active ? null : root.uuid)}
                 style={[styles.chip, active ? styles.chipActive : null]}
               >
                 <Text
@@ -248,18 +267,21 @@ const ProductsScreen = () => {
         </ScrollView>
 
         <View style={styles.filterRow}>
-          {category ? (
-            <FilterSheet
-              facets={facets}
-              selected={selected}
-              open={sheetOpen}
-              onOpen={() => setSheetOpen(true)}
-              onClose={() => setSheetOpen(false)}
-              onChange={setSelected}
-            />
-          ) : (
+          <FilterSheet
+            categories={roots}
+            selectedCategory={categoryUuid}
+            onSelectCategory={setCategoryUuid}
+            totalProducts={total}
+            facets={facets}
+            selected={selected}
+            open={sheetOpen}
+            onOpen={() => setSheetOpen(true)}
+            onClose={() => setSheetOpen(false)}
+            onChange={setSelected}
+          />
+          {!categoryUuid ? (
             <Text style={styles.hint}>Pick a category to filter by spec</Text>
-          )}
+          ) : null}
           <Text style={styles.count}>
             {products.length} {products.length === 1 ? "item" : "items"}
           </Text>

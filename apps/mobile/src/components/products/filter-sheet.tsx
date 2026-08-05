@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { FilterTree } from "@/components/products/filter-tree";
 import { Button } from "@/components/ui/button";
 import { Kicker } from "@/components/ui/editorial";
 import {
@@ -18,9 +19,21 @@ import {
   tracking,
   type,
 } from "@/lib/theme";
-import type { SpecFacet } from "@/lib/types";
+import type { TreeNode } from "@/lib/tree";
+import type { Category, SpecFacet } from "@/lib/types";
 
 type FilterSheetProps = {
+  /**
+   * Category families, already assembled into a tree with rolled-up counts. Left
+   * out on a screen that is already scoped to one category — the category page
+   * offers facets, and a category picker there would navigate the shopper away
+   * from the page they chose.
+   */
+  categories?: TreeNode<Category>[];
+  selectedCategory?: string | null;
+  onSelectCategory?: (uuid: string | null) => void;
+  /** Products across the whole catalogue, shown against "All products". */
+  totalProducts?: number;
   facets: SpecFacet[];
   selected: Record<string, string[]>;
   open: boolean;
@@ -78,11 +91,22 @@ const FacetBlock = ({ facet, chosen, onToggle }: FacetBlockProps) => (
 );
 
 /**
- * The facet sidebar the web catalog has, as a sheet. Facets are resolved by
- * the API from the category's assignments, so this renders whatever it is
- * given and never needs to know the attribute library.
+ * The filter sidebar the web catalog has, as a sheet: the category tree first,
+ * then the specification facets that category offers.
+ *
+ * Category leads because the facets depend on it — an attribute assigned at
+ * Networking has nothing to narrow while the shopper is looking at everything.
+ * Facets are resolved by the API from the category's assignments, so this renders
+ * whatever it is given and never needs to know the attribute library.
+ *
+ * The sheet no longer hides itself when a category offers no facets: it now holds
+ * the category tree, which is the one filter that is always worth opening.
  */
 export const FilterSheet = ({
+  categories,
+  selectedCategory = null,
+  onSelectCategory,
+  totalProducts = 0,
   facets,
   selected,
   open,
@@ -90,12 +114,17 @@ export const FilterSheet = ({
   onClose,
   onChange,
 }: FilterSheetProps) => {
-  const count = Object.values(selected).reduce(
+  const specCount = Object.values(selected).reduce(
     (total, values) => total + values.length,
     0,
   );
+  const showCategories = Boolean(categories && categories.length > 0);
+  // The category counts as an applied filter on the trigger, because from the
+  // outside it is one — the tally has to match what the shopper narrowed by.
+  const count = specCount + (showCategories && selectedCategory ? 1 : 0);
 
-  if (facets.length === 0) {
+  // Nothing to offer at all: no tree to pick from and no facets to narrow by.
+  if (!showCategories && facets.length === 0) {
     return null;
   }
 
@@ -160,6 +189,41 @@ export const FilterSheet = ({
             contentContainerStyle={styles.sheetBody}
             showsVerticalScrollIndicator={false}
           >
+            {showCategories && categories ? (
+              <View style={styles.section}>
+                <Text style={styles.facetLabel}>Category</Text>
+                {/* "All products" is a row like any other so clearing the category
+                  is one tap in the same column, not a separate control. */}
+                <Pressable
+                  onPress={() => onSelectCategory?.(null)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selectedCategory === null }}
+                  accessibilityLabel="All products"
+                  style={({ pressed }) => [
+                    styles.allRow,
+                    pressed ? styles.chipPressed : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.allLabel,
+                      selectedCategory === null ? styles.allLabelOn : null,
+                    ]}
+                  >
+                    All products
+                  </Text>
+                  <Text style={styles.allCount}>{totalProducts}</Text>
+                </Pressable>
+                <FilterTree
+                  roots={categories}
+                  isSelected={(uuid) => uuid === selectedCategory}
+                  onSelect={(uuid) =>
+                    onSelectCategory?.(uuid === selectedCategory ? null : uuid)
+                  }
+                />
+              </View>
+            ) : null}
+
             {facets.map((facet) => (
               <FacetBlock
                 key={facet.key}
@@ -177,7 +241,10 @@ export const FilterSheet = ({
                 variant="outline"
                 size="md"
                 full={false}
-                onPress={() => onChange({})}
+                onPress={() => {
+                  onChange({});
+                  onSelectCategory?.(null);
+                }}
               />
             ) : null}
             <View style={styles.footGrow}>
@@ -264,6 +331,28 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     gap: spacing.xl,
+  },
+  section: { gap: spacing.sm },
+  allRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 44,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  allLabel: {
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
+  },
+  allLabelOn: { color: colors.primary, fontFamily: fonts.medium },
+  allCount: {
+    color: colors.faint,
+    fontFamily: fonts.body,
+    fontSize: type.kicker.size,
+    ...tabular,
   },
   facet: { gap: spacing.sm },
   // The same uppercase letterspaced label the profile details use, so a field
