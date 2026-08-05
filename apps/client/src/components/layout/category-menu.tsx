@@ -22,6 +22,8 @@ type TreeItemProps = {
   openUuids: Set<string>;
   onSelect: (node: CategoryNode) => void;
   onToggle: (uuid: string) => void;
+  /** Called when a row navigates, so the panel closes behind the click. */
+  onNavigate: () => void;
 };
 
 type ProductTileProps = {
@@ -83,6 +85,7 @@ const TreeItem = ({
   openUuids,
   onSelect,
   onToggle,
+  onNavigate,
 }: TreeItemProps) => {
   const isSelected = selectedUuid === node.uuid;
   const isOpen = openUuids.has(node.uuid);
@@ -97,6 +100,7 @@ const TreeItem = ({
         <Link
           href={`/products?category=${node.uuid}`}
           onMouseEnter={() => onSelect(node)}
+          onClick={onNavigate}
           className={cn(
             "font-grotesk flex items-center gap-2.5 rounded-lg py-1.5 pr-2 pl-4 text-sm transition-colors",
             isSelected ? "text-primary" : "text-secondary hover:text-primary",
@@ -122,6 +126,7 @@ const TreeItem = ({
                 openUuids={openUuids}
                 onSelect={onSelect}
                 onToggle={onToggle}
+                onNavigate={onNavigate}
               />
             ))}
           </ul>
@@ -146,6 +151,7 @@ const TreeItem = ({
         <Link
           href={`/products?category=${node.uuid}`}
           onMouseEnter={() => onSelect(node)}
+          onClick={onNavigate}
           className="flex flex-1 items-center gap-3 py-2.5 pr-1 pl-3 text-left"
         >
           <CategoryPlate node={node} size={36} />
@@ -193,6 +199,7 @@ const TreeItem = ({
               openUuids={openUuids}
               onSelect={onSelect}
               onToggle={onToggle}
+              onNavigate={onNavigate}
             />
           ))}
         </ul>
@@ -296,6 +303,13 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
     closeTimer.current = setTimeout(() => setActiveTopUuid(null), 120);
   };
 
+  // Clicking a category navigates; the panel has to come down with it, or the
+  // shopper lands on the filtered page behind a menu still covering it.
+  const closeMenu = () => {
+    cancelClose();
+    setActiveTopUuid(null);
+  };
+
   // One branch open at a time. Leaving them all open pushed the panel past the
   // bottom of the screen, so the products it exists to show scrolled out of view
   // behind a column of category names.
@@ -387,7 +401,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
               </div>
             )}
 
-            <div className="relative mx-auto flex items-start gap-4 px-6 py-12 lg:px-12 xl:px-20">
+            <div className="relative flex w-full items-start gap-4 px-6 py-12 lg:px-12 xl:px-20">
               <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
                 {selected.image ? (
                   <Image
@@ -421,7 +435,10 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
             </div>
           </div>
 
-          <div className="scrollbar-slim mx-auto grid min-h-0 flex-1 grid-cols-[260px_1fr] gap-8 overflow-y-auto px-6 pt-8 pb-6 lg:px-12 xl:px-20">
+          {/* w-full, not mx-auto: the panel is a flex column now, and an auto
+              margin there overrides stretch and sizes the row to its content —
+              so the sidebar shifted whenever the product grid was empty. */}
+          <div className="scrollbar-slim grid min-h-0 w-full flex-1 grid-cols-[260px_1fr] gap-8 overflow-y-auto px-6 pt-8 pb-6 lg:px-12 xl:px-20">
             <div>
               <p className="font-grotesk px-3 text-xs font-semibold tracking-widest text-faint uppercase">
                 Categories
@@ -436,6 +453,7 @@ export const CategoryMenu = ({ categories }: CategoryMenuProps) => {
                     openUuids={openUuids}
                     onSelect={showCategory}
                     onToggle={toggle}
+                    onNavigate={closeMenu}
                   />
                 ))}
               </ul>

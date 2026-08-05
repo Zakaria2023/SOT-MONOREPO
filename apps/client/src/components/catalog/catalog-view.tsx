@@ -159,7 +159,7 @@ export const CatalogView = ({
               itself: the filters are taller than the viewport once a category is
               open, and scrolling to reach the specifications used to drag the
               whole product grid off the screen with them. */}
-          <aside className="scrollbar-slim hidden shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:w-80 lg:overflow-y-auto lg:pr-1 xl:w-96">
+          <aside className="scrollbar-slim hidden shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:w-72 lg:overflow-y-auto lg:pr-1 xl:w-80">
             <CategoryFilter
               tree={categoryTree}
               total={total}
