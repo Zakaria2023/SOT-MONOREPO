@@ -56,8 +56,8 @@ export const MultiImageUpload = ({
           body: formData,
         });
         const result:
-          | { documentId: string; fileName: string }
-          | { error: string } = await response.json();
+          { documentId: string; fileName: string } | { error: string } =
+          await response.json();
 
         if (!response.ok || "error" in result) {
           setError("error" in result ? result.error : "Failed to upload image");
@@ -105,17 +105,20 @@ export const MultiImageUpload = ({
         {value.map((documentId) => (
           <div
             key={documentId}
-            className="relative h-16 w-16 shrink-0 overflow-hidden rounded-control border border-hairline bg-hover"
+            // Same size and fit as the main image plate, one step smaller: these
+            // are a gallery, and a cropped 64px square told the admin nothing
+            // about which shot they were looking at.
+            className="relative h-32 w-32 shrink-0 overflow-hidden rounded-control border border-hairline bg-hover"
           >
             <Image
               src={previewFor(documentId)}
               alt="Sub image"
               fill
-              sizes="64px"
+              sizes="128px"
               // See image-upload: a blob: URL from the local file picker cannot
               // be optimized, a stored document can.
               unoptimized={previewFor(documentId).startsWith("blob:")}
-              className="object-cover"
+              className="object-contain p-2"
             />
             <button
               type="button"
