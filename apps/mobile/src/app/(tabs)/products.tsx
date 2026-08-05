@@ -32,7 +32,7 @@ import {
 } from "@/lib/theme";
 import { buildTree, findNode, subtreeMap } from "@/lib/tree";
 import { useAsync } from "@/lib/use-async";
-import type { Product, SpecFacet } from "@/lib/types";
+import type { Product, ProductSort, SpecFacet } from "@/lib/types";
 
 const ProductsScreen = () => {
   const { getToken } = useAuth();
@@ -56,6 +56,7 @@ const ProductsScreen = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [rows, setRows] = useState<Product[] | null>(null);
   const [brandUuids, setBrandUuids] = useState<string[]>([]);
+  const [sort, setSort] = useState<ProductSort>("featured");
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [term, setTerm] = useState("");
@@ -164,9 +165,12 @@ const ProductsScreen = () => {
     if (!tree) {
       return;
     }
+    // "featured" is the order the unfiltered list already arrives in, so it is
+    // not a reason to ask the API for the same list again.
     if (
       !categoryUuid &&
       !term &&
+      sort === "featured" &&
       brandsChosen.length === 0 &&
       Object.keys(chosen).length === 0
     ) {
@@ -185,6 +189,7 @@ const ProductsScreen = () => {
       specValues: chosen,
       search: term || undefined,
       brandUuids: brandsChosen.length > 0 ? brandsChosen : undefined,
+      sort,
     })
       .then((next) => {
         if (!cancelled) {
@@ -201,7 +206,7 @@ const ProductsScreen = () => {
       cancelled = true;
     };
     // Keyed on the joined uuids rather than the array, which is rebuilt each render.
-  }, [categoryUuid, signature, term, brandSignature]);
+  }, [categoryUuid, signature, term, brandSignature, sort]);
 
   if (loading || error || !data) {
     return (
@@ -310,6 +315,8 @@ const ProductsScreen = () => {
             totalProducts={total}
             brands={brandRoots}
             selectedBrands={brandUuids}
+            sort={sort}
+            onSort={setSort}
             onToggleBrand={(uuid) =>
               setBrandUuids((current) =>
                 current.includes(uuid)

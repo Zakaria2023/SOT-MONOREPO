@@ -1,5 +1,6 @@
 import { API_URL } from "./env";
 import type {
+  ProductSort,
   AuthUser,
   Boq,
   Brand,
@@ -36,7 +37,7 @@ type ProductsQuery = {
   search?: string;
   categoryUuids?: string[];
   brandUuids?: string[];
-  sort?: "featured" | "price-asc" | "price-desc" | "name";
+  sort?: ProductSort;
   // Chosen facet values per attribute key. Sent as repeated `spec=key:value`,
   // the same encoding the web catalog uses, so a shared link means the same
   // thing on both.

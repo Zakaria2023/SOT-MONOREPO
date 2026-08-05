@@ -20,7 +20,19 @@ import {
   type,
 } from "@/lib/theme";
 import type { TreeNode } from "@/lib/tree";
-import type { Brand, Category, SpecFacet } from "@/lib/types";
+import type { Brand, Category, ProductSort, SpecFacet } from "@/lib/types";
+
+/**
+ * The four orders the catalogue offers, in the same words the web catalogue uses.
+ * "Featured" is the order the merchandiser set, which is why it leads and why it
+ * is what an untouched screen shows.
+ */
+const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
+  { value: "featured", label: "Featured" },
+  { value: "price-asc", label: "Price: low to high" },
+  { value: "price-desc", label: "Price: high to low" },
+  { value: "name", label: "Name A–Z" },
+];
 
 type FilterSheetProps = {
   /**
@@ -42,6 +54,8 @@ type FilterSheetProps = {
   brands?: TreeNode<Brand>[];
   selectedBrands?: string[];
   onToggleBrand?: (uuid: string) => void;
+  sort?: ProductSort;
+  onSort?: (value: ProductSort) => void;
   facets: SpecFacet[];
   selected: Record<string, string[]>;
   open: boolean;
@@ -118,6 +132,8 @@ export const FilterSheet = ({
   brands,
   selectedBrands,
   onToggleBrand,
+  sort = "featured",
+  onSort,
   facets,
   selected,
   open,
@@ -134,13 +150,16 @@ export const FilterSheet = ({
   const chosenBrands = selectedBrands ?? [];
   // Category and brands count as applied filters on the trigger, because from the
   // outside they are — the tally has to match what the shopper narrowed by.
+  // Sort is deliberately absent from the tally and from Clear: it narrows
+  // nothing, and resetting an order the shopper chose while they were clearing
+  // filters would reshuffle the page under them.
   const count =
     specCount +
     (showCategories && selectedCategory ? 1 : 0) +
     (showBrands ? chosenBrands.length : 0);
 
   // Nothing to offer at all: no tree to pick from and no facets to narrow by.
-  if (!showCategories && !showBrands && facets.length === 0) {
+  if (!showCategories && !showBrands && !onSort && facets.length === 0) {
     return null;
   }
 
@@ -205,6 +224,40 @@ export const FilterSheet = ({
             contentContainerStyle={styles.sheetBody}
             showsVerticalScrollIndicator={false}
           >
+            {onSort ? (
+              <View style={styles.section}>
+                <Text style={styles.facetLabel}>Sort</Text>
+                <View style={styles.options}>
+                  {SORT_OPTIONS.map((option) => {
+                    const active = option.value === sort;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => onSort(option.value)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={`Sort by ${option.label}`}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          active ? styles.chipActive : null,
+                          pressed ? styles.chipPressed : null,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            active ? styles.chipTextActive : null,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
             {showCategories && categories ? (
               <View style={styles.section}>
                 <Text style={styles.facetLabel}>Category</Text>

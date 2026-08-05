@@ -39,6 +39,9 @@ export type ProductDetail = Product & {
   specs: ProductSpec[] | null;
 };
 
+/** The orders `getProducts` understands, mirrored from the service's ProductSort. */
+export type ProductSort = "featured" | "price-asc" | "price-desc" | "name";
+
 export type ProductSpec = {
   uuid: string;
   label: string;
