@@ -1,17 +1,20 @@
 "use client";
 
 import { type LibraryAttributeInput } from "@/app/(dashboard)/library/action";
-import type { OptionSet } from "services";
 import type { SpecificationType } from "@/db/enum";
+import type { OptionSet } from "services";
 
-import { SPECIFICATION_TYPE_LABELS } from "@/db/label";
-import { Field } from "@/components/shared/field";
 import {
+  aliasesFromText,
+  aliasesToText,
+  emptyOptionDraft,
   liveOptions,
   OptionListEditor,
   toDrafts,
   type OptionDraft,
 } from "@/components/library/option-list-editor";
+import { Field } from "@/components/shared/field";
+import { SPECIFICATION_TYPE_LABELS } from "@/db/label";
 
 import {
   ArrowDown,
@@ -23,6 +26,18 @@ import {
   X,
 } from "lucide-react";
 
+import type {
+  GroupFieldDraft,
+  LibraryAttribute,
+} from "@/components/library/library-shared";
+import {
+  GROUP_FIELD_KIND_OPTIONS,
+  isOptionType,
+  sourceOptions,
+  toFieldDrafts,
+  TYPE_OPTIONS,
+  UNIT_OPTIONS,
+} from "@/components/library/library-shared";
 import { useState } from "react";
 import {
   Button,
@@ -30,20 +45,13 @@ import {
   Combobox,
   Dropdown,
   Input,
+  Textarea,
   type DropdownOption,
 } from "ui";
-import {
-  GROUP_FIELD_KIND_OPTIONS,
-  TYPE_OPTIONS,
-  UNIT_OPTIONS,
-  isOptionType,
-  sourceOptions,
-  toFieldDrafts,
-} from "@/components/library/library-shared";
-import type {
-  GroupFieldDraft,
-  LibraryAttribute,
-} from "@/components/library/library-shared";
+// The SAME derivation the service uses when no external name is supplied, so the
+// placeholder promises exactly what the save will do rather than something close
+// to it.
+import { slugify } from "utils";
 /**
  * The attribute editor, ~590 lines and most of why the original file was so long.
  *
@@ -145,11 +153,6 @@ const SubFieldSlice = ({
   list ? (
     <Field
       label="Which of its values this column uses"
-      hint={
-        value.length === 0
-          ? `All ${list.options.length}, including any added to the list later.`
-          : "Exactly these. Values added to the shared list later will not appear here until you add them."
-      }
       accessory={
         value.length > 0 && (
           <button
@@ -209,12 +212,16 @@ export const AttributeForm = ({
   const [type, setType] = useState<SpecificationType>(
     initial?.type ?? "single_select",
   );
+  const [labelAliases, setLabelAliases] = useState(
+    aliasesToText(initial?.labelAliases ?? undefined),
+  );
+  const [key, setKey] = useState(initial?.key ?? "");
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [group, setGroup] = useState(initial?.groupUuid ?? groupUuid ?? "");
   const [options, setOptions] = useState<OptionDraft[]>(
-    initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
+    initial ? toDrafts(initial.options) : [emptyOptionDraft()],
   );
   const [optionSetUuid, setOptionSetUuid] = useState(
     initial?.optionSetUuid ?? "",
@@ -293,6 +300,8 @@ export const AttributeForm = ({
       label,
       internalName: null,
       description: null,
+      labelAliases: aliasesFromText(labelAliases),
+      key: key.trim() || null,
       type,
       categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
@@ -336,6 +345,7 @@ export const AttributeForm = ({
                 field.kind === "select" && field.optionSetUuid
                   ? field.setValues
                   : null,
+              distinct: field.kind === "select" ? field.distinct : false,
             }))
           : [],
     });
@@ -351,10 +361,43 @@ export const AttributeForm = ({
           onChange={(event) => setLabel(event.target.value)}
         />
 
-        <Field
-          label="Categories"
-          hint="Which categories use this attribute. How each one uses it is set in Assignments."
-        >
+        {/* The name everything OUTSIDE this system points at — an import
+            mapping, an export, the read model. Left blank it is derived from the
+            label; typed, it is kept exactly, which is why `slugify` never
+            touches it (it would turn pwr.power_draw_w into pwr-power-draw-w and
+            every mapping keyed on the dotted form would resolve to nothing). */}
+        <Field label="External name">
+          <Input
+            // The placeholder is the key this attribute WILL GET if the field is
+            // left blank — not a generic example. "Leave blank and one is derived
+            // from the name" is a sentence somebody has to take on trust; showing
+            // the derived value is the same promise, checkable at a glance, and it
+            // is how an author notices that "PoE Budget" becomes `poe-budget` and
+            // decides they wanted `pwr.poe_budget_w` instead.
+            //
+            // Falls back to a real dotted id before a name is typed, so the shape
+            // is visible from the first moment rather than only after.
+            placeholder={
+              label.trim() ? slugify(label) : "e.g. pwr.power_draw_w"
+            }
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+          />
+        </Field>
+
+        {/* What the SOURCES call this attribute, not what we call it. One vendor
+            sheet says "Sensitive element" and the next says "Sensing element";
+            recorded here, an import lands both on this attribute instead of
+            creating a second one nobody notices until a rule stops matching. */}
+        <Textarea
+          label="Other names in source data"
+          rows={2}
+          placeholder={"Sensitive element\nSensing element"}
+          value={labelAliases}
+          onChange={(event) => setLabelAliases(event.target.value)}
+        />
+
+        <Field label="Categories">
           <Dropdown
             multiple
             value={categories}
@@ -370,14 +413,7 @@ export const AttributeForm = ({
         {/* A type change would turn every stored value into an unreadable one, so
             once a rule depends on the attribute the type is shown, not offered.
             The service refuses it too — this is only the explanation. */}
-        <Field
-          label="Type"
-          hint={
-            locked
-              ? `${initial?.relationshipCount} rule(s) use this, so the type is fixed. Create a new attribute instead.`
-              : undefined
-          }
-        >
+        <Field label="Type">
           {locked ? (
             <div className="flex items-center gap-2 rounded-control border border-hairline bg-hover px-3 py-2 text-sm text-secondary">
               <Lock size={13} className="text-faint" />
@@ -399,10 +435,7 @@ export const AttributeForm = ({
 
       {type === "number" && (
         <div className="flex flex-col gap-4">
-          <Field
-            label="Unit"
-            hint="A rule can only compare two numbers that measure the same thing. W converts to kW; W and VA never convert, because 1500 VA is not 1500 W."
-          >
+          <Field label="Unit">
             <Combobox
               value={unit}
               onChange={setUnit}
@@ -464,11 +497,6 @@ export const AttributeForm = ({
             // choice, and a dropdown with a single dead entry reads as a broken
             // field rather than a feature nobody has used — so it says where the
             // second choice comes from instead of leaving the author to find out.
-            hint={
-              sharedLists.length === 0
-                ? "No shared lists yet — create one on the Shared lists tab and it appears here. You want one when this attribute's values have to be comparable with another one's: a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
-                : "Point at a shared list when this attribute's values have to be comparable with another one's — a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
-            }
           >
             <Dropdown
               value={optionSetUuid}
@@ -499,11 +527,6 @@ export const AttributeForm = ({
                   borrow in the first place. */}
               <Field
                 label="Which of its values this attribute uses"
-                hint={
-                  setValues.length === 0
-                    ? `All ${chosenList.options.length}, including any added to the list later.`
-                    : "Exactly these. Values added to the shared list later will not appear here until you add them."
-                }
                 accessory={
                   setValues.length > 0 && (
                     <button
@@ -644,10 +667,7 @@ export const AttributeForm = ({
               </div>
 
               {field.kind === "number" ? (
-                <Field
-                  label="Unit"
-                  hint="What the count measures. Leave blank when the sub-field is a plain tally, like how many ports."
-                >
+                <Field label="Unit">
                   <Combobox
                     value={field.unit}
                     onChange={(next) => setGroupField(index, { unit: next })}
@@ -662,10 +682,7 @@ export const AttributeForm = ({
                       spell "1G" identically and store unrelated values, so no rule
                       can ask whether a module fits a cage. Pointing both at one
                       list is what makes that question answerable. */}
-                  <Field
-                    label="Where the picks come from"
-                    hint="Point at a shared list when this sub-field has to be comparable with another attribute — a cage's speed against a module's."
-                  >
+                  <Field label="Where the picks come from">
                     <Dropdown
                       value={field.optionSetUuid}
                       onChange={(next) =>
@@ -674,6 +691,22 @@ export const AttributeForm = ({
                       options={sources}
                     />
                   </Field>
+
+                  {/* Turns the group from "several of these" into "one fact,
+                      several cases". Power draw is one number whose value
+                      depends on the supply mode — {12 V DC, 9 W}, {PoE, 8.5 W},
+                      {maximum, 12 W} — and a rule reads the case it needs.
+                      Without it a case answered twice gets SUMMED, and a 12 W
+                      camera silently becomes a 24 W one. */}
+                  <Checkbox
+                    label="Each row answers a different one of these"
+                    checked={field.distinct}
+                    onChange={(event) =>
+                      setGroupField(index, {
+                        distinct: event.target.checked,
+                      })
+                    }
+                  />
 
                   {field.optionSetUuid === "" ? (
                     <div className="flex flex-col gap-2">
@@ -736,6 +769,7 @@ export const AttributeForm = ({
                   ordered: false,
                   options: [],
                   optionSetUuid: "",
+                  distinct: false,
                 },
               ])
             }

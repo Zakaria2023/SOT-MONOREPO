@@ -22,6 +22,50 @@ export type LibraryOptionInput = {
   value?: string;
   label: string;
   rank: number | null;
+  // Other spellings this option answers to. See SpecOption.aliases.
+  aliases?: string[];
+};
+
+/**
+ * An option's alias list, as it will be stored.
+ *
+ * Trimmed, de-duplicated, and stripped of any spelling the option ALREADY
+ * answers to under its own name — an alias that repeats the label is not wrong,
+ * it is noise, and it would show up in every conflict report for the rest of the
+ * attribute's life.
+ *
+ * De-duplication is case-insensitive but the FIRST spelling is what gets stored:
+ * aliases are matched case-insensitively, so keeping both "II" and "ii" would be
+ * two entries that can never resolve differently. Punctuation is deliberately NOT
+ * normalised away here — `||` is a real alias and squashing it would leave an
+ * empty string.
+ *
+ * Empty becomes NULL-equivalent (an empty array), on the same reasoning as
+ * `normalizeSetValues`: one representation of "none", not two.
+ */
+export const normalizeAliases = (
+  aliases: string[] | null | undefined,
+  own: { value: string; label: string },
+): string[] => {
+  const excluded = new Set([
+    own.value.trim().toLowerCase(),
+    own.label.trim().toLowerCase(),
+  ]);
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const raw of aliases ?? []) {
+    const alias = raw.trim();
+    if (alias === "") {
+      continue;
+    }
+    const key = alias.toLowerCase();
+    if (excluded.has(key) || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    kept.push(alias);
+  }
+  return kept;
 };
 
 /**
@@ -107,6 +151,7 @@ export const mergeOptions = (
       stored || uniqueValue(slugify(label) || `option-${index + 1}`);
     seen.add(value);
     taken.add(value);
+    const aliases = normalizeAliases(entry.aliases, { value, label });
     merged.push({
       value,
       label,
@@ -115,6 +160,11 @@ export const mergeOptions = (
       // the admin asks for it explicitly.
       rank: ordered ? (entry.rank ?? index + 1) : null,
       retired: false,
+      // OMITTED when empty rather than stored as `[]`. Absent and empty already
+      // mean the same thing, and writing `[]` onto every option in the library
+      // would rewrite the stored JSON of thousands of options that have no
+      // aliases and never will — a diff nobody can read, for no information.
+      ...(aliases.length > 0 ? { aliases } : {}),
     });
   });
 
@@ -127,6 +177,10 @@ export const mergeOptions = (
     if (held && !held.has(option.value)) {
       continue;
     }
+    // Aliases come across UNTOUCHED. A retired option still owns its value and
+    // products still hold it, so it has to keep answering to every spelling it
+    // ever answered to — otherwise a live option claims one of them and each of
+    // those products silently changes meaning.
     merged.push({ ...option, retired: true });
   }
   return merged;
@@ -207,6 +261,312 @@ export const similarOptions = (
   existing: SpecOption[],
 ): SpecOption[] =>
   existing.filter((option) => looksLikeSameOption(label, option.label));
+
+// ---------------------------------------------------------------------------
+// Resolving a written form onto an option — the importer's front door
+//
+// `similarOptions` SURFACES a maybe for a human. This DECIDES, because an import
+// running over thousands of rows has no human in the loop and the wrong decision
+// is the expensive one: a source string landing on the wrong option is a product
+// that reads as something it is not, and nothing errors.
+//
+// So it resolves only what it can resolve UNAMBIGUOUSLY, and returns null for
+// everything else. Null is not a failure — it is the review queue, which is where
+// an unrecognised spelling is supposed to go.
+// ---------------------------------------------------------------------------
+
+// Exact match, case- and whitespace-insensitive. The precise level.
+const exactKey = (text: string): string => text.trim().toLowerCase();
+
+/**
+ * The written forms an option answers to, at both precisions.
+ *
+ * ONE definition, used by the resolver AND by the conflict check, so a refusal
+ * covers exactly the ambiguity the resolver would have hit. Two definitions here
+ * would let a save pass its own check and then resolve to nothing.
+ */
+const optionForms = (option: SpecOption): { exact: string[]; loose: string[] } => {
+  const written = [option.value, option.label, ...(option.aliases ?? [])];
+  return {
+    exact: written.map(exactKey).filter((form) => form !== ""),
+    // Punctuation and spacing dropped, which is the whole point at this level:
+    // "866.0–866.5 MHz" and "866.0 – 866.5 MHz" differ by two spaces and a dash
+    // and are the same band. Forms that squash to nothing (`||`) or to one or two
+    // characters are excluded — at that length a loose match is a coincidence.
+    loose: written
+      .map(squash)
+      .filter((form) => form.length >= 3),
+  };
+};
+
+/**
+ * The option a source string means, or null when that cannot be decided.
+ *
+ * FOUR PASSES, in falling order of certainty, and the order is the safety
+ * property: identity beats display text, display text beats a nickname, and an
+ * exact spelling beats a punctuation-blind one. A value that IS an option's
+ * stored identity can never be stolen by something else's alias.
+ *
+ * A pass matching SEVERAL options returns null rather than the first. Two options
+ * answering to one string is a library defect, and picking either one hides it
+ * behind data that looks entered.
+ *
+ * Retired options are matched. A source still writing a retired spelling means
+ * that product genuinely holds the retired value, and re-deriving a live one for
+ * it would rewrite history to look tidier than it was.
+ */
+export const resolveOptionByText = (
+  text: string,
+  options: SpecOption[],
+): SpecOption | null => {
+  const wanted = exactKey(text);
+  if (wanted === "") {
+    return null;
+  }
+  const forms = options.map(
+    (option) => [option, optionForms(option)] as const,
+  );
+
+  const decide = (matched: SpecOption[]): SpecOption | null =>
+    matched.length === 1 ? (matched[0] ?? null) : null;
+
+  const byValue = forms.filter(([option]) => exactKey(option.value) === wanted);
+  if (byValue.length > 0) {
+    return decide(byValue.map(([option]) => option));
+  }
+  const byLabel = forms.filter(([option]) => exactKey(option.label) === wanted);
+  if (byLabel.length > 0) {
+    return decide(byLabel.map(([option]) => option));
+  }
+  const byAlias = forms.filter(([option]) =>
+    (option.aliases ?? []).some((alias) => exactKey(alias) === wanted),
+  );
+  if (byAlias.length > 0) {
+    return decide(byAlias.map(([option]) => option));
+  }
+  const squashed = squash(text);
+  if (squashed.length < 3) {
+    return null;
+  }
+  const loose = forms.filter(([, form]) => form.loose.includes(squashed));
+  return decide(loose.map(([option]) => option));
+};
+
+// One written form that more than one option answers to.
+export type AliasConflict = {
+  // The spelling itself, as the author typed it.
+  alias: string;
+  // The options fighting over it, by label.
+  claimedBy: string[];
+};
+
+/**
+ * Aliases that would make a resolution ambiguous.
+ *
+ * Scoped to ALIASES on purpose. Two options have always been allowed to share a
+ * LABEL — `mergeOptions` keeps them apart by value and the admin shows both — so
+ * starting to refuse that here would reject lists that have been saved for months.
+ * An alias is new, so refusing an ambiguous one breaks nothing and stops the
+ * ambiguity from ever entering.
+ *
+ * Both precisions are checked, because the resolver uses both: an alias that only
+ * collides once punctuation is dropped ("866.0-866.5" against another option's
+ * "866.0 – 866.5") is exactly as ambiguous as an identical one, and it is the
+ * harder of the two to spot by eye.
+ */
+export const aliasConflicts = (options: SpecOption[]): AliasConflict[] => {
+  const forms = options.map(
+    (option) => [option, optionForms(option)] as const,
+  );
+  const conflicts: AliasConflict[] = [];
+  const reported = new Set<string>();
+
+  for (const [owner] of forms) {
+    for (const alias of owner.aliases ?? []) {
+      const exact = exactKey(alias);
+      const loose = squash(alias);
+      const rivals = forms
+        .filter(([other]) => other.value !== owner.value)
+        .filter(
+          ([, form]) =>
+            form.exact.includes(exact) ||
+            (loose.length >= 3 && form.loose.includes(loose)),
+        )
+        .map(([other]) => other.label);
+      if (rivals.length === 0) {
+        continue;
+      }
+      // The same clash is visible from both sides; report it once.
+      const signature = [owner.label, ...rivals].sort().join(" ");
+      if (reported.has(signature)) {
+        continue;
+      }
+      reported.add(signature);
+      conflicts.push({ alias, claimedBy: [owner.label, ...rivals] });
+    }
+  }
+  return conflicts;
+};
+
+// ---------------------------------------------------------------------------
+// The same problem one level up — which ATTRIBUTE a source column means
+//
+// "Sensitive element", "Sensitive elements" and "Sensing element" are three
+// columns in the source data and one attribute here. Resolving them is the same
+// decision as resolving an option spelling, made against the same rules, so it is
+// the same code with `key` standing where `value` stood.
+// ---------------------------------------------------------------------------
+
+// Just enough of an attribute to be named. Deliberately structural rather than
+// the full row: the importer, the library service and the tests all have
+// different shapes of attribute in hand and none of them should have to build a
+// whole one to ask what a column means.
+export type NameableAttribute = {
+  uuid: string;
+  key: string;
+  label: string;
+  labelAliases?: string[] | null;
+};
+
+const attributeForms = (
+  attribute: NameableAttribute,
+): { exact: string[]; loose: string[] } => {
+  const written = [
+    attribute.key,
+    attribute.label,
+    ...(attribute.labelAliases ?? []),
+  ];
+  return {
+    exact: written.map(exactKey).filter((form) => form !== ""),
+    loose: written.map(squash).filter((form) => form.length >= 3),
+  };
+};
+
+/**
+ * The attribute a source label means, or null when that cannot be decided.
+ *
+ * Same four passes and the same refusal to guess as `resolveOptionByText`, and
+ * for a sharper reason: an option resolved wrongly gives a product the wrong
+ * value, while a COLUMN resolved wrongly gives every product in the import the
+ * wrong value, under an attribute whose own values then look plausible.
+ */
+export const resolveAttributeByText = (
+  text: string,
+  attributes: NameableAttribute[],
+): NameableAttribute | null => {
+  const wanted = exactKey(text);
+  if (wanted === "") {
+    return null;
+  }
+  const decide = (matched: NameableAttribute[]): NameableAttribute | null =>
+    matched.length === 1 ? (matched[0] ?? null) : null;
+
+  const byKey = attributes.filter((attr) => exactKey(attr.key) === wanted);
+  if (byKey.length > 0) {
+    return decide(byKey);
+  }
+  const byLabel = attributes.filter((attr) => exactKey(attr.label) === wanted);
+  if (byLabel.length > 0) {
+    return decide(byLabel);
+  }
+  const byAlias = attributes.filter((attr) =>
+    (attr.labelAliases ?? []).some((alias) => exactKey(alias) === wanted),
+  );
+  if (byAlias.length > 0) {
+    return decide(byAlias);
+  }
+  const squashed = squash(text);
+  if (squashed.length < 3) {
+    return null;
+  }
+  return decide(
+    attributes.filter((attr) =>
+      attributeForms(attr).loose.includes(squashed),
+    ),
+  );
+};
+
+/**
+ * Label aliases on ONE attribute that another attribute already answers to.
+ *
+ * The library-wide twin of `aliasConflicts`, and it has to be checked against the
+ * whole library rather than within one row — the collision that matters is
+ * between two DIFFERENT attributes, which is invisible from either one alone.
+ */
+export const labelAliasConflicts = (
+  candidate: NameableAttribute,
+  others: NameableAttribute[],
+): AliasConflict[] => {
+  const rivals = others.filter((other) => other.uuid !== candidate.uuid);
+  const conflicts: AliasConflict[] = [];
+  for (const alias of candidate.labelAliases ?? []) {
+    const exact = exactKey(alias);
+    const loose = squash(alias);
+    const claimed = rivals
+      .filter((other) => {
+        const form = attributeForms(other);
+        return (
+          form.exact.includes(exact) ||
+          (loose.length >= 3 && form.loose.includes(loose))
+        );
+      })
+      .map((other) => other.label);
+    if (claimed.length > 0) {
+      conflicts.push({ alias, claimedBy: [candidate.label, ...claimed] });
+    }
+  }
+  return conflicts;
+};
+
+// ---------------------------------------------------------------------------
+// The external name
+//
+// `uuid` is identity INSIDE the model — values, assignments, rules and
+// predicates all key on it, and that is what makes a rename free. `key` is
+// identity OUTSIDE it: an import mapping a brand column onto an attribute, an
+// export, the read model, a spreadsheet somebody keeps by hand. Those cannot
+// hold a uuid and would not survive one.
+//
+// Which is why it has a shape rather than being any string at all. A mapping file
+// that says `pwr.power_draw_w` while the database says `Pwr.Power Draw W`
+// resolves to nothing, and the failure is an import that quietly skips a column.
+// ---------------------------------------------------------------------------
+
+// Lowercase letters, digits and underscores, in dot-separated segments:
+// `pwr.power_draw_w`, `phys.ip_rating`, `id.lifecycle_status`. A single segment
+// (`sku`) is allowed — the dotted prefix is a filing convention, not a rule.
+const LIBRARY_KEY_SHAPE = /^[a-z0-9]+(?:_[a-z0-9]+)*(?:\.[a-z0-9]+(?:_[a-z0-9]+)*)*$/;
+
+export type LibraryKeyResult =
+  | { ok: true; key: string }
+  | { ok: false; reason: string };
+
+/**
+ * An author-supplied external name, checked rather than coerced.
+ *
+ * CHECKED, because coercing is what `slugify` would do and `slugify` is the
+ * problem: it turns `pwr.power_draw_w` into `pwr-power-draw-w`, so an author who
+ * typed the dotted id from the specification document would find the database
+ * holding something else and every mapping keyed on what they typed resolving to
+ * nothing. Silently. A refusal naming the shape is the only honest answer.
+ */
+export const normalizeLibraryKey = (raw: string): LibraryKeyResult => {
+  const key = raw.trim().toLowerCase();
+  if (key === "") {
+    return { ok: false, reason: "it is empty" };
+  }
+  if (key.length > 255) {
+    return { ok: false, reason: "it is longer than 255 characters" };
+  }
+  if (!LIBRARY_KEY_SHAPE.test(key)) {
+    return {
+      ok: false,
+      reason:
+        "it has to be lowercase letters, digits and underscores in dot-separated parts, like pwr.power_draw_w",
+    };
+  }
+  return { ok: true, key };
+};
 
 // ---------------------------------------------------------------------------
 // Shared vocabularies
@@ -425,6 +785,8 @@ export type LibraryGroupFieldInput = {
   optionSetUuid?: string | null;
   // Which of that vocabulary's words this column uses. Empty = all of them.
   setValues?: string[] | null;
+  // No two rows may share this column's value — see SpecGroupField.distinct.
+  distinct?: boolean;
 };
 
 /**
@@ -525,6 +887,13 @@ export const mergeGroupFields = (
       // own narrowing: a slice of a list this column does not borrow is a setting
       // waiting to surprise whoever points it at one later.
       setValues: shared ? normalizeSetValues(entry.setValues) : null,
+      // Only on a select, for the same reason `unit` is only on a number: a count
+      // column that claimed to be a discriminator would refuse the second `24`
+      // in a port group, which is a legitimate way to describe 48 ports.
+      //
+      // Omitted when off rather than stored as `false`, so this rewrites the
+      // stored schema of no group that does not use it.
+      ...(isSelect && entry.distinct ? { distinct: true } : {}),
     });
   });
 

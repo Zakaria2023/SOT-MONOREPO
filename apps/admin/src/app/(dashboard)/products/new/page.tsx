@@ -3,12 +3,14 @@ import {
   getBrands,
   getCategories,
   getProductFormFieldsByCategory,
+  getVariants,
 } from "services";
 
 const NewProductPage = async () => {
-  const [categories, brands, fieldsByCategory] = await Promise.all([
+  const [categories, brands, variants, fieldsByCategory] = await Promise.all([
     getCategories(),
     getBrands(),
+    getVariants(),
     getProductFormFieldsByCategory(),
   ]);
 
@@ -17,6 +19,7 @@ const NewProductPage = async () => {
       mode="add"
       categories={categories}
       brands={brands}
+      variants={variants}
       fieldsByCategory={fieldsByCategory}
     />
   );

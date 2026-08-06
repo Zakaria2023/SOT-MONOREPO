@@ -20,7 +20,7 @@ type FieldProps = {
 /**
  * A labelled wrapper for a control that is not an `Input`.
  *
- * It exists because `Input` renders its own label as `text-sm font-semibold
+ * It exists because `Input` renders its own label as `text-sm font-medium
  * text-ink` with `gap-2` above the control. Anything hand-rolled beside an Input
  * — a Dropdown, a Combobox — has to use exactly that, or the two controls land on
  * different baselines with visibly different labels. That mismatch is what made
@@ -33,7 +33,7 @@ type FieldProps = {
 export const Field = ({ label, hint, accessory, children }: FieldProps) => (
   <div className="flex flex-col gap-2">
     <div className="flex items-center justify-between gap-2">
-      <span className="text-sm font-semibold text-ink">{label}</span>
+      <span className="text-sm font-medium text-ink">{label}</span>
       {accessory}
     </div>
     <div className="flex flex-col gap-1">
@@ -60,7 +60,7 @@ export const FieldSet = ({
   <div className="flex flex-col gap-3 rounded-card border border-hairline bg-base/40 p-3">
     <div className="flex items-start justify-between gap-2">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-semibold text-ink">{title}</span>
+        <span className="text-sm font-medium text-ink">{title}</span>
         {hint && <span className="text-[11px] text-muted">{hint}</span>}
       </div>
       {accessory}

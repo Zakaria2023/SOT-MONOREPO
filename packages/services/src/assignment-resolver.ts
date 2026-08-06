@@ -107,6 +107,26 @@ export type ResolveAssignmentsInput = {
 // admin panel shows everything, because that is where the catalog is authored.
 export type Viewer = "user" | "partner";
 
+/**
+ * Whether an audience admits this viewer.
+ *
+ * `everyone` is the UNION of the two, not a rung above them: a retail customer
+ * does not see a partner-only thing and a partner does not see a user-only one.
+ * Written as a ladder — `partner >= user` — a partner would silently inherit
+ * every retail-only listing, which is the opposite of what the field is for.
+ *
+ * One definition, because there are two readers that must agree: the catalogue
+ * query, which cannot call this (it has to be SQL), and every page that has
+ * already loaded a row and has to decide whether to render it. Left as an
+ * expression written out at each call site, the day somebody fixes one is the
+ * day the listing and the detail page disagree — and the symptom is a product
+ * that is invisible until you have its URL.
+ */
+export const audienceAdmits = (
+  audience: AssignmentAudience,
+  viewer: Viewer,
+): boolean => audience === "everyone" || audience === viewer;
+
 // ---------------------------------------------------------------------------
 // The enabled slice
 // ---------------------------------------------------------------------------
@@ -464,6 +484,13 @@ export type CompletenessProblem = {
   //                    today, almost always because a sub-field was added after
   //                    the rows were entered. The readers drop those rows, so the
   //                    product reads as having none.
+  //   duplicate_rows — two rows answer the same case of a column that is supposed
+  //                    to discriminate between them (two rows both saying the
+  //                    power draw "when" is maximum). Kept apart from
+  //                    incomplete_rows because these rows are perfectly READABLE
+  //                    — that is exactly the danger. An operand totals a group
+  //                    column, so the two get summed and a 12 W camera reads as
+  //                    24 W, with arithmetic nobody can trace back to a datasheet.
   //   unassigned     — an answered value for an attribute this category does not
   //                    carry. The mirror image of `missing` and easy to miss
   //                    precisely because the data LOOKS present: no rule reads it,
@@ -475,6 +502,7 @@ export type CompletenessProblem = {
     | "outside_slice"
     | "unknown_value"
     | "incomplete_rows"
+    | "duplicate_rows"
     | "unassigned";
   // What is wrong, in the author's words. Only set for the kinds where naming the
   // offending value or row is what makes the problem fixable.
@@ -537,7 +565,15 @@ export const completenessProblems = (
     // here, a switch whose ports all became unreadable would show as complete
     // and pass every port check — the exact failure this module exists to catch.
     const issues = groupRowIssues(raw, definition);
-    if (issues.length > 0) {
+    // Split by what the reader will DO with the row, not by which check found
+    // it. An unreadable row is dropped and the product measures less than it
+    // should; a duplicate row is kept and the product measures more. Reported
+    // together, the count in the message ("2 of 3 rows cannot be read") would be
+    // wrong for one of them and the fix would be wrong for both.
+    const unreadable = issues.filter((issue) => issue.problem !== "duplicate");
+    const duplicates = issues.filter((issue) => issue.problem === "duplicate");
+
+    if (unreadable.length > 0) {
       const readable = completeGroupRows(raw, definition).length;
       const total = asGroupRows(raw).length;
       problems.push({
@@ -545,7 +581,7 @@ export const completenessProblems = (
         label: definition.label,
         reason: assignment.showIf ? "revealed" : "assigned",
         kind: "incomplete_rows",
-        detail: `${total - readable} of ${total} row(s) cannot be read — ${issues
+        detail: `${total - readable} of ${total} row(s) cannot be read — ${unreadable
           .slice(0, 3)
           .map((issue) =>
             issue.problem === "missing"
@@ -553,6 +589,22 @@ export const completenessProblems = (
               : `row ${issue.row}'s ${issue.fieldLabel} is "${issue.value}", which is not on the list`,
           )
           .join("; ")}.`,
+      });
+    }
+
+    if (duplicates.length > 0) {
+      problems.push({
+        specificationUuid: definition.uuid,
+        label: definition.label,
+        reason: assignment.showIf ? "revealed" : "assigned",
+        kind: "duplicate_rows",
+        detail: `${duplicates
+          .slice(0, 3)
+          .map(
+            (issue) =>
+              `row ${issue.row} answers ${issue.fieldLabel} "${issue.value}" a second time`,
+          )
+          .join("; ")} — each of these has to be answered once, or the two rows are added together.`,
       });
     }
   }

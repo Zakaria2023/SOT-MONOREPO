@@ -245,7 +245,7 @@ export const LibraryBuilder = ({
               and to the engine, so nothing here changes how anything behaves. */}
           <aside className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink">Groups</h2>
+              <h2 className="text-sm font-medium text-ink">Groups</h2>
               <button
                 type="button"
                 onClick={() => {
@@ -372,7 +372,7 @@ export const LibraryBuilder = ({
           {/* RIGHT — the attributes filed in the selected group. */}
           <section className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink">
+              <h2 className="text-sm font-medium text-ink">
                 {active?.name ?? "Attributes"}
                 <span className="ml-2 text-xs font-normal text-faint">
                   {active?.attributes.length ?? 0}

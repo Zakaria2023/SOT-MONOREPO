@@ -1,5 +1,4 @@
-import type { ReactNode, TextareaHTMLAttributes } from "react";
-import { forwardRef } from "react";
+import { forwardRef, ReactNode, TextareaHTMLAttributes } from "react";
 import { FormError } from "./form-error";
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
@@ -20,7 +19,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="flex items-center gap-2 text-sm font-semibold text-ink"
+            className="flex items-center gap-2 text-sm font-medium text-ink"
           >
             {labelIcon && <span className="text-primary">{labelIcon}</span>}
             {label}

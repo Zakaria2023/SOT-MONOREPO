@@ -33,6 +33,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
       brandUuid: product?.brandUuid ?? "",
       name: product?.name ?? "",
       model: product?.model ?? "",
+      variantUuids: product?.variantUuids ?? [],
       brandIdValue: product?.brandIdValue ?? "",
       seriesCode: product?.seriesCode ?? "",
       warrantyPeriod: product?.warrantyPeriod ?? "",
@@ -46,6 +47,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
       price: product?.price ?? "",
       currency: product?.currency ?? "SAR",
       isAvailable: product?.isAvailable ?? true,
+      audience: product?.audience ?? "everyone",
       // WHICH attributes a product carries is not stored — it is resolved from
       // the category's assignment chain, so adding an attribute to a category
       // applies to every product in it immediately.
@@ -62,6 +64,10 @@ export const useProductForm = (args: UseProductFormArgs) => {
         brandUuid: values.brandUuid,
         name: values.name,
         model: values.model || null,
+        // The signature the identity check runs on is rebuilt from this set by
+        // the service, never sent from here — two copies of one fact is how the
+        // uniqueness check ends up running on the stale one.
+        variantUuids: values.variantUuids ?? [],
         brandIdValue: values.brandIdValue || null,
         seriesCode: values.seriesCode || null,
         warrantyPeriod: values.warrantyPeriod || null,
@@ -75,6 +81,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
         price: values.price || null,
         currency: values.currency,
         isAvailable: values.isAvailable,
+        audience: values.audience,
         specValues: values.specValues,
         status: values.status,
         order: values.order,

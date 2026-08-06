@@ -12,6 +12,7 @@ import { breadcrumbNode, graph, productNode } from "@/lib/structured-data";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
+  audienceAdmits,
   getComparableProducts,
   getComparisonSpecs,
   getRelatedProducts,
@@ -67,6 +68,14 @@ export const generateMetadata = async ({
     return { title: "Product not found", robots: { index: false } };
   }
 
+  // A trade-only product is never indexed, whoever is asking. Metadata is
+  // generated for crawlers as much as for browsers, and a title and description
+  // in a search result is the product being advertised to exactly the people the
+  // page itself would turn away.
+  if (product.audience !== "everyone") {
+    return { title: "Product not found", robots: { index: false } };
+  }
+
   return pageMetadata({
     title: productTitle(product),
     description: productDescription(product),
@@ -91,6 +100,16 @@ const ProductPage = async ({ params }: Props) => {
   }
 
   const viewerPricing = await getViewerPartnerPricing();
+  const viewer = viewerPricing.isPartner ? "partner" : "user";
+
+  // Keeping a trade-only product out of the LISTING leaves its page reachable by
+  // anyone who has the URL, and a URL is exactly the thing that gets forwarded.
+  // 404 rather than a "you may not see this": the difference between a product
+  // that does not exist and one this shopper is not allowed to know exists is
+  // information, and it is not information we have any reason to give out.
+  if (!audienceAdmits(product.audience, viewer)) {
+    notFound();
+  }
 
   const [comparables, related, specs] = await Promise.all([
     getComparableProducts(product.categoryUuid, product.uuid),
@@ -105,7 +124,7 @@ const ProductPage = async ({ params }: Props) => {
     getProductSpecsForDisplay(
       product.categoryUuid,
       product.specValues ?? {},
-      viewerPricing.isPartner ? "partner" : "user",
+      viewer,
     ),
   ]);
 

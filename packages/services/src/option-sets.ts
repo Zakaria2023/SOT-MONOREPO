@@ -9,6 +9,7 @@ import { recordAudit } from "./catalog-audit";
 import { invalidateCatalogModel } from "./catalog-model";
 import { ValidationError } from "./errors";
 import {
+  aliasConflicts,
   mergeOptions,
   usedOptionValues,
   type LibraryOptionInput,
@@ -121,6 +122,22 @@ const assertValidInput = (input: OptionSetInput): void => {
   }
 };
 
+/**
+ * Refuse a list where one written spelling would answer to two options.
+ *
+ * Checked against the MERGED list rather than the input, because `mergeOptions`
+ * is what settles an option's final value and normalises its aliases — and the
+ * resolver runs against what was stored, not against what was typed.
+ */
+const assertAliasesResolve = (name: string, options: SpecOption[]): void => {
+  const [conflict] = aliasConflicts(options);
+  if (conflict) {
+    throw new ValidationError(
+      `In "${name}", "${conflict.alias}" is a spelling of both ${conflict.claimedBy.join(" and ")}. An alias has to point at exactly one option, or nothing reading it can tell which you meant.`,
+    );
+  }
+};
+
 export const createOptionSet = async (
   input: OptionSetInput,
   actor?: { uuid: string; name: string },
@@ -128,11 +145,14 @@ export const createOptionSet = async (
   assertValidInput(input);
   const uuid = generateUuid();
 
+  const options = mergeOptions([], input.options, input.ordered);
+  assertAliasesResolve(input.name, options);
+
   await db.insert(SpecificationOptionSets).values({
     uuid,
     name: input.name.trim(),
     ordered: input.ordered,
-    options: mergeOptions([], input.options, input.ordered),
+    options,
   });
 
   // Filed under `specification` rather than a target of its own: widening that
@@ -176,20 +196,26 @@ export const updateOptionSet = async (
     throw new ValidationError("That shared list no longer exists.");
   }
 
+  // Removing a word an author took out of the list, rather than retiring it,
+  // whenever no product spells anything with it. Retiring is a refusal, and
+  // there is nothing here to refuse.
+  const options = mergeOptions(
+    current.options ?? [],
+    input.options,
+    input.ordered,
+    await heldSetValues(uuid),
+  );
+  // A shared list is the one place an ambiguous alias does the most damage: every
+  // attribute borrowing the set inherits it, so one unresolvable spelling stops
+  // resolving in every category at once.
+  assertAliasesResolve(input.name, options);
+
   await db
     .update(SpecificationOptionSets)
     .set({
       name: input.name.trim(),
       ordered: input.ordered,
-      // Removing a word an author took out of the list, rather than retiring it,
-      // whenever no product spells anything with it. Retiring is a refusal, and
-      // there is nothing here to refuse.
-      options: mergeOptions(
-        current.options ?? [],
-        input.options,
-        input.ordered,
-        await heldSetValues(uuid),
-      ),
+      options,
     })
     .where(eq(SpecificationOptionSets.uuid, uuid));
 

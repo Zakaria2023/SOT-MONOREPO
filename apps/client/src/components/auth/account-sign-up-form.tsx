@@ -236,7 +236,7 @@ export const AccountSignUpForm = ({ type }: AccountSignUpFormProps) => {
 
       {/* One identifier so Clerk sends a single verification code. */}
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-semibold text-ink">Verify with</span>
+        <span className="text-sm font-medium text-ink">Verify with</span>
         <div className="grid grid-cols-2 gap-2 rounded-xl border border-search-border p-1">
           {(["email", "phone"] as const).map((option) => (
             <button

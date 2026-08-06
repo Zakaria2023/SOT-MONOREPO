@@ -56,6 +56,8 @@ export type GroupFieldDraft = {
   optionSetUuid: string;
   // Which of that list's words this column uses. Empty = all of them.
   setValues: string[];
+  // No two rows may share this column's value — see SpecGroupField.distinct.
+  distinct: boolean;
 };
 
 export type SearchHit = LibraryAttribute & { groupLabel: string };
@@ -154,6 +156,7 @@ export const toFieldDrafts = (fields: SpecGroupField[]): GroupFieldDraft[] =>
     options: toDrafts(field.options),
     optionSetUuid: field.optionSetUuid ?? "",
     setValues: field.setValues ?? [],
+    distinct: field.distinct ?? false,
   }));
 
 // Where a select's options come from. "" is the default and the common case —

@@ -146,6 +146,9 @@ const ProductsPage = async ({ searchParams }: Props) => {
     categoryUuids,
     brandUuids,
     sort,
+    // Trade-only lines stay out of a retail listing. On the filters rather than
+    // applied afterwards, so the count under the grid matches the grid.
+    viewer,
   };
   const paging = { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE };
 

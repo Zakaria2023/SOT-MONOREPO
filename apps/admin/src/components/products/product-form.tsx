@@ -3,6 +3,8 @@
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { SpecificationComposer } from "@/components/products/specification-composer";
+import { VariantPicker } from "@/components/products/variant-picker";
+import { Field } from "@/components/shared/field";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { productStatuses } from "@/db/enum";
@@ -10,6 +12,7 @@ import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
+import type { Variant } from "services";
 import { documentImageUrl } from "@/lib/documents";
 import type { FormField } from "@/components/products/specification-composer";
 import {
@@ -39,12 +42,14 @@ type ProductFormProps =
       mode: "add";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      variants: Variant[];
       fieldsByCategory: Record<string, FormField[]>;
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      variants: Variant[];
       fieldsByCategory: Record<string, FormField[]>;
       product: SelectProducts;
     };
@@ -59,8 +64,16 @@ const availabilityOptions = [
   { value: "unavailable", label: "Not available" },
 ];
 
+// Not a ladder — "user" and "partner" are siblings and "everyone" is their
+// union, exactly as the attribute-level audience reads.
+const audienceOptions = [
+  { value: "everyone", label: "Everyone" },
+  { value: "partner", label: "Partners only" },
+  { value: "user", label: "Retail customers only" },
+];
+
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands, fieldsByCategory } = props;
+  const { mode, categories, brands, variants, fieldsByCategory } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -123,6 +136,26 @@ export const ProductForm = (props: ProductFormProps) => {
             type="text"
             {...register("model")}
           />
+          {/* Identity, not decoration: brand + model + the set of variants is
+              what makes two rows two products. Leaving it empty on one member of
+              a variant family is how that family collapses into a single row on
+              the next import, silently. */}
+          <Field
+            label="Variants"
+            hint="What tells this apart from its siblings. Several can apply at once."
+          >
+            <Controller
+              control={control}
+              name="variantUuids"
+              render={({ field }) => (
+                <VariantPicker
+                  variants={variants}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </Field>
           <Input
             label="Series Code"
             labelIcon={<Hash size={15} />}
@@ -157,7 +190,7 @@ export const ProductForm = (props: ProductFormProps) => {
             />
           )}
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-ink">Status</label>
+            <label className="text-sm font-medium text-ink">Status</label>
             <Controller
               control={control}
               name="status"
@@ -188,7 +221,7 @@ export const ProductForm = (props: ProductFormProps) => {
           />
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-ink">
+            <label className="text-sm font-medium text-ink">
               Availability
             </label>
             <Controller
@@ -203,6 +236,27 @@ export const ProductForm = (props: ProductFormProps) => {
               )}
             />
           </div>
+          {/* A whole product line can be trade-only — Ajax sells Superior to
+              installers and not to the public. Visibility only: the rules engine
+              reads this product exactly the same for everyone, or the same
+              design would pass for one shopper and fail for another with no way
+              to show why. */}
+          <Field
+            label="Sold to"
+            hint="Who can browse and buy this. It never changes what the compatibility engine checks."
+          >
+            <Controller
+              control={control}
+              name="audience"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value ?? "everyone"}
+                  onChange={field.onChange}
+                  options={audienceOptions}
+                />
+              )}
+            />
+          </Field>
           <Input
             label="Warranty period"
             labelIcon={<ShieldCheck size={15} />}

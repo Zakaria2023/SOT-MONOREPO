@@ -1,5 +1,6 @@
 "use server";
 
+import { getViewerPartnerPricing } from "@/lib/partner-pricing";
 import { getProducts, type ProductSummary } from "services";
 
 /**
@@ -19,5 +20,13 @@ export const getMenuProducts = async (
   if (categoryUuids.length === 0) {
     return [];
   }
-  return getProducts({ categoryUuids });
+  // Resolved from the session here, never taken as an argument. This is a server
+  // action the browser calls directly, so a viewer passed in would be a viewer
+  // anyone could claim — and the whole point of the field is that some products
+  // are not for everyone.
+  const { isPartner } = await getViewerPartnerPricing();
+  return getProducts({
+    categoryUuids,
+    viewer: isPartner ? "partner" : "user",
+  });
 };

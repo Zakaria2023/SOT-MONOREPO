@@ -8,6 +8,11 @@ import {
 } from "./catalog-model";
 import { pendingQuestions, type DesignQuestion } from "./design-questions";
 import {
+  incompatiblePairs,
+  type IncompatibleFinding,
+} from "./product-compatibility";
+import { missingParts, type MissingPart } from "./product-composition";
+import {
   evaluateSelection,
   type EngineVariable,
   type Finding,
@@ -88,6 +93,101 @@ const toFinding = (finding: Finding): DesignFinding => ({
   skipped: finding.skipped,
 });
 
+/**
+ * A brand-authored incompatibility, as the buyer sees it.
+ *
+ * `family: "match"` because that is what it IS from the buyer's side — two
+ * things that do not go together — and the tone vocabulary is shared with every
+ * other finding so a surface does not need a special case to render it.
+ *
+ * Always a BLOCK. The bar for blocking is deliberately very high everywhere else
+ * in this model, and downshifts and uncertified-but-functional combinations are
+ * warnings. This clears that bar for the one reason nothing else does: the
+ * manufacturer has said in writing that these two do not work together, and
+ * there is no reading of "compatible" left to argue about.
+ *
+ * The note and the source are carried into the message because a finding that
+ * says "these do not work together" and cannot say who says so is one the buyer
+ * cannot act on and support cannot defend.
+ */
+const brandFinding = (
+  pair: IncompatibleFinding,
+  selection: { productUuid: string; name: string }[],
+): DesignFinding => {
+  const nameOf = (uuid: string): string =>
+    selection.find((item) => item.productUuid === uuid)?.name ?? "this product";
+  const a = nameOf(pair.productUuidA);
+  const b = nameOf(pair.productUuidB);
+  return {
+    id: `brand:${pair.productUuidA}:${pair.productUuidB}`,
+    title: `${a} does not work with ${b}`,
+    message: pair.note
+      ? `${pair.note} (${pair.source})`
+      : `${a} and ${b} are listed as incompatible by the manufacturer (${pair.source}).`,
+    family: "match",
+    tone: "block",
+    // No correction. Every other shape here is computed — swap for a bigger one,
+    // add supply, reduce demand — and this one has no arithmetic behind it to
+    // compute from. Inventing "try something else" would be filling the slot
+    // rather than answering it.
+    corrections: [],
+    failingProductUuids: [pair.productUuidA, pair.productUuidB],
+    skipped: [],
+  };
+};
+
+/**
+ * A part the basket is short of, as the buyer sees it.
+ *
+ * A WARNING, not a block, and the difference is the whole judgement. The parts
+ * are real — DoubleButton genuinely does not mount without its Holder — but a
+ * buyer may already own one, may be adding it on a second order, or may be a
+ * partner who keeps a box of them. Refusing the sale in any of those cases is a
+ * false block, and §6.4 is explicit that a false block costs more than a missed
+ * warning.
+ *
+ * `family: "presence"` because that is what it is: a companion that should be
+ * there and isn't. It reaches the buyer through the same shape as every other
+ * finding, so no surface needs a special case to render it.
+ */
+const compositionFinding = (
+  missing: MissingPart,
+  selection: { productUuid: string; name: string }[],
+): DesignFinding => {
+  const parentName =
+    selection.find((item) => item.productUuid === missing.parentUuid)?.name ??
+    "A product in your basket";
+  const quantity = missing.shortBy > 1 ? `${missing.shortBy} × ` : "";
+  return {
+    id: `composition:${missing.parentUuid}:${missing.childUuid}`,
+    title: `${parentName} needs ${quantity}${missing.childName}`,
+    message: missing.note
+      ? `${missing.note} It is sold separately, and your basket is ${missing.shortBy} short.`
+      : `${missing.childName} is sold separately and is needed for ${parentName} to work as described. Your basket is ${missing.shortBy} short.`,
+    family: "presence",
+    tone: "warn",
+    // The fix is not a computation, it is the named part. Reusing `add_supply`
+    // rather than inventing a shape lets the cart render its existing "add this"
+    // affordance, and the product it names is the answer rather than a guess at
+    // one.
+    corrections: [
+      {
+        shape: "add_supply",
+        message: `Add ${quantity}${missing.childName}`,
+        products: [
+          {
+            productUuid: missing.childUuid,
+            name: missing.childName,
+            capacity: missing.shortBy,
+          },
+        ],
+      },
+    ],
+    failingProductUuids: [missing.parentUuid],
+    skipped: [],
+  };
+};
+
 const EMPTY: DesignCheckResult = {
   blockers: [],
   warnings: [],
@@ -139,9 +239,30 @@ export const checkDesign = async (
       region: input.region,
     });
 
+    // The exception list, checked alongside the derived rules rather than
+    // through them. It is not a seventh family — a family is a way of COMPUTING
+    // an answer from attributes, and this is a stored answer about two named
+    // products. Folding it in would have meant a family whose operands name
+    // products, which is the one thing the relationship model refuses.
+    const brandBlocks = incompatiblePairs(
+      model.compatibility,
+      selection.map((item) => item.productUuid),
+    ).map((pair) => brandFinding(pair, selection));
+
+    // Parts sold separately that the basket does not hold. Alongside the rules
+    // rather than through them, for the same reason the exception list is: this
+    // compares products to products, and a relationship compares attributes.
+    const compositionWarnings = missingParts(
+      model.composition,
+      selection.map((item) => ({
+        productUuid: item.productUuid,
+        quantity: item.quantity,
+      })),
+    ).map((missing) => compositionFinding(missing, selection));
+
     return {
-      blockers: report.blockers.map(toFinding),
-      warnings: report.warnings.map(toFinding),
+      blockers: [...report.blockers.map(toFinding), ...brandBlocks],
+      warnings: [...report.warnings.map(toFinding), ...compositionWarnings],
       unknowns: report.unknowns.map(toFinding),
       questions: pendingQuestions(
         report.findings,

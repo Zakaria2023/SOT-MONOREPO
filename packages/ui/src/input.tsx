@@ -39,7 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {label && (
               <label
                 htmlFor={inputId}
-                className="flex items-center gap-2 text-sm font-semibold text-ink"
+                className="flex items-center gap-2 text-sm font-medium text-ink"
               >
                 {labelIcon && <span className="text-primary">{labelIcon}</span>}
                 {label}

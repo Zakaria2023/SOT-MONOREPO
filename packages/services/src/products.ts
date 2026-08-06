@@ -6,6 +6,7 @@ import {
   eq,
   getTableColumns,
   inArray,
+  isNull,
   like,
   ne,
   or,
@@ -28,7 +29,10 @@ import {
   Products,
   SelectProducts,
 } from "../../../db/schema/products";
+import type { Viewer } from "./assignment-resolver";
+import { ValidationError } from "./errors";
 import { normalizeProductValues } from "./product-completeness";
+import { signatureForVariants } from "./variants";
 
 export type { SelectProducts };
 
@@ -100,6 +104,16 @@ export type ProductFilters = {
    * question worth asking of it.
    */
   specRanges?: Record<string, { min?: number; max?: number }>;
+  /**
+   * Who is browsing, so trade-only products stay out of a public listing.
+   *
+   * OMITTED MEANS STAFF — the admin panel and anything else authoring the
+   * catalogue, which must see everything. Every shopper-facing caller passes it,
+   * and it is deliberately not defaulted to "user": a default that hides rows
+   * would silently shrink an admin listing the day somebody forgot to pass it,
+   * and a short list looks exactly like a small catalogue.
+   */
+  viewer?: Viewer;
   /** Page size. Omitted, the query returns every match. */
   limit?: number;
   /** Rows to skip — `(page - 1) * limit`. Only read when `limit` is set. */
@@ -239,6 +253,15 @@ export const generateProductSku = async (input: {
  */
 const catalogConditions = (filters: ProductFilters): (SQL | undefined)[] => {
   const conditions: (SQL | undefined)[] = [];
+  // Trade-only products stay out of a public listing. `everyone` is the union
+  // rather than a third rung — a user does not see a partner-only product and a
+  // partner does not see a user-only one, which is the same reading the
+  // attribute-level audience already has.
+  if (filters.viewer) {
+    conditions.push(
+      inArray(Products.audience, ["everyone", filters.viewer]),
+    );
+  }
   if (filters.search) {
     const term = `%${filters.search}%`;
     // Flexible match across every field a product might be found by.
@@ -395,6 +418,73 @@ export const getProductsPage = async (
 };
 
 /**
+ * Refuse a second row claiming an identity that already exists.
+ *
+ * A PRODUCT IS brand + model + its set of variants. Not its name, and above all
+ * not its slug: brands reuse one slug across a whole variant family — 86 of
+ * Ajax's 290 products share a slug with a sibling — so an import keyed on the
+ * slug lets those 86 overwrite each other with nothing raised. The first parse
+ * came back with 204 products and every missing one looked like a page that had
+ * simply not been harvested.
+ *
+ * The unique index enforces this whatever route the write came in by. This exists
+ * so the author gets a sentence naming the product they collided with, instead of
+ * a driver error naming a constraint.
+ *
+ * A product with no model is left alone. Rows entered before identity was
+ * claimable carry none, and MySQL treats those NULLs as distinct — refusing them
+ * would turn a schema addition into a migration nobody can run.
+ */
+const assertIdentityIsFree = async (
+  brandUuid: string,
+  model: string | null,
+  variantKey: string | null,
+  // Absent when creating. Present when updating, so a product does not collide
+  // with the row it already is.
+  selfUuid?: string,
+): Promise<void> => {
+  if (!model) {
+    return;
+  }
+  const [clash] = await db
+    .select({ uuid: Products.uuid, name: Products.name })
+    .from(Products)
+    .where(
+      and(
+        eq(Products.brandUuid, brandUuid),
+        eq(Products.model, model),
+        variantKey === null
+          ? isNull(Products.variantKey)
+          : eq(Products.variantKey, variantKey),
+      ),
+    )
+    .limit(1);
+
+  if (clash && clash.uuid !== selfUuid) {
+    throw new ValidationError(
+      variantKey
+        ? `"${clash.name}" is already this brand's ${model} with exactly these variants. Two rows for one variant combination is how a product silently overwrites its sibling — give this one the variant that actually tells them apart.`
+        : `"${clash.name}" is already this brand's ${model}. If these are two variants of it, tick the variants on each — otherwise one will overwrite the other on the next import.`,
+    );
+  }
+};
+
+/**
+ * The model and identity signature a write should store.
+ *
+ * The signature is rebuilt from the variant set here rather than accepted from
+ * the caller. A caller-supplied signature is a second copy of a fact the set
+ * already holds, and the day the two disagree the database's uniqueness check is
+ * running on the wrong one.
+ */
+const resolveIdentity = async (
+  fields: ProductClientFields,
+): Promise<{ model: string | null; variantKey: string | null }> => ({
+  model: fields.model?.trim() || null,
+  variantKey: await signatureForVariants(fields.variantUuids),
+});
+
+/**
  * Create a product. The SKU is system-owned (assembled from the brand/category/
  * series codes) and the slug is derived from the name — neither comes from the
  * client. Returns the new product's uuid.
@@ -403,6 +493,9 @@ export const createProduct = async (
   fields: ProductClientFields,
 ): Promise<string> => {
   const uuid = generateUuid();
+
+  const identity = await resolveIdentity(fields);
+  await assertIdentityIsFree(fields.brandUuid, identity.model, identity.variantKey);
 
   // The row count, the SKU and the normalized values are independent of one
   // another — only the insert needs all three — so they go out together
@@ -423,6 +516,7 @@ export const createProduct = async (
 
   await db.insert(Products).values({
     ...fields,
+    ...identity,
     specValues,
     sku,
     uuid,
@@ -436,6 +530,14 @@ export const updateProduct = async (
   uuid: string,
   fields: ProductClientFields,
 ): Promise<void> => {
+  const identity = await resolveIdentity(fields);
+  await assertIdentityIsFree(
+    fields.brandUuid,
+    identity.model,
+    identity.variantKey,
+    uuid,
+  );
+
   // Regenerating the SKU (stable when brand/category/series are unchanged) and
   // normalizing the values are independent — only the update needs both.
   const [sku, specValues] = await Promise.all([
@@ -452,6 +554,7 @@ export const updateProduct = async (
     .update(Products)
     .set({
       ...fields,
+      ...identity,
       specValues,
       sku,
       slug: slugify(fields.name),

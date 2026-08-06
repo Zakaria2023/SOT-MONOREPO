@@ -23,11 +23,14 @@ export const metadata: Metadata = {
 };
 
 const HomePage = async () => {
-  const [products, categories, brands, viewerPricing] = await Promise.all([
-    getProducts(),
+  // The viewer has to be known BEFORE the catalogue is read — a trade-only line
+  // must not appear on the home grid and then vanish on the listing page — so
+  // the pricing lookup is awaited first rather than joining the batch.
+  const viewerPricing = await getViewerPartnerPricing();
+  const [products, categories, brands] = await Promise.all([
+    getProducts({ viewer: viewerPricing.isPartner ? "partner" : "user" }),
     getCachedCategories(),
     getBrands(),
-    getViewerPartnerPricing(),
   ]);
 
   // Every other route wraps its content in <main>; this one was the exception,

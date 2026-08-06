@@ -2,7 +2,7 @@
 
 import type { SpecOption } from "@/db/types";
 import { ArrowDown, ArrowUp, Plus, Undo2, X } from "lucide-react";
-import { Input } from "ui";
+import { Input, Textarea } from "ui";
 
 // ---------------------------------------------------------------------------
 // The option list editor — used in THREE places now: a select attribute's own
@@ -23,7 +23,34 @@ export type OptionDraft = {
   value?: string;
   label: string;
   retired: boolean;
+  // Other spellings this option answers to, ONE PER LINE.
+  //
+  // Newline-separated rather than comma-separated because the real aliases are
+  // vendor strings and some of them contain commas. A separator that cannot
+  // appear inside a value is the only kind that never silently splits one.
+  aliases: string;
 };
+
+// The editor holds aliases as the author types them — one per line — and the
+// service wants a list. Both directions live here so the two can never disagree
+// about what a blank line means.
+const ALIAS_SEPARATOR = "\n";
+
+export const aliasesToText = (aliases: string[] | undefined): string =>
+  (aliases ?? []).join(ALIAS_SEPARATOR);
+
+/** A blank row, so the seeded empty option and the "add" button agree. */
+export const emptyOptionDraft = (): OptionDraft => ({
+  label: "",
+  retired: false,
+  aliases: "",
+});
+
+export const aliasesFromText = (text: string): string[] =>
+  text
+    .split(ALIAS_SEPARATOR)
+    .map((alias) => alias.trim())
+    .filter((alias) => alias !== "");
 
 type OptionListEditorProps = {
   options: OptionDraft[];
@@ -38,6 +65,7 @@ export const toDrafts = (options: SpecOption[]): OptionDraft[] =>
     value: option.value,
     label: option.label,
     retired: option.retired,
+    aliases: aliasesToText(option.aliases),
   }));
 
 // The live options of a select, in the shape the service wants. Retired ones are
@@ -53,6 +81,7 @@ export const liveOptions = (options: OptionDraft[], ordered: boolean) =>
       value: option.value,
       label: option.label,
       rank: ordered ? index + 1 : null,
+      aliases: aliasesFromText(option.aliases),
     }));
 
 export const OptionListEditor = ({
@@ -99,7 +128,7 @@ export const OptionListEditor = ({
             key={option.value ?? `new-${index}`}
             className="flex shrink-0 items-center gap-1"
           >
-            <div className="w-40">
+            <div className="flex w-40 flex-col gap-1">
               <Input
                 placeholder="Option label"
                 value={option.label}
@@ -107,6 +136,20 @@ export const OptionListEditor = ({
                 onChange={(event) =>
                   setOption(index, { label: event.target.value })
                 }
+              />
+              {/* Aliases are never shown to a shopper — they exist so an import
+                  lands on THIS option instead of adding a second one beside it.
+                  A retired option keeps its own: products still hold its value,
+                  so it has to keep answering to every spelling it ever had. */}
+              <Textarea
+                rows={2}
+                placeholder="Other spellings, one per line"
+                value={option.aliases}
+                onChange={(event) =>
+                  setOption(index, { aliases: event.target.value })
+                }
+                className="text-[11px]"
+                aria-label={`Other spellings of ${option.label || "this option"}`}
               />
             </div>
             {/* Position is the rank, so ordering is done by moving options
@@ -167,7 +210,7 @@ export const OptionListEditor = ({
           around as options are added. */}
       <button
         type="button"
-        onClick={() => onChange([...options, { label: "", retired: false }])}
+        onClick={() => onChange([...options, emptyOptionDraft()])}
         className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
       >
         <Plus size={13} />

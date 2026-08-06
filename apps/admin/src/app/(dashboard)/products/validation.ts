@@ -1,4 +1,4 @@
-import { productStatuses } from "@/db/enum";
+import { assignmentAudiences, productStatuses } from "@/db/enum";
 import { z } from "zod";
 
 const priceField = z
@@ -13,6 +13,9 @@ export const productFormSchema = z.object({
   brandUuid: z.string().min(1, "Brand is required"),
   name: z.string().min(1, "Name is required").max(255),
   model: z.string().optional(),
+  // Half the product's identity, not a label. A set rather than one value
+  // because the axes stack — see Products.variantUuids.
+  variantUuids: z.array(z.string()).optional(),
   brandIdValue: z.string().max(255).optional(),
   seriesCode: z.string().max(4, "Max 4 characters").optional(),
   warrantyPeriod: z.string().optional(),
@@ -26,6 +29,8 @@ export const productFormSchema = z.object({
   price: priceField, // public MSRP
   currency: z.string().min(1, "Required").max(3),
   isAvailable: z.boolean(),
+  // Who may browse it. Visibility only — see Products.audience.
+  audience: z.enum(assignmentAudiences),
   // Keyed by Specifications.uuid and typed: a number stays a number, a
   // multi-select stays an array. The server normalises and clears hidden values
   // again before writing, so the form is convenience, never the authority.

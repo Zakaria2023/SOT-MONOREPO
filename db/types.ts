@@ -47,6 +47,34 @@ export type SpecOption = {
   label: string;
   rank: number | null;
   retired: boolean;
+
+  // OTHER SPELLINGS OF THIS SAME OPTION, as the sources write them.
+  //
+  // Not display text and not a second label — an alias is never shown. It exists
+  // so an importer reading a brand's sheet can land on the option that already
+  // exists instead of creating a second one beside it. `||` is how one brand
+  // renders the roman numeral II; `Workbench` is what another calls a desktop
+  // mount. Both are the SAME value, and without somewhere to record that, the
+  // next import forks the list again and half the catalogue quietly stops
+  // matching every rule keyed on the other half.
+  //
+  // It belongs HERE rather than in the importer for the reason the boundary rule
+  // is worth having at all: a set is a dictionary, and alternative spellings are
+  // exactly what a dictionary holds. Kept only in an importer, this is
+  // documentation somebody has to remember to read; kept here it is a contract
+  // the resolver enforces on every route into the catalogue.
+  //
+  // NOT behaviour, so it does not bend the boundary rule: an alias has no type,
+  // no unit, no rank, and names no other attribute. It resolves to the option it
+  // sits on and nothing else.
+  //
+  // A RETIRED option keeps its aliases. It still owns its value and products
+  // still hold it, so letting a live option claim a retired one's spelling would
+  // silently re-point every one of those products.
+  //
+  // Optional so every option stored before this existed still parses — absent and
+  // `[]` both mean "this option answers only to its own name".
+  aliases?: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -107,6 +135,32 @@ export type SpecGroupField = {
   // a port group's Speed column has no business offering 100G on a switch whose
   // fastest cage is 10G. See Specifications.setValues.
   setValues?: string[] | null;
+
+  // NO TWO ROWS MAY SHARE THIS COLUMN'S VALUE. The column is a discriminator:
+  // each row answers a different case, rather than adding to a total.
+  //
+  // This is what makes a "one fact, several conditions" attribute safe, and that
+  // shape is common: power draw is one number whose value depends on the supply
+  // mode and the load — {when: 12 V DC, 9 W}, {when: PoE, 8.5 W}, {when: maximum,
+  // 12 W} — and battery autonomy is 24 h or 72 h depending which battery was
+  // bought. Four separate attributes for power draw would be four facts where
+  // there is one, and a rule would have to know which of them to read.
+  //
+  // WITHOUT this flag the shape is quietly unsafe, because an operand reading a
+  // group column TOTALS it. `where: when = maximum` over two rows both saying
+  // maximum sums them, and a 12 W camera silently becomes a 24 W one — a design
+  // that fails a budget check it should have passed, or passes one it should
+  // have failed, with the arithmetic showing a number nobody can trace.
+  //
+  // Off by default, because the ordinary group is the opposite: `{count: 24,
+  // speed: 1G}` and a second `{count: 24, speed: 1G}` is a legitimate way to
+  // describe 48 ports, and refusing it would break every port group already
+  // stored.
+  //
+  // Only meaningful on a `select`. A discriminator has to be drawn from a fixed
+  // list, or "maximum" and "max" are two cases and the rule reading one of them
+  // finds nothing.
+  distinct?: boolean;
 };
 
 // One authored row of a `group` attribute: sub-field key → value.
@@ -141,6 +195,47 @@ export const isSpecGroupRows = (value: unknown): value is SpecGroupRow[] =>
           (typeof entry === "number" && Number.isFinite(entry)),
       ),
   );
+
+/**
+ * Rows that answer a DISCRIMINATOR column somebody else already answered.
+ *
+ * Lives here, beside the shapes, rather than in the engine — because both ends
+ * need it and they must not disagree. The engine reports it as a completeness
+ * problem after the fact; the product form has to say it WHILE the author is
+ * typing, and the form cannot import the engine (that module opens a database
+ * connection the moment it is loaded, and this runs in a browser).
+ *
+ * Two copies of this check would be two definitions of what a duplicate is, and
+ * the one the author sees is not the one that decides the arithmetic.
+ *
+ * Returns the LATER row of each clash. The first is the answer that was already
+ * there; the second is the one somebody added, and it is the one to point at.
+ * Indexes are 0-based — callers that show a row number add one.
+ */
+export const duplicateGroupRows = (
+  rows: SpecGroupRow[],
+  field: SpecGroupField,
+): { index: number; value: string }[] => {
+  // A discriminator is only meaningful on a pick: a count column marked distinct
+  // would refuse the second `24` in a port group, which is a real switch.
+  if (!field.distinct || field.kind !== "select") {
+    return [];
+  }
+  const seen = new Set<string>();
+  const clashes: { index: number; value: string }[] = [];
+  rows.forEach((row, index) => {
+    const entry = row[field.key];
+    if (typeof entry !== "string" || entry.trim() === "") {
+      return;
+    }
+    if (seen.has(entry)) {
+      clashes.push({ index, value: entry });
+      return;
+    }
+    seen.add(entry);
+  });
+  return clashes;
+};
 
 // ---------------------------------------------------------------------------
 // The predicate language — ONE condition shape for the whole system

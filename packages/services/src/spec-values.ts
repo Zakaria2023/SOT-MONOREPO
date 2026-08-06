@@ -1,5 +1,6 @@
 import { UNIT_DIMENSIONS, type SpecificationType } from "../../../db/enum";
 import {
+  duplicateGroupRows,
   isSpecGroupRows,
   isSpecRange,
   type ProductValue,
@@ -305,8 +306,8 @@ export type GroupRowIssue = {
   row: number;
   fieldKey: string;
   fieldLabel: string;
-  problem: "missing" | "unknown_value";
-  // Only on unknown_value.
+  problem: "missing" | "unknown_value" | "duplicate";
+  // Only on unknown_value and duplicate.
   value?: string;
 };
 
@@ -358,6 +359,32 @@ export const groupRowIssues = (
       }
     }
   });
+
+  // A DISCRIMINATOR column answered twice.
+  //
+  // Reported after the per-row pass because it is the only defect that is not
+  // visible from inside a single row — two rows each saying `when = maximum` are
+  // both perfectly well-formed, and it is the pair that is wrong.
+  //
+  // It matters because an operand reading a group column TOTALS it: `where:
+  // when = maximum` over two maximum rows sums them, so a 12 W camera becomes a
+  // 24 W one and every budget check downstream is computed off a number nobody
+  // can trace back to anything on the datasheet.
+  //
+  // Through the SAME `duplicateGroupRows` the product form calls, so what an
+  // author is warned about while typing and what the engine reports afterwards
+  // are one definition rather than two that drift.
+  for (const field of fields) {
+    for (const clash of duplicateGroupRows(asGroupRows(raw), field)) {
+      issues.push({
+        row: clash.index + 1,
+        fieldKey: field.key,
+        fieldLabel: field.label,
+        problem: "duplicate",
+        value: clash.value,
+      });
+    }
+  }
   return issues;
 };
 
