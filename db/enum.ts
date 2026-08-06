@@ -400,6 +400,20 @@ export const relationshipStatuses = [
 
 export type RelationshipStatus = (typeof relationshipStatuses)[number];
 
+// What a vendor-authored pair says about two specific products. Read only where
+// the derived rules cannot reach — see ProductCompatibility, which is an
+// exception list and is meant to stay small.
+//
+// Both directions exist because they fail in opposite ways: a missing
+// `compatible` row blocks a sale that should have gone through, while a missing
+// `incompatible` row sells a combination that does not work.
+export const compatibilityVerdicts = [
+  "compatible",
+  "incompatible",
+] as const satisfies readonly string[];
+
+export type CompatibilityVerdict = (typeof compatibilityVerdicts)[number];
+
 // A project input is a number (or a yes/no) the BUYER supplies — expected
 // concurrent calls, retention days, uplink capacity. It is a rule operand
 // exactly like an attribute, which is what lets the Ratio family exist at all.

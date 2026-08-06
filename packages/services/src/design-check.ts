@@ -8,6 +8,10 @@ import {
 } from "./catalog-model";
 import { pendingQuestions, type DesignQuestion } from "./design-questions";
 import {
+  incompatiblePairs,
+  type IncompatibleFinding,
+} from "./product-compatibility";
+import {
   evaluateSelection,
   type EngineVariable,
   type Finding,
@@ -88,6 +92,49 @@ const toFinding = (finding: Finding): DesignFinding => ({
   skipped: finding.skipped,
 });
 
+/**
+ * A vendor-authored incompatibility, as the buyer sees it.
+ *
+ * `family: "match"` because that is what it IS from the buyer's side — two
+ * things that do not go together — and the tone vocabulary is shared with every
+ * other finding so a surface does not need a special case to render it.
+ *
+ * Always a BLOCK. The bar for blocking is deliberately very high everywhere else
+ * in this model, and downshifts and uncertified-but-functional combinations are
+ * warnings. This clears that bar for the one reason nothing else does: the
+ * manufacturer has said in writing that these two do not work together, and
+ * there is no reading of "compatible" left to argue about.
+ *
+ * The note and the source are carried into the message because a finding that
+ * says "these do not work together" and cannot say who says so is one the buyer
+ * cannot act on and support cannot defend.
+ */
+const vendorFinding = (
+  pair: IncompatibleFinding,
+  selection: { productUuid: string; name: string }[],
+): DesignFinding => {
+  const nameOf = (uuid: string): string =>
+    selection.find((item) => item.productUuid === uuid)?.name ?? "this product";
+  const a = nameOf(pair.productUuidA);
+  const b = nameOf(pair.productUuidB);
+  return {
+    id: `vendor:${pair.productUuidA}:${pair.productUuidB}`,
+    title: `${a} does not work with ${b}`,
+    message: pair.note
+      ? `${pair.note} (${pair.source})`
+      : `${a} and ${b} are listed as incompatible by the manufacturer (${pair.source}).`,
+    family: "match",
+    tone: "block",
+    // No correction. Every other shape here is computed — swap for a bigger one,
+    // add supply, reduce demand — and this one has no arithmetic behind it to
+    // compute from. Inventing "try something else" would be filling the slot
+    // rather than answering it.
+    corrections: [],
+    failingProductUuids: [pair.productUuidA, pair.productUuidB],
+    skipped: [],
+  };
+};
+
 const EMPTY: DesignCheckResult = {
   blockers: [],
   warnings: [],
@@ -139,8 +186,18 @@ export const checkDesign = async (
       region: input.region,
     });
 
+    // The exception list, checked alongside the derived rules rather than
+    // through them. It is not a seventh family — a family is a way of COMPUTING
+    // an answer from attributes, and this is a stored answer about two named
+    // products. Folding it in would have meant a family whose operands name
+    // products, which is the one thing the relationship model refuses.
+    const vendorBlocks = incompatiblePairs(
+      model.compatibility,
+      selection.map((item) => item.productUuid),
+    ).map((pair) => vendorFinding(pair, selection));
+
     return {
-      blockers: report.blockers.map(toFinding),
+      blockers: [...report.blockers.map(toFinding), ...vendorBlocks],
       warnings: report.warnings.map(toFinding),
       unknowns: report.unknowns.map(toFinding),
       questions: pendingQuestions(

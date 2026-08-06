@@ -1,6 +1,7 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
+import { ProductCompatibility } from "../../../db/schema/product-compatibility";
 import { Products } from "../../../db/schema/products";
 import { ProjectVariables } from "../../../db/schema/project-variables";
 import { Relationships } from "../../../db/schema/relationships";
@@ -21,6 +22,10 @@ import {
   resolveVocabulary,
   type OptionSetIndex,
 } from "./library-options";
+import {
+  indexCompatibility,
+  type CompatibilityIndex,
+} from "./product-compatibility";
 import type {
   EngineItem,
   EngineRelationship,
@@ -52,6 +57,10 @@ export type CatalogModel = {
   // Nearest-first ancestor chain for every category, precomputed once. Walking
   // the parent chain per category would otherwise be a query per row.
   chains: Map<string, string[]>;
+  // Vendor-authored pairs the derived rules cannot reach. Part of the model
+  // rather than a per-check query for the same reason everything else here is:
+  // it is small, it changes rarely, and the cart check runs on every render.
+  compatibility: CompatibilityIndex;
 };
 
 let cached: CatalogModel | null = null;
@@ -145,7 +154,7 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
     return cached;
   }
 
-  const [specs, assignments, rules, variables, categories, sets] =
+  const [specs, assignments, rules, variables, categories, sets, pairs] =
     await Promise.all([
       db.select().from(Specifications).orderBy(asc(Specifications.order)),
       db.select().from(SpecificationCategories),
@@ -161,6 +170,15 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
       // wide by design, and a sequential read here would add its full latency to
       // every cold cart check.
       loadOptionSetIndex(),
+      db
+        .select({
+          productUuidA: ProductCompatibility.productUuidA,
+          productUuidB: ProductCompatibility.productUuidB,
+          verdict: ProductCompatibility.verdict,
+          note: ProductCompatibility.note,
+          source: ProductCompatibility.source,
+        })
+        .from(ProductCompatibility),
     ]);
 
   const definitions = specs.map((spec) => toDefinition(spec, sets));
@@ -202,6 +220,7 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
             : Number(row.defaultValue),
     })),
     chains: buildChains(categories),
+    compatibility: indexCompatibility(pairs),
   };
 
   cached = model;

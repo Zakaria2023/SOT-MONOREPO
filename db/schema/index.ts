@@ -13,6 +13,7 @@ export * from "./orders";
 export * from "./partner-discounts";
 export * from "./partner-requests";
 export * from "./payouts";
+export * from "./product-compatibility";
 export * from "./products";
 export * from "./project-variables";
 export * from "./relationships";
