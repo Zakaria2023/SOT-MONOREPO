@@ -7,8 +7,11 @@ import {
   AddOptionRequest,
   AddOptionResult,
   ProductClientFields,
+  Variant,
+  VariantInput,
   addAttributeOption as addAttributeOptionRecord,
   createProduct as createProductRecord,
+  createVariant as createVariantRecord,
   deleteProduct as deleteProductRecord,
   updateProduct as updateProductRecord,
 } from "services";
@@ -35,6 +38,27 @@ export const addSpecOption = async (
     return await addAttributeOptionRecord(request, actor);
   } catch (error) {
     return fail(error, "Failed to add the value");
+  }
+};
+
+/**
+ * Add a variant to the vocabulary, from the product form.
+ *
+ * Same shape as `addSpecOption` and for the same reason: the author is standing
+ * in a half-filled form, so this returns the new variant for the picker to
+ * splice in rather than revalidating the page and throwing away their work.
+ *
+ * The service owns whether the name is a second spelling of a variant that
+ * already exists — that judgement is the reason variants are a table at all.
+ */
+export const addVariant = async (
+  input: VariantInput,
+): Promise<Variant | { error: string }> => {
+  await requireAdmin();
+  try {
+    return await createVariantRecord(input);
+  } catch (error) {
+    return fail(error, "Failed to add the variant");
   }
 };
 

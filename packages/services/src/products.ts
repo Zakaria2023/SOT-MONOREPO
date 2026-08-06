@@ -31,6 +31,7 @@ import {
 } from "../../../db/schema/products";
 import { ValidationError } from "./errors";
 import { normalizeProductValues } from "./product-completeness";
+import { signatureForVariants } from "./variants";
 
 export type { SelectProducts };
 
@@ -399,12 +400,12 @@ export const getProductsPage = async (
 /**
  * Refuse a second row claiming an identity that already exists.
  *
- * A PRODUCT IS brand + model + variant. Not its name, and above all not its
- * slug: vendors reuse one slug across a whole variant family — 86 of Ajax's 290
- * products share a slug with a sibling — so an import keyed on the slug lets
- * those 86 overwrite each other with nothing raised. The first parse came back
- * with 204 products and every missing one looked like a page that had simply not
- * been harvested.
+ * A PRODUCT IS brand + model + its set of variants. Not its name, and above all
+ * not its slug: vendors reuse one slug across a whole variant family — 86 of
+ * Ajax's 290 products share a slug with a sibling — so an import keyed on the
+ * slug lets those 86 overwrite each other with nothing raised. The first parse
+ * came back with 204 products and every missing one looked like a page that had
+ * simply not been harvested.
  *
  * The unique index enforces this whatever route the write came in by. This exists
  * so the author gets a sentence naming the product they collided with, instead of
@@ -415,38 +416,53 @@ export const getProductsPage = async (
  * would turn a schema addition into a migration nobody can run.
  */
 const assertIdentityIsFree = async (
-  fields: Pick<ProductClientFields, "brandUuid" | "model" | "variant">,
+  brandUuid: string,
+  model: string | null,
+  variantKey: string | null,
   // Absent when creating. Present when updating, so a product does not collide
   // with the row it already is.
   selfUuid?: string,
 ): Promise<void> => {
-  const model = fields.model?.trim() || null;
   if (!model) {
     return;
   }
-  const variant = fields.variant?.trim() || null;
   const [clash] = await db
     .select({ uuid: Products.uuid, name: Products.name })
     .from(Products)
     .where(
       and(
-        eq(Products.brandUuid, fields.brandUuid),
+        eq(Products.brandUuid, brandUuid),
         eq(Products.model, model),
-        variant === null
-          ? isNull(Products.variant)
-          : eq(Products.variant, variant),
+        variantKey === null
+          ? isNull(Products.variantKey)
+          : eq(Products.variantKey, variantKey),
       ),
     )
     .limit(1);
 
   if (clash && clash.uuid !== selfUuid) {
     throw new ValidationError(
-      variant
-        ? `"${clash.name}" is already this brand's ${model} ${variant}. Two rows for one variant is how a product silently overwrites its sibling — give this one the variant that tells them apart.`
-        : `"${clash.name}" is already this brand's ${model}. If these are two variants of it, name the variant on each — otherwise one will overwrite the other on the next import.`,
+      variantKey
+        ? `"${clash.name}" is already this brand's ${model} with exactly these variants. Two rows for one variant combination is how a product silently overwrites its sibling — give this one the variant that actually tells them apart.`
+        : `"${clash.name}" is already this brand's ${model}. If these are two variants of it, tick the variants on each — otherwise one will overwrite the other on the next import.`,
     );
   }
 };
+
+/**
+ * The model and identity signature a write should store.
+ *
+ * The signature is rebuilt from the variant set here rather than accepted from
+ * the caller. A caller-supplied signature is a second copy of a fact the set
+ * already holds, and the day the two disagree the database's uniqueness check is
+ * running on the wrong one.
+ */
+const resolveIdentity = async (
+  fields: ProductClientFields,
+): Promise<{ model: string | null; variantKey: string | null }> => ({
+  model: fields.model?.trim() || null,
+  variantKey: await signatureForVariants(fields.variantUuids),
+});
 
 /**
  * Create a product. The SKU is system-owned (assembled from the brand/category/
@@ -458,7 +474,8 @@ export const createProduct = async (
 ): Promise<string> => {
   const uuid = generateUuid();
 
-  await assertIdentityIsFree(fields);
+  const identity = await resolveIdentity(fields);
+  await assertIdentityIsFree(fields.brandUuid, identity.model, identity.variantKey);
 
   // The row count, the SKU and the normalized values are independent of one
   // another — only the insert needs all three — so they go out together
@@ -479,6 +496,7 @@ export const createProduct = async (
 
   await db.insert(Products).values({
     ...fields,
+    ...identity,
     specValues,
     sku,
     uuid,
@@ -492,7 +510,13 @@ export const updateProduct = async (
   uuid: string,
   fields: ProductClientFields,
 ): Promise<void> => {
-  await assertIdentityIsFree(fields, uuid);
+  const identity = await resolveIdentity(fields);
+  await assertIdentityIsFree(
+    fields.brandUuid,
+    identity.model,
+    identity.variantKey,
+    uuid,
+  );
 
   // Regenerating the SKU (stable when brand/category/series are unchanged) and
   // normalizing the values are independent — only the update needs both.
@@ -510,6 +534,7 @@ export const updateProduct = async (
     .update(Products)
     .set({
       ...fields,
+      ...identity,
       specValues,
       sku,
       slug: slugify(fields.name),

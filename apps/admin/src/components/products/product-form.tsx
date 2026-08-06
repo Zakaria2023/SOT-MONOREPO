@@ -3,6 +3,8 @@
 import { useProductForm } from "@/app/(dashboard)/products/use-product-form";
 import { DatasheetUpload } from "@/components/products/datasheet-upload";
 import { SpecificationComposer } from "@/components/products/specification-composer";
+import { VariantPicker } from "@/components/products/variant-picker";
+import { Field } from "@/components/shared/field";
 import { BrandDropdown } from "@/components/brands/brand-dropdown";
 import { CategoryDropdown } from "@/components/categories/category-dropdown";
 import { productStatuses } from "@/db/enum";
@@ -10,6 +12,7 @@ import { PRODUCT_STATUS_LABELS } from "@/db/label";
 import type { SelectBrands } from "@/db/schema/brands";
 import type { SelectCategories } from "@/db/schema/categories";
 import type { SelectProducts } from "@/db/schema/products";
+import type { Variant } from "services";
 import { documentImageUrl } from "@/lib/documents";
 import type { FormField } from "@/components/products/specification-composer";
 import {
@@ -39,12 +42,14 @@ type ProductFormProps =
       mode: "add";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      variants: Variant[];
       fieldsByCategory: Record<string, FormField[]>;
     }
   | {
       mode: "edit";
       categories: SelectCategories[];
       brands: SelectBrands[];
+      variants: Variant[];
       fieldsByCategory: Record<string, FormField[]>;
       product: SelectProducts;
     };
@@ -60,7 +65,7 @@ const availabilityOptions = [
 ];
 
 export const ProductForm = (props: ProductFormProps) => {
-  const { mode, categories, brands, fieldsByCategory } = props;
+  const { mode, categories, brands, variants, fieldsByCategory } = props;
 
   const { form, state, isPending, onSubmit } = useProductForm(
     props.mode === "edit"
@@ -123,18 +128,26 @@ export const ProductForm = (props: ProductFormProps) => {
             type="text"
             {...register("model")}
           />
-          {/* Identity, not decoration: brand + model + variant is what makes two
-              rows two products. Leaving it blank on one member of a variant
-              family is how that family collapses into a single row on the next
-              import, silently. */}
-          <Input
-            label="Variant"
-            labelIcon={<Tag size={15} />}
-            type="text"
-            placeholder="e.g. RB, (4G), White"
-            {...register("variant")}
-            error={errors.variant?.message}
-          />
+          {/* Identity, not decoration: brand + model + the set of variants is
+              what makes two rows two products. Leaving it empty on one member of
+              a variant family is how that family collapses into a single row on
+              the next import, silently. */}
+          <Field
+            label="Variants"
+            hint="What tells this apart from its siblings. Several can apply at once."
+          >
+            <Controller
+              control={control}
+              name="variantUuids"
+              render={({ field }) => (
+                <VariantPicker
+                  variants={variants}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </Field>
           <Input
             label="Series Code"
             labelIcon={<Hash size={15} />}

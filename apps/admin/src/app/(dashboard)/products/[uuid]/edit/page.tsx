@@ -5,6 +5,7 @@ import {
   getCategories,
   getProduct,
   getProductFormFieldsByCategory,
+  getVariants,
 } from "services";
 
 type Props = {
@@ -14,12 +15,14 @@ type Props = {
 const EditProductPage = async ({ params }: Props) => {
   const { uuid } = await params;
 
-  const [product, categories, brands, fieldsByCategory] = await Promise.all([
-    getProduct(uuid),
-    getCategories(),
-    getBrands(),
-    getProductFormFieldsByCategory(),
-  ]);
+  const [product, categories, brands, variants, fieldsByCategory] =
+    await Promise.all([
+      getProduct(uuid),
+      getCategories(),
+      getBrands(),
+      getVariants(),
+      getProductFormFieldsByCategory(),
+    ]);
 
   if (!product) {
     notFound();
@@ -31,6 +34,7 @@ const EditProductPage = async ({ params }: Props) => {
       product={product}
       categories={categories}
       brands={brands}
+      variants={variants}
       fieldsByCategory={fieldsByCategory}
     />
   );

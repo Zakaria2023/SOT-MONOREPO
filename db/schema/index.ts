@@ -21,3 +21,4 @@ export * from "./specification-groups";
 export * from "./specification-option-sets";
 export * from "./specifications";
 export * from "./users";
+export * from "./variants";

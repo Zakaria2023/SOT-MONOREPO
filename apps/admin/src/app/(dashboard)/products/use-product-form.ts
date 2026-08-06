@@ -33,7 +33,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
       brandUuid: product?.brandUuid ?? "",
       name: product?.name ?? "",
       model: product?.model ?? "",
-      variant: product?.variant ?? "",
+      variantUuids: product?.variantUuids ?? [],
       brandIdValue: product?.brandIdValue ?? "",
       seriesCode: product?.seriesCode ?? "",
       warrantyPeriod: product?.warrantyPeriod ?? "",
@@ -63,7 +63,10 @@ export const useProductForm = (args: UseProductFormArgs) => {
         brandUuid: values.brandUuid,
         name: values.name,
         model: values.model || null,
-        variant: values.variant || null,
+        // The signature the identity check runs on is rebuilt from this set by
+        // the service, never sent from here — two copies of one fact is how the
+        // uniqueness check ends up running on the stale one.
+        variantUuids: values.variantUuids ?? [],
         brandIdValue: values.brandIdValue || null,
         seriesCode: values.seriesCode || null,
         warrantyPeriod: values.warrantyPeriod || null,

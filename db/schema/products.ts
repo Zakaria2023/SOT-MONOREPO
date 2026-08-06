@@ -41,20 +41,36 @@ export const Products = mysqlTable(
     sku: varchar("sku", { length: 100 }).unique(),
     model: varchar("model", { length: 255 }),
 
-    // Which member of a variant family this row is — "RB" / "SB", "(2G)" /
-    // "(4G)", "White" / "Yellow", "with casing" / "without casing".
+    // Which member of a variant family this row is, as Variants.uuid values.
     //
-    // A COLUMN rather than part of the name, because it is half the identity.
-    // Vendors reuse one URL slug across a whole variant family: 86 of Ajax's 290
-    // products share a slug with a sibling, and keying an import on the slug let
-    // those 86 overwrite each other in silence — the count came back 204 and
-    // every collision looked like a product that simply had not been harvested.
+    // A SET, because the axes stack: `FireProtect 2 RB (CO) UL Jeweller` differs
+    // from its siblings on battery, sensor, certification and radio at once, and
+    // a single string holding all four cannot be searched, grouped or matched by
+    // an importer.
     //
-    // Variants that differ on a RULE-BEARING attribute are separate rows, which
-    // is why this has to be identity and not a label: an RB and an SB carry
-    // different certifications, so a single row for both would answer a
-    // compliance rule with whichever one happened to be entered.
-    variant: varchar("variant", { length: 120 }),
+    // Half the product's IDENTITY rather than a label. Vendors reuse one URL slug
+    // across a whole variant family — 86 of Ajax's 290 products share a slug with
+    // a sibling — so keyed on the slug those 86 overwrote each other in silence:
+    // the count came back 204 and every collision looked like a page that had not
+    // been harvested. Variants also differ on rule-bearing attributes (an RB and
+    // an SB carry different certifications), so one row standing for both answers
+    // a compliance rule with whichever happened to be entered.
+    variantUuids: json("variant_uuids").$type<string[]>(),
+
+    // The variant set flattened into one comparable string — sorted variant
+    // slugs, joined. Maintained by the service on every write.
+    //
+    // It exists because identity has to be enforceable by the DATABASE and a
+    // unique index cannot span a JSON array. With it, brand + model + signature
+    // is a real constraint that holds against any writer, including one that
+    // forgot to ask.
+    //
+    // SORTED, so the same set always produces the same signature — otherwise the
+    // order an author happened to tick two boxes in would decide whether a
+    // duplicate was caught. Built from slugs rather than uuids so it stays
+    // readable in a query, and rebuilt from the set rather than typed so the two
+    // can never disagree.
+    variantKey: varchar("variant_key", { length: 255 }),
 
     // Value for the selected brand's ID label (Brands.idLabel — e.g. the brand's
     // own BOM / PID / Part Number). The label comes from the brand; this is the
@@ -144,21 +160,24 @@ export const Products = mysqlTable(
     index("idx_products_status").on(table.status),
     // THE IDENTITY OF A PRODUCT, and the backstop under every import.
     //
-    // Brand + model + variant, not the slug and not the name. A slug is derived
-    // from a name and vendors reuse both across a variant family, so keying on
-    // either lets two real products collapse into one with nothing raised.
+    // Brand + model + variant set, not the slug and not the name. A slug is
+    // derived from a name and vendors reuse both across a variant family, so
+    // keying on either lets two real products collapse into one with nothing
+    // raised.
+    //
+    // The set arrives here as `variantKey` because a unique index cannot span a
+    // JSON array. That is the whole reason the signature column exists: without
+    // it this guarantee would live only in the service, and the one writer that
+    // forgot to ask is exactly the one that does the damage.
     //
     // MySQL treats NULLs in a unique index as distinct, which is deliberate here
     // rather than tolerated: products entered before this existed carry no model,
     // and a constraint that rejected them would make this change a migration
     // nobody can run. It binds exactly where identity is actually claimed.
-    //
-    // The service guard is what produces a readable refusal — this is what makes
-    // the guarantee true even for a writer that forgets to ask.
     unique("uq_products_brand_model_variant").on(
       table.brandUuid,
       table.model,
-      table.variant,
+      table.variantKey,
     ),
   ],
 );
