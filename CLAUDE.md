@@ -576,6 +576,17 @@ The schema and connection live in the repo-root `db/` folder, not in a package â
   });
   ```
 
+## Specification authoring
+
+- Before adding or shaping an attribute in the specification library, read
+  `docs/specification-conventions.md`. It records the decisions where the model
+  already does the right thing and only the usage was in question â€” how a range
+  inside a repeatable row is expressed, how a "one fact, several cases" attribute
+  is built and why its case column must be marked distinct, why external names
+  are dotted and never re-derived, and where an unfamiliar source spelling
+  belongs. Each entry names the attribute it came from, so a new case can be
+  checked against the one that set the precedent.
+
 ## Enums
 
 - Never use TypeScript's `enum`. Always define enums as a `const` array typed with `as const satisfies readonly string[]`, and derive the union type from it with `(typeof arr)[number]`.
