@@ -1,8 +1,8 @@
 import type { BoqItemRole, ProductStatus } from "@/db/enum";
 import { BOQ_ITEM_ROLE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
+import { ProductGallery } from "@/components/products/product-gallery";
 import { documentImageUrl } from "@/lib/documents";
-import { ArrowLeft, FileText, ImageOff, Pencil } from "lucide-react";
-import Image from "next/image";
+import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
@@ -97,35 +97,11 @@ export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="flex flex-col gap-5">
           <Section title="Media">
-            <div className="overflow-hidden rounded-card border border-hairline bg-page">
-              {product.image ? (
-                <Image
-                  src={documentImageUrl(product.image)}
-                  alt={product.name}
-                  width={640}
-                  height={640}
-                  className="h-72 w-full object-contain"
-                />
-              ) : (
-                <div className="flex h-72 w-full items-center justify-center text-faint">
-                  <ImageOff size={40} />
-                </div>
-              )}
-            </div>
-            {gallery.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {gallery.map((image) => (
-                  <Image
-                    key={image}
-                    src={documentImageUrl(image)}
-                    alt={product.name}
-                    width={64}
-                    height={64}
-                    className="h-16 w-16 rounded-control border border-hairline object-cover"
-                  />
-                ))}
-              </div>
-            )}
+            <ProductGallery
+              name={product.name}
+              image={product.image}
+              images={gallery}
+            />
           </Section>
 
           <Section title="Descriptions">

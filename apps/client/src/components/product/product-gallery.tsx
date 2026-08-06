@@ -4,6 +4,7 @@ import { documentImageUrl } from "@/lib/documents";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { useState, type ReactNode } from "react";
+import { galleryFrames } from "utils";
 
 // ---------------------------------------------------------------------------
 // The product's pictures, and the only interactive part of the hero.
@@ -33,11 +34,12 @@ export const ProductGallery = ({
   images,
   children,
 }: ProductGalleryProps) => {
-  // The primary FIRST, then the rest, deduplicated. Without the primary in the
-  // strip a shopper who clicks a thumbnail has no way back to the picture they
-  // started on — and a product whose primary is also listed among its extras
-  // would otherwise show the same thumbnail twice.
-  const gallery = [...new Set([...(image ? [image] : []), ...images])];
+  // The primary FIRST, then the rest, deduplicated — see `galleryFrames` for
+  // why both halves matter. Shared with the admin's gallery, which is otherwise
+  // a completely different component: this is an LCP hero with a gradient behind
+  // it and that is a small inspection strip, and the ordering rule is the only
+  // thing they have in common worth keeping in one place.
+  const gallery = galleryFrames(image, images);
 
   const [active, setActive] = useState(image);
   // The stored value, not an index. If the pictures are ever reordered, an index

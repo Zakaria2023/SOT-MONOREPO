@@ -633,3 +633,30 @@ export type ActionResult = {
 export const fail = (error: unknown, fallback: string): { error: string } => ({
   error: error instanceof Error ? error.message : fallback,
 });
+
+/**
+ * A product's pictures in the order a gallery shows them.
+ *
+ * The PRIMARY FIRST, then the extras, deduplicated. Both halves matter and both
+ * were learned the hard way:
+ *
+ * Without the primary in the list, somebody who clicks a thumbnail has no way
+ * back to the picture they started on — the main image is gone from the strip
+ * and only a reload returns it.
+ *
+ * Without the dedupe, a product whose primary is also listed among its extras —
+ * which is what happens every time somebody uploads the same file twice — shows
+ * the same thumbnail in two places, and clicking either does nothing visible.
+ *
+ * Shared rather than written in each app because it is the only part of a
+ * gallery that is not presentation. The storefront's gallery is an LCP hero with
+ * a gradient behind it and the admin's is a small inspection strip; they have
+ * almost nothing else in common, and a second copy of THIS would be the part
+ * that quietly drifted.
+ */
+export const galleryFrames = (
+  image: string | null | undefined,
+  images: string[] | null | undefined,
+): string[] => [
+  ...new Set([...(image ? [image] : []), ...(images ?? [])].filter(Boolean)),
+];
