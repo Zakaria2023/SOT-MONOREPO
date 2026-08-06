@@ -7,6 +7,7 @@ import {
 } from "@/app/(dashboard)/library/action";
 import type { OptionSet, OptionSetInput } from "services";
 import {
+  emptyOptionDraft,
   liveOptions,
   OptionListEditor,
   toDrafts,
@@ -58,7 +59,7 @@ const ListForm = ({
   const [name, setName] = useState(initial?.name ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [options, setOptions] = useState<OptionDraft[]>(
-    initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
+    initial ? toDrafts(initial.options) : [emptyOptionDraft()],
   );
 
   const empty = liveOptions(options, ordered).length === 0;

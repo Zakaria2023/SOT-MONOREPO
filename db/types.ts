@@ -47,6 +47,34 @@ export type SpecOption = {
   label: string;
   rank: number | null;
   retired: boolean;
+
+  // OTHER SPELLINGS OF THIS SAME OPTION, as the sources write them.
+  //
+  // Not display text and not a second label — an alias is never shown. It exists
+  // so an importer reading a vendor sheet can land on the option that already
+  // exists instead of creating a second one beside it. `||` is how one vendor
+  // renders the roman numeral II; `Workbench` is what another calls a desktop
+  // mount. Both are the SAME value, and without somewhere to record that, the
+  // next import forks the list again and half the catalogue quietly stops
+  // matching every rule keyed on the other half.
+  //
+  // It belongs HERE rather than in the importer for the reason the boundary rule
+  // is worth having at all: a set is a dictionary, and alternative spellings are
+  // exactly what a dictionary holds. Kept only in an importer, this is
+  // documentation somebody has to remember to read; kept here it is a contract
+  // the resolver enforces on every route into the catalogue.
+  //
+  // NOT behaviour, so it does not bend the boundary rule: an alias has no type,
+  // no unit, no rank, and names no other attribute. It resolves to the option it
+  // sits on and nothing else.
+  //
+  // A RETIRED option keeps its aliases. It still owns its value and products
+  // still hold it, so letting a live option claim a retired one's spelling would
+  // silently re-point every one of those products.
+  //
+  // Optional so every option stored before this existed still parses — absent and
+  // `[]` both mean "this option answers only to its own name".
+  aliases?: string[];
 };
 
 // ---------------------------------------------------------------------------

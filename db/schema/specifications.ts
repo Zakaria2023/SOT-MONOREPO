@@ -46,9 +46,36 @@ export const Specifications = mysqlTable("Specifications", {
   // How authors tell two same-labelled attributes apart in the admin. Never
   // shown to a shopper, never used for identity.
   internalName: varchar("internal_name", { length: 255 }),
-  // A human-readable slug for exports and the AI read model ONLY. Nothing
-  // points at it, so it is free to change when the label does.
-  key: varchar("key", { length: 255 }).notNull(),
+  // The attribute's STABLE EXTERNAL NAME — `pwr.power_draw_w`, `phys.ip_rating`.
+  //
+  // Nothing INSIDE the model points at it: values, assignments, rules and
+  // predicates all key on `uuid`, and that is what keeps a rename free. What
+  // points at it is everything OUTSIDE — an import mapping a vendor column onto
+  // an attribute, an export, the AI read model, a spreadsheet a human wrote.
+  //
+  // So it is unique and it does not change. Derived from the label on creation
+  // when nobody supplies one, but an importer may set it explicitly, and the
+  // dotted form is why: `slugify` would turn `pwr.power_draw_w` into
+  // `pwr-power-draw-w`, and a mapping file that says one while the database says
+  // the other resolves to nothing at all. A key silently re-derived on a rename
+  // would break the same mapping a month later with nothing to look at.
+  key: varchar("key", { length: 255 }).notNull().unique(),
+
+  // Other LABELS the sources use for this same attribute — the label-level twin
+  // of SpecOption.aliases.
+  //
+  // One vendor writes "Sensitive element", the next writes "Sensing element" and
+  // the same sheet uses both. They are one attribute, and the only place that can
+  // be recorded once for every route into the catalogue is here.
+  //
+  // Distinct from `internalName`, which disambiguates two attributes that share a
+  // label for a human author. This is the reverse: many written forms collapsing
+  // onto one attribute for a machine.
+  //
+  // Must not collide with another attribute's label or aliases — an ambiguous
+  // source label is refused at save time rather than resolved by guessing, since
+  // guessing here files a value under the wrong attribute and nothing errors.
+  labelAliases: json("label_aliases").$type<string[] | null>(),
 
   description: varchar("description", { length: 500 }),
 

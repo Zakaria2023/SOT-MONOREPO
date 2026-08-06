@@ -7,6 +7,9 @@ import type { SpecificationType } from "@/db/enum";
 import { SPECIFICATION_TYPE_LABELS } from "@/db/label";
 import { Field } from "@/components/shared/field";
 import {
+  aliasesFromText,
+  aliasesToText,
+  emptyOptionDraft,
   liveOptions,
   OptionListEditor,
   toDrafts,
@@ -30,6 +33,7 @@ import {
   Combobox,
   Dropdown,
   Input,
+  Textarea,
   type DropdownOption,
 } from "ui";
 import {
@@ -209,12 +213,15 @@ export const AttributeForm = ({
   const [type, setType] = useState<SpecificationType>(
     initial?.type ?? "single_select",
   );
+  const [labelAliases, setLabelAliases] = useState(
+    aliasesToText(initial?.labelAliases ?? undefined),
+  );
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [group, setGroup] = useState(initial?.groupUuid ?? groupUuid ?? "");
   const [options, setOptions] = useState<OptionDraft[]>(
-    initial ? toDrafts(initial.options) : [{ label: "", retired: false }],
+    initial ? toDrafts(initial.options) : [emptyOptionDraft()],
   );
   const [optionSetUuid, setOptionSetUuid] = useState(
     initial?.optionSetUuid ?? "",
@@ -293,6 +300,7 @@ export const AttributeForm = ({
       label,
       internalName: null,
       description: null,
+      labelAliases: aliasesFromText(labelAliases),
       type,
       categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
@@ -349,6 +357,18 @@ export const AttributeForm = ({
           placeholder="PoE Budget"
           value={label}
           onChange={(event) => setLabel(event.target.value)}
+        />
+
+        {/* What the SOURCES call this attribute, not what we call it. One vendor
+            sheet says "Sensitive element" and the next says "Sensing element";
+            recorded here, an import lands both on this attribute instead of
+            creating a second one nobody notices until a rule stops matching. */}
+        <Textarea
+          label="Other names in source data"
+          rows={2}
+          placeholder={"Sensitive element\nSensing element"}
+          value={labelAliases}
+          onChange={(event) => setLabelAliases(event.target.value)}
         />
 
         <Field

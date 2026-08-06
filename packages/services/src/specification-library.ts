@@ -24,15 +24,20 @@ import { ValidationError } from "./errors";
 // Option identity lives in its own module because this one opens a database
 // connection on import, and that logic has to be testable on its own.
 import {
+  aliasConflicts,
+  labelAliasConflicts,
   mergeGroupFields,
   mergeOptions,
+  normalizeAliases,
   normalizeSetValues,
   resolveGroupFields,
   resolveVocabulary,
   usedOptionValues,
   valuesOutsideVocabulary,
+  type AliasConflict,
   type LibraryGroupFieldInput,
   type LibraryOptionInput,
+  type NameableAttribute,
   type OptionSetIndex,
 } from "./library-options";
 import { readHeldValues, type HeldValues } from "./option-sets";
@@ -59,6 +64,9 @@ export type LibraryAttributeInput = {
   label: string;
   internalName: string | null;
   description: string | null;
+  // Other labels the SOURCES use for this attribute. Not display text — see
+  // Specifications.labelAliases.
+  labelAliases: string[] | null;
   type: SpecificationType;
   unit: string | null;
   ordered: boolean;
@@ -83,6 +91,7 @@ export type LibraryAttribute = {
   label: string;
   internalName: string | null;
   description: string | null;
+  labelAliases: SelectSpecifications["labelAliases"];
   key: string;
   type: SpecificationType;
   unit: SelectSpecifications["unit"];
@@ -189,6 +198,95 @@ const assertValidInput = (input: LibraryAttributeInput): void => {
   }
 };
 
+/**
+ * Every alias this save would introduce, checked for ambiguity — and refused.
+ *
+ * REFUSED rather than surfaced, which is the opposite of what near-duplicate
+ * detection does, and the difference is who is going to read the result. A
+ * near-duplicate is a judgement call for a human looking at two labels. An
+ * ambiguous alias is a question a machine will ask thousands of times with no
+ * human present, and the only honest answers are "this option" or "I don't know".
+ * Storing an alias two options answer to guarantees the second answer forever,
+ * on a field whose entire purpose is to give the first.
+ *
+ * Group sub-fields are checked too. Their picks are option lists like any other
+ * and an importer resolves a port's speed column exactly the way it resolves a
+ * top-level select — an unchecked alias there fails the same way, one level down
+ * where nobody is looking.
+ */
+/**
+ * An attribute's label aliases as the column stores them.
+ *
+ * Empty becomes NULL rather than `[]`, so "no aliases" has one representation
+ * instead of two that every reader has to remember are the same.
+ */
+const storedLabelAliases = (input: LibraryAttributeInput): string[] | null => {
+  const aliases = normalizeAliases(input.labelAliases, {
+    value: "",
+    label: input.label.trim(),
+  });
+  return aliases.length > 0 ? aliases : null;
+};
+
+const assertAliasesResolve = (
+  input: LibraryAttributeInput,
+  nextOptions: SpecOption[],
+  nextGroupFields: SpecGroupField[],
+  library: NameableAttribute[],
+  uuid: string,
+): void => {
+  const describe = (conflict: AliasConflict, where: string): string =>
+    `"${conflict.alias}" is already how ${conflict.claimedBy
+      .filter((name) => name !== "")
+      .join(" and ")} ${where}. An alias has to point at exactly one thing, or nothing that reads it can tell which you meant.`;
+
+  const ownConflicts = aliasConflicts(nextOptions);
+  if (ownConflicts[0]) {
+    throw new ValidationError(describe(ownConflicts[0], "are both written"));
+  }
+  for (const field of nextGroupFields) {
+    const fieldConflicts = aliasConflicts(field.options);
+    if (fieldConflicts[0]) {
+      throw new ValidationError(
+        describe(
+          fieldConflicts[0],
+          `are both written in the "${field.label}" sub-field`,
+        ),
+      );
+    }
+  }
+
+  const labelConflicts = labelAliasConflicts(
+    {
+      uuid,
+      // The key is not being checked against here — only labels and their
+      // aliases — so a placeholder is honest rather than a guess at what the key
+      // will be. `labelAliasConflicts` compares the CANDIDATE's aliases against
+      // every other attribute's key, label and aliases, never its own.
+      key: "",
+      label: input.label.trim(),
+      labelAliases: storedLabelAliases(input),
+    },
+    library,
+  );
+  if (labelConflicts[0]) {
+    throw new ValidationError(
+      describe(labelConflicts[0], "are both known as"),
+    );
+  }
+};
+
+/** Every attribute in the library, in the shape the alias checks want. */
+const readNameableLibrary = async (): Promise<NameableAttribute[]> =>
+  db
+    .select({
+      uuid: Specifications.uuid,
+      key: Specifications.key,
+      label: Specifications.label,
+      labelAliases: Specifications.labelAliases,
+    })
+    .from(Specifications);
+
 /** Groups in order, each with its attributes and reference counts. */
 export const getLibrary = async (): Promise<LibraryGroup[]> => {
   const [groups, specs, rules, links, sets] = await Promise.all([
@@ -233,6 +331,7 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
       label: spec.label,
       internalName: spec.internalName,
       description: spec.description,
+      labelAliases: spec.labelAliases,
       key: spec.key,
       type: spec.type,
       unit: spec.unit,
@@ -351,9 +450,20 @@ export const createLibraryAttribute = async (
   const uuid = generateUuid();
 
   const [existing, [total]] = await Promise.all([
-    db.select({ key: Specifications.key }).from(Specifications),
+    readNameableLibrary(),
     db.select({ value: count() }).from(Specifications),
   ]);
+
+  const options =
+    isOptionBacked(input.type) && !input.optionSetUuid
+      ? mergeOptions([], input.options, input.ordered)
+      : [];
+  const groupFields =
+    input.type === "group" ? mergeGroupFields([], input.groupFields) : [];
+  // Against what will actually be WRITTEN, never against the raw input —
+  // `mergeOptions` is what decides an option's final value and its normalised
+  // aliases, and checking the input would check a list that never existed.
+  assertAliasesResolve(input, options, groupFields, existing, uuid);
 
   await db.insert(Specifications).values({
     uuid,
@@ -361,6 +471,10 @@ export const createLibraryAttribute = async (
     label: input.label.trim(),
     internalName: input.internalName?.trim() || null,
     description: input.description?.trim() || null,
+    labelAliases: normalizeAliases(input.labelAliases, {
+      value: "",
+      label: input.label.trim(),
+    }),
     key: uniqueKey(input.label, new Set(existing.map((row) => row.key))),
     type: input.type,
     unit: input.type === "number" ? input.unit?.trim() || null : null,
@@ -377,10 +491,7 @@ export const createLibraryAttribute = async (
     // A pointer and an inline list are never both stored. Two lists for one
     // attribute is two answers to "what may a product hold", and the loser drifts
     // out of date in silence.
-    options:
-      isOptionBacked(input.type) && !input.optionSetUuid
-        ? mergeOptions([], input.options, input.ordered)
-        : [],
+    options,
     optionSetUuid: isOptionBacked(input.type)
       ? input.optionSetUuid || null
       : null,
@@ -390,8 +501,7 @@ export const createLibraryAttribute = async (
       isOptionBacked(input.type) && input.optionSetUuid
         ? normalizeSetValues(input.setValues)
         : null,
-    groupFields:
-      input.type === "group" ? mergeGroupFields([], input.groupFields) : [],
+    groupFields,
     order: Number(total?.value ?? 0),
   });
 
@@ -653,6 +763,14 @@ export const updateLibraryAttribute = async (
       ? mergeGroupFields(current.groupFields ?? [], input.groupFields)
       : [];
 
+  assertAliasesResolve(
+    input,
+    nextOptions,
+    nextGroupFields,
+    await readNameableLibrary(),
+    uuid,
+  );
+
   const warnings = await checkValueImpact(
     uuid,
     current,
@@ -668,6 +786,10 @@ export const updateLibraryAttribute = async (
       label: input.label.trim(),
       internalName: input.internalName?.trim() || null,
       description: input.description?.trim() || null,
+      labelAliases: storedLabelAliases(input),
+      // `key` is deliberately NOT here. It is the name every import mapping and
+      // export outside this system points at, so a rename must not move it —
+      // see Specifications.key.
       type: input.type,
       unit: input.type === "number" ? input.unit?.trim() || null : null,
       ordered: nextOrdered,
