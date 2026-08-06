@@ -11,6 +11,7 @@ import {
   incompatiblePairs,
   type IncompatibleFinding,
 } from "./product-compatibility";
+import { missingParts, type MissingPart } from "./product-composition";
 import {
   evaluateSelection,
   type EngineVariable,
@@ -135,6 +136,58 @@ const brandFinding = (
   };
 };
 
+/**
+ * A part the basket is short of, as the buyer sees it.
+ *
+ * A WARNING, not a block, and the difference is the whole judgement. The parts
+ * are real — DoubleButton genuinely does not mount without its Holder — but a
+ * buyer may already own one, may be adding it on a second order, or may be a
+ * partner who keeps a box of them. Refusing the sale in any of those cases is a
+ * false block, and §6.4 is explicit that a false block costs more than a missed
+ * warning.
+ *
+ * `family: "presence"` because that is what it is: a companion that should be
+ * there and isn't. It reaches the buyer through the same shape as every other
+ * finding, so no surface needs a special case to render it.
+ */
+const compositionFinding = (
+  missing: MissingPart,
+  selection: { productUuid: string; name: string }[],
+): DesignFinding => {
+  const parentName =
+    selection.find((item) => item.productUuid === missing.parentUuid)?.name ??
+    "A product in your basket";
+  const quantity = missing.shortBy > 1 ? `${missing.shortBy} × ` : "";
+  return {
+    id: `composition:${missing.parentUuid}:${missing.childUuid}`,
+    title: `${parentName} needs ${quantity}${missing.childName}`,
+    message: missing.note
+      ? `${missing.note} It is sold separately, and your basket is ${missing.shortBy} short.`
+      : `${missing.childName} is sold separately and is needed for ${parentName} to work as described. Your basket is ${missing.shortBy} short.`,
+    family: "presence",
+    tone: "warn",
+    // The fix is not a computation, it is the named part. Reusing `add_supply`
+    // rather than inventing a shape lets the cart render its existing "add this"
+    // affordance, and the product it names is the answer rather than a guess at
+    // one.
+    corrections: [
+      {
+        shape: "add_supply",
+        message: `Add ${quantity}${missing.childName}`,
+        products: [
+          {
+            productUuid: missing.childUuid,
+            name: missing.childName,
+            capacity: missing.shortBy,
+          },
+        ],
+      },
+    ],
+    failingProductUuids: [missing.parentUuid],
+    skipped: [],
+  };
+};
+
 const EMPTY: DesignCheckResult = {
   blockers: [],
   warnings: [],
@@ -196,9 +249,20 @@ export const checkDesign = async (
       selection.map((item) => item.productUuid),
     ).map((pair) => brandFinding(pair, selection));
 
+    // Parts sold separately that the basket does not hold. Alongside the rules
+    // rather than through them, for the same reason the exception list is: this
+    // compares products to products, and a relationship compares attributes.
+    const compositionWarnings = missingParts(
+      model.composition,
+      selection.map((item) => ({
+        productUuid: item.productUuid,
+        quantity: item.quantity,
+      })),
+    ).map((missing) => compositionFinding(missing, selection));
+
     return {
       blockers: [...report.blockers.map(toFinding), ...brandBlocks],
-      warnings: report.warnings.map(toFinding),
+      warnings: [...report.warnings.map(toFinding), ...compositionWarnings],
       unknowns: report.unknowns.map(toFinding),
       questions: pendingQuestions(
         report.findings,

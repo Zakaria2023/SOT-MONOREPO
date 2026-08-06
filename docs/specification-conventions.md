@@ -132,8 +132,15 @@ free; a triple type would need a comparator of its own to do the same thing.
 **The known gap.** `Ø 20 × 90 mm` (DoorProtect) is a cylinder and three axes are
 the wrong shape for it. Leave the depth blank and record the diameter in whatever
 display field the category has, exactly as §4.5 says: flag it, do not force it.
-Rack-depth-vs-device-depth is listed as an unmodelled Match rule in §6.2 and this
-is the attribute it will read when it is written.
+
+**The rack-depth rule these feed is a Budget, not a Match** — §6.2.5 calls it a
+Match and authoring it that way ships a rule that blocks every rack build.
+Match resolves both sides through option *ranks*, and two plain numbers have
+none, so the comparison finds nothing on either side and fails everything. Use
+`budget` with `perItem: true`: each device judged against the rack's usable depth
+on its own, rather than summed, because four 520 mm servers do not need a
+2,080 mm rack. There is a test pinning both halves of this in
+`claimed-non-gaps.test.ts`.
 
 ---
 

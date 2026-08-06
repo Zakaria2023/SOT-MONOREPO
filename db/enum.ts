@@ -23,6 +23,9 @@ export const measurementUnits = [
   "devices",
   "users",
   "licenses",
+  // Access control counts doors, and a door is not a device: a controller that
+  // handles 4 doors and 40 credentials must never have the two totalled.
+  "doors",
   // Distance & physical
   "m",
   "cm",
@@ -30,6 +33,10 @@ export const measurementUnits = [
   "km",
   // Floor area, for the project inputs that size a system against a building.
   "m²",
+  // Optical wavelength. Its own scale rather than a fraction of a metre, because
+  // 1310 is what every datasheet and every author writes and 0.00000131 is what
+  // nobody would recognise.
+  "nm",
   "kg",
   "g",
   // Data & network
@@ -147,6 +154,7 @@ export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
     users: { dimension: "users", toBase: 1 },
     licenses: { dimension: "licenses", toBase: 1 },
     calls: { dimension: "calls", toBase: 1 },
+    doors: { dimension: "doors", toBase: 1 },
     // A concentration, and its own dimension for the same reason the counts are:
     // ppm sums with nothing, and a CO threshold must never be comparable to a
     // percentage just because both are dimensionless-looking ratios.

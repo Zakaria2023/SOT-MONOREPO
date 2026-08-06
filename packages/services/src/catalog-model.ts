@@ -2,6 +2,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
 import { Categories } from "../../../db/schema/categories";
 import { ProductCompatibility } from "../../../db/schema/product-compatibility";
+import { ProductComposition } from "../../../db/schema/product-composition";
 import { Products } from "../../../db/schema/products";
 import { ProjectVariables } from "../../../db/schema/project-variables";
 import { Relationships } from "../../../db/schema/relationships";
@@ -26,6 +27,10 @@ import {
   indexCompatibility,
   type CompatibilityIndex,
 } from "./product-compatibility";
+import {
+  indexComposition,
+  type CompositionIndex,
+} from "./product-composition";
 import type {
   EngineItem,
   EngineRelationship,
@@ -61,6 +66,8 @@ export type CatalogModel = {
   // rather than a per-check query for the same reason everything else here is:
   // it is small, it changes rarely, and the cart check runs on every render.
   compatibility: CompatibilityIndex;
+  // What each product contains, and what it needs that is sold separately.
+  composition: CompositionIndex;
 };
 
 let cached: CatalogModel | null = null;
@@ -154,7 +161,7 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
     return cached;
   }
 
-  const [specs, assignments, rules, variables, categories, sets, pairs] =
+  const [specs, assignments, rules, variables, categories, sets, pairs, parts] =
     await Promise.all([
       db.select().from(Specifications).orderBy(asc(Specifications.order)),
       db.select().from(SpecificationCategories),
@@ -179,6 +186,20 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
           source: ProductCompatibility.source,
         })
         .from(ProductCompatibility),
+      // The child's NAME comes back with the row. A finding that names a uuid is
+      // one a buyer cannot act on, and resolving it later would be a second query
+      // per missing part — the fan-out this whole module exists to avoid.
+      db
+        .select({
+          parentUuid: ProductComposition.parentUuid,
+          childUuid: ProductComposition.childUuid,
+          childName: Products.name,
+          quantity: ProductComposition.quantity,
+          included: ProductComposition.included,
+          note: ProductComposition.note,
+        })
+        .from(ProductComposition)
+        .innerJoin(Products, eq(ProductComposition.childUuid, Products.uuid)),
     ]);
 
   const definitions = specs.map((spec) => toDefinition(spec, sets));
@@ -221,6 +242,7 @@ export const getCatalogModel = async (): Promise<CatalogModel> => {
     })),
     chains: buildChains(categories),
     compatibility: indexCompatibility(pairs),
+    composition: indexComposition(parts),
   };
 
   cached = model;
