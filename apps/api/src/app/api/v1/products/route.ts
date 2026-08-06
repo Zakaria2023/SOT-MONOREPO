@@ -33,10 +33,14 @@ export const GET = async (request: Request) => {
   const asked =
     Object.keys(chosen).length > 0 || Object.keys(ranges).length > 0;
 
+  // Resolved once, up front, because the LISTING needs it too now — a
+  // trade-only product must stay out of the mobile catalogue whether or not the
+  // caller asked for facets.
+  const viewer = await getViewerFromRequest(request);
+
   let specValues: Record<string, string[]> = {};
   let specRanges: Record<string, { min?: number; max?: number }> = {};
   if (asked && facetCategory) {
-    const viewer = await getViewerFromRequest(request);
     const facets = await getCategoryFacets(facetCategory, viewer);
     const offered = new Set(facets.map((facet) => facet.key));
     // Anything this category doesn't offer THIS viewer is dropped: a stale key
@@ -61,6 +65,7 @@ export const GET = async (request: Request) => {
     specValues,
     specRanges: Object.keys(specRanges).length > 0 ? specRanges : undefined,
     sort: sort as ProductSort | undefined,
+    viewer,
   });
 
   return NextResponse.json(products);

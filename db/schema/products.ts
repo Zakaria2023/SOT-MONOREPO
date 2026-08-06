@@ -13,7 +13,12 @@ import {
   unique,
   varchar,
 } from "drizzle-orm/mysql-core";
-import { boqItemRoles, lifecycleStatuses, productStatuses } from "../enum";
+import {
+  assignmentAudiences,
+  boqItemRoles,
+  lifecycleStatuses,
+  productStatuses,
+} from "../enum";
 import { ProductValues } from "../types";
 import { Brands } from "./brands";
 import { Categories } from "./categories";
@@ -108,6 +113,28 @@ export const Products = mysqlTable(
     // `isAvailable` is the manual Available/Unavailable storefront toggle — the
     // Phase-1 signal until the real-time Odoo stock link arrives.
     isAvailable: boolean("is_available").default(true).notNull(),
+
+    // WHO MAY SEE THIS PRODUCT on a shopper surface. Default `everyone`.
+    //
+    // A whole product line can be trade-only: Ajax's Superior range is sold to
+    // installers and not to the public. That is a fact about the PRODUCTS, and
+    // the audience switches already in the model are not — they sit on an
+    // attribute and on an assignment, so setting one to `partner` hides the
+    // attribute everywhere rather than hiding the Superior products anywhere.
+    // Nothing else could express this.
+    //
+    // Visibility only. It never reaches the rules engine, exactly as the
+    // attribute-level audience never does: if a partner-only product validated
+    // differently for two people, the same design would pass one and fail the
+    // other and neither could be shown why. A product a user cannot browse is
+    // still checked normally when it is in front of the engine.
+    //
+    // Staff surfaces ignore it. The admin panel is where the catalogue is
+    // authored, and a product an author cannot see is one they cannot notice is
+    // wrong.
+    audience: mysqlEnum("audience", assignmentAudiences)
+      .default("everyone")
+      .notNull(),
 
     // The product's attribute values, keyed by Specifications.uuid and stored
     // TYPED — a number as a number, a multi-select as an array, a boolean as

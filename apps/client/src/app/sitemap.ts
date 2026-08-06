@@ -15,7 +15,10 @@ export const revalidate = 3600;
 // never fans out per row against a connection pool the other apps share.
 const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
   const [products, categories, brands] = await Promise.all([
-    getProducts(),
+    // A sitemap is read by crawlers, so it lists what a signed-out visitor can
+    // see and nothing else. A trade-only product listed here would be indexed,
+    // linked from search results, and 404 for everyone who clicked it.
+    getProducts({ viewer: "user" }),
     getCategories(),
     getBrands(),
   ]);

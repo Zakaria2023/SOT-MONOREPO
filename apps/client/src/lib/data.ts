@@ -6,6 +6,7 @@ import {
   getCategory,
   getProductDetailBySlug,
   getProducts,
+  type Viewer,
 } from "services";
 
 /**
@@ -17,8 +18,14 @@ export const getCachedCategories = cache(() => getCategories());
 /**
  * Request-scoped products fetch, shared by the navbar mega-menu and the home
  * page's product grid.
+ *
+ * The viewer is a parameter rather than resolved inside, because `cache` keys on
+ * the arguments: resolved inside, a partner and a guest rendering in the same
+ * request scope would share whichever list was fetched first.
  */
-export const getCachedProducts = cache(() => getProducts());
+export const getCachedProducts = cache((viewer: Viewer) =>
+  getProducts({ viewer }),
+);
 
 /** Request-scoped brands fetch, for the pages that list and filter by them. */
 export const getCachedBrands = cache(() => getBrands());

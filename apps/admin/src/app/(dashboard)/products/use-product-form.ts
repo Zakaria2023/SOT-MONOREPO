@@ -47,6 +47,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
       price: product?.price ?? "",
       currency: product?.currency ?? "SAR",
       isAvailable: product?.isAvailable ?? true,
+      audience: product?.audience ?? "everyone",
       // WHICH attributes a product carries is not stored — it is resolved from
       // the category's assignment chain, so adding an attribute to a category
       // applies to every product in it immediately.
@@ -80,6 +81,7 @@ export const useProductForm = (args: UseProductFormArgs) => {
         price: values.price || null,
         currency: values.currency,
         isAvailable: values.isAvailable,
+        audience: values.audience,
         specValues: values.specValues,
         status: values.status,
         order: values.order,

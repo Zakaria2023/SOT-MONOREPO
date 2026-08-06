@@ -64,6 +64,14 @@ const availabilityOptions = [
   { value: "unavailable", label: "Not available" },
 ];
 
+// Not a ladder — "user" and "partner" are siblings and "everyone" is their
+// union, exactly as the attribute-level audience reads.
+const audienceOptions = [
+  { value: "everyone", label: "Everyone" },
+  { value: "partner", label: "Partners only" },
+  { value: "user", label: "Retail customers only" },
+];
+
 export const ProductForm = (props: ProductFormProps) => {
   const { mode, categories, brands, variants, fieldsByCategory } = props;
 
@@ -228,6 +236,27 @@ export const ProductForm = (props: ProductFormProps) => {
               )}
             />
           </div>
+          {/* A whole product line can be trade-only — Ajax sells Superior to
+              installers and not to the public. Visibility only: the rules engine
+              reads this product exactly the same for everyone, or the same
+              design would pass for one shopper and fail for another with no way
+              to show why. */}
+          <Field
+            label="Sold to"
+            hint="Who can browse and buy this. It never changes what the compatibility engine checks."
+          >
+            <Controller
+              control={control}
+              name="audience"
+              render={({ field }) => (
+                <Dropdown
+                  value={field.value ?? "everyone"}
+                  onChange={field.onChange}
+                  options={audienceOptions}
+                />
+              )}
+            />
+          </Field>
           <Input
             label="Warranty period"
             labelIcon={<ShieldCheck size={15} />}

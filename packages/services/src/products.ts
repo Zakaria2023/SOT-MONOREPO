@@ -29,6 +29,7 @@ import {
   Products,
   SelectProducts,
 } from "../../../db/schema/products";
+import type { Viewer } from "./assignment-resolver";
 import { ValidationError } from "./errors";
 import { normalizeProductValues } from "./product-completeness";
 import { signatureForVariants } from "./variants";
@@ -103,6 +104,16 @@ export type ProductFilters = {
    * question worth asking of it.
    */
   specRanges?: Record<string, { min?: number; max?: number }>;
+  /**
+   * Who is browsing, so trade-only products stay out of a public listing.
+   *
+   * OMITTED MEANS STAFF — the admin panel and anything else authoring the
+   * catalogue, which must see everything. Every shopper-facing caller passes it,
+   * and it is deliberately not defaulted to "user": a default that hides rows
+   * would silently shrink an admin listing the day somebody forgot to pass it,
+   * and a short list looks exactly like a small catalogue.
+   */
+  viewer?: Viewer;
   /** Page size. Omitted, the query returns every match. */
   limit?: number;
   /** Rows to skip — `(page - 1) * limit`. Only read when `limit` is set. */
@@ -242,6 +253,15 @@ export const generateProductSku = async (input: {
  */
 const catalogConditions = (filters: ProductFilters): (SQL | undefined)[] => {
   const conditions: (SQL | undefined)[] = [];
+  // Trade-only products stay out of a public listing. `everyone` is the union
+  // rather than a third rung — a user does not see a partner-only product and a
+  // partner does not see a user-only one, which is the same reading the
+  // attribute-level audience already has.
+  if (filters.viewer) {
+    conditions.push(
+      inArray(Products.audience, ["everyone", filters.viewer]),
+    );
+  }
   if (filters.search) {
     const term = `%${filters.search}%`;
     // Flexible match across every field a product might be found by.

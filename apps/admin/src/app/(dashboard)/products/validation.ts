@@ -1,4 +1,4 @@
-import { productStatuses } from "@/db/enum";
+import { assignmentAudiences, productStatuses } from "@/db/enum";
 import { z } from "zod";
 
 const priceField = z
@@ -29,6 +29,8 @@ export const productFormSchema = z.object({
   price: priceField, // public MSRP
   currency: z.string().min(1, "Required").max(3),
   isAvailable: z.boolean(),
+  // Who may browse it. Visibility only — see Products.audience.
+  audience: z.enum(assignmentAudiences),
   // Keyed by Specifications.uuid and typed: a number stays a number, a
   // multi-select stays an array. The server normalises and clears hidden values
   // again before writing, so the form is convenience, never the authority.
