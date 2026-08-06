@@ -414,7 +414,7 @@ const AddAssignmentForm = ({
   return (
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-ink">Add an attribute</span>
+        <span className="text-sm font-medium text-ink">Add an attribute</span>
         <button
           type="button"
           onClick={onCancel}

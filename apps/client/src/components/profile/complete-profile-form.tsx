@@ -51,7 +51,7 @@ export const CompleteProfileForm = ({
         className="font-grotesk mt-6 flex flex-col gap-4"
       >
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-semibold text-ink">Account type</span>
+          <span className="text-sm font-medium text-ink">Account type</span>
           <div className="grid grid-cols-2 gap-2 rounded-xl border border-search-border p-1">
             {(["individual", "facility"] as const).map((option) => (
               <button

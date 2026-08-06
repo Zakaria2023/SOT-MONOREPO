@@ -190,7 +190,7 @@ export const ProductForm = (props: ProductFormProps) => {
             />
           )}
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-ink">Status</label>
+            <label className="text-sm font-medium text-ink">Status</label>
             <Controller
               control={control}
               name="status"
@@ -221,7 +221,7 @@ export const ProductForm = (props: ProductFormProps) => {
           />
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-ink">
+            <label className="text-sm font-medium text-ink">
               Availability
             </label>
             <Controller

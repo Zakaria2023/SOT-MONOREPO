@@ -70,7 +70,7 @@ export const CategoryDropdown = <TFieldValues extends FieldValues>({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-semibold text-ink">{label}</label>
+      <label className="text-sm font-medium text-ink">{label}</label>
       <Controller
         control={control}
         name={name}

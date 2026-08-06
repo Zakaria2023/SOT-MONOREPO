@@ -13,7 +13,7 @@ type BusinessLinesFieldProps = {
 
 export const BusinessLinesField = ({ control }: BusinessLinesFieldProps) => (
   <div className="flex flex-col gap-2">
-    <label className="text-sm font-semibold text-ink">Business lines</label>
+    <label className="text-sm font-medium text-ink">Business lines</label>
     <p className="text-xs text-muted">
       Products inherit these from the brand — pick every line this brand sells
       into.

@@ -153,11 +153,6 @@ const SubFieldSlice = ({
   list ? (
     <Field
       label="Which of its values this column uses"
-      hint={
-        value.length === 0
-          ? `All ${list.options.length}, including any added to the list later.`
-          : "Exactly these. Values added to the shared list later will not appear here until you add them."
-      }
       accessory={
         value.length > 0 && (
           <button
@@ -371,14 +366,7 @@ export const AttributeForm = ({
             label; typed, it is kept exactly, which is why `slugify` never
             touches it (it would turn pwr.power_draw_w into pwr-power-draw-w and
             every mapping keyed on the dotted form would resolve to nothing). */}
-        <Field
-          label="External name"
-          hint={
-            key.trim()
-              ? "Lowercase letters, digits and underscores, in dot-separated parts."
-              : "What imports, exports and mapping files call this attribute. Leave it blank to use the greyed-out name."
-          }
-        >
+        <Field label="External name">
           <Input
             // The placeholder is the key this attribute WILL GET if the field is
             // left blank — not a generic example. "Leave blank and one is derived
@@ -425,14 +413,7 @@ export const AttributeForm = ({
         {/* A type change would turn every stored value into an unreadable one, so
             once a rule depends on the attribute the type is shown, not offered.
             The service refuses it too — this is only the explanation. */}
-        <Field
-          label="Type"
-          hint={
-            locked
-              ? `${initial?.relationshipCount} rule(s) use this, so the type is fixed. Create a new attribute instead.`
-              : undefined
-          }
-        >
+        <Field label="Type">
           {locked ? (
             <div className="flex items-center gap-2 rounded-control border border-hairline bg-hover px-3 py-2 text-sm text-secondary">
               <Lock size={13} className="text-faint" />
@@ -454,10 +435,7 @@ export const AttributeForm = ({
 
       {type === "number" && (
         <div className="flex flex-col gap-4">
-          <Field
-            label="Unit"
-            hint="A rule can only compare two numbers that measure the same thing. W converts to kW; W and VA never convert, because 1500 VA is not 1500 W."
-          >
+          <Field label="Unit">
             <Combobox
               value={unit}
               onChange={setUnit}
@@ -549,11 +527,6 @@ export const AttributeForm = ({
                   borrow in the first place. */}
               <Field
                 label="Which of its values this attribute uses"
-                // hint={
-                //   setValues.length === 0
-                //     ? `All ${chosenList.options.length}, including any added to the list later.`
-                //     : "Exactly these. Values added to the shared list later will not appear here until you add them."
-                // }
                 accessory={
                   setValues.length > 0 && (
                     <button
@@ -694,10 +667,7 @@ export const AttributeForm = ({
               </div>
 
               {field.kind === "number" ? (
-                <Field
-                  label="Unit"
-                  hint="What the count measures. Leave blank when the sub-field is a plain tally, like how many ports."
-                >
+                <Field label="Unit">
                   <Combobox
                     value={field.unit}
                     onChange={(next) => setGroupField(index, { unit: next })}
@@ -712,10 +682,7 @@ export const AttributeForm = ({
                       spell "1G" identically and store unrelated values, so no rule
                       can ask whether a module fits a cage. Pointing both at one
                       list is what makes that question answerable. */}
-                  <Field
-                    label="Where the picks come from"
-                    hint="Point at a shared list when this sub-field has to be comparable with another attribute — a cage's speed against a module's."
-                  >
+                  <Field label="Where the picks come from">
                     <Dropdown
                       value={field.optionSetUuid}
                       onChange={(next) =>

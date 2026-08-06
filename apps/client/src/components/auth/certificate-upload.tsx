@@ -64,7 +64,7 @@ export const CertificateUpload = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-semibold text-ink">{label}</span>
+      <span className="text-sm font-medium text-ink">{label}</span>
 
       <button
         type="button"

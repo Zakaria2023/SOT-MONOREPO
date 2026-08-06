@@ -417,7 +417,7 @@ const FieldRow = ({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-ink">{field.label}</span>
+        <span className="text-sm font-medium text-ink">{field.label}</span>
         {onRemove && (
           <button
             type="button"

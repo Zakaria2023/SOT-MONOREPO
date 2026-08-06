@@ -189,7 +189,7 @@ export const RelationPreview = ({
     <div className="flex flex-col gap-4 rounded-card border border-primary/40 bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink">
+          <p className="text-sm font-medium text-ink">
             Try “{relation.name}” against a real basket
           </p>
           <p className="mt-0.5 text-xs text-muted">

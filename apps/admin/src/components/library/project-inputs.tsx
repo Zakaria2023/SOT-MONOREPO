@@ -150,7 +150,7 @@ export const ProjectInputs = ({ variables }: ProjectInputsProps) => {
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-card border border-hairline bg-surface p-4">
-        <p className="text-sm font-semibold text-ink">
+        <p className="text-sm font-medium text-ink">
           Numbers the buyer supplies
         </p>
         <p className="mt-1 text-xs text-muted">
