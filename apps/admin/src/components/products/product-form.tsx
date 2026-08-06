@@ -123,6 +123,18 @@ export const ProductForm = (props: ProductFormProps) => {
             type="text"
             {...register("model")}
           />
+          {/* Identity, not decoration: brand + model + variant is what makes two
+              rows two products. Leaving it blank on one member of a variant
+              family is how that family collapses into a single row on the next
+              import, silently. */}
+          <Input
+            label="Variant"
+            labelIcon={<Tag size={15} />}
+            type="text"
+            placeholder="e.g. RB, (4G), White"
+            {...register("variant")}
+            error={errors.variant?.message}
+          />
           <Input
             label="Series Code"
             labelIcon={<Hash size={15} />}

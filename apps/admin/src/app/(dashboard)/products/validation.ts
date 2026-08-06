@@ -13,6 +13,8 @@ export const productFormSchema = z.object({
   brandUuid: z.string().min(1, "Brand is required"),
   name: z.string().min(1, "Name is required").max(255),
   model: z.string().optional(),
+  // Half the product's identity, not a label — see Products.variant.
+  variant: z.string().max(120).optional(),
   brandIdValue: z.string().max(255).optional(),
   seriesCode: z.string().max(4, "Max 4 characters").optional(),
   warrantyPeriod: z.string().optional(),

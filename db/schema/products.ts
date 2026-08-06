@@ -10,6 +10,7 @@ import {
   mysqlTable,
   text,
   timestamp,
+  unique,
   varchar,
 } from "drizzle-orm/mysql-core";
 import { boqItemRoles, lifecycleStatuses, productStatuses } from "../enum";
@@ -39,6 +40,21 @@ export const Products = mysqlTable(
     // reserved until the structured spec template exists.
     sku: varchar("sku", { length: 100 }).unique(),
     model: varchar("model", { length: 255 }),
+
+    // Which member of a variant family this row is — "RB" / "SB", "(2G)" /
+    // "(4G)", "White" / "Yellow", "with casing" / "without casing".
+    //
+    // A COLUMN rather than part of the name, because it is half the identity.
+    // Vendors reuse one URL slug across a whole variant family: 86 of Ajax's 290
+    // products share a slug with a sibling, and keying an import on the slug let
+    // those 86 overwrite each other in silence — the count came back 204 and
+    // every collision looked like a product that simply had not been harvested.
+    //
+    // Variants that differ on a RULE-BEARING attribute are separate rows, which
+    // is why this has to be identity and not a label: an RB and an SB carry
+    // different certifications, so a single row for both would answer a
+    // compliance rule with whichever one happened to be entered.
+    variant: varchar("variant", { length: 120 }),
 
     // Value for the selected brand's ID label (Brands.idLabel — e.g. the brand's
     // own BOM / PID / Part Number). The label comes from the brand; this is the
@@ -126,6 +142,24 @@ export const Products = mysqlTable(
     index("idx_products_category_uuid").on(table.categoryUuid),
     index("idx_products_brand_uuid").on(table.brandUuid),
     index("idx_products_status").on(table.status),
+    // THE IDENTITY OF A PRODUCT, and the backstop under every import.
+    //
+    // Brand + model + variant, not the slug and not the name. A slug is derived
+    // from a name and vendors reuse both across a variant family, so keying on
+    // either lets two real products collapse into one with nothing raised.
+    //
+    // MySQL treats NULLs in a unique index as distinct, which is deliberate here
+    // rather than tolerated: products entered before this existed carry no model,
+    // and a constraint that rejected them would make this change a migration
+    // nobody can run. It binds exactly where identity is actually claimed.
+    //
+    // The service guard is what produces a readable refusal — this is what makes
+    // the guarantee true even for a writer that forgets to ask.
+    unique("uq_products_brand_model_variant").on(
+      table.brandUuid,
+      table.model,
+      table.variant,
+    ),
   ],
 );
 

@@ -6,6 +6,7 @@ import {
   eq,
   getTableColumns,
   inArray,
+  isNull,
   like,
   ne,
   or,
@@ -28,6 +29,7 @@ import {
   Products,
   SelectProducts,
 } from "../../../db/schema/products";
+import { ValidationError } from "./errors";
 import { normalizeProductValues } from "./product-completeness";
 
 export type { SelectProducts };
@@ -395,6 +397,58 @@ export const getProductsPage = async (
 };
 
 /**
+ * Refuse a second row claiming an identity that already exists.
+ *
+ * A PRODUCT IS brand + model + variant. Not its name, and above all not its
+ * slug: vendors reuse one slug across a whole variant family — 86 of Ajax's 290
+ * products share a slug with a sibling — so an import keyed on the slug lets
+ * those 86 overwrite each other with nothing raised. The first parse came back
+ * with 204 products and every missing one looked like a page that had simply not
+ * been harvested.
+ *
+ * The unique index enforces this whatever route the write came in by. This exists
+ * so the author gets a sentence naming the product they collided with, instead of
+ * a driver error naming a constraint.
+ *
+ * A product with no model is left alone. Rows entered before identity was
+ * claimable carry none, and MySQL treats those NULLs as distinct — refusing them
+ * would turn a schema addition into a migration nobody can run.
+ */
+const assertIdentityIsFree = async (
+  fields: Pick<ProductClientFields, "brandUuid" | "model" | "variant">,
+  // Absent when creating. Present when updating, so a product does not collide
+  // with the row it already is.
+  selfUuid?: string,
+): Promise<void> => {
+  const model = fields.model?.trim() || null;
+  if (!model) {
+    return;
+  }
+  const variant = fields.variant?.trim() || null;
+  const [clash] = await db
+    .select({ uuid: Products.uuid, name: Products.name })
+    .from(Products)
+    .where(
+      and(
+        eq(Products.brandUuid, fields.brandUuid),
+        eq(Products.model, model),
+        variant === null
+          ? isNull(Products.variant)
+          : eq(Products.variant, variant),
+      ),
+    )
+    .limit(1);
+
+  if (clash && clash.uuid !== selfUuid) {
+    throw new ValidationError(
+      variant
+        ? `"${clash.name}" is already this brand's ${model} ${variant}. Two rows for one variant is how a product silently overwrites its sibling — give this one the variant that tells them apart.`
+        : `"${clash.name}" is already this brand's ${model}. If these are two variants of it, name the variant on each — otherwise one will overwrite the other on the next import.`,
+    );
+  }
+};
+
+/**
  * Create a product. The SKU is system-owned (assembled from the brand/category/
  * series codes) and the slug is derived from the name — neither comes from the
  * client. Returns the new product's uuid.
@@ -403,6 +457,8 @@ export const createProduct = async (
   fields: ProductClientFields,
 ): Promise<string> => {
   const uuid = generateUuid();
+
+  await assertIdentityIsFree(fields);
 
   // The row count, the SKU and the normalized values are independent of one
   // another — only the insert needs all three — so they go out together
@@ -436,6 +492,8 @@ export const updateProduct = async (
   uuid: string,
   fields: ProductClientFields,
 ): Promise<void> => {
+  await assertIdentityIsFree(fields, uuid);
+
   // Regenerating the SKU (stable when brand/category/series are unchanged) and
   // normalizing the values are independent — only the update needs both.
   const [sku, specValues] = await Promise.all([
