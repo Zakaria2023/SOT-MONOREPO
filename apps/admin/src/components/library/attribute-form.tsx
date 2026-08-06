@@ -1,11 +1,9 @@
 "use client";
 
 import { type LibraryAttributeInput } from "@/app/(dashboard)/library/action";
-import type { OptionSet } from "services";
 import type { SpecificationType } from "@/db/enum";
+import type { OptionSet } from "services";
 
-import { SPECIFICATION_TYPE_LABELS } from "@/db/label";
-import { Field } from "@/components/shared/field";
 import {
   aliasesFromText,
   aliasesToText,
@@ -15,6 +13,8 @@ import {
   toDrafts,
   type OptionDraft,
 } from "@/components/library/option-list-editor";
+import { Field } from "@/components/shared/field";
+import { SPECIFICATION_TYPE_LABELS } from "@/db/label";
 
 import {
   ArrowDown,
@@ -26,6 +26,18 @@ import {
   X,
 } from "lucide-react";
 
+import type {
+  GroupFieldDraft,
+  LibraryAttribute,
+} from "@/components/library/library-shared";
+import {
+  GROUP_FIELD_KIND_OPTIONS,
+  isOptionType,
+  sourceOptions,
+  toFieldDrafts,
+  TYPE_OPTIONS,
+  UNIT_OPTIONS,
+} from "@/components/library/library-shared";
 import { useState } from "react";
 import {
   Button,
@@ -36,18 +48,10 @@ import {
   Textarea,
   type DropdownOption,
 } from "ui";
-import {
-  GROUP_FIELD_KIND_OPTIONS,
-  TYPE_OPTIONS,
-  UNIT_OPTIONS,
-  isOptionType,
-  sourceOptions,
-  toFieldDrafts,
-} from "@/components/library/library-shared";
-import type {
-  GroupFieldDraft,
-  LibraryAttribute,
-} from "@/components/library/library-shared";
+// The SAME derivation the service uses when no external name is supplied, so the
+// placeholder promises exactly what the save will do rather than something close
+// to it.
+import { slugify } from "utils";
 /**
  * The attribute editor, ~590 lines and most of why the original file was so long.
  *
@@ -369,10 +373,25 @@ export const AttributeForm = ({
             every mapping keyed on the dotted form would resolve to nothing). */}
         <Field
           label="External name"
-          hint="How imports and exports refer to this attribute. Leave blank to derive it from the name."
+          hint={
+            key.trim()
+              ? "Lowercase letters, digits and underscores, in dot-separated parts."
+              : "What imports, exports and mapping files call this attribute. Leave it blank to use the greyed-out name."
+          }
         >
           <Input
-            placeholder="pwr.power_draw_w"
+            // The placeholder is the key this attribute WILL GET if the field is
+            // left blank — not a generic example. "Leave blank and one is derived
+            // from the name" is a sentence somebody has to take on trust; showing
+            // the derived value is the same promise, checkable at a glance, and it
+            // is how an author notices that "PoE Budget" becomes `poe-budget` and
+            // decides they wanted `pwr.poe_budget_w` instead.
+            //
+            // Falls back to a real dotted id before a name is typed, so the shape
+            // is visible from the first moment rather than only after.
+            placeholder={
+              label.trim() ? slugify(label) : "e.g. pwr.power_draw_w"
+            }
             value={key}
             onChange={(event) => setKey(event.target.value)}
           />
@@ -390,10 +409,7 @@ export const AttributeForm = ({
           onChange={(event) => setLabelAliases(event.target.value)}
         />
 
-        <Field
-          label="Categories"
-          hint="Which categories use this attribute. How each one uses it is set in Assignments."
-        >
+        <Field label="Categories">
           <Dropdown
             multiple
             value={categories}
@@ -503,11 +519,6 @@ export const AttributeForm = ({
             // choice, and a dropdown with a single dead entry reads as a broken
             // field rather than a feature nobody has used — so it says where the
             // second choice comes from instead of leaving the author to find out.
-            hint={
-              sharedLists.length === 0
-                ? "No shared lists yet — create one on the Shared lists tab and it appears here. You want one when this attribute's values have to be comparable with another one's: a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
-                : "Point at a shared list when this attribute's values have to be comparable with another one's — a cage speed against a module speed. Two attributes on their own lists can never be compared, however alike the options look."
-            }
           >
             <Dropdown
               value={optionSetUuid}
@@ -538,11 +549,11 @@ export const AttributeForm = ({
                   borrow in the first place. */}
               <Field
                 label="Which of its values this attribute uses"
-                hint={
-                  setValues.length === 0
-                    ? `All ${chosenList.options.length}, including any added to the list later.`
-                    : "Exactly these. Values added to the shared list later will not appear here until you add them."
-                }
+                // hint={
+                //   setValues.length === 0
+                //     ? `All ${chosenList.options.length}, including any added to the list later.`
+                //     : "Exactly these. Values added to the shared list later will not appear here until you add them."
+                // }
                 accessory={
                   setValues.length > 0 && (
                     <button
