@@ -346,6 +346,7 @@ export const AttributeForm = ({
                 field.kind === "select" && field.optionSetUuid
                   ? field.setValues
                   : null,
+              distinct: field.kind === "select" ? field.distinct : false,
             }))
           : [],
     });
@@ -713,6 +714,22 @@ export const AttributeForm = ({
                     />
                   </Field>
 
+                  {/* Turns the group from "several of these" into "one fact,
+                      several cases". Power draw is one number whose value
+                      depends on the supply mode — {12 V DC, 9 W}, {PoE, 8.5 W},
+                      {maximum, 12 W} — and a rule reads the case it needs.
+                      Without it a case answered twice gets SUMMED, and a 12 W
+                      camera silently becomes a 24 W one. */}
+                  <Checkbox
+                    label="Each row answers a different one of these"
+                    checked={field.distinct}
+                    onChange={(event) =>
+                      setGroupField(index, {
+                        distinct: event.target.checked,
+                      })
+                    }
+                  />
+
                   {field.optionSetUuid === "" ? (
                     <div className="flex flex-col gap-2">
                       <Checkbox
@@ -774,6 +791,7 @@ export const AttributeForm = ({
                   ordered: false,
                   options: [],
                   optionSetUuid: "",
+                  distinct: false,
                 },
               ])
             }

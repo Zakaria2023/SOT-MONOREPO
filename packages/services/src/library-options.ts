@@ -785,6 +785,8 @@ export type LibraryGroupFieldInput = {
   optionSetUuid?: string | null;
   // Which of that vocabulary's words this column uses. Empty = all of them.
   setValues?: string[] | null;
+  // No two rows may share this column's value — see SpecGroupField.distinct.
+  distinct?: boolean;
 };
 
 /**
@@ -885,6 +887,13 @@ export const mergeGroupFields = (
       // own narrowing: a slice of a list this column does not borrow is a setting
       // waiting to surprise whoever points it at one later.
       setValues: shared ? normalizeSetValues(entry.setValues) : null,
+      // Only on a select, for the same reason `unit` is only on a number: a count
+      // column that claimed to be a discriminator would refuse the second `24`
+      // in a port group, which is a legitimate way to describe 48 ports.
+      //
+      // Omitted when off rather than stored as `false`, so this rewrites the
+      // stored schema of no group that does not use it.
+      ...(isSelect && entry.distinct ? { distinct: true } : {}),
     });
   });
 

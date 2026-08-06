@@ -135,6 +135,32 @@ export type SpecGroupField = {
   // a port group's Speed column has no business offering 100G on a switch whose
   // fastest cage is 10G. See Specifications.setValues.
   setValues?: string[] | null;
+
+  // NO TWO ROWS MAY SHARE THIS COLUMN'S VALUE. The column is a discriminator:
+  // each row answers a different case, rather than adding to a total.
+  //
+  // This is what makes a "one fact, several conditions" attribute safe, and that
+  // shape is common: power draw is one number whose value depends on the supply
+  // mode and the load — {when: 12 V DC, 9 W}, {when: PoE, 8.5 W}, {when: maximum,
+  // 12 W} — and battery autonomy is 24 h or 72 h depending which battery was
+  // bought. Four separate attributes for power draw would be four facts where
+  // there is one, and a rule would have to know which of them to read.
+  //
+  // WITHOUT this flag the shape is quietly unsafe, because an operand reading a
+  // group column TOTALS it. `where: when = maximum` over two rows both saying
+  // maximum sums them, and a 12 W camera silently becomes a 24 W one — a design
+  // that fails a budget check it should have passed, or passes one it should
+  // have failed, with the arithmetic showing a number nobody can trace.
+  //
+  // Off by default, because the ordinary group is the opposite: `{count: 24,
+  // speed: 1G}` and a second `{count: 24, speed: 1G}` is a legitimate way to
+  // describe 48 ports, and refusing it would break every port group already
+  // stored.
+  //
+  // Only meaningful on a `select`. A discriminator has to be drawn from a fixed
+  // list, or "maximum" and "max" are two cases and the rule reading one of them
+  // finds nothing.
+  distinct?: boolean;
 };
 
 // One authored row of a `group` attribute: sub-field key → value.

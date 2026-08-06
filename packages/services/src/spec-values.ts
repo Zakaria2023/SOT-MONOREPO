@@ -305,8 +305,8 @@ export type GroupRowIssue = {
   row: number;
   fieldKey: string;
   fieldLabel: string;
-  problem: "missing" | "unknown_value";
-  // Only on unknown_value.
+  problem: "missing" | "unknown_value" | "duplicate";
+  // Only on unknown_value and duplicate.
   value?: string;
 };
 
@@ -358,6 +358,43 @@ export const groupRowIssues = (
       }
     }
   });
+
+  // A DISCRIMINATOR column answered twice.
+  //
+  // Reported after the per-row pass because it is the only defect that is not
+  // visible from inside a single row — two rows each saying `when = maximum` are
+  // both perfectly well-formed, and it is the pair that is wrong.
+  //
+  // It matters because an operand reading a group column TOTALS it: `where:
+  // when = maximum` over two maximum rows sums them, so a 12 W camera becomes a
+  // 24 W one and every budget check downstream is computed off a number nobody
+  // can trace back to anything on the datasheet.
+  for (const field of fields) {
+    if (!field.distinct || field.kind !== "select") {
+      continue;
+    }
+    const seen = new Map<string, number>();
+    asGroupRows(raw).forEach((row, index) => {
+      const entry = row[field.key];
+      if (typeof entry !== "string" || entry.trim() === "") {
+        return;
+      }
+      const first = seen.get(entry);
+      if (first === undefined) {
+        seen.set(entry, index);
+        return;
+      }
+      // Reported against the LATER row. The first one is the answer that was
+      // already there; the second is the one somebody added.
+      issues.push({
+        row: index + 1,
+        fieldKey: field.key,
+        fieldLabel: field.label,
+        problem: "duplicate",
+        value: entry,
+      });
+    });
+  }
   return issues;
 };
 
