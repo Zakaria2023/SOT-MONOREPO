@@ -1,5 +1,4 @@
-import type { ReactNode, TextareaHTMLAttributes } from "react";
-import { forwardRef } from "react";
+import { forwardRef, ReactNode, TextareaHTMLAttributes } from "react";
 import { FormError } from "./form-error";
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
