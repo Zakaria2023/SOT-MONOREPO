@@ -53,7 +53,7 @@ export const Products = mysqlTable(
     // a single string holding all four cannot be searched, grouped or matched by
     // an importer.
     //
-    // Half the product's IDENTITY rather than a label. Vendors reuse one URL slug
+    // Half the product's IDENTITY rather than a label. Brands reuse one URL slug
     // across a whole variant family — 86 of Ajax's 290 products share a slug with
     // a sibling — so keyed on the slug those 86 overwrote each other in silence:
     // the count came back 204 and every collision looked like a page that had not
@@ -188,7 +188,7 @@ export const Products = mysqlTable(
     // THE IDENTITY OF A PRODUCT, and the backstop under every import.
     //
     // Brand + model + variant set, not the slug and not the name. A slug is
-    // derived from a name and vendors reuse both across a variant family, so
+    // derived from a name and brands reuse both across a variant family, so
     // keying on either lets two real products collapse into one with nothing
     // raised.
     //

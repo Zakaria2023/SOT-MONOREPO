@@ -51,8 +51,8 @@ export type SpecOption = {
   // OTHER SPELLINGS OF THIS SAME OPTION, as the sources write them.
   //
   // Not display text and not a second label — an alias is never shown. It exists
-  // so an importer reading a vendor sheet can land on the option that already
-  // exists instead of creating a second one beside it. `||` is how one vendor
+  // so an importer reading a brand's sheet can land on the option that already
+  // exists instead of creating a second one beside it. `||` is how one brand
   // renders the roman numeral II; `Workbench` is what another calls a desktop
   // mount. Both are the SAME value, and without somewhere to record that, the
   // next import forks the list again and half the catalogue quietly stops

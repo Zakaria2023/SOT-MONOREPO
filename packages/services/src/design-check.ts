@@ -93,7 +93,7 @@ const toFinding = (finding: Finding): DesignFinding => ({
 });
 
 /**
- * A vendor-authored incompatibility, as the buyer sees it.
+ * A brand-authored incompatibility, as the buyer sees it.
  *
  * `family: "match"` because that is what it IS from the buyer's side — two
  * things that do not go together — and the tone vocabulary is shared with every
@@ -109,7 +109,7 @@ const toFinding = (finding: Finding): DesignFinding => ({
  * says "these do not work together" and cannot say who says so is one the buyer
  * cannot act on and support cannot defend.
  */
-const vendorFinding = (
+const brandFinding = (
   pair: IncompatibleFinding,
   selection: { productUuid: string; name: string }[],
 ): DesignFinding => {
@@ -118,7 +118,7 @@ const vendorFinding = (
   const a = nameOf(pair.productUuidA);
   const b = nameOf(pair.productUuidB);
   return {
-    id: `vendor:${pair.productUuidA}:${pair.productUuidB}`,
+    id: `brand:${pair.productUuidA}:${pair.productUuidB}`,
     title: `${a} does not work with ${b}`,
     message: pair.note
       ? `${pair.note} (${pair.source})`
@@ -191,13 +191,13 @@ export const checkDesign = async (
     // an answer from attributes, and this is a stored answer about two named
     // products. Folding it in would have meant a family whose operands name
     // products, which is the one thing the relationship model refuses.
-    const vendorBlocks = incompatiblePairs(
+    const brandBlocks = incompatiblePairs(
       model.compatibility,
       selection.map((item) => item.productUuid),
-    ).map((pair) => vendorFinding(pair, selection));
+    ).map((pair) => brandFinding(pair, selection));
 
     return {
-      blockers: [...report.blockers.map(toFinding), ...vendorBlocks],
+      blockers: [...report.blockers.map(toFinding), ...brandBlocks],
       warnings: report.warnings.map(toFinding),
       unknowns: report.unknowns.map(toFinding),
       questions: pendingQuestions(

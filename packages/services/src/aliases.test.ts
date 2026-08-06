@@ -81,7 +81,7 @@ describe("resolveOptionByText", () => {
     option("class-iii", "Class III", ["|||"]),
   ];
 
-  it("resolves the vendor's pipe rendering onto the roman numeral", () => {
+  it("resolves the brand's pipe rendering onto the roman numeral", () => {
     expect(resolveOptionByText("||", classes)?.value).toBe("class-ii");
     expect(resolveOptionByText("|||", classes)?.value).toBe("class-iii");
   });

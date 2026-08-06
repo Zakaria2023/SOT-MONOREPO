@@ -6,7 +6,7 @@ import { normalizeLibraryKey } from "./library-options";
 //
 // `uuid` is what values, assignments, rules and predicates key on, and that is
 // what makes renaming an attribute free. `key` is what everything OUTSIDE keys
-// on: an import mapping a vendor column, an export, a spreadsheet somebody keeps
+// on: an import mapping a brand column, an export, a spreadsheet somebody keeps
 // by hand. None of those can hold a uuid.
 //
 // The whole reason it is CHECKED and not coerced: `slugify` turns

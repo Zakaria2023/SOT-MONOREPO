@@ -14,7 +14,7 @@ import {
 import {
   incompatiblePairs,
   indexCompatibility,
-  isVendorApproved,
+  isBrandApproved,
 } from "./product-compatibility";
 import {
   columnTotal,
@@ -378,7 +378,7 @@ describe("the exception list beside the derived rules", () => {
   ]);
 
   it("records the permission the derived rules would have refused", () => {
-    expect(isVendorApproved(index, "external-antenna", "hub-bp")).toBe(true);
+    expect(isBrandApproved(index, "external-antenna", "hub-bp")).toBe(true);
   });
 
   it("blocks the pair the manufacturer ruled out, with a reason", () => {

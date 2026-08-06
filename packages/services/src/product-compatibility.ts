@@ -11,7 +11,7 @@ import type { CompatibilityVerdict } from "../../../db/enum";
 //
 // Compatibility is DERIVED. A rule reads the attributes both sides carry, so a
 // new SKU joins every existing rule the moment its values are filled in, and a
-// second vendor with the same radio just works. That is the property that lets a
+// second brand with the same radio just works. That is the property that lets a
 // catalogue of 339 products be maintained by people rather than by everyone
 // remembering everything. Naming products in a rule throws it away.
 //
@@ -26,7 +26,7 @@ import type { CompatibilityVerdict } from "../../../db/enum";
 // one host, a physical fit nothing measures, a bundle. Those live here.
 // ---------------------------------------------------------------------------
 
-// One vendor-authored claim about two specific products, as the engine reads it.
+// One brand-authored claim about two specific products, as the engine reads it.
 export type CompatibilityPair = {
   productUuidA: string;
   productUuidB: string;
@@ -69,20 +69,20 @@ export const indexCompatibility = (
 };
 
 /**
- * What the vendor says about two products, or null when it has said nothing.
+ * What the brand says about two products, or null when it has said nothing.
  *
  * NULL IS THE COMMON ANSWER and it means "no exception recorded", never "these
  * are incompatible". Reading silence as a refusal would turn an exception list
  * into a whitelist: every pair not in it would block, and a catalogue of 339
  * products would need 100,000 rows before anything could be bought.
  */
-export const vendorVerdict = (
+export const brandVerdict = (
   index: CompatibilityIndex,
   a: string,
   b: string,
 ): CompatibilityPair | null => index.byPair.get(pairKey(a, b)) ?? null;
 
-// A pair in a basket the vendor has explicitly ruled out.
+// A pair in a basket the brand has explicitly ruled out.
 export type IncompatibleFinding = {
   productUuidA: string;
   productUuidB: string;
@@ -121,13 +121,13 @@ export const incompatiblePairs = (
       if (a === undefined || b === undefined) {
         continue;
       }
-      const pair = vendorVerdict(index, a, b);
+      const pair = brandVerdict(index, a, b);
       if (pair?.verdict !== "incompatible") {
         continue;
       }
       findings.push({
         // Reported in the STORED direction, not the basket's, so the message
-        // reads the way the vendor wrote it — "the antenna does not fit the hub"
+        // reads the way the brand wrote it — "the antenna does not fit the hub"
         // rather than whichever line happened to be added first.
         productUuidA: pair.productUuidA,
         productUuidB: pair.productUuidB,
@@ -148,8 +148,8 @@ export const incompatiblePairs = (
  * false block is not to weaken the rule for everyone, it is to record the
  * exception on the pair it applies to.
  */
-export const isVendorApproved = (
+export const isBrandApproved = (
   index: CompatibilityIndex,
   a: string,
   b: string,
-): boolean => vendorVerdict(index, a, b)?.verdict === "compatible";
+): boolean => brandVerdict(index, a, b)?.verdict === "compatible";

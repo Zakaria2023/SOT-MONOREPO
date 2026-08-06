@@ -523,7 +523,7 @@ export const labelAliasConflicts = (
 //
 // `uuid` is identity INSIDE the model — values, assignments, rules and
 // predicates all key on it, and that is what makes a rename free. `key` is
-// identity OUTSIDE it: an import mapping a vendor column onto an attribute, an
+// identity OUTSIDE it: an import mapping a brand column onto an attribute, an
 // export, the read model, a spreadsheet somebody keeps by hand. Those cannot
 // hold a uuid and would not survive one.
 //

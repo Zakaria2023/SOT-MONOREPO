@@ -77,7 +77,7 @@ export const Relationships = mysqlTable(
     // The provider-side filter is what expresses an ecosystem lock without
     // naming a brand in the rule: "providers are items whose wireless_protocol
     // is Jeweller". Modelled as an attribute both sides carry, the rule stays
-    // brand-agnostic and a second vendor with the same radio just works.
+    // brand-agnostic and a second brand with the same radio just works.
     consumerWhen: json("consumer_when").$type<Predicate | null>(),
     providerWhen: json("provider_when").$type<Predicate | null>(),
 

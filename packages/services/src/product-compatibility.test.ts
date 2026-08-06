@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   incompatiblePairs,
   indexCompatibility,
-  isVendorApproved,
-  vendorVerdict,
+  isBrandApproved,
+  brandVerdict,
   type CompatibilityPair,
 } from "./product-compatibility";
 
@@ -43,14 +43,14 @@ describe("silence is not a refusal", () => {
     // incompatible" would turn an exception list into a whitelist, and a
     // catalogue of 339 products would need 100,000 rows before anything could be
     // bought.
-    expect(vendorVerdict(index, "camera", "switch")).toBeNull();
+    expect(brandVerdict(index, "camera", "switch")).toBeNull();
     expect(incompatiblePairs(index, ["camera", "switch"])).toEqual([]);
   });
 
   it("does not block on a pair recorded as compatible", () => {
     // A permission has nothing to say about a basket on its own.
     expect(incompatiblePairs(index, ["antenna", "hub-bp"])).toEqual([]);
-    expect(isVendorApproved(index, "antenna", "hub-bp")).toBe(true);
+    expect(isBrandApproved(index, "antenna", "hub-bp")).toBe(true);
   });
 });
 
@@ -68,7 +68,7 @@ describe("a pair reads the same from either side", () => {
     expect(incompatiblePairs(index, ["hub-2g", "antenna"])).toHaveLength(1);
   });
 
-  it("reports it in the direction the vendor wrote it", () => {
+  it("reports it in the direction the brand wrote it", () => {
     // So the message reads "the antenna does not fit the hub" rather than
     // whichever line the shopper happened to add first.
     const [finding] = incompatiblePairs(index, ["hub-2g", "antenna"]);
@@ -127,6 +127,6 @@ describe("an empty list", () => {
   it("blocks nothing, which is the state the catalogue starts in", () => {
     const index = indexCompatibility([]);
     expect(incompatiblePairs(index, ["a", "b", "c"])).toEqual([]);
-    expect(isVendorApproved(index, "a", "b")).toBe(false);
+    expect(isBrandApproved(index, "a", "b")).toBe(false);
   });
 });

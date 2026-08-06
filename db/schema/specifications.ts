@@ -50,7 +50,7 @@ export const Specifications = mysqlTable("Specifications", {
   //
   // Nothing INSIDE the model points at it: values, assignments, rules and
   // predicates all key on `uuid`, and that is what keeps a rename free. What
-  // points at it is everything OUTSIDE — an import mapping a vendor column onto
+  // points at it is everything OUTSIDE — an import mapping a brand column onto
   // an attribute, an export, the AI read model, a spreadsheet a human wrote.
   //
   // So it is unique and it does not change. Derived from the label on creation
@@ -64,7 +64,7 @@ export const Specifications = mysqlTable("Specifications", {
   // Other LABELS the sources use for this same attribute — the label-level twin
   // of SpecOption.aliases.
   //
-  // One vendor writes "Sensitive element", the next writes "Sensing element" and
+  // One brand writes "Sensitive element", the next writes "Sensing element" and
   // the same sheet uses both. They are one attribute, and the only place that can
   // be recorded once for every route into the catalogue is here.
   //

@@ -421,7 +421,7 @@ export const getProductsPage = async (
  * Refuse a second row claiming an identity that already exists.
  *
  * A PRODUCT IS brand + model + its set of variants. Not its name, and above all
- * not its slug: vendors reuse one slug across a whole variant family — 86 of
+ * not its slug: brands reuse one slug across a whole variant family — 86 of
  * Ajax's 290 products share a slug with a sibling — so an import keyed on the
  * slug lets those 86 overwrite each other with nothing raised. The first parse
  * came back with 204 products and every missing one looked like a page that had

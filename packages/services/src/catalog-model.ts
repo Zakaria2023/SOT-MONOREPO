@@ -57,7 +57,7 @@ export type CatalogModel = {
   // Nearest-first ancestor chain for every category, precomputed once. Walking
   // the parent chain per category would otherwise be a query per row.
   chains: Map<string, string[]>;
-  // Vendor-authored pairs the derived rules cannot reach. Part of the model
+  // Brand-authored pairs the derived rules cannot reach. Part of the model
   // rather than a per-check query for the same reason everything else here is:
   // it is small, it changes rarely, and the cart check runs on every render.
   compatibility: CompatibilityIndex;

@@ -400,7 +400,7 @@ export const relationshipStatuses = [
 
 export type RelationshipStatus = (typeof relationshipStatuses)[number];
 
-// What a vendor-authored pair says about two specific products. Read only where
+// What a brand-authored pair says about two specific products. Read only where
 // the derived rules cannot reach — see ProductCompatibility, which is an
 // exception list and is meant to stay small.
 //
