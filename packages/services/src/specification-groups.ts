@@ -12,6 +12,9 @@ export type { SelectSpecificationGroups };
 export type SpecificationGroupFields = {
   name: string;
   domain: string | null;
+  // The first segment of every external name filed under this group — `pwr` for
+  // Power & Battery. Decided once here so no attribute author has to invent one.
+  keyPrefix: string | null;
 };
 
 export const getSpecificationGroups = async (): Promise<
@@ -51,7 +54,11 @@ export const updateSpecificationGroup = async (
 ): Promise<void> => {
   await db
     .update(SpecificationGroups)
-    .set({ name: fields.name, domain: fields.domain })
+    .set({
+      name: fields.name,
+      domain: fields.domain,
+      keyPrefix: fields.keyPrefix?.trim().toLowerCase() || null,
+    })
     .where(eq(SpecificationGroups.uuid, uuid));
 };
 

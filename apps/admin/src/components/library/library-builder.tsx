@@ -281,7 +281,11 @@ export const LibraryBuilder = ({
                   return (
                     <GroupForm
                       key={group.uuid}
-                      initial={{ name: group.name, domain: group.domain }}
+                      initial={{
+                        name: group.name,
+                        domain: group.domain,
+                        keyPrefix: group.keyPrefix ?? null,
+                      }}
                       pending={pending}
                       onCancel={() => {
                         setEditingGroup(null);

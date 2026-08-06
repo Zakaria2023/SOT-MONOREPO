@@ -25,6 +25,7 @@ import { ValidationError } from "./errors";
 // connection on import, and that logic has to be testable on its own.
 import {
   aliasConflicts,
+  deriveLibraryKey,
   labelAliasConflicts,
   mergeGroupFields,
   mergeOptions,
@@ -127,13 +128,31 @@ export type LibraryGroup = {
   uuid: string;
   name: string;
   domain: string | null;
+  // What every external name filed under this group starts with.
+  keyPrefix: string | null;
   order: number;
   attributes: LibraryAttribute[];
 };
 
-/** Derived from the label when the author supplies no external name. */
-const derivedKey = (label: string, taken: Set<string>): string => {
-  const base = slugify(label) || "attribute";
+/**
+ * Derived from the group's prefix and the label when nobody supplies one.
+ *
+ * Which is now the ordinary case: the admin no longer asks. An external name is
+ * the one identifier everything OUTSIDE this system keys on, and asking each
+ * author to invent one produced a field most people left blank and a scattering
+ * of unrelated shapes for facts of the same kind. The group decides the prefix
+ * once; the label supplies the rest.
+ *
+ * The `-2` suffix on a collision keeps its old form deliberately. It is a
+ * convenience nobody wrote down, and a numbered key is a visible sign that two
+ * attributes in one group share a name — which is worth seeing.
+ */
+const derivedKey = (
+  label: string,
+  groupPrefix: string | null,
+  taken: Set<string>,
+): string => {
+  const base = deriveLibraryKey(label, groupPrefix);
   if (!taken.has(base)) {
     return base;
   }
@@ -158,10 +177,11 @@ const derivedKey = (label: string, taken: Set<string>): string => {
 const resolveKey = (
   input: LibraryAttributeInput,
   taken: Set<string>,
+  groupPrefix: string | null,
 ): string => {
   const supplied = input.key?.trim();
   if (!supplied) {
-    return derivedKey(input.label, taken);
+    return derivedKey(input.label, groupPrefix, taken);
   }
   const parsed = normalizeLibraryKey(supplied);
   if (!parsed.ok) {
@@ -314,6 +334,26 @@ const assertAliasesResolve = (
   }
 };
 
+/**
+ * The prefix every external name filed under a group starts with.
+ *
+ * Read at save time rather than carried on the input: the group is chosen on the
+ * same form, and a prefix passed from the client would be one the client could
+ * be wrong about.
+ */
+const groupKeyPrefix = async (
+  groupUuid: string | null,
+): Promise<string | null> => {
+  if (!groupUuid) {
+    return null;
+  }
+  const [group] = await db
+    .select({ keyPrefix: SpecificationGroups.keyPrefix })
+    .from(SpecificationGroups)
+    .where(eq(SpecificationGroups.uuid, groupUuid));
+  return group?.keyPrefix ?? null;
+};
+
 /** Every attribute in the library, in the shape the alias checks want. */
 const readNameableLibrary = async (): Promise<NameableAttribute[]> =>
   db
@@ -404,6 +444,7 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
     uuid: group.uuid,
     name: group.name,
     domain: group.domain,
+    keyPrefix: group.keyPrefix,
     order: group.order,
     attributes: byGroup.get(group.uuid) ?? [],
   }));
@@ -413,6 +454,7 @@ export const getLibrary = async (): Promise<LibraryGroup[]> => {
       uuid: "",
       name: "Ungrouped",
       domain: null,
+      keyPrefix: null,
       order: Number.MAX_SAFE_INTEGER,
       attributes: ungrouped,
     });
@@ -487,9 +529,10 @@ export const createLibraryAttribute = async (
   assertValidInput(input);
   const uuid = generateUuid();
 
-  const [existing, [total]] = await Promise.all([
+  const [existing, [total], keyPrefix] = await Promise.all([
     readNameableLibrary(),
     db.select({ value: count() }).from(Specifications),
+    groupKeyPrefix(input.groupUuid),
   ]);
 
   const options =
@@ -513,7 +556,7 @@ export const createLibraryAttribute = async (
       value: "",
       label: input.label.trim(),
     }),
-    key: resolveKey(input, new Set(existing.map((row) => row.key))),
+    key: resolveKey(input, new Set(existing.map((row) => row.key)), keyPrefix),
     type: input.type,
     unit: input.type === "number" ? input.unit?.trim() || null : null,
     // False when a set is named: the set owns whether its own words form a scale,
@@ -820,6 +863,7 @@ export const updateLibraryAttribute = async (
               .filter((row) => row.uuid !== uuid)
               .map((row) => row.key),
           ),
+          await groupKeyPrefix(input.groupUuid),
         )
       : current.key;
 

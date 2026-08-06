@@ -542,6 +542,33 @@ export type LibraryKeyResult =
   | { ok: false; reason: string };
 
 /**
+ * The external name an attribute gets when nobody types one.
+ *
+ * `<group prefix>.<label in snake_case>` — "PoE Budget" in Power & Battery
+ * becomes `pwr.poe_budget`. The prefix is the group's, decided once when the
+ * group was set up, so the shape stays consistent across everything filed under
+ * it without an author having to know the convention exists.
+ *
+ * Built from `slugify` and then re-joined with underscores rather than parsed by
+ * hand: `slugify` already strips accents, collapses punctuation and lowercases,
+ * and re-deriving that here would be a second, subtly different normaliser.
+ *
+ * A group with no prefix yields a single-segment key — usable, and visibly
+ * missing its prefix, which is the right kind of prompt.
+ */
+export const deriveLibraryKey = (
+  label: string,
+  groupPrefix: string | null | undefined,
+): string => {
+  const body = slugify(label).replace(/-/g, "_");
+  const prefix = (groupPrefix ?? "").trim().toLowerCase();
+  if (body === "") {
+    return prefix || "attribute";
+  }
+  return prefix ? `${prefix}.${body}` : body;
+};
+
+/**
  * An author-supplied external name, checked rather than coerced.
  *
  * CHECKED, because coercing is what `slugify` would do and `slugify` is the

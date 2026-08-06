@@ -5,8 +5,6 @@ import type { SpecificationType } from "@/db/enum";
 import type { OptionSet } from "services";
 
 import {
-  aliasesFromText,
-  aliasesToText,
   emptyOptionDraft,
   liveOptions,
   OptionListEditor,
@@ -45,13 +43,8 @@ import {
   Combobox,
   Dropdown,
   Input,
-  Textarea,
   type DropdownOption,
 } from "ui";
-// The SAME derivation the service uses when no external name is supplied, so the
-// placeholder promises exactly what the save will do rather than something close
-// to it.
-import { slugify } from "utils";
 /**
  * The attribute editor, ~590 lines and most of why the original file was so long.
  *
@@ -212,14 +205,11 @@ export const AttributeForm = ({
   const [type, setType] = useState<SpecificationType>(
     initial?.type ?? "single_select",
   );
-  const [labelAliases, setLabelAliases] = useState(
-    aliasesToText(initial?.labelAliases ?? undefined),
-  );
-  const [key, setKey] = useState(initial?.key ?? "");
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
   const [group, setGroup] = useState(initial?.groupUuid ?? groupUuid ?? "");
+
   const [options, setOptions] = useState<OptionDraft[]>(
     initial ? toDrafts(initial.options) : [emptyOptionDraft()],
   );
@@ -300,8 +290,16 @@ export const AttributeForm = ({
       label,
       internalName: null,
       description: null,
-      labelAliases: aliasesFromText(labelAliases),
-      key: key.trim() || null,
+      // Not authored on this form — an author has nothing to gain from typing
+      // them until an importer exists to read them. Whatever is already stored
+      // is carried through untouched rather than wiped by a save that simply did
+      // not ask.
+      labelAliases: initial?.labelAliases ?? null,
+      // ALWAYS null from this form. On a new attribute the service derives the
+      // name from the group and the label; on an existing one it keeps the name
+      // already stored. Sending the displayed value back would make a rename
+      // move the key, which is the one thing it must never do.
+      key: null,
       type,
       categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
@@ -359,42 +357,6 @@ export const AttributeForm = ({
           placeholder="PoE Budget"
           value={label}
           onChange={(event) => setLabel(event.target.value)}
-        />
-
-        {/* The name everything OUTSIDE this system points at — an import
-            mapping, an export, the read model. Left blank it is derived from the
-            label; typed, it is kept exactly, which is why `slugify` never
-            touches it (it would turn pwr.power_draw_w into pwr-power-draw-w and
-            every mapping keyed on the dotted form would resolve to nothing). */}
-        <Field label="External name">
-          <Input
-            // The placeholder is the key this attribute WILL GET if the field is
-            // left blank — not a generic example. "Leave blank and one is derived
-            // from the name" is a sentence somebody has to take on trust; showing
-            // the derived value is the same promise, checkable at a glance, and it
-            // is how an author notices that "PoE Budget" becomes `poe-budget` and
-            // decides they wanted `pwr.poe_budget_w` instead.
-            //
-            // Falls back to a real dotted id before a name is typed, so the shape
-            // is visible from the first moment rather than only after.
-            placeholder={
-              label.trim() ? slugify(label) : "e.g. pwr.power_draw_w"
-            }
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-          />
-        </Field>
-
-        {/* What the SOURCES call this attribute, not what we call it. One vendor
-            sheet says "Sensitive element" and the next says "Sensing element";
-            recorded here, an import lands both on this attribute instead of
-            creating a second one nobody notices until a rule stops matching. */}
-        <Textarea
-          label="Other names in source data"
-          rows={2}
-          placeholder={"Sensitive element\nSensing element"}
-          value={labelAliases}
-          onChange={(event) => setLabelAliases(event.target.value)}
         />
 
         <Field label="Categories">
