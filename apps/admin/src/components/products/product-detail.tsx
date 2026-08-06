@@ -1,12 +1,15 @@
 import type { BoqItemRole, ProductStatus } from "@/db/enum";
 import { BOQ_ITEM_ROLE_LABELS, PRODUCT_STATUS_LABELS } from "@/db/label";
 import { ProductGallery } from "@/components/products/product-gallery";
+import { ProductLinks } from "@/components/products/product-links";
 import { documentImageUrl } from "@/lib/documents";
 import { ArrowLeft, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   sectionSpecs,
+  type CompatibilityLink,
+  type CompositionLink,
   type DisplaySpec,
   type ProductDetail as ProductDetailData,
 } from "services";
@@ -18,6 +21,12 @@ type ProductDetailProps = {
   // only those the reveal currently shows, in the order the category authored.
   // Staff see every audience, which is why the page asks as "admin".
   specs: DisplaySpec[];
+  // The two product-to-product facts, authored on this page because each one
+  // saves on its own rather than through the edit form's single Save.
+  compatibility: CompatibilityLink[];
+  composition: CompositionLink[];
+  // Everything a link can point at — the catalogue minus this product.
+  linkable: { uuid: string; name: string; sku: string | null }[];
 };
 
 type FieldProps = {
@@ -62,7 +71,13 @@ const Section = ({ title, children }: SectionProps) => (
   </div>
 );
 
-export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
+export const ProductDetail = ({
+  product,
+  specs,
+  compatibility,
+  composition,
+  linkable,
+}: ProductDetailProps) => {
   const status = product.status ?? "in_stock";
   const gallery = product.images ?? [];
   const sections = sectionSpecs(specs);
@@ -158,6 +173,17 @@ export const ProductDetail = ({ product, specs }: ProductDetailProps) => {
               ))
             )}
           </Section>
+
+          {/* Below the specs deliberately: both are about how this product sits
+              beside others, and the question "what does it not work with" only
+              makes sense once you have seen what it is. */}
+          <ProductLinks
+            productUuid={product.uuid}
+            productName={product.name}
+            compatibility={compatibility}
+            composition={composition}
+            linkable={linkable}
+          />
         </div>
 
         <div className="flex flex-col gap-5">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpecGroupField } from "../../../db/types";
+import { duplicateGroupRows, type SpecGroupField } from "../../../db/types";
 import { columnTotal, groupRowIssues, type AttributeMeta } from "./spec-values";
 
 // ---------------------------------------------------------------------------
@@ -97,6 +97,42 @@ describe("a discriminator column answered once per case", () => {
     ];
     expect(columnTotal(doubled, powerDraw, "watts")).toBe(24);
     expect(groupRowIssues(doubled, powerDraw)).toHaveLength(1);
+  });
+});
+
+describe("the product form and the engine share one definition", () => {
+  // They have to, and they cannot share code the usual way: the form runs in a
+  // browser and the engine's module opens a database connection when it loads.
+  // So the check lives in `db/types` and both call it — because two definitions
+  // of "duplicate" means the one an author is warned about is not the one that
+  // decides the arithmetic.
+  it("agrees with what the completeness check reports", () => {
+    const rows = [
+      { when: "poe", watts: 8.5 },
+      { when: "maximum", watts: 12 },
+      { when: "poe", watts: 9 },
+    ];
+
+    // What the product form draws its red line from.
+    const live = duplicateGroupRows(rows, whenField);
+    // What the engine reports after the save.
+    const reported = groupRowIssues(rows, powerDraw).filter(
+      (issue) => issue.problem === "duplicate",
+    );
+
+    expect(live).toEqual([{ index: 2, value: "poe" }]);
+    expect(reported.map((issue) => issue.row)).toEqual(
+      live.map((clash) => clash.index + 1),
+    );
+  });
+
+  it("stays silent on a column that is not a discriminator", () => {
+    expect(
+      duplicateGroupRows([{ when: "poe" }, { when: "poe" }], {
+        ...whenField,
+        distinct: false,
+      }),
+    ).toEqual([]);
   });
 });
 

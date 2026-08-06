@@ -5,6 +5,7 @@ import { AddOption } from "@/components/products/add-option";
 import { Field } from "@/components/shared/field";
 import type { SpecificationType } from "@/db/enum";
 import {
+  duplicateGroupRows,
   isSpecGroupRows,
   isSpecRange,
   type ProductValue,
@@ -272,102 +273,140 @@ const satisfied = (
  * owns, and a switch adds as many rows as it has distinct port groups — so
  * nothing here is free text and every part stays comparable.
  */
-const GroupRowsEditor = ({ fields, rows, onChange }: GroupRowsEditorProps) => (
-  <div className="flex flex-col gap-2">
-    {rows.map((row, index) => {
-      const complete = isRowComplete(row, fields);
-      return (
-        <div
-          key={index}
-          className="flex flex-wrap items-start gap-2 rounded-card border border-hairline bg-hover/40 p-2"
-        >
-          {fields.map((subField) => {
-            const entry = row[subField.key];
-            const live = subField.options.filter((option) => !option.retired);
-            return (
-              <div key={subField.key} className="min-w-28 flex-1">
-                {subField.kind === "number" ? (
-                  <Input
-                    type="number"
-                    placeholder={subField.label}
-                    aria-label={subField.label}
-                    value={typeof entry === "number" ? String(entry) : ""}
-                    onChange={(event) =>
-                      onChange(
-                        patchRow(
-                          rows,
-                          index,
-                          subField.key,
-                          event.target.value === ""
-                            ? undefined
-                            : Number(event.target.value),
-                        ),
-                      )
-                    }
-                    rightSlot={
-                      subField.unit ? (
-                        <span className="text-xs text-faint">
-                          {subField.unit}
-                        </span>
-                      ) : undefined
-                    }
-                  />
-                ) : (
-                  <Dropdown
-                    value={typeof entry === "string" ? entry : ""}
-                    onChange={(next) =>
-                      onChange(
-                        patchRow(
-                          rows,
-                          index,
-                          subField.key,
-                          next === "" ? undefined : next,
-                        ),
-                      )
-                    }
-                    options={live.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    }))}
-                    placeholder={subField.label}
-                    searchable={live.length > 8}
-                  />
-                )}
-              </div>
-            );
-          })}
+const GroupRowsEditor = ({ fields, rows, onChange }: GroupRowsEditorProps) => {
+  // Which rows answer a discriminator column somebody already answered, keyed by
+  // row so the warning lands ON the offending row rather than in a list at the
+  // bottom that nobody connects to anything.
+  //
+  // Computed here on every keystroke rather than reported after the save,
+  // because that is the only moment the author can act on it: an operand TOTALS
+  // a group column, so two rows both saying "maximum" make a 12 W camera measure
+  // 24 W — and the resulting budget failure names a number that appears on no
+  // datasheet anywhere. The engine catches it too, through the very same
+  // `duplicateGroupRows`, but by then the product is saved and nobody is looking.
+  const clashes = new Map<number, { label: string; value: string }>();
+  for (const subField of fields) {
+    for (const clash of duplicateGroupRows(rows, subField)) {
+      const option = subField.options.find(
+        (entry) => entry.value === clash.value,
+      );
+      clashes.set(clash.index, {
+        label: subField.label,
+        value: option?.label ?? clash.value,
+      });
+    }
+  }
 
-          <button
-            type="button"
-            onClick={() => onChange(rows.filter((_, at) => at !== index))}
-            aria-label={`Remove row ${index + 1}`}
-            className="mt-2 shrink-0 rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+  return (
+    <div className="flex flex-col gap-2">
+      {rows.map((row, index) => {
+        const complete = isRowComplete(row, fields);
+        const clash = clashes.get(index);
+        return (
+          <div
+            key={index}
+            className="flex flex-wrap items-start gap-2 rounded-card border border-hairline bg-hover/40 p-2"
           >
-            <X size={13} />
-          </button>
+            {fields.map((subField) => {
+              const entry = row[subField.key];
+              const live = subField.options.filter((option) => !option.retired);
+              return (
+                <div key={subField.key} className="min-w-28 flex-1">
+                  {subField.kind === "number" ? (
+                    <Input
+                      type="number"
+                      placeholder={subField.label}
+                      aria-label={subField.label}
+                      value={typeof entry === "number" ? String(entry) : ""}
+                      onChange={(event) =>
+                        onChange(
+                          patchRow(
+                            rows,
+                            index,
+                            subField.key,
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value),
+                          ),
+                        )
+                      }
+                      rightSlot={
+                        subField.unit ? (
+                          <span className="text-xs text-faint">
+                            {subField.unit}
+                          </span>
+                        ) : undefined
+                      }
+                    />
+                  ) : (
+                    <Dropdown
+                      value={typeof entry === "string" ? entry : ""}
+                      onChange={(next) =>
+                        onChange(
+                          patchRow(
+                            rows,
+                            index,
+                            subField.key,
+                            next === "" ? undefined : next,
+                          ),
+                        )
+                      }
+                      options={live.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      placeholder={subField.label}
+                      searchable={live.length > 8}
+                    />
+                  )}
+                </div>
+              );
+            })}
 
-          {/* Said on the row itself, because the readers DROP an incomplete row
+            <button
+              type="button"
+              onClick={() => onChange(rows.filter((_, at) => at !== index))}
+              aria-label={`Remove row ${index + 1}`}
+              className="mt-2 shrink-0 rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
+            >
+              <X size={13} />
+            </button>
+
+            {/* Said on the row itself, because the readers DROP an incomplete row
               rather than partly counting it — so a half-filled port group would
               otherwise look entered and contribute nothing. */}
-          {!complete && (
-            <p className="w-full text-xs text-amber-500">
-              Fill every box, or this row is ignored.
-            </p>
-          )}
-        </div>
-      );
-    })}
+            {!complete && (
+              <p className="w-full text-xs text-amber-500">
+                Fill every box, or this row is ignored.
+              </p>
+            )}
 
-    <button
-      type="button"
-      onClick={() => onChange([...rows, blankRow()])}
-      className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
-    >
-      <Plus size={13} />
-      Add row
-    </button>
-  </div>
-);
+            {/* Red rather than amber, and it is the only thing in this editor that
+              is. An incomplete row is IGNORED — the design simply measures less
+              than it should. A duplicate is COUNTED TWICE, so the design
+              measures more, and the number it produces cannot be traced back to
+              anything on a datasheet. */}
+            {clash && (
+              <p className="w-full text-xs text-red-500">
+                {clash.label} is already “{clash.value}” on an earlier row. Each
+                one can be answered once — two rows here are added together.
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={() => onChange([...rows, blankRow()])}
+        className="flex w-fit items-center gap-1 rounded-control px-2 py-1 text-xs text-primary hover:bg-hover"
+      >
+        <Plus size={13} />
+        Add row
+      </button>
+    </div>
+  );
+};
 
 /**
  * Options an author added from this form, merged into the list the server sent.

@@ -24,6 +24,7 @@ export * from "./predicate";
 export * from "./pricing";
 export * from "./product-compatibility";
 export * from "./product-composition";
+export * from "./product-links";
 export * from "./product-completeness";
 export * from "./products";
 export * from "./relationship-engine";

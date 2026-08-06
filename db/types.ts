@@ -196,6 +196,47 @@ export const isSpecGroupRows = (value: unknown): value is SpecGroupRow[] =>
       ),
   );
 
+/**
+ * Rows that answer a DISCRIMINATOR column somebody else already answered.
+ *
+ * Lives here, beside the shapes, rather than in the engine — because both ends
+ * need it and they must not disagree. The engine reports it as a completeness
+ * problem after the fact; the product form has to say it WHILE the author is
+ * typing, and the form cannot import the engine (that module opens a database
+ * connection the moment it is loaded, and this runs in a browser).
+ *
+ * Two copies of this check would be two definitions of what a duplicate is, and
+ * the one the author sees is not the one that decides the arithmetic.
+ *
+ * Returns the LATER row of each clash. The first is the answer that was already
+ * there; the second is the one somebody added, and it is the one to point at.
+ * Indexes are 0-based — callers that show a row number add one.
+ */
+export const duplicateGroupRows = (
+  rows: SpecGroupRow[],
+  field: SpecGroupField,
+): { index: number; value: string }[] => {
+  // A discriminator is only meaningful on a pick: a count column marked distinct
+  // would refuse the second `24` in a port group, which is a real switch.
+  if (!field.distinct || field.kind !== "select") {
+    return [];
+  }
+  const seen = new Set<string>();
+  const clashes: { index: number; value: string }[] = [];
+  rows.forEach((row, index) => {
+    const entry = row[field.key];
+    if (typeof entry !== "string" || entry.trim() === "") {
+      return;
+    }
+    if (seen.has(entry)) {
+      clashes.push({ index, value: entry });
+      return;
+    }
+    seen.add(entry);
+  });
+  return clashes;
+};
+
 // ---------------------------------------------------------------------------
 // The predicate language — ONE condition shape for the whole system
 // ---------------------------------------------------------------------------

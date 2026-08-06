@@ -1,5 +1,6 @@
 import { UNIT_DIMENSIONS, type SpecificationType } from "../../../db/enum";
 import {
+  duplicateGroupRows,
   isSpecGroupRows,
   isSpecRange,
   type ProductValue,
@@ -369,31 +370,20 @@ export const groupRowIssues = (
   // when = maximum` over two maximum rows sums them, so a 12 W camera becomes a
   // 24 W one and every budget check downstream is computed off a number nobody
   // can trace back to anything on the datasheet.
+  //
+  // Through the SAME `duplicateGroupRows` the product form calls, so what an
+  // author is warned about while typing and what the engine reports afterwards
+  // are one definition rather than two that drift.
   for (const field of fields) {
-    if (!field.distinct || field.kind !== "select") {
-      continue;
-    }
-    const seen = new Map<string, number>();
-    asGroupRows(raw).forEach((row, index) => {
-      const entry = row[field.key];
-      if (typeof entry !== "string" || entry.trim() === "") {
-        return;
-      }
-      const first = seen.get(entry);
-      if (first === undefined) {
-        seen.set(entry, index);
-        return;
-      }
-      // Reported against the LATER row. The first one is the answer that was
-      // already there; the second is the one somebody added.
+    for (const clash of duplicateGroupRows(asGroupRows(raw), field)) {
       issues.push({
-        row: index + 1,
+        row: clash.index + 1,
         fieldKey: field.key,
         fieldLabel: field.label,
         problem: "duplicate",
-        value: entry,
+        value: clash.value,
       });
-    });
+    }
   }
   return issues;
 };
