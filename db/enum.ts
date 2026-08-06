@@ -6,6 +6,10 @@ export const measurementUnits = [
   // Power & electrical
   "W",
   "kW",
+  // Radio output is quoted in milliwatts and nothing else — 20 mW and 25 mW are
+  // the only two values in the whole harvest. Written as 0.02 W instead it is a
+  // number no author recognises and no datasheet agrees with.
+  "mW",
   "VA",
   "V",
   "A",
@@ -24,6 +28,8 @@ export const measurementUnits = [
   "cm",
   "mm",
   "km",
+  // Floor area, for the project inputs that size a system against a building.
+  "m²",
   "kg",
   "g",
   // Data & network
@@ -42,6 +48,14 @@ export const measurementUnits = [
   "dBm",
   "°C",
   "%",
+  // Gas concentration. The CO alarm thresholds and the alarm curve are quoted in
+  // ppm and have no other sensible expression.
+  "ppm",
+  // The short end of duration. A polling interval is 12–300 s and a detection
+  // speed is measured in milliseconds; both were previously unwritable, and the
+  // nearest available unit (minutes) turns a 36 s interval into 0.6.
+  "ms",
+  "s",
   "min",
   "h",
   // Added for the specification library
@@ -77,6 +91,7 @@ export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
     // Power — base W
     W: { dimension: "power", toBase: 1 },
     kW: { dimension: "power", toBase: 1000 },
+    mW: { dimension: "power", toBase: 0.001 },
     // Apparent power is deliberately its OWN dimension: 1500 VA is not 1500 W,
     // and letting them convert would be the classic UPS sizing mistake.
     VA: { dimension: "apparent_power", toBase: 1 },
@@ -91,6 +106,9 @@ export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
     cm: { dimension: "distance", toBase: 0.01 },
     mm: { dimension: "distance", toBase: 0.001 },
     km: { dimension: "distance", toBase: 1000 },
+    // Area is its OWN dimension, not distance. Letting m² convert against m
+    // would compare a floor plan against a cable run and report a number.
+    "m²": { dimension: "area", toBase: 1 },
     // Mass — base g
     kg: { dimension: "mass", toBase: 1000 },
     g: { dimension: "mass", toBase: 1 },
@@ -105,9 +123,19 @@ export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
     MHz: { dimension: "frequency", toBase: 1 },
     GHz: { dimension: "frequency", toBase: 1000 },
     Hz: { dimension: "frequency", toBase: 0.000001 },
-    // Time — base min
-    min: { dimension: "duration", toBase: 1 },
-    h: { dimension: "duration", toBase: 60 },
+    // Time — base SECONDS.
+    //
+    // Re-based from minutes when milliseconds and seconds arrived. The base is
+    // arbitrary — `unitFactor` divides one `toBase` by the other, so it cancels
+    // and no stored value or authored limit means anything different — but which
+    // one is chosen decides whether the factors are exact. On a minute base a
+    // second is 1/60, and h → s came out as 3600.0000000000005: a detection speed
+    // compared against a polling interval would fail on the last decimal place,
+    // intermittently, in a way nobody could reproduce.
+    ms: { dimension: "duration", toBase: 0.001 },
+    s: { dimension: "duration", toBase: 1 },
+    min: { dimension: "duration", toBase: 60 },
+    h: { dimension: "duration", toBase: 3600 },
     months: { dimension: "period", toBase: 1 },
     years: { dimension: "period", toBase: 12 },
     // Countable things. Each is its own dimension so "ports" never sums with
@@ -119,6 +147,10 @@ export const UNIT_DIMENSIONS: Partial<Record<MeasurementUnit, UnitDimension>> =
     users: { dimension: "users", toBase: 1 },
     licenses: { dimension: "licenses", toBase: 1 },
     calls: { dimension: "calls", toBase: 1 },
+    // A concentration, and its own dimension for the same reason the counts are:
+    // ppm sums with nothing, and a CO threshold must never be comparable to a
+    // percentage just because both are dimensionless-looking ratios.
+    ppm: { dimension: "concentration", toBase: 1 },
   };
 
 // Navigation domains for the specification library — a functional grouping
