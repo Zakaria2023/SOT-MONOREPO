@@ -12,6 +12,7 @@ import { breadcrumbNode, graph, productNode } from "@/lib/structured-data";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
+  audienceAdmits,
   getComparableProducts,
   getComparisonSpecs,
   getRelatedProducts,
@@ -106,7 +107,7 @@ const ProductPage = async ({ params }: Props) => {
   // 404 rather than a "you may not see this": the difference between a product
   // that does not exist and one this shopper is not allowed to know exists is
   // information, and it is not information we have any reason to give out.
-  if (product.audience !== "everyone" && product.audience !== viewer) {
+  if (!audienceAdmits(product.audience, viewer)) {
     notFound();
   }
 

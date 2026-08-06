@@ -107,6 +107,26 @@ export type ResolveAssignmentsInput = {
 // admin panel shows everything, because that is where the catalog is authored.
 export type Viewer = "user" | "partner";
 
+/**
+ * Whether an audience admits this viewer.
+ *
+ * `everyone` is the UNION of the two, not a rung above them: a retail customer
+ * does not see a partner-only thing and a partner does not see a user-only one.
+ * Written as a ladder — `partner >= user` — a partner would silently inherit
+ * every retail-only listing, which is the opposite of what the field is for.
+ *
+ * One definition, because there are two readers that must agree: the catalogue
+ * query, which cannot call this (it has to be SQL), and every page that has
+ * already loaded a row and has to decide whether to render it. Left as an
+ * expression written out at each call site, the day somebody fixes one is the
+ * day the listing and the detail page disagree — and the symptom is a product
+ * that is invisible until you have its URL.
+ */
+export const audienceAdmits = (
+  audience: AssignmentAudience,
+  viewer: Viewer,
+): boolean => audience === "everyone" || audience === viewer;
+
 // ---------------------------------------------------------------------------
 // The enabled slice
 // ---------------------------------------------------------------------------
