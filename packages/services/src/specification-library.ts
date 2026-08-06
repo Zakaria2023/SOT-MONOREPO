@@ -29,6 +29,7 @@ import {
   mergeGroupFields,
   mergeOptions,
   normalizeAliases,
+  normalizeLibraryKey,
   normalizeSetValues,
   resolveGroupFields,
   resolveVocabulary,
@@ -67,6 +68,10 @@ export type LibraryAttributeInput = {
   // Other labels the SOURCES use for this attribute. Not display text — see
   // Specifications.labelAliases.
   labelAliases: string[] | null;
+  // The stable external name — `pwr.power_draw_w`. Null lets it be derived from
+  // the label, which is what the admin form does when an author does not care.
+  // An importer working from a mapping file always supplies it.
+  key: string | null;
   type: SpecificationType;
   unit: string | null;
   ordered: boolean;
@@ -126,8 +131,8 @@ export type LibraryGroup = {
   attributes: LibraryAttribute[];
 };
 
-/** A slug for exports and the AI layer. Not identity — free to change. */
-const uniqueKey = (label: string, taken: Set<string>): string => {
+/** Derived from the label when the author supplies no external name. */
+const derivedKey = (label: string, taken: Set<string>): string => {
   const base = slugify(label) || "attribute";
   if (!taken.has(base)) {
     return base;
@@ -137,6 +142,39 @@ const uniqueKey = (label: string, taken: Set<string>): string => {
     suffix += 1;
   }
   return `${base}-${suffix}`;
+};
+
+/**
+ * The external name this save should store, refusing the two ways it goes wrong.
+ *
+ * A key that does not parse is refused rather than coerced — see
+ * `normalizeLibraryKey`. A key another attribute already holds is refused
+ * outright rather than being given a `-2` suffix the way a derived one is:
+ * a derived key is a convenience nobody wrote down, so quietly numbering it costs
+ * nothing, but a key an author TYPED is one they are about to write into a
+ * mapping file. Handing them `pwr.power_draw_w-2` and saying nothing produces a
+ * mapping that resolves to nothing on the first run.
+ */
+const resolveKey = (
+  input: LibraryAttributeInput,
+  taken: Set<string>,
+): string => {
+  const supplied = input.key?.trim();
+  if (!supplied) {
+    return derivedKey(input.label, taken);
+  }
+  const parsed = normalizeLibraryKey(supplied);
+  if (!parsed.ok) {
+    throw new ValidationError(
+      `"${supplied}" cannot be an attribute's external name because ${parsed.reason}.`,
+    );
+  }
+  if (taken.has(parsed.key)) {
+    throw new ValidationError(
+      `Another attribute is already named "${parsed.key}". An external name has to point at one attribute, or every import and export keyed on it lands somewhere nobody chose.`,
+    );
+  }
+  return parsed.key;
 };
 
 const assertValidInput = (input: LibraryAttributeInput): void => {
@@ -475,7 +513,7 @@ export const createLibraryAttribute = async (
       value: "",
       label: input.label.trim(),
     }),
-    key: uniqueKey(input.label, new Set(existing.map((row) => row.key))),
+    key: resolveKey(input, new Set(existing.map((row) => row.key))),
     type: input.type,
     unit: input.type === "number" ? input.unit?.trim() || null : null,
     // False when a set is named: the set owns whether its own words form a scale,
@@ -763,13 +801,27 @@ export const updateLibraryAttribute = async (
       ? mergeGroupFields(current.groupFields ?? [], input.groupFields)
       : [];
 
-  assertAliasesResolve(
-    input,
-    nextOptions,
-    nextGroupFields,
-    await readNameableLibrary(),
-    uuid,
-  );
+  const library = await readNameableLibrary();
+  assertAliasesResolve(input, nextOptions, nextGroupFields, library, uuid);
+
+  // The external name changes only when an author TYPES a different one, never
+  // because the label moved. That distinction is the whole point of the field: a
+  // key re-derived on a rename breaks every mapping keyed on it a month later,
+  // with nothing to look at. A deliberate edit is a different act, and it is
+  // allowed — with a warning, because the consequence lands outside this system
+  // where we cannot see it.
+  const supplied = input.key?.trim();
+  const nextKey =
+    supplied && supplied.toLowerCase() !== current.key
+      ? resolveKey(
+          input,
+          new Set(
+            library
+              .filter((row) => row.uuid !== uuid)
+              .map((row) => row.key),
+          ),
+        )
+      : current.key;
 
   const warnings = await checkValueImpact(
     uuid,
@@ -787,9 +839,7 @@ export const updateLibraryAttribute = async (
       internalName: input.internalName?.trim() || null,
       description: input.description?.trim() || null,
       labelAliases: storedLabelAliases(input),
-      // `key` is deliberately NOT here. It is the name every import mapping and
-      // export outside this system points at, so a rename must not move it —
-      // see Specifications.key.
+      key: nextKey,
       type: input.type,
       unit: input.type === "number" ? input.unit?.trim() || null : null,
       ordered: nextOrdered,
@@ -814,7 +864,15 @@ export const updateLibraryAttribute = async (
     changes: diffAttribute(current, input),
   });
   invalidateCatalogModel();
-  return { warnings };
+  return {
+    warnings:
+      nextKey === current.key
+        ? warnings
+        : [
+            ...warnings,
+            `This attribute's external name changed from "${current.key}" to "${nextKey}". Anything outside this system that referenced the old one — an import mapping, an export, a spreadsheet — now resolves to nothing and needs updating too.`,
+          ],
+  };
 };
 
 const diffAttribute = (

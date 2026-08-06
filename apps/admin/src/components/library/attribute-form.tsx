@@ -216,6 +216,7 @@ export const AttributeForm = ({
   const [labelAliases, setLabelAliases] = useState(
     aliasesToText(initial?.labelAliases ?? undefined),
   );
+  const [key, setKey] = useState(initial?.key ?? "");
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [ordered, setOrdered] = useState(initial?.ordered ?? false);
   const [allowRange, setAllowRange] = useState(initial?.allowRange ?? false);
@@ -301,6 +302,7 @@ export const AttributeForm = ({
       internalName: null,
       description: null,
       labelAliases: aliasesFromText(labelAliases),
+      key: key.trim() || null,
       type,
       categoryUuids: categories,
       unit: type === "number" ? unit || null : null,
@@ -358,6 +360,22 @@ export const AttributeForm = ({
           value={label}
           onChange={(event) => setLabel(event.target.value)}
         />
+
+        {/* The name everything OUTSIDE this system points at — an import
+            mapping, an export, the read model. Left blank it is derived from the
+            label; typed, it is kept exactly, which is why `slugify` never
+            touches it (it would turn pwr.power_draw_w into pwr-power-draw-w and
+            every mapping keyed on the dotted form would resolve to nothing). */}
+        <Field
+          label="External name"
+          hint="How imports and exports refer to this attribute. Leave blank to derive it from the name."
+        >
+          <Input
+            placeholder="pwr.power_draw_w"
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+          />
+        </Field>
 
         {/* What the SOURCES call this attribute, not what we call it. One vendor
             sheet says "Sensitive element" and the next says "Sensing element";

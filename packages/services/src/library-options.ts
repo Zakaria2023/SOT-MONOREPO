@@ -519,6 +519,56 @@ export const labelAliasConflicts = (
 };
 
 // ---------------------------------------------------------------------------
+// The external name
+//
+// `uuid` is identity INSIDE the model — values, assignments, rules and
+// predicates all key on it, and that is what makes a rename free. `key` is
+// identity OUTSIDE it: an import mapping a vendor column onto an attribute, an
+// export, the read model, a spreadsheet somebody keeps by hand. Those cannot
+// hold a uuid and would not survive one.
+//
+// Which is why it has a shape rather than being any string at all. A mapping file
+// that says `pwr.power_draw_w` while the database says `Pwr.Power Draw W`
+// resolves to nothing, and the failure is an import that quietly skips a column.
+// ---------------------------------------------------------------------------
+
+// Lowercase letters, digits and underscores, in dot-separated segments:
+// `pwr.power_draw_w`, `phys.ip_rating`, `id.lifecycle_status`. A single segment
+// (`sku`) is allowed — the dotted prefix is a filing convention, not a rule.
+const LIBRARY_KEY_SHAPE = /^[a-z0-9]+(?:_[a-z0-9]+)*(?:\.[a-z0-9]+(?:_[a-z0-9]+)*)*$/;
+
+export type LibraryKeyResult =
+  | { ok: true; key: string }
+  | { ok: false; reason: string };
+
+/**
+ * An author-supplied external name, checked rather than coerced.
+ *
+ * CHECKED, because coercing is what `slugify` would do and `slugify` is the
+ * problem: it turns `pwr.power_draw_w` into `pwr-power-draw-w`, so an author who
+ * typed the dotted id from the specification document would find the database
+ * holding something else and every mapping keyed on what they typed resolving to
+ * nothing. Silently. A refusal naming the shape is the only honest answer.
+ */
+export const normalizeLibraryKey = (raw: string): LibraryKeyResult => {
+  const key = raw.trim().toLowerCase();
+  if (key === "") {
+    return { ok: false, reason: "it is empty" };
+  }
+  if (key.length > 255) {
+    return { ok: false, reason: "it is longer than 255 characters" };
+  }
+  if (!LIBRARY_KEY_SHAPE.test(key)) {
+    return {
+      ok: false,
+      reason:
+        "it has to be lowercase letters, digits and underscores in dot-separated parts, like pwr.power_draw_w",
+    };
+  }
+  return { ok: true, key };
+};
+
+// ---------------------------------------------------------------------------
 // Shared vocabularies
 //
 // An attribute, or one sub-field of a group, either owns its option list or
