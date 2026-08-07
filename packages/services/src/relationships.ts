@@ -33,6 +33,7 @@ import { ValidationError } from "./errors";
 import { groupRowAttributes, validatePredicate } from "./predicate";
 import {
   evaluateRelationship,
+  evaluateSelection,
   type EngineRelationship,
   type EngineVariable,
   type Finding,
@@ -916,5 +917,75 @@ export const getRuleReachability = async (): Promise<RuleReach[]> => {
     assignments: model.assignments,
     chains: model.chains,
     products,
+  });
+};
+
+// ---------------------------------------------------------------------------
+// The trace
+// ---------------------------------------------------------------------------
+
+export type TracedRule = {
+  finding: Finding;
+  // The one-line reading of the rule, so a `not_applicable` row can be judged
+  // without opening the authoring form to remember what the rule asks for.
+  summary: string;
+};
+
+/**
+ * Every rule's verdict on a selection, including the ones that said nothing.
+ *
+ * Deliberately NOT part of `checkDesign`. The buyer is shown what is wrong with
+ * their basket; being told that fourteen rules found nothing to say about it
+ * would be noise. But for whoever authors the rules that silence is the most
+ * important output on the screen — `not_applicable` is where a rule that was
+ * supposed to cover this basket quietly failed to, and `pass` is the only proof
+ * that a rule ran at all.
+ *
+ * Same evaluator, same model, same ordering as the gate. It reads; it never
+ * writes and it never gates.
+ */
+export const traceDesign = async (
+  selection: SelectionLine[],
+  variables: Record<string, number | boolean> = {},
+): Promise<TracedRule[]> => {
+  const lines = selection.filter((line) => line.quantity > 0);
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const [model, items, catalog] = await Promise.all([
+    getCatalogModel(),
+    loadSelection(lines),
+    loadSuggestionCatalog(),
+  ]);
+  if (items.length === 0) {
+    return [];
+  }
+
+  const resolved = new Map<string, EngineVariable>(
+    model.variables.map((variable) => [
+      variable.uuid,
+      variable.uuid in variables
+        ? { ...variable, value: variables[variable.uuid] }
+        : variable,
+    ]),
+  );
+
+  const report = evaluateSelection(model.relationships, items, {
+    attributes: model.attributes,
+    variables: resolved,
+    catalog,
+  });
+
+  const byUuid = new Map(
+    model.relationships.map((rule) => [rule.uuid, rule] as const),
+  );
+
+  return report.findings.map((finding) => {
+    const rule = byUuid.get(finding.relationshipUuid);
+    return {
+      finding,
+      summary: rule ? summarizeRelationship(rule, model) : "",
+    };
   });
 };

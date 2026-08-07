@@ -3,8 +3,9 @@
 import {
   runDesignCheckAction,
   searchProductsAction,
+  traceDesignAction,
 } from "@/app/(dashboard)/sandbox/actions";
-import type { DesignCheckResult, DesignQuestion } from "services";
+import type { DesignCheckResult, DesignQuestion, TracedRule } from "services";
 import {
   BasketBuilder,
   type BasketLine,
@@ -12,8 +13,14 @@ import {
 import { FieldSet } from "@/components/shared/field";
 import { FindingCard } from "@/components/sandbox/finding-card";
 import { QuestionField } from "@/components/sandbox/question-field";
+import { TraceList } from "@/components/sandbox/trace-list";
 import type { ProjectAnswers } from "@/db/types";
-import { CheckCircle2, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  ListChecks,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "ui";
 
@@ -42,9 +49,11 @@ export const DesignSandbox = () => {
   const [lines, setLines] = useState<BasketLine[]>([]);
   const [answers, setAnswers] = useState<ProjectAnswers>({});
   const [result, setResult] = useState<DesignCheckResult>();
+  const [trace, setTrace] = useState<TracedRule[]>();
   const [seen, setSeen] = useState<DesignQuestion[]>([]);
   const [error, setError] = useState<string>();
   const [running, setRunning] = useState(false);
+  const [tracing, setTracing] = useState(false);
 
   const nameOf = (uuid: string): string =>
     lines.find((line) => line.productUuid === uuid)?.name ?? "a removed product";
@@ -54,6 +63,7 @@ export const DesignSandbox = () => {
   // a line moves would make the screen unusable.
   const changeLines = (next: BasketLine[]): void => {
     setResult(undefined);
+    setTrace(undefined);
     setLines(next);
   };
 
@@ -69,9 +79,33 @@ export const DesignSandbox = () => {
     });
   };
 
+  const showTrace = async (): Promise<void> => {
+    setError(undefined);
+    setTracing(true);
+    try {
+      const outcome = await traceDesignAction(
+        lines.map((line) => ({
+          productUuid: line.productUuid,
+          quantity: line.quantity,
+        })),
+        answers,
+      );
+      if (outcome.error || !outcome.trace) {
+        setError(outcome.error ?? "The trace returned nothing.");
+        return;
+      }
+      setTrace(outcome.trace);
+    } finally {
+      setTracing(false);
+    }
+  };
+
   const run = async (): Promise<void> => {
     setError(undefined);
     setRunning(true);
+    // A previous trace describes the previous answers. Dropped rather than left
+    // beside a fresh verdict it no longer matches.
+    setTrace(undefined);
     try {
       const outcome = await runDesignCheckAction(
         lines.map((line) => ({
@@ -106,6 +140,7 @@ export const DesignSandbox = () => {
     setLines([]);
     setAnswers({});
     setResult(undefined);
+    setTrace(undefined);
     setSeen([]);
     setError(undefined);
   };
@@ -305,6 +340,27 @@ export const DesignSandbox = () => {
               ))}
             </div>
           </FieldSet>
+        )}
+
+        {/* The findings above are the buyer's half. This is the author's: the
+            rules that produced no finding at all, which the buyer must never be
+            shown and the author cannot work without. */}
+        {result && !result.degraded && (
+          <div className="flex flex-col gap-3 border-t border-hairline pt-3">
+            {trace ? (
+              <TraceList trace={trace} />
+            ) : (
+              <button
+                type="button"
+                onClick={showTrace}
+                disabled={tracing}
+                className="flex items-center justify-center gap-1.5 rounded-control border border-hairline px-3 py-2 text-xs text-secondary hover:bg-hover hover:text-ink disabled:opacity-60"
+              >
+                <ListChecks size={13} />
+                {tracing ? "Tracing…" : "Show every rule, including the silent ones"}
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

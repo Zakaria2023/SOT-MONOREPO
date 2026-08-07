@@ -11,12 +11,15 @@ import {
   type BasketLine,
 } from "@/components/shared/basket-builder";
 import { Field, FieldSet } from "@/components/shared/field";
+import {
+  FINDING_STATUS_LABEL,
+  FINDING_STATUS_STYLE,
+} from "@/components/shared/finding-status";
 import type { SelectRelationships } from "@/db/schema/relationships";
 import type { Operand } from "@/db/types";
 import { TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 import { Button, Dropdown, Input } from "ui";
-import type { FindingStatus } from "services";
 
 // ---------------------------------------------------------------------------
 // HOW A RULE GETS REVIEWED.
@@ -36,22 +39,6 @@ type RelationPreviewProps = {
   relation: SelectRelationships;
   variables: RelationVariable[];
   onClose: () => void;
-};
-
-const STATUS_STYLE: Record<FindingStatus, string> = {
-  pass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-  warn: "border-amber-500/30 bg-amber-500/10 text-amber-500",
-  block: "border-red-500/30 bg-red-500/10 text-red-400",
-  unknown: "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  not_applicable: "border-hairline bg-hover text-secondary",
-};
-
-const STATUS_LABEL: Record<FindingStatus, string> = {
-  pass: "Passes",
-  warn: "Warns the buyer",
-  block: "Blocks the order",
-  unknown: "Cannot be judged",
-  not_applicable: "Does not apply",
 };
 
 // Which project inputs this rule actually reads. Asking for every variable in
@@ -249,10 +236,10 @@ export const RelationPreview = ({
           <p className="text-[11px] text-muted">{preview?.summary}</p>
 
           <div
-            className={`flex flex-col gap-1 rounded-card border px-3 py-2.5 ${STATUS_STYLE[finding.status]}`}
+            className={`flex flex-col gap-1 rounded-card border px-3 py-2.5 ${FINDING_STATUS_STYLE[finding.status]}`}
           >
             <span className="text-[11px] font-semibold tracking-wide uppercase">
-              {STATUS_LABEL[finding.status]}
+              {FINDING_STATUS_LABEL[finding.status]}
             </span>
             {/* The buyer's own words, verbatim. If this sentence does not make
                 sense here, it will not make sense at checkout either. */}

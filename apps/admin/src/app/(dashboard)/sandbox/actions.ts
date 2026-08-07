@@ -5,12 +5,14 @@ import {
   checkDesign,
   getRuleReachability,
   searchProductsForPicker,
+  traceDesign,
 } from "services";
 import type {
   DesignCheckResult,
   ProductPickerItem,
   RuleReach,
   SelectionLine,
+  TracedRule,
 } from "services";
 import type { ProjectAnswers } from "@/db/types";
 import { fail } from "utils";
@@ -70,4 +72,24 @@ export const runDesignCheckAction = async (
 export const getRuleReachabilityAction = async (): Promise<RuleReach[]> => {
   await requireAdmin();
   return getRuleReachability();
+};
+
+/**
+ * Every rule's verdict on this basket, including the ones that said nothing.
+ *
+ * Its own action, fetched only when asked for, rather than folded into the run
+ * above. The buyer's answer is the common case and it stays cheap; the trace
+ * evaluates the whole rule set a second time, which is worth it only when
+ * somebody is actually reading it.
+ */
+export const traceDesignAction = async (
+  selection: SelectionLine[],
+  variables: ProjectAnswers = {},
+): Promise<{ trace?: TracedRule[]; error?: string }> => {
+  await requireAdmin();
+  try {
+    return { trace: await traceDesign(selection, variables) };
+  } catch (error) {
+    return fail(error, "Failed to trace the rules");
+  }
 };
