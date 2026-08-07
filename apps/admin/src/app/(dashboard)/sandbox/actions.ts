@@ -1,10 +1,15 @@
 "use server";
 
 import { requireAdmin } from "@/lib/server/auth";
-import { checkDesign, searchProductsForPicker } from "services";
+import {
+  checkDesign,
+  getRuleReachability,
+  searchProductsForPicker,
+} from "services";
 import type {
   DesignCheckResult,
   ProductPickerItem,
+  RuleReach,
   SelectionLine,
 } from "services";
 import type { ProjectAnswers } from "@/db/types";
@@ -52,4 +57,17 @@ export const runDesignCheckAction = async (
   } catch (error) {
     return fail(error, "Failed to run the check");
   }
+};
+
+/**
+ * Why each rule can or cannot fire.
+ *
+ * The sandbox answers "what happens to THIS basket". This answers the question
+ * a basket can never answer: a rule that engages with nothing looks identical to
+ * a rule that passed, and only a static read of the catalogue can tell them
+ * apart — or say whose problem it is.
+ */
+export const getRuleReachabilityAction = async (): Promise<RuleReach[]> => {
+  await requireAdmin();
+  return getRuleReachability();
 };

@@ -31,6 +31,7 @@ export * from "./product-completeness";
 export * from "./products";
 export * from "./relationship-engine";
 export * from "./relationships";
+export * from "./rule-reachability";
 export * from "./spec-values";
 export * from "./specification-assignments";
 export * from "./specification-groups";

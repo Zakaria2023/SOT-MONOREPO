@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import type {
@@ -37,6 +37,13 @@ import {
   type EngineVariable,
   type Finding,
 } from "./relationship-engine";
+import { Products } from "../../../db/schema/products";
+import {
+  diagnoseRules,
+  type ProductFacts,
+  type RuleReach,
+} from "./rule-reachability";
+import { referencedAttributeUuids } from "./specification-library";
 import { groupSubField, unitFactor, type AttributeMeta } from "./spec-values";
 
 // ---------------------------------------------------------------------------
@@ -831,4 +838,83 @@ export const summarizeRelationship = (
     return `${name(rule.consumer)} must stay within the limit its own configuration allows.`;
   }
   return `When the trigger is present, the selection must also contain ${(rule.presence?.requires ?? []).map((requirement) => requirement.description).join("; ") || "its companion"}.`;
+};
+
+// ---------------------------------------------------------------------------
+// Reachability
+// ---------------------------------------------------------------------------
+
+/**
+ * `JSON_KEYS` rather than the column, because the diagnosis needs to know WHICH
+ * attributes a product answers and never what it answered. Pulling every stored
+ * value to count keys would move the whole catalogue's spec data across the wire
+ * to compute a handful of integers.
+ *
+ * The driver hands a JSON array back as either a parsed array or its text,
+ * depending on how the column is read, so both are accepted rather than trusting
+ * one and silently counting nothing.
+ */
+const toAttributeUuids = (keys: unknown): string[] => {
+  if (Array.isArray(keys)) {
+    return keys.filter((key): key is string => typeof key === "string");
+  }
+  if (typeof keys !== "string") {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(keys);
+    return Array.isArray(parsed)
+      ? parsed.filter((key): key is string => typeof key === "string")
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Why each rule can or cannot fire.
+ *
+ * Three queries, whatever the size of the catalogue — the model (cached), the
+ * rules, and one pass over products for their answered-attribute keys. Never one
+ * query per rule: this is an admin screen, but it reads the same tables the cart
+ * does and the connection ceiling is shared.
+ */
+export const getRuleReachability = async (): Promise<RuleReach[]> => {
+  const [model, rows, productRows] = await Promise.all([
+    getCatalogModel(),
+    listRelationships(),
+    db
+      .select({
+        categoryUuid: Products.categoryUuid,
+        keys: sql<unknown>`JSON_KEYS(${Products.specValues})`,
+      })
+      .from(Products),
+  ]);
+
+  const products: ProductFacts[] = productRows.map((product) => ({
+    categoryUuid: product.categoryUuid,
+    attributeUuids: toAttributeUuids(product.keys),
+  }));
+
+  return diagnoseRules({
+    rules: rows.map((row) => ({
+      uuid: row.uuid,
+      name: row.name,
+      family: row.family,
+      attributeUuids: referencedAttributeUuids(row),
+      predicates: [
+        row.consumerWhen ?? null,
+        row.providerWhen ?? null,
+        row.presence?.trigger ?? null,
+        ...(row.lookup?.rows ?? []).map((lookupRow) => lookupRow.when),
+      ],
+      regions: row.scope?.regions ?? null,
+    })),
+    attributeLabels: new Map(
+      model.definitions.map((definition) => [definition.uuid, definition.label]),
+    ),
+    assignments: model.assignments,
+    chains: model.chains,
+    products,
+  });
 };
