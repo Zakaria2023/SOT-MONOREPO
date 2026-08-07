@@ -21,7 +21,12 @@
 // that referenced it.
 // ---------------------------------------------------------------------------
 
-import { MatchMode, PredicateOperator, RelationshipFamily } from "./enum";
+import {
+  FindingStatus,
+  MatchMode,
+  PredicateOperator,
+  RelationshipFamily,
+} from "./enum";
 
 // ---------------------------------------------------------------------------
 // Option lists
@@ -607,4 +612,39 @@ export type RelationshipExport = {
   gate: "block" | "warn";
   attributes: string[];
   variables: string[];
+};
+
+// ---------------------------------------------------------------------------
+// Saved scenarios — a basket somebody decided was worth re-checking
+// ---------------------------------------------------------------------------
+
+// One line of a saved basket. The product is held by uuid and its name is NOT
+// stored: a renamed product must still be the same line, and a deleted one must
+// show up as gone rather than as a name nothing answers to.
+export type ScenarioLine = {
+  productUuid: string;
+  quantity: number;
+};
+
+// What one rule said, the last time this scenario was agreed to be correct.
+//
+// The rule's NAME is stored beside its uuid purely so a deleted rule can still
+// be named in the drift report. Nothing matches on it.
+export type ScenarioRuleVerdict = {
+  relationshipUuid: string;
+  name: string;
+  status: FindingStatus;
+  // Product uuids the rule could not read. Recorded because a check that
+  // silently starts skipping items is a regression that changes no status —
+  // "pass" before and "pass" after, on half the products.
+  skippedProductUuids: string[];
+};
+
+// The agreed answer for a scenario.
+//
+// Deliberately statuses and uuids, never the engine's sentences. A message is
+// prose and gets reworded; a scenario that failed every time somebody improved
+// the wording of a finding would be turned off within a week.
+export type ScenarioSnapshot = {
+  rules: ScenarioRuleVerdict[];
 };

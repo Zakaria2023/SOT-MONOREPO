@@ -11,6 +11,8 @@ export * from "./categories";
 export * from "./classifications";
 export * from "./document-visibility";
 export * from "./design-check";
+export * from "./scenario-drift";
+export * from "./design-scenarios";
 export * from "./design-questions";
 export * from "./errors";
 export * from "./government";

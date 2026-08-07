@@ -1,5 +1,6 @@
 import { DesignSandbox } from "@/components/sandbox/design-sandbox";
 import { RuleHealth } from "@/components/sandbox/rule-health";
+import { ScenarioSection } from "@/components/sandbox/scenario-section";
 import { AsyncSection } from "@/components/shared/async-section";
 import { PageHeader } from "@/components/shared/page-header";
 
@@ -27,6 +28,20 @@ const SandboxPage = () => (
 
       <AsyncSection reloadKey="rule-health">
         <RuleHealth />
+      </AsyncSection>
+    </div>
+
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="font-heading text-lg text-ink">Saved scenarios</h2>
+        <p className="text-sm text-muted">
+          Baskets somebody decided were worth re-checking. Run them after
+          editing a rule to find out what you moved.
+        </p>
+      </div>
+
+      <AsyncSection reloadKey="scenarios">
+        <ScenarioSection />
       </AsyncSection>
     </div>
   </div>

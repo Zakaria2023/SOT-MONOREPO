@@ -1,4 +1,5 @@
 import type {
+  FindingStatus,
   MatchMode,
   RelationshipAllocation,
   RelationshipComparator,
@@ -141,8 +142,7 @@ export type EngineContext = {
 // block       — violated, and the rule gates checkout
 // not_applicable — nothing in the selection participates
 // unknown     — could not be checked. Never treated as a pass.
-export type FindingStatus =
-  "pass" | "warn" | "block" | "not_applicable" | "unknown";
+export type { FindingStatus };
 
 export type Participant = {
   productUuid: string;

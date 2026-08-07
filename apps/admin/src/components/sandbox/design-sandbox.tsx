@@ -13,6 +13,7 @@ import {
 import { FieldSet } from "@/components/shared/field";
 import { FindingCard } from "@/components/sandbox/finding-card";
 import { QuestionField } from "@/components/sandbox/question-field";
+import { SaveScenario } from "@/components/sandbox/save-scenario";
 import { TraceList } from "@/components/sandbox/trace-list";
 import type { ProjectAnswers } from "@/db/types";
 import {
@@ -264,6 +265,10 @@ export const DesignSandbox = () => {
         <Button onClick={run} disabled={running || lines.length === 0}>
           {running ? "Running…" : "Run the check"}
         </Button>
+
+        {/* Only after a run. Keeping a basket nobody has looked at produces a
+            scenario whose verdict is a surprise to whoever saved it. */}
+        {result && <SaveScenario lines={lines} answers={answers} />}
       </div>
 
       <div className="flex flex-col gap-3">

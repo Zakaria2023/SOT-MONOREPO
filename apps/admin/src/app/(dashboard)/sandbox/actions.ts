@@ -1,9 +1,15 @@
 "use server";
 
 import { requireAdmin } from "@/lib/server/auth";
+import { revalidatePath } from "next/cache";
 import {
+  baselineScenario,
   checkDesign,
+  createScenario,
+  deleteScenario,
   getRuleReachability,
+  listScenarios,
+  runAllScenarios,
   searchProductsForPicker,
   traceDesign,
 } from "services";
@@ -11,11 +17,14 @@ import type {
   DesignCheckResult,
   ProductPickerItem,
   RuleReach,
+  ScenarioInput,
+  ScenarioRun,
+  SelectDesignScenarios,
   SelectionLine,
   TracedRule,
 } from "services";
 import type { ProjectAnswers } from "@/db/types";
-import { fail } from "utils";
+import { fail, type ActionResult } from "utils";
 
 /**
  * The picker behind the sandbox basket.
@@ -92,4 +101,68 @@ export const traceDesignAction = async (
   } catch (error) {
     return fail(error, "Failed to trace the rules");
   }
+};
+
+// ---------------------------------------------------------------------------
+// The regression suite
+// ---------------------------------------------------------------------------
+
+/**
+ * Keep this basket, so the next person to edit a rule finds out they broke it.
+ *
+ * Saved WITHOUT a baseline. The verdict it produced today is recorded when
+ * somebody accepts it, not when it is stored — a suite that adopts its first run
+ * as the expectation has enshrined whatever the engine did that day, bug and all.
+ */
+export const saveScenarioAction = async (
+  input: ScenarioInput,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await createScenario(input);
+    revalidatePath("/sandbox");
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to save the scenario");
+  }
+};
+
+export const runAllScenariosAction = async (): Promise<ScenarioRun[]> => {
+  await requireAdmin();
+  return runAllScenarios();
+};
+
+/** Accept what this scenario says today as what it should say. */
+export const baselineScenarioAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await baselineScenario(uuid, actor);
+    revalidatePath("/sandbox");
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to accept this verdict");
+  }
+};
+
+export const deleteScenarioAction = async (
+  uuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteScenario(uuid);
+    revalidatePath("/sandbox");
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to delete the scenario");
+  }
+};
+
+/** The saved scenarios, without running any of them. */
+export const listScenariosAction = async (): Promise<
+  SelectDesignScenarios[]
+> => {
+  await requireAdmin();
+  return listScenarios();
 };

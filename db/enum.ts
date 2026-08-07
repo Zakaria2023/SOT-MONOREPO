@@ -741,3 +741,22 @@ export const importIssueStatuses = [
 ] as const satisfies readonly string[];
 
 export type ImportIssueStatus = (typeof importIssueStatuses)[number];
+
+// pass           — checked and satisfied, on everything the rule matched
+// warn           — violated, and the rule only cautions
+// block          — violated, and the rule gates checkout
+// not_applicable — nothing in the selection participates
+// unknown        — could not be checked. Never treated as a pass.
+//
+// Not a column on any table. It lives here because a saved scenario stores one
+// per rule in its JSON snapshot, and db/types.ts cannot reach into the services
+// package to borrow the union.
+export const findingStatuses = [
+  "pass",
+  "warn",
+  "block",
+  "not_applicable",
+  "unknown",
+] as const satisfies readonly string[];
+
+export type FindingStatus = (typeof findingStatuses)[number];

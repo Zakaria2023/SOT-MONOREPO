@@ -4,6 +4,7 @@ export * from "./brands";
 export * from "./carts";
 export * from "./catalog-audit";
 export * from "./categories";
+export * from "./design-scenarios";
 export * from "./classifications";
 export * from "./government-requests";
 export * from "./handovers";
