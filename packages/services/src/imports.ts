@@ -7,6 +7,7 @@ import {
   ImportRows,
   type ImportPayload,
   type ImportProposal,
+  type SelectImportBatches,
   type SelectImportIssues,
   type SelectImportRows,
 } from "../../../db/schema/imports";
@@ -16,9 +17,11 @@ import { ConflictError, ValidationError } from "./errors";
 import {
   applyResolutions,
   type DraftIssue,
+  type ImportTarget,
   type ParsedRow,
   type SourceRow,
 } from "./import-pipeline";
+import { resolveCategoryAssignments } from "./catalog-model";
 import { createProduct, updateProduct } from "./products";
 import { addOptionToAttribute } from "./specification-library";
 
@@ -429,3 +432,118 @@ export const commitImportBatch = async (
 };
 
 export type { SelectImportRows };
+
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
+
+export type ImportBatchSummary = {
+  uuid: string;
+  source: string;
+  status: SelectImportBatches["status"];
+  rows: number;
+  openIssues: number;
+  createdAt: Date;
+};
+
+/**
+ * Every batch with the two numbers that decide what to do next: how much is in
+ * it, and how much of it is still waiting on somebody.
+ *
+ * Counted with sub-selects rather than joins. Two joins onto the same batch
+ * multiply each other — rows × issues — and the totals come back inflated in a
+ * way that looks plausible until somebody checks one.
+ */
+export const listImportBatches = async (): Promise<ImportBatchSummary[]> => {
+  const rows = await db
+    .select({
+      uuid: ImportBatches.uuid,
+      source: ImportBatches.source,
+      status: ImportBatches.status,
+      createdAt: ImportBatches.createdAt,
+      rows: sql<number>`(SELECT COUNT(*) FROM ${ImportRows} r WHERE r.batch_uuid = ${ImportBatches.uuid})`,
+      openIssues: sql<number>`(
+        SELECT COUNT(*) FROM ${ImportIssues} i
+        JOIN ${ImportRows} r ON r.uuid = i.row_uuid
+        WHERE r.batch_uuid = ${ImportBatches.uuid} AND i.status = 'open')`,
+    })
+    .from(ImportBatches)
+    .orderBy(sql`${ImportBatches.createdAt} DESC`);
+
+  return rows.map((row) => ({
+    ...row,
+    rows: Number(row.rows),
+    openIssues: Number(row.openIssues),
+  }));
+};
+
+export const getImportBatch = async (uuid: string) => {
+  const [batch] = await db
+    .select()
+    .from(ImportBatches)
+    .where(eq(ImportBatches.uuid, uuid))
+    .limit(1);
+  return batch ?? null;
+};
+
+export type ImportRowSummary = {
+  uuid: string;
+  sourceRef: string;
+  name: string | null;
+  status: SelectImportRows["status"];
+  productUuid: string | null;
+  openIssues: number;
+};
+
+export const getImportRows = async (
+  batchUuid: string,
+): Promise<ImportRowSummary[]> => {
+  const rows = await db
+    .select({
+      uuid: ImportRows.uuid,
+      sourceRef: ImportRows.sourceRef,
+      payload: ImportRows.payload,
+      status: ImportRows.status,
+      productUuid: ImportRows.productUuid,
+      openIssues: sql<number>`(
+        SELECT COUNT(*) FROM ${ImportIssues} i
+        WHERE i.row_uuid = ${ImportRows.uuid} AND i.status = 'open')`,
+    })
+    .from(ImportRows)
+    .where(eq(ImportRows.batchUuid, batchUuid))
+    .orderBy(ImportRows.sourceRef);
+
+  return rows.map((row) => ({
+    uuid: row.uuid,
+    sourceRef: row.sourceRef,
+    name: row.payload?.name ?? null,
+    status: row.status,
+    productUuid: row.productUuid,
+    openIssues: Number(row.openIssues),
+  }));
+};
+
+/**
+ * What a category will accept, in the shape the parser reads.
+ *
+ * Suppressed attributes are dropped: a descendant that removed one is saying the
+ * attribute does not apply here, and offering it to the parser would file values
+ * under a field this category does not have.
+ *
+ * `offeredOptions` is the slice already narrowed and with retired values
+ * removed, so a value the category no longer offers surfaces as
+ * `outside_vocabulary` rather than being quietly accepted.
+ */
+export const importTargetsForCategory = async (
+  categoryUuid: string,
+): Promise<ImportTarget[]> => {
+  const resolved = await resolveCategoryAssignments(categoryUuid);
+  return resolved
+    .filter((assignment) => !assignment.suppressed)
+    .map((assignment) => ({
+      meta: assignment.definition,
+      key: assignment.definition.key,
+      labelAliases: assignment.definition.labelAliases,
+      enabledValues: assignment.offeredOptions.map((option) => option.value),
+    }));
+};

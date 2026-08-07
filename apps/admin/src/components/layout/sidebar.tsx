@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Award,
   FileText,
+  Inbox,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -46,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Library, label: "Spec Library", href: "/library" },
       { icon: Workflow, label: "Assignments", href: "/assignments" },
       { icon: Package, label: "Products", href: "/products" },
+      { icon: Inbox, label: "Imports", href: "/imports" },
     ],
   },
   {

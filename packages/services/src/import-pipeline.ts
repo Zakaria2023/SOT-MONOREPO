@@ -598,3 +598,71 @@ export const applyResolutions = (
 
   return values;
 };
+
+// ---------------------------------------------------------------------------
+// Reading pasted source
+// ---------------------------------------------------------------------------
+
+/**
+ * Source text a person pasted, split into products.
+ *
+ * A real import route, not a stopgap. Most of what a catalogue clerk has is a
+ * block of text off a spec page, and the alternative — wait for an extractor per
+ * vendor — leaves the whole queue untestable until the last vendor is written.
+ * Every other producer (a file, a crawler) lands on the same `stageImportRow`.
+ *
+ * The format is the one the text is already in: `Label: value` per line, blank
+ * line or a `#` between products. `#` names the product's source reference,
+ * which is what a second run recognises — a paste with no `#` gets its name,
+ * because two runs of the same paste should update rather than pile up.
+ */
+export const parsePastedSource = (text: string): SourceRow[] => {
+  const rows: SourceRow[] = [];
+  let current: SourceRow | null = null;
+
+  const flush = () => {
+    // A block that produced nothing at all is whitespace, not a product.
+    if (current && (current.name || current.fields.length > 0)) {
+      rows.push({ ...current, sourceRef: current.sourceRef || (current.name ?? "") });
+    }
+    current = null;
+  };
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+
+    if (line === "") {
+      flush();
+      continue;
+    }
+    if (line.startsWith("#")) {
+      flush();
+      current = { sourceRef: line.slice(1).trim(), fields: [] };
+      continue;
+    }
+
+    const separator = line.indexOf(":");
+    if (separator < 1) {
+      // A line with no label is not a field. Skipped rather than guessed at —
+      // a heading or a stray sentence turned into a value would be a field
+      // nobody wrote, queued as a question nobody can answer.
+      continue;
+    }
+    const label = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim();
+    current ??= { sourceRef: "", fields: [] };
+
+    if (label.toLowerCase() === "name") {
+      current.name = value;
+      continue;
+    }
+    if (label.toLowerCase() === "model") {
+      current.model = value;
+      continue;
+    }
+    current.fields.push({ label, text: value });
+  }
+  flush();
+
+  return rows;
+};

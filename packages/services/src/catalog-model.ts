@@ -118,6 +118,7 @@ const toDefinition = (
     options: vocabulary.options,
     groupFields: resolveGroupFields(row.groupFields ?? [], sets),
     key: row.key,
+    labelAliases: row.labelAliases,
     internalName: row.internalName,
     description: row.description,
     audience: row.audience,

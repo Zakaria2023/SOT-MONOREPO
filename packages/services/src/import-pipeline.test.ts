@@ -4,6 +4,7 @@ import {
   applyResolutions,
   issueGroupKey,
   parseQuantity,
+  parsePastedSource,
   parseSourceRow,
   parseSpan,
   type ImportTarget,
@@ -439,5 +440,52 @@ describe("applyResolutions", () => {
         },
       ]),
     ).toEqual({ ip: "IP66", elements: "PIR" });
+  });
+});
+
+describe("parsePastedSource", () => {
+  it("reads one product's labels and values", () => {
+    const rows = parsePastedSource(
+      ["# ajax.systems/domecam", "Name: DomeCam Mini", "Power draw: 4.8 W"].join("\n"),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sourceRef).toBe("ajax.systems/domecam");
+    expect(rows[0]?.name).toBe("DomeCam Mini");
+    expect(rows[0]?.fields).toEqual([{ label: "Power draw", text: "4.8 W" }]);
+  });
+
+  it("splits products on a # and on a blank line", () => {
+    const rows = parsePastedSource(
+      ["Name: A", "Power draw: 1 W", "", "Name: B", "Power draw: 2 W"].join("\n"),
+    );
+    expect(rows.map((row) => row.name)).toEqual(["A", "B"]);
+  });
+
+  it("falls back to the name as the reference", () => {
+    // Two runs of the same paste should update rather than pile up, and without
+    // a `#` the name is the only stable handle there is.
+    const rows = parsePastedSource("Name: DomeCam Mini\nPower draw: 4.8 W");
+    expect(rows[0]?.sourceRef).toBe("DomeCam Mini");
+  });
+
+  it("keeps a value containing a colon intact", () => {
+    // Only the FIRST colon separates. A URL or a ratio in the value would
+    // otherwise be cut in half.
+    const rows = parsePastedSource("Datasheet: https://example.com/a.pdf");
+    expect(rows[0]?.fields[0]).toEqual({
+      label: "Datasheet",
+      text: "https://example.com/a.pdf",
+    });
+  });
+
+  it("skips a line with no label rather than inventing a field", () => {
+    // A heading or a stray sentence turned into a value would be queued as a
+    // question nobody can answer.
+    const rows = parsePastedSource("Specifications\nPower draw: 4.8 W");
+    expect(rows[0]?.fields).toEqual([{ label: "Power draw", text: "4.8 W" }]);
+  });
+
+  it("ignores blocks that are only whitespace", () => {
+    expect(parsePastedSource("\n\n   \n\n")).toEqual([]);
   });
 });
