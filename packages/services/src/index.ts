@@ -32,6 +32,7 @@ export * from "./product-links";
 export * from "./product-completeness";
 export * from "./products";
 export * from "./relationship-engine";
+export * from "./relationship-diff";
 export * from "./relationships";
 export * from "./rule-reachability";
 export * from "./spec-values";

@@ -7,6 +7,7 @@ import {
   validateRelationAction,
 } from "@/app/(dashboard)/assignments/actions";
 import type { RelationshipInput, RelationshipProblem } from "services";
+import { RelationHistory } from "@/components/assignments/relation-history";
 import { RelationPreview } from "@/components/assignments/relation-preview";
 import { RowFilter } from "@/components/assignments/row-filter";
 import { Field } from "@/components/shared/field";
@@ -38,6 +39,7 @@ import type { LookupTable, Operand, Predicate, PresenceSpec } from "@/db/types";
 import {
   Check,
   FlaskConical,
+  History,
   Pencil,
   Plus,
   Trash2,
@@ -854,6 +856,7 @@ export const RelationBuilder = ({
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [error, setError] = useState<string>();
 
   const run = (action: () => Promise<{ error?: string }>): void => {
@@ -1043,6 +1046,16 @@ export const RelationBuilder = ({
                 </button>
                 <button
                   type="button"
+                  onClick={() =>
+                    setHistoryFor(historyFor === row.uuid ? null : row.uuid)
+                  }
+                  aria-label={`History of ${row.name}`}
+                  className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
+                >
+                  <History size={14} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => setEditing(row.uuid)}
                   aria-label={`Edit ${row.name}`}
                   className="rounded-control p-1.5 text-faint hover:bg-hover hover:text-ink"
@@ -1066,6 +1079,15 @@ export const RelationBuilder = ({
                 relation={row}
                 variables={variables}
                 onClose={() => setPreviewing(null)}
+              />
+            )}
+
+            {historyFor === row.uuid && (
+              <RelationHistory
+                relationUuid={row.uuid}
+                relationName={row.name}
+                onClose={() => setHistoryFor(null)}
+                onRestored={() => router.refresh()}
               />
             )}
           </div>

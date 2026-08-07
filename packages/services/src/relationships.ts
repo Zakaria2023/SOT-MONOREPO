@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import type {
@@ -20,6 +20,7 @@ import {
   type Predicate,
   type PresenceSpec,
   type RelationshipScope,
+  type RelationshipSnapshot,
 } from "../../../db/types";
 import { recordAudit } from "./catalog-audit";
 import {
@@ -40,10 +41,15 @@ import {
 } from "./relationship-engine";
 import { Products } from "../../../db/schema/products";
 import {
+  RelationshipVersions,
+  type SelectRelationshipVersions,
+} from "../../../db/schema/relationship-versions";
+import {
   diagnoseRules,
   type ProductFacts,
   type RuleReach,
 } from "./rule-reachability";
+import { diffSnapshots, type FieldChange } from "./relationship-diff";
 import { referencedAttributeUuids } from "./specification-library";
 import { groupSubField, unitFactor, type AttributeMeta } from "./spec-values";
 
@@ -61,25 +67,15 @@ import { groupSubField, unitFactor, type AttributeMeta } from "./spec-values";
 // presence rule with no trigger silently never fires.
 // ---------------------------------------------------------------------------
 
-export type RelationshipInput = {
-  name: string;
-  description: string | null;
-  family: RelationshipFamily;
-  gate: RelationshipGate;
-  comparator: RelationshipComparator;
-  matchMode: MatchMode;
-  headroomPercent: number;
-  ratioLimit: number | null;
-  allocation: RelationshipAllocation;
-  perItem: boolean;
-  consumer: Operand | null;
-  provider: Operand | null;
-  consumerWhen: Predicate | null;
-  providerWhen: Predicate | null;
-  lookup: LookupTable | null;
-  presence: PresenceSpec | null;
-  scope: RelationshipScope | null;
-};
+/**
+ * What an author submits.
+ *
+ * Declared AS the stored snapshot rather than beside it: a version restores by
+ * feeding its snapshot straight back through the update path, and if these two
+ * shapes were written out separately they would drift the first time a field was
+ * added to one of them.
+ */
+export type RelationshipInput = RelationshipSnapshot;
 
 const toEngine = (row: SelectRelationships): EngineRelationship => ({
   uuid: row.uuid,
@@ -620,6 +616,7 @@ export const createRelationship = async (
     ...toRow(input),
   });
 
+  await recordVersion(uuid, input, actor, null);
   await recordAudit({
     target: "relationship",
     action: "create",
@@ -635,6 +632,9 @@ export const updateRelationship = async (
   uuid: string,
   input: RelationshipInput,
   actor?: { uuid: string; name: string },
+  // Set only by a restore, which is the one save whose reason is not visible in
+  // the diff it produces.
+  note?: string | null,
 ): Promise<void> => {
   const problems = await validateRelationship(input);
   const first = problems[0];
@@ -652,6 +652,7 @@ export const updateRelationship = async (
     .set(toRow(input))
     .where(eq(Relationships.uuid, uuid));
 
+  await recordVersion(uuid, input, actor, note);
   await recordAudit({
     target: "relationship",
     action: "update",
@@ -988,4 +989,119 @@ export const traceDesign = async (
       summary: rule ? summarizeRelationship(rule, model) : "",
     };
   });
+};
+
+// ---------------------------------------------------------------------------
+// Versions
+// ---------------------------------------------------------------------------
+
+export type { SelectRelationshipVersions };
+
+export type RelationshipVersionEntry = {
+  version: SelectRelationshipVersions["version"];
+  name: SelectRelationshipVersions["name"];
+  actorName: SelectRelationshipVersions["actorName"];
+  note: SelectRelationshipVersions["note"];
+  createdAt: SelectRelationshipVersions["createdAt"];
+  snapshot: RelationshipSnapshot;
+  // What this save changed, against the version before it. Empty on version 1,
+  // which had nothing to differ from.
+  changes: FieldChange[];
+};
+
+/**
+ * Keep the state the rule is now in.
+ *
+ * Called after the write, never before: a version is a record of what the rule
+ * BECAME. Recording the attempt before it succeeds would leave a version nobody
+ * can restore to, because the row it describes never existed.
+ *
+ * The version number is read and written in one statement so two saves racing
+ * cannot both decide they are version 4 — and the unique constraint behind it
+ * turns any remaining race into an error rather than a silent duplicate.
+ */
+const recordVersion = async (
+  relationshipUuid: string,
+  input: RelationshipInput,
+  actor: { uuid: string; name: string } | undefined,
+  note: string | null | undefined,
+): Promise<void> => {
+  await db.insert(RelationshipVersions).values({
+    uuid: generateUuid(),
+    relationshipUuid,
+    version: sql`(SELECT COALESCE(MAX(v.version), 0) + 1 FROM ${RelationshipVersions} v WHERE v.relationship_uuid = ${relationshipUuid})`,
+    snapshot: input,
+    name: input.name,
+    actorUuid: actor?.uuid ?? null,
+    actorName: actor?.name ?? null,
+    note: note ?? null,
+  });
+};
+
+/**
+ * Every state this rule has been in, newest first, each with what it changed.
+ *
+ * The diff is computed against the version BELOW it in the list — the one it
+ * replaced — so each row reads as "this save did this", which is the question
+ * somebody opening a history is asking.
+ */
+export const listRelationshipVersions = async (
+  relationshipUuid: string,
+): Promise<RelationshipVersionEntry[]> => {
+  const rows = await db
+    .select()
+    .from(RelationshipVersions)
+    .where(eq(RelationshipVersions.relationshipUuid, relationshipUuid))
+    .orderBy(desc(RelationshipVersions.version));
+
+  return rows.map((row, index) => {
+    const previous = rows[index + 1];
+    return {
+      version: row.version,
+      name: row.name,
+      actorName: row.actorName,
+      note: row.note,
+      createdAt: row.createdAt,
+      snapshot: row.snapshot,
+      changes: previous ? diffSnapshots(previous.snapshot, row.snapshot) : [],
+    };
+  });
+};
+
+/**
+ * Put the rule back the way it was at a given version.
+ *
+ * A FORWARD operation. It writes the old snapshot through the ordinary update
+ * path, which validates it and records a new version of its own, so the history
+ * gains a step rather than losing one — and anyone reading it later can see that
+ * a restore happened and to what.
+ *
+ * Validation is the point, not an obstacle: a snapshot that was correct when it
+ * was taken may name an attribute deleted since, and restoring it unchecked
+ * would resurrect a rule that silently never runs.
+ */
+export const restoreRelationshipVersion = async (
+  relationshipUuid: string,
+  version: number,
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  const [row] = await db
+    .select()
+    .from(RelationshipVersions)
+    .where(
+      and(
+        eq(RelationshipVersions.relationshipUuid, relationshipUuid),
+        eq(RelationshipVersions.version, version),
+      ),
+    );
+  if (!row) {
+    throw new ValidationError("That version no longer exists.");
+  }
+
+  await updateRelationship(
+    relationshipUuid,
+    row.snapshot,
+    actor,
+    `Restored from v${version}`,
+  );
 };

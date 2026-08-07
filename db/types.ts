@@ -25,7 +25,10 @@ import {
   FindingStatus,
   MatchMode,
   PredicateOperator,
+  RelationshipAllocation,
+  RelationshipComparator,
   RelationshipFamily,
+  RelationshipGate,
 } from "./enum";
 
 // ---------------------------------------------------------------------------
@@ -647,4 +650,36 @@ export type ScenarioRuleVerdict = {
 // the wording of a finding would be turned off within a week.
 export type ScenarioSnapshot = {
   rules: ScenarioRuleVerdict[];
+};
+
+// ---------------------------------------------------------------------------
+// A rule, as it was authored
+// ---------------------------------------------------------------------------
+
+// Every field an author controls on a relationship — no uuid, no timestamps, no
+// status. Exactly what it takes to reconstruct the rule and nothing that
+// identifies which rule it is.
+//
+// It lives here rather than in the services package because a stored version is
+// a JSON column, and a column's shape cannot be defined by the layer that reads
+// it. `RelationshipInput` is then declared AS this type, so the thing an author
+// submits and the thing a version restores can never drift apart.
+export type RelationshipSnapshot = {
+  name: string;
+  description: string | null;
+  family: RelationshipFamily;
+  gate: RelationshipGate;
+  comparator: RelationshipComparator;
+  matchMode: MatchMode;
+  headroomPercent: number;
+  ratioLimit: number | null;
+  allocation: RelationshipAllocation;
+  perItem: boolean;
+  consumer: Operand | null;
+  provider: Operand | null;
+  consumerWhen: Predicate | null;
+  providerWhen: Predicate | null;
+  lookup: LookupTable | null;
+  presence: PresenceSpec | null;
+  scope: RelationshipScope | null;
 };

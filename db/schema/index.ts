@@ -19,6 +19,7 @@ export * from "./product-compatibility";
 export * from "./product-composition";
 export * from "./products";
 export * from "./project-variables";
+export * from "./relationship-versions";
 export * from "./relationships";
 export * from "./specification-categories";
 export * from "./specification-groups";

@@ -5,8 +5,10 @@ import { revalidatePath } from "next/cache";
 import {
   createRelationship,
   deleteRelationship,
+  listRelationshipVersions,
   previewRelationship,
   removeAssignment,
+  restoreRelationshipVersion,
   saveAssignment,
   searchProductsForPicker,
   suppressInherited,
@@ -19,6 +21,7 @@ import type {
   RelationshipInput,
   RelationshipPreview,
   RelationshipProblem,
+  RelationshipVersionEntry,
 } from "services";
 import { fail, type ActionResult } from "utils";
 
@@ -164,5 +167,41 @@ export const previewRelationAction = async (
     return { preview };
   } catch (error) {
     return fail(error, "Failed to run the preview");
+  }
+};
+
+/**
+ * Every state a rule has been in, with what each save changed.
+ *
+ * The audit trail knows a rule was edited and by whom; it diffs three scalar
+ * fields, so re-pointing a rule at a different attribute left no trace anywhere.
+ * This reads the stored snapshots instead.
+ */
+export const listRelationVersionsAction = async (
+  uuid: string,
+): Promise<RelationshipVersionEntry[]> => {
+  await requireAdmin();
+  return listRelationshipVersions(uuid);
+};
+
+/**
+ * Put a rule back the way it was.
+ *
+ * Forward, never destructive: it saves the old snapshot as a new version, so the
+ * history shows the restore instead of hiding what it undid. The ordinary save
+ * validation applies, which is what stops a snapshot naming a since-deleted
+ * attribute being resurrected as a rule that silently never runs.
+ */
+export const restoreRelationVersionAction = async (
+  uuid: string,
+  version: number,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await restoreRelationshipVersion(uuid, version, actor);
+    refreshCatalog();
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to restore that version");
   }
 };
