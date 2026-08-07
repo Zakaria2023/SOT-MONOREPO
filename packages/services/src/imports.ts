@@ -461,11 +461,16 @@ export const listImportBatches = async (): Promise<ImportBatchSummary[]> => {
       source: ImportBatches.source,
       status: ImportBatches.status,
       createdAt: ImportBatches.createdAt,
-      rows: sql<number>`(SELECT COUNT(*) FROM ${ImportRows} r WHERE r.batch_uuid = ${ImportBatches.uuid})`,
+      // The outer column is written table-qualified rather than as
+      // `${ImportBatches.uuid}`, which drizzle renders bare. `ImportRows` has a
+      // `uuid` of its own, so the bare form makes the correlation ambiguous and
+      // MySQL refuses the whole query — a failure no test and no build sees,
+      // because it only exists once there is real SQL to run.
+      rows: sql<number>`(SELECT COUNT(*) FROM ${ImportRows} r WHERE r.batch_uuid = \`ImportBatches\`.\`uuid\`)`,
       openIssues: sql<number>`(
         SELECT COUNT(*) FROM ${ImportIssues} i
         JOIN ${ImportRows} r ON r.uuid = i.row_uuid
-        WHERE r.batch_uuid = ${ImportBatches.uuid} AND i.status = 'open')`,
+        WHERE r.batch_uuid = \`ImportBatches\`.\`uuid\` AND i.status = 'open')`,
     })
     .from(ImportBatches)
     .orderBy(sql`${ImportBatches.createdAt} DESC`);
@@ -505,9 +510,14 @@ export const getImportRows = async (
       payload: ImportRows.payload,
       status: ImportRows.status,
       productUuid: ImportRows.productUuid,
+      // Table-qualified for the same reason as listImportBatches, but this one
+      // is the dangerous shape: `ImportIssues` has a `uuid` too, so a bare
+      // `uuid` here does not error — MySQL resolves it to the SUBQUERY's column,
+      // compares a row_uuid against its own uuid, and returns 0 every time.
+      // Every row would read "Ready" with questions still open on it.
       openIssues: sql<number>`(
         SELECT COUNT(*) FROM ${ImportIssues} i
-        WHERE i.row_uuid = ${ImportRows.uuid} AND i.status = 'open')`,
+        WHERE i.row_uuid = \`ImportRows\`.\`uuid\` AND i.status = 'open')`,
     })
     .from(ImportRows)
     .where(eq(ImportRows.batchUuid, batchUuid))
