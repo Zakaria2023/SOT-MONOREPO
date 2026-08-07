@@ -1,6 +1,6 @@
-import type { ImportIssueType } from "../../../db/enum";
-import type { ImportProposal } from "../../../db/schema/imports";
-import type { ProductValue, SpecRange } from "../../../db/types";
+import type { ImportIssueStatus, ImportIssueType } from "../../../db/enum";
+import type { ImportPayload, ImportProposal } from "../../../db/schema/imports";
+import type { ProductValue, ProductValues, SpecRange } from "../../../db/types";
 import { resolveAttributeByText, resolveOptionByText } from "./library-options";
 import { convert, type AttributeMeta } from "./spec-values";
 
@@ -539,4 +539,62 @@ export const parseSourceRow = (
     specValues,
     issues,
   };
+};
+
+// ---------------------------------------------------------------------------
+// Laying the reviewer's answers over the parser's draft
+// ---------------------------------------------------------------------------
+
+/** An answered issue, reduced to what the commit step reads. */
+export type ResolvedIssue = {
+  status: ImportIssueStatus;
+  specificationUuid: string | null;
+  resolvedValue: ImportProposal | null;
+};
+
+/**
+ * The parser's draft with the reviewer's answers laid over it.
+ *
+ * Applied at commit rather than written back into the payload, so changing one's
+ * mind re-answers an issue instead of rewriting every row that shares it. The
+ * payload stays exactly what the parser produced — which is what makes keeping
+ * the source text worthwhile: draft plus answer explains any stored value.
+ *
+ * A `rejected` issue contributes nothing, and that IS the answer: the field
+ * stays empty. Empty is empty — never zero, never "N/A", never "None" unless the
+ * source said so.
+ *
+ * An `open` issue contributes nothing either, but a row carrying one must never
+ * reach here — the commit path refuses first. This is a second line, not the
+ * gate: a half-answered row committing quietly is the one outcome worth two
+ * checks.
+ */
+export const applyResolutions = (
+  payload: ImportPayload | null,
+  issues: ResolvedIssue[],
+): ProductValues => {
+  const values: ProductValues = { ...(payload?.specValues ?? {}) };
+
+  for (const issue of issues) {
+    if (issue.status === "rejected" || issue.status === "open") {
+      continue;
+    }
+    const answer = issue.resolvedValue;
+    if (!answer) {
+      continue;
+    }
+    const uuid = answer.specificationUuid ?? issue.specificationUuid;
+    if (!uuid) {
+      continue;
+    }
+    // `value` wins over `option` when both are present: it is the typed form,
+    // and a multi-select answer has to arrive as an array rather than one
+    // string. `option` is the convenience for the ordinary single-select case.
+    const resolved = answer.value ?? answer.option;
+    if (resolved !== undefined) {
+      values[uuid] = resolved;
+    }
+  }
+
+  return values;
 };
