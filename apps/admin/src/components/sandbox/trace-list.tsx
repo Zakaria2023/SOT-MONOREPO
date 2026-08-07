@@ -78,6 +78,33 @@ const TraceRow = ({ traced }: TraceRowProps) => {
             .join("; ")}
         </p>
       )}
+
+      {/* The bin packing. The engine has always computed which physical unit
+          each item was placed on, and nothing has ever shown it — so "over
+          budget across 4 devices" was as much as anyone could find out. For
+          whoever is debugging the rule, WHICH switch filled up is the answer. */}
+      {finding.bins.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          {finding.bins.map((bin) => (
+            <p
+              key={`${bin.productUuid}-${bin.unitIndex}`}
+              className="flex items-baseline justify-between gap-2 font-mono text-[11px] opacity-80"
+            >
+              <span className="min-w-0 line-clamp-1">
+                {bin.name} #{bin.unitIndex + 1}
+                {bin.items.length > 0 &&
+                  ` · ${bin.items
+                    .map((item) => `${item.count}× ${item.name}`)
+                    .join(", ")}`}
+              </span>
+              <span className="shrink-0">
+                {bin.used}/{bin.capacity}
+                {finding.unit ?? ""}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
