@@ -14,6 +14,7 @@ import {
 import { missingParts, type MissingPart } from "./product-composition";
 import {
   evaluateSelection,
+  splitPasses,
   type EngineVariable,
   type Finding,
 } from "./relationship-engine";
@@ -36,7 +37,10 @@ export type DesignFinding = {
   title: string;
   message: string;
   family: RelationshipFamily;
-  tone: "block" | "warn" | "unknown";
+  // `partial` is a pass that could not read every item it matched. It is not
+  // `unknown` — that would tell a buyer nothing was checked when most of it was —
+  // and it is not a plain pass either.
+  tone: "block" | "warn" | "unknown" | "partial";
   corrections: {
     shape: CorrectionShape;
     message: string;
@@ -58,9 +62,25 @@ export type DesignCheckResult = {
   // buyer has not answered. Surfaced, never swallowed: a check we could not run
   // must not look like a check that passed.
   unknowns: DesignFinding[];
+  // Checks that DID reach a verdict, and could not read every item they matched.
+  //
+  // The engine has always carried the skipped items on the finding. The finding
+  // itself used to be thrown away when its status was `pass`, so a rule that
+  // approved three products while unable to read five reported as a clean pass
+  // and the buyer was told nothing at all. That is the precise failure the
+  // skipped list exists to prevent, reintroduced at this boundary.
+  //
+  // Not a failure — what the rule could read was fine — and so it does not gate.
+  // But it is not the clean pass `passed` implies either, which is why it is
+  // counted apart from it rather than folded in.
+  partial: DesignFinding[];
   // Questions whose answers would change a finding above. Empty when the rules
   // this basket touched need nothing from the buyer.
   questions: DesignQuestion[];
+  // Rules that passed having read everything they matched. Deliberately NOT the
+  // total number of passes — a partial pass is reported in `partial`, so this
+  // number can be shown to a buyer as "checks that fully cleared" without it
+  // being a lie.
   passed: number;
   // True when the engine itself failed. The sale is allowed through (blocking
   // real revenue on our own bug is worse than shipping one bad design) but the
@@ -82,12 +102,16 @@ const toFinding = (finding: Finding): DesignFinding => ({
   title: finding.name,
   message: finding.message,
   family: finding.family,
+  // A `pass` only ever reaches here through the partial list — a clean pass is
+  // counted, not carried — so mapping it to `partial` cannot mislabel anything.
   tone:
     finding.status === "block"
       ? "block"
       : finding.status === "warn"
         ? "warn"
-        : "unknown",
+        : finding.status === "pass"
+          ? "partial"
+          : "unknown",
   corrections: finding.corrections,
   failingProductUuids: finding.failingItems.map((item) => item.productUuid),
   skipped: finding.skipped,
@@ -192,6 +216,7 @@ const EMPTY: DesignCheckResult = {
   blockers: [],
   warnings: [],
   unknowns: [],
+  partial: [],
   questions: [],
   passed: 0,
   degraded: false,
@@ -260,16 +285,22 @@ export const checkDesign = async (
       })),
     ).map((missing) => compositionFinding(missing, selection));
 
+    // A pass that could not read everything it matched, told apart from one that
+    // could. The engine's own `passed` total counts both together, and a buyer
+    // has to be able to see the difference.
+    const { clean, partial } = splitPasses(report.findings);
+
     return {
       blockers: [...report.blockers.map(toFinding), ...brandBlocks],
       warnings: [...report.warnings.map(toFinding), ...compositionWarnings],
       unknowns: report.unknowns.map(toFinding),
+      partial: partial.map(toFinding),
       questions: pendingQuestions(
         report.findings,
         model.relationships,
         variables,
       ),
-      passed: report.passed,
+      passed: clean,
       degraded: false,
     };
   } catch (error) {
@@ -291,6 +322,11 @@ export type GateDecision = {
   // what we managed to check cannot later tell "nothing was wrong" from "we
   // never looked", and that snapshot is how a wrong rule gets found.
   unknowns: DesignFinding[];
+  // Checks that cleared without covering everything. Carried into the snapshot
+  // for exactly the reason the unknowns are: an order that recorded "all checks
+  // passed" when five products were never read cannot later be told apart from
+  // one that was genuinely clean, and that snapshot is how a wrong rule is found.
+  partial: DesignFinding[];
   // Questions still unanswered at the moment of the decision. Carried for the
   // same reason as the unknowns: a refusal that says "incompatible" when the real
   // problem is a question nobody was asked sends the buyer looking for a fault in
@@ -333,6 +369,7 @@ export const gateSelection = async (
     blockers: result.blockers,
     warnings: result.warnings,
     unknowns: result.unknowns,
+    partial: result.partial,
     questions: result.questions,
     overridden,
     degraded: result.degraded,

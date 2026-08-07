@@ -148,7 +148,12 @@ export const DesignSandbox = () => {
   const findings = useMemo(
     () =>
       result
-        ? [...result.blockers, ...result.warnings, ...result.unknowns]
+        ? [
+            ...result.blockers,
+            ...result.warnings,
+            ...result.unknowns,
+            ...result.partial,
+          ]
         : [],
     [result],
   );
@@ -284,6 +289,12 @@ export const DesignSandbox = () => {
             <span className="text-secondary">
               <span className="font-medium text-ink">{result.passed}</span>{" "}
               passed
+            </span>
+            <span className="text-secondary">
+              <span className="font-medium text-ink">
+                {result.partial.length}
+              </span>{" "}
+              partial
             </span>
             <span className="text-secondary">
               <span className="font-medium text-red-400">

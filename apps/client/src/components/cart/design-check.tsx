@@ -17,11 +17,24 @@ type DesignCheckProps = {
   // check we could not run must not look like a check that passed, and the
   // green "your design checks out" panel is exactly what it would look like.
   unknowns?: DesignFinding[];
+  // Checks that DID clear, without being able to read every product they cover.
+  // Separate from `unknowns` because the two are different facts — "we could not
+  // look at all" against "we looked, and not at everything" — and separate from
+  // the green panel because neither of them is "all clear".
+  partial?: DesignFinding[];
 };
 
 type FindingRowProps = {
   finding: DesignFinding;
   tone: "block" | "warn";
+};
+
+type SkippedRowProps = {
+  finding: DesignFinding;
+  // Whether the rule reached a verdict on what it COULD read. It changes the
+  // sentence entirely, and getting it wrong would either alarm a buyer whose
+  // design is fine or reassure one whose design was never checked.
+  reachedVerdict: boolean;
 };
 
 const FindingRow = ({ finding, tone }: FindingRowProps) => (
@@ -79,18 +92,20 @@ const FindingRow = ({ finding, tone }: FindingRowProps) => (
  * is built from them and the sentence is used only when a check was skipped for a
  * reason that names no product at all (a unit mismatch in the library, say).
  */
-const UnknownRow = ({ finding }: { finding: DesignFinding }) => (
+const SkippedRow = ({ finding, reachedVerdict }: SkippedRowProps) => (
   <div className="font-grotesk text-sm">
     <p className="font-semibold text-sky-900">{finding.title}</p>
 
     {finding.skipped.length > 0 ? (
       <>
         <p className="mt-0.5 text-sky-800">
-          Missing data on{" "}
-          {finding.skipped.length === 1
-            ? "one product"
-            : `${finding.skipped.length} products`}
-          , so this check was left out:
+          {reachedVerdict
+            ? "Everything we could read is fine. These were left out of it:"
+            : `Missing data on ${
+                finding.skipped.length === 1
+                  ? "one product"
+                  : `${finding.skipped.length} products`
+              }, so this check was left out:`}
         </p>
         <ul className="mt-2 flex flex-col gap-1.5">
           {finding.skipped.map((item) => (
@@ -119,8 +134,14 @@ export const DesignCheck = ({
   blockers,
   warnings,
   unknowns = [],
+  partial = [],
 }: DesignCheckProps) => {
-  if (blockers.length === 0 && warnings.length === 0 && unknowns.length === 0) {
+  if (
+    blockers.length === 0 &&
+    warnings.length === 0 &&
+    unknowns.length === 0 &&
+    partial.length === 0
+  ) {
     return (
       <section className="flex items-center gap-2 rounded-[18px] border border-emerald-200 bg-emerald-50 p-4">
         <CheckCircle2 size={18} className="text-emerald-600" />
@@ -185,12 +206,46 @@ export const DesignCheck = ({
 
           <div className="mt-4 flex flex-col gap-4">
             {unknowns.map((finding) => (
-              <UnknownRow key={finding.id} finding={finding} />
+              <SkippedRow
+                key={finding.id}
+                finding={finding}
+                reachedVerdict={false}
+              />
             ))}
           </div>
 
           <p className="font-grotesk mt-4 border-t border-sky-200 pt-3 text-xs text-sky-700">
             You can still order. Ask us to confirm these before you install.
+          </p>
+        </section>
+      )}
+
+      {/* A pass that did not cover everything. Its own panel for the same reason
+          the unknowns have theirs: it used to be counted as a clean pass, which
+          told a buyer their design was checked when most of it never was. */}
+      {partial.length > 0 && (
+        <section className="rounded-[18px] border border-slate-200 bg-slate-50 p-5">
+          <div className="flex items-center gap-2">
+            <HelpCircle size={18} className="text-slate-500" />
+            <h2 className="font-heading text-base text-slate-900">
+              {partial.length} {partial.length === 1 ? "check" : "checks"}{" "}
+              cleared, but not on everything
+            </h2>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-4">
+            {partial.map((finding) => (
+              <SkippedRow
+                key={finding.id}
+                finding={finding}
+                reachedVerdict={true}
+              />
+            ))}
+          </div>
+
+          <p className="font-grotesk mt-4 border-t border-slate-200 pt-3 text-xs text-slate-600">
+            Nothing here is wrong with your design. These products are missing
+            values we need, so they sat the check out.
           </p>
         </section>
       )}

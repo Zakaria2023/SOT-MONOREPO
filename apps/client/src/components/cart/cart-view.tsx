@@ -253,7 +253,7 @@ export const CartView = ({
 
   // Design check over everything in the cart, re-run (debounced) on change.
   // Blockers (missing companions + broken rules) must be fixed; warnings caution.
-  const { blockers, warnings, unknowns, questions } = useCompatibility(
+  const { blockers, warnings, unknowns, partial, questions } = useCompatibility(
     items,
     answers,
   );
@@ -339,6 +339,7 @@ export const CartView = ({
               blockers={blockers}
               warnings={warnings}
               unknowns={unknowns}
+              partial={partial}
             />
 
             {/* Below the findings, because the questions only make sense once the

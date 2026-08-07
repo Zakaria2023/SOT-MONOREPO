@@ -29,12 +29,14 @@ const TONE_STYLE: Record<DesignFinding["tone"], string> = {
   block: "border-red-500/30 bg-red-500/10 text-red-400",
   warn: "border-amber-500/30 bg-amber-500/10 text-amber-500",
   unknown: "border-blue-500/30 bg-blue-500/10 text-blue-400",
+  partial: "border-hairline bg-hover text-secondary",
 };
 
 const TONE_LABEL: Record<DesignFinding["tone"], string> = {
   block: "Blocks the order",
   warn: "Warns the buyer",
   unknown: "Could not be judged",
+  partial: "Cleared, but not on everything",
 };
 
 export const FindingCard = ({
