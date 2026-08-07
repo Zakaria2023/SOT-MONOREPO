@@ -675,3 +675,69 @@ export const businessLines = [
 ] as const satisfies readonly string[];
 
 export type BusinessLine = (typeof businessLines)[number];
+
+// Where an import run has got to. `parsing` is the dry run reading the source;
+// `review` is a human working the queue; `committed` means its ready rows became
+// products. A batch is never skipped straight to committed — that is the whole
+// point of the queue.
+export const importBatchStatuses = [
+  "parsing",
+  "review",
+  "committed",
+  "discarded",
+] as const satisfies readonly string[];
+
+export type ImportBatchStatus = (typeof importBatchStatuses)[number];
+
+// What happened to ONE source product.
+//
+// There is deliberately no `ready` state. Whether a row may commit is "it has no
+// open issues", and that is already recorded on the issues — a second copy of it
+// here would be a fact stored twice, and the day the two disagree a row commits
+// with an unresolved value in it.
+export const importRowStatuses = [
+  "pending",
+  "committed",
+  "rejected",
+] as const satisfies readonly string[];
+
+export type ImportRowStatus = (typeof importRowStatuses)[number];
+
+// Why the importer stopped and asked. Each one renders differently in the review
+// queue, so the list is fixed rather than a free string: an issue type nobody
+// wrote a UI for is an issue nobody can resolve, and the row never commits.
+export const importIssueTypes = [
+  // A value the master list has never seen. Controlled-add or map to a canonical
+  // one — never auto-created, which is the rule the whole queue exists to keep.
+  "unknown_value",
+  // A source label that resolves to no attribute, and no labelAlias claims it.
+  "unknown_attribute",
+  // Resolves to a real option, but one this category's slice does not offer.
+  "outside_vocabulary",
+  // Two places in the source disagree. DoorProtect U says CR123A in its body and
+  // CR131A in its table. Flagged, never resolved by preferring one silently.
+  "contradiction",
+  // A number whose unit cannot be read, or two units that do not convert.
+  "unit_ambiguity",
+  // Text that no parser could turn into the attribute's declared type.
+  "unparseable",
+  // One source page describing several products. Which variants become rows is a
+  // judgement: separate whenever a difference touches a rule-bearing attribute.
+  "multi_variant",
+] as const satisfies readonly string[];
+
+export type ImportIssueType = (typeof importIssueTypes)[number];
+
+// How a human answered.
+//
+// `approved` takes the importer's proposal as-is; `corrected` supplies a
+// different value; `rejected` drops the value and leaves the field empty —
+// which is a real answer, since empty is empty and never zero or "N/A".
+export const importIssueStatuses = [
+  "open",
+  "approved",
+  "corrected",
+  "rejected",
+] as const satisfies readonly string[];
+
+export type ImportIssueStatus = (typeof importIssueStatuses)[number];

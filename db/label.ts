@@ -10,6 +10,10 @@ import {
   BoqStatus,
   GovernmentRequestStatus,
   HandoverCredentialType,
+  ImportBatchStatus,
+  ImportIssueStatus,
+  ImportIssueType,
+  ImportRowStatus,
   HandoverStatus,
   InvoiceStatus,
   OfferPresentationMode,
@@ -312,4 +316,34 @@ export const CATALOG_AUDIT_ACTION_LABELS: Record<CatalogAuditAction, string> = {
   update: "Changed",
   delete: "Deleted",
   publish: "Published",
+};
+
+export const IMPORT_BATCH_STATUS_LABELS: Record<ImportBatchStatus, string> = {
+  parsing: "Reading source",
+  review: "Awaiting review",
+  committed: "Committed",
+  discarded: "Discarded",
+};
+
+export const IMPORT_ROW_STATUS_LABELS: Record<ImportRowStatus, string> = {
+  pending: "Pending",
+  committed: "Committed",
+  rejected: "Rejected",
+};
+
+export const IMPORT_ISSUE_TYPE_LABELS: Record<ImportIssueType, string> = {
+  unknown_value: "Unknown value",
+  unknown_attribute: "Unknown attribute",
+  outside_vocabulary: "Not offered by this category",
+  contradiction: "Sources disagree",
+  unit_ambiguity: "Unit unclear",
+  unparseable: "Could not be read",
+  multi_variant: "Several products on one page",
+};
+
+export const IMPORT_ISSUE_STATUS_LABELS: Record<ImportIssueStatus, string> = {
+  open: "Open",
+  approved: "Approved",
+  corrected: "Corrected",
+  rejected: "Rejected",
 };
