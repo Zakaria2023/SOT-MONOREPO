@@ -20,6 +20,7 @@ import {
   type SourceRow,
 } from "./import-pipeline";
 import { createProduct, updateProduct } from "./products";
+import { addOptionToAttribute } from "./specification-library";
 
 // THE COMMIT PATH — how an answered queue becomes products.
 //
@@ -199,16 +200,25 @@ export const getOpenIssueGroups = async (
  * The whole reason `groupKey` exists. One write settles every open issue that
  * asked the same thing, and the reviewer's name goes on all of them.
  *
- * An option must already be in the master list. Adding one is a LIBRARY action
- * with its own guards — alias conflicts, append-only, the retired flag — and
- * letting a resolution create one as a side effect is precisely the silent fork
- * the queue was built to prevent. The refusal names what to add.
+ * An option must be on the master list before it can be an answer. A reviewer
+ * who has met a genuinely new value passes `addOption` and it is added first —
+ * through the library's own guards, never by pushing onto an array — so the
+ * call that answers the question is the call that made the answer valid.
+ *
+ * Without that flag an unrecognised value is refused and named. The distinction
+ * is the "controlled" in controlled-add: a new word enters the vocabulary
+ * because somebody said so, not as a side effect of clearing a queue.
  */
 export const resolveIssueGroup = async (input: {
   batchUuid: string;
   groupKey: string;
   status: "approved" | "corrected" | "rejected";
   resolution?: ImportProposal;
+  // Controlled-add, and the word "controlled" is the whole point: a new option
+  // enters the master list only because a reviewer said so, explicitly, on this
+  // call. Absent, an unrecognised value is refused and named. It is never a
+  // side effect of answering a question.
+  addOption?: { label: string; aliases?: string[] };
   decidedBy?: string;
 }): Promise<number> => {
   const { batchUuid, groupKey, status, resolution } = input;
@@ -241,8 +251,24 @@ export const resolveIssueGroup = async (input: {
     );
   }
 
-  const answer = status === "rejected" ? null : (resolution ?? targets[0]?.proposedValue ?? null);
+  let answer =
+    status === "rejected" ? null : (resolution ?? targets[0]?.proposedValue ?? null);
   const specUuid = answer?.specificationUuid ?? targets[0]?.specificationUuid ?? null;
+
+  // Adding the value comes FIRST, so the same call that answers the question is
+  // the one that made the answer valid. Adding it afterwards would leave a
+  // window where the issues are resolved and point at a value the library does
+  // not have — and a failure between the two would be exactly that state, on
+  // disk, with nothing saying why the rows will not commit.
+  if (input.addOption && status !== "rejected") {
+    if (!specUuid) {
+      throw new ValidationError(
+        "That question is not about one attribute, so there is no master list to add to.",
+      );
+    }
+    const value = await addOptionToAttribute(specUuid, input.addOption);
+    answer = { ...(answer ?? {}), option: value };
+  }
 
   if (answer?.option && specUuid) {
     await assertOptionExists(specUuid, answer.option);
