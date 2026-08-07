@@ -32,6 +32,7 @@ import {
 import type { Viewer } from "./assignment-resolver";
 import { ValidationError } from "./errors";
 import { normalizeProductValues } from "./product-completeness";
+import { chooseProductSlug } from "./product-slug";
 import { signatureForVariants } from "./variants";
 
 export type { SelectProducts };
@@ -243,6 +244,48 @@ export const generateProductSku = async (input: {
   const seq = (used.length ? Math.max(...used) : 0) + 1;
 
   return `${prefix}-${String(seq).padStart(2, "0")}`;
+};
+
+/**
+ * The slug this product should hold — derived from its name, never supplied.
+ *
+ * `slug` is NOT NULL UNIQUE, and a name is not an identity: a product IS brand +
+ * model + variants (see assertIdentityIsFree). So two rows sharing a name are
+ * legitimate and common — 86 of Ajax's 290 — and the second one must still save.
+ * It gets `-2`.
+ *
+ * Only the slug's own family is read, not every product: the `LIKE base-%` range
+ * rides the unique index instead of scanning the table on every write. slugify
+ * emits `[a-z0-9-]` only, so there is no LIKE wildcard to escape.
+ *
+ * A product keeps the slug it already has whenever its name still derives the
+ * same base, for the same reason generateProductSku keeps a stable code: a URL
+ * that changes because an unrelated sibling was renamed is a dead link, and
+ * `-2` shuffling between two rows on every edit is worse than either order.
+ */
+const resolveProductSlug = async (
+  name: string,
+  selfUuid?: string,
+): Promise<string> => {
+  const base = slugify(name);
+  if (!base) {
+    throw new ValidationError(
+      "This product's name has no letters or digits to build a slug from.",
+    );
+  }
+
+  const family = await db
+    .select({ uuid: Products.uuid, slug: Products.slug })
+    .from(Products)
+    .where(or(eq(Products.slug, base), like(Products.slug, `${base}-%`)));
+
+  const slug = chooseProductSlug(name, family, selfUuid);
+  if (!slug) {
+    throw new ValidationError(
+      "This product's name has no letters or digits to build a slug from.",
+    );
+  }
+  return slug;
 };
 
 /**
@@ -497,16 +540,17 @@ export const createProduct = async (
   const identity = await resolveIdentity(fields);
   await assertIdentityIsFree(fields.brandUuid, identity.model, identity.variantKey);
 
-  // The row count, the SKU and the normalized values are independent of one
-  // another — only the insert needs all three — so they go out together
-  // instead of in three serial waits.
-  const [[{ total }], sku, specValues] = await Promise.all([
+  // The row count, the SKU, the slug and the normalized values are independent
+  // of one another — only the insert needs all four — so they go out together
+  // instead of in four serial waits.
+  const [[{ total }], sku, slug, specValues] = await Promise.all([
     db.select({ total: count() }).from(Products),
     generateProductSku({
       brandUuid: fields.brandUuid,
       categoryUuid: fields.categoryUuid,
       seriesCode: fields.seriesCode,
     }),
+    resolveProductSlug(fields.name),
     // The form's values are convenience, never the authority: the server coerces
     // each one to the type its attribute declares and drops anything the reveal
     // conditions now hide. A leftover value on a hidden field would still feed
@@ -519,9 +563,9 @@ export const createProduct = async (
     ...identity,
     specValues,
     sku,
+    slug,
     uuid,
     order: total,
-    slug: slugify(fields.name),
   });
   return uuid;
 };
@@ -538,15 +582,17 @@ export const updateProduct = async (
     uuid,
   );
 
-  // Regenerating the SKU (stable when brand/category/series are unchanged) and
-  // normalizing the values are independent — only the update needs both.
-  const [sku, specValues] = await Promise.all([
+  // Regenerating the SKU (stable when brand/category/series are unchanged),
+  // re-resolving the slug (stable when the name still derives the same base) and
+  // normalizing the values are independent — only the update needs all three.
+  const [sku, slug, specValues] = await Promise.all([
     generateProductSku({
       brandUuid: fields.brandUuid,
       categoryUuid: fields.categoryUuid,
       seriesCode: fields.seriesCode,
       productUuid: uuid,
     }),
+    resolveProductSlug(fields.name, uuid),
     normalizeProductValues(fields.categoryUuid, fields.specValues ?? {}),
   ]);
 
@@ -557,7 +603,7 @@ export const updateProduct = async (
       ...identity,
       specValues,
       sku,
-      slug: slugify(fields.name),
+      slug,
     })
     .where(eq(Products.uuid, uuid));
 };

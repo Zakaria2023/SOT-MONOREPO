@@ -411,6 +411,32 @@ export const resolveUniqueCode = (
   }
 };
 
+/**
+ * Picks a slug that isn't already in `taken`, appending `-2`, `-3` ... until one
+ * is free.
+ *
+ * Deliberately NOT resolveUniqueCode: a code is a fixed-width SKU segment, so it
+ * absorbs its suffix by truncating (SW -> SW2). A slug is a URL and has no width
+ * to protect, so it grows a hyphenated suffix instead and keeps the whole name
+ * readable — `bulletcam-hl-2`, never `bulletcam-h2`.
+ *
+ * This exists because a slug is NOT NULL UNIQUE while several products
+ * legitimately share a name: 86 of Ajax's 290 products are a sibling's name plus
+ * a variant that lives in another column. Without this the 87th insert dies on a
+ * driver-level duplicate-key error halfway through an import.
+ */
+export const resolveUniqueSlug = (base: string, taken: Set<string>): string => {
+  if (!taken.has(base)) {
+    return base;
+  }
+  for (let n = 2; ; n++) {
+    const candidate = `${base}-${n}`;
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+};
+
 /** Two-letter initials from a full name, e.g. "Zakaria Asad" -> "ZA". */
 export const getInitials = (fullName: string): string => {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
