@@ -26,6 +26,8 @@ export * from "./partner-discounts";
 export * from "./price-resolution";
 export * from "./product-pricing";
 export * from "./partners";
+export * from "./partner-payables";
+export * from "./platform-financials";
 export * from "./payouts";
 export * from "./predicate";
 export * from "./product-compatibility";

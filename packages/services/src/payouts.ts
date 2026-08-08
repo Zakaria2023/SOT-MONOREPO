@@ -220,7 +220,14 @@ export const requestPayout = async ({
 /** SOT settles a requested payout — transfers the money and clears the ledger. */
 export const markPayoutPaid = async (
   payoutUuid: string,
+  // How the transfer can be found again. Required rather than optional: a
+  // payout marked paid that cannot be matched to a bank statement is an
+  // assertion, not a record.
+  transfer: { reference: string; by: string },
 ): Promise<SelectPartnerPayouts> => {
+  if (transfer.reference.trim() === "") {
+    throw new ValidationError("A transfer needs a reference.");
+  }
   const [payout] = await db
     .select()
     .from(PartnerPayouts)
@@ -235,7 +242,12 @@ export const markPayoutPaid = async (
   await db.transaction(async (tx) => {
     await tx
       .update(PartnerPayouts)
-      .set({ status: "paid", paidAt: new Date() })
+      .set({
+        status: "paid",
+        paidAt: new Date(),
+        paidReference: transfer.reference.trim(),
+        paidBy: transfer.by,
+      })
       .where(eq(PartnerPayouts.uuid, payoutUuid));
 
     await tx
