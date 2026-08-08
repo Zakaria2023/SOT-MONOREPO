@@ -20,6 +20,8 @@ export * from "./handovers";
 export * from "./import-pipeline";
 export * from "./imports";
 export * from "./offers";
+export * from "./zatca";
+export * from "./invoicing";
 export * from "./orders";
 export * from "./partner-capabilities";
 export * from "./partner-discounts";
