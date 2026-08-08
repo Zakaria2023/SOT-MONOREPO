@@ -188,3 +188,52 @@ export const describeUnpriced = (unpriced: UnpricedLine[]): string => {
   }
   return parts.join("; ");
 };
+
+// ---------------------------------------------------------------------------
+// Effective dating
+// ---------------------------------------------------------------------------
+
+export type DatedPrice = {
+  price: string;
+  currency: string;
+  effectiveFrom: Date;
+  // Null means still in force.
+  effectiveTo: Date | null;
+};
+
+/**
+ * The price in force at an instant.
+ *
+ * A window contains an instant when it started at or before it and has not
+ * ended by it. `effectiveTo` is EXCLUSIVE, so a window closing at noon and the
+ * next opening at noon leave no gap and no overlap at that moment — the
+ * alternative puts two prices in force for one instant, and whichever the sort
+ * happens to return becomes the price.
+ *
+ * Where windows genuinely overlap, the latest start wins. That is what makes
+ * "correct a price" a single insert rather than a close-then-open pair somebody
+ * has to get right under time pressure.
+ *
+ * Returns null when nothing covers the instant. Null is the answer, never a
+ * fallback to the nearest row: quoting a price that was not in force is the
+ * failure this whole table exists to prevent.
+ */
+export const priceInForce = (
+  windows: DatedPrice[],
+  asOf: Date,
+): DatedPrice | null => {
+  const at = asOf.getTime();
+  const covering = windows.filter(
+    (window) =>
+      window.effectiveFrom.getTime() <= at &&
+      (window.effectiveTo === null || window.effectiveTo.getTime() > at),
+  );
+  if (covering.length === 0) {
+    return null;
+  }
+  return covering.reduce((latest, window) =>
+    window.effectiveFrom.getTime() >= latest.effectiveFrom.getTime()
+      ? window
+      : latest,
+  );
+};

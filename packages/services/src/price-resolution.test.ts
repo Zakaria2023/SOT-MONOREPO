@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   describeUnpriced,
+  priceInForce,
   resolvePricing,
+  type DatedPrice,
   type PriceableLine,
 } from "./price-resolution";
 
@@ -145,5 +147,81 @@ describe("describeUnpriced", () => {
     expect(sentence).toBe(
       "A camera has no price; Imported is priced in another currency",
     );
+  });
+});
+
+describe("priceInForce", () => {
+  const window = (
+    from: string,
+    to: string | null,
+    price = "100.00",
+  ): DatedPrice => ({
+    price,
+    currency: "SAR",
+    effectiveFrom: new Date(from),
+    effectiveTo: to === null ? null : new Date(to),
+  });
+
+  const at = (when: string) => new Date(when);
+
+  it("finds the open window", () => {
+    expect(
+      priceInForce([window("2026-01-01", null, "50.00")], at("2026-08-08"))
+        ?.price,
+    ).toBe("50.00");
+  });
+
+  it("returns null before any window starts", () => {
+    // Not the nearest row. Quoting a price that was not in force is the failure
+    // this table exists to prevent.
+    expect(
+      priceInForce([window("2026-09-01", null)], at("2026-08-08")),
+    ).toBeNull();
+  });
+
+  it("treats the end of a window as exclusive", () => {
+    // A window closing at noon and the next opening at noon must leave neither a
+    // gap nor two prices in force at that instant.
+    const windows = [
+      window("2026-01-01", "2026-06-01", "old"),
+      window("2026-06-01", null, "new"),
+    ];
+    expect(priceInForce(windows, at("2026-06-01"))?.price).toBe("new");
+    expect(
+      priceInForce(windows, at("2026-05-31T23:59:59Z"))?.price,
+    ).toBe("old");
+  });
+
+  it("takes the latest start when two windows overlap", () => {
+    // Correcting a price is one insert, not a close-then-open pair somebody has
+    // to get right under time pressure.
+    expect(
+      priceInForce(
+        [window("2026-01-01", null, "old"), window("2026-07-01", null, "corrected")],
+        at("2026-08-08"),
+      )?.price,
+    ).toBe("corrected");
+  });
+
+  it("returns null inside a deliberate gap", () => {
+    expect(
+      priceInForce(
+        [window("2026-01-01", "2026-02-01"), window("2026-09-01", null)],
+        at("2026-05-01"),
+      ),
+    ).toBeNull();
+  });
+
+  it("handles no windows at all", () => {
+    expect(priceInForce([], at("2026-08-08"))).toBeNull();
+  });
+
+  it("prices a past quote at the price that was in force then", () => {
+    const windows = [
+      window("2026-01-01", "2026-07-01", "100.00"),
+      window("2026-07-01", null, "130.00"),
+    ];
+    expect(priceInForce(windows, at("2026-06-15"))?.price).toBe("100.00");
+    expect(priceInForce(windows, at("2026-08-08"))?.price).toBe("130.00");
   });
 });

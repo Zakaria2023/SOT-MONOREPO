@@ -17,6 +17,7 @@ export * from "./partner-requests";
 export * from "./payouts";
 export * from "./product-compatibility";
 export * from "./product-composition";
+export * from "./product-prices";
 export * from "./products";
 export * from "./project-variables";
 export * from "./relationship-versions";
