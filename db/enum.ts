@@ -778,3 +778,30 @@ export const partnerCapabilityActions = [
 
 export type PartnerCapabilityAction =
   (typeof partnerCapabilityActions)[number];
+
+// THE EXPERT DESK'S TWO QUEUES.
+//
+// One table, two queues, because the lifecycle is identical and the WORK is not.
+// A design question needs somebody who knows the engine; a datasheet needs
+// somebody who knows the products. Mixing them into one list means whoever opens
+// it skims past most of it.
+export const expertQueues = [
+  // A buyer stuck on a design. Carries the selection they were looking at.
+  "design_help",
+  // A document the importer could not read. The deterministic stand-in for
+  // automated document interpretation — a human reads it and answers.
+  "document_review",
+] as const satisfies readonly string[];
+
+export type ExpertQueue = (typeof expertQueues)[number];
+
+export const expertRequestStatuses = [
+  "open",
+  // Somebody is working on it. Exists so two experts do not answer the same
+  // question twice and contradict each other in front of a customer.
+  "claimed",
+  "answered",
+  "closed",
+] as const satisfies readonly string[];
+
+export type ExpertRequestStatus = (typeof expertRequestStatuses)[number];

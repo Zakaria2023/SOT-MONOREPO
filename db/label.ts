@@ -6,6 +6,8 @@ import {
   BoqItemRole,
   CatalogAuditAction,
   CatalogAuditTarget,
+  ExpertQueue,
+  ExpertRequestStatus,
   BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
@@ -351,3 +353,16 @@ export const IMPORT_ISSUE_STATUS_LABELS: Record<ImportIssueStatus, string> = {
   corrected: "Corrected",
   rejected: "Rejected",
 };
+
+export const EXPERT_QUEUE_LABELS: Record<ExpertQueue, string> = {
+  design_help: "Design help",
+  document_review: "Document review",
+};
+
+export const EXPERT_REQUEST_STATUS_LABELS: Record<ExpertRequestStatus, string> =
+  {
+    open: "Waiting",
+    claimed: "Being looked at",
+    answered: "Answered",
+    closed: "Closed",
+  };

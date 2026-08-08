@@ -6,6 +6,7 @@ export * from "./catalog-audit";
 export * from "./categories";
 export * from "./design-scenarios";
 export * from "./classifications";
+export * from "./expert-requests";
 export * from "./government-requests";
 export * from "./handovers";
 export * from "./imports";

@@ -19,6 +19,7 @@ export * from "./scenario-drift";
 export * from "./design-scenarios";
 export * from "./design-questions";
 export * from "./errors";
+export * from "./expert-desk";
 export * from "./government";
 export * from "./handovers";
 export * from "./import-pipeline";

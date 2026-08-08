@@ -8,6 +8,7 @@ import {
   Inbox,
   Landmark,
   Layers,
+  LifeBuoy,
   LayoutDashboard,
   Library,
   Network,
@@ -69,6 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Percent, label: "Partner Discounts", href: "/partner-discounts" },
       { icon: Landmark, label: "Government", href: "/government" },
       { icon: Ticket, label: "Offers", href: "/offers" },
+      { icon: LifeBuoy, label: "Expert Desk", href: "/expert-desk" },
     ],
   },
 ];
