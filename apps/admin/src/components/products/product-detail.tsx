@@ -13,6 +13,7 @@ import {
   type DisplaySpec,
   type ProductDetail as ProductDetailData,
 } from "services";
+import { PriceWindows } from "@/components/products/price-windows";
 import { formatPrice } from "utils";
 
 type ProductDetailProps = {
@@ -221,16 +222,29 @@ export const ProductDetail = ({
 
           <Section title="Pricing">
             <Field
-              label="Public price (MSRP)"
+              label="Undated price (MSRP)"
               value={
                 product.price ? (
                   <span className="font-heading text-xl text-ink">
                     {formatPrice(product.price, product.currency)}
                   </span>
                 ) : (
-                  "Set by partner"
+                  // It used to read "Set by partner", which is not what an
+                  // absent price means: nothing can be ordered without one. The
+                  // gate refuses an unpriced line rather than selling it for
+                  // nothing, so this is a blocker, not a pricing model.
+                  <span className="text-sm text-amber-500">
+                    None — this product cannot be ordered
+                  </span>
                 )
               }
+            />
+
+            {/* The dated windows below take precedence over the number above.
+                A product with windows is priced by whichever one is in force. */}
+            <PriceWindows
+              productUuid={product.uuid}
+              currency={product.currency ?? "SAR"}
             />
           </Section>
 

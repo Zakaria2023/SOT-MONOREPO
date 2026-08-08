@@ -1,7 +1,12 @@
-import { inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db";
-import { ProductPrices } from "../../../db/schema/product-prices";
+import {
+  ProductPrices,
+  type SelectProductPrices,
+} from "../../../db/schema/product-prices";
 import { Products } from "../../../db/schema/products";
+import { generateUuid } from "utils";
+import { ValidationError } from "./errors";
 import {
   priceInForce,
   type DatedPrice,
@@ -108,4 +113,106 @@ export const priceLinesAsOf = async (
       quantity: request.quantity,
     };
   });
+};
+
+// ---------------------------------------------------------------------------
+// Authoring a price
+// ---------------------------------------------------------------------------
+
+export type { SelectProductPrices };
+
+export type ProductPriceInput = {
+  productUuid: string;
+  price: string;
+  currency: string;
+  effectiveFrom: Date;
+  effectiveTo: Date | null;
+  note: string | null;
+};
+
+/** Every window for a product, newest start first. */
+export const listProductPrices = async (
+  productUuid: string,
+): Promise<SelectProductPrices[]> =>
+  db
+    .select()
+    .from(ProductPrices)
+    .where(eq(ProductPrices.productUuid, productUuid))
+    .orderBy(desc(ProductPrices.effectiveFrom));
+
+/**
+ * Open a price window.
+ *
+ * Zero is allowed and null is not, which is the distinction the whole pricing
+ * path now rests on: a 0.00 row is somebody stating that this product is free,
+ * and an absent price is nobody having said anything. Only the first is
+ * sellable.
+ */
+export const addProductPrice = async (
+  input: ProductPriceInput,
+  actor?: { name: string },
+): Promise<string> => {
+  const amount = Number(input.price);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new ValidationError("A price must be a number, and not negative.");
+  }
+  if (
+    input.effectiveTo !== null &&
+    input.effectiveTo.getTime() <= input.effectiveFrom.getTime()
+  ) {
+    throw new ValidationError("A price window has to end after it starts.");
+  }
+  if (!/^[A-Z]{3}$/.test(input.currency)) {
+    throw new ValidationError("Currency has to be a three-letter code.");
+  }
+
+  const uuid = generateUuid();
+  await db.insert(ProductPrices).values({
+    uuid,
+    productUuid: input.productUuid,
+    price: amount.toFixed(2),
+    currency: input.currency,
+    effectiveFrom: input.effectiveFrom,
+    effectiveTo: input.effectiveTo,
+    note: input.note?.trim() || null,
+    actorName: actor?.name ?? null,
+  });
+  return uuid;
+};
+
+/**
+ * Stop a window at an instant.
+ *
+ * Separate from deleting it: a price that applied last month is a fact about
+ * orders placed last month, and removing the row would make those orders
+ * unexplainable.
+ */
+export const closeProductPrice = async (
+  uuid: string,
+  at: Date,
+): Promise<void> => {
+  const [row] = await db
+    .select()
+    .from(ProductPrices)
+    .where(eq(ProductPrices.uuid, uuid));
+  if (!row) {
+    throw new ValidationError("That price no longer exists.");
+  }
+  if (at.getTime() <= row.effectiveFrom.getTime()) {
+    throw new ValidationError("A price window has to end after it starts.");
+  }
+  await db
+    .update(ProductPrices)
+    .set({ effectiveTo: at })
+    .where(eq(ProductPrices.uuid, uuid));
+};
+
+/**
+ * Remove a window outright.
+ *
+ * For a row entered by mistake — a typo, the wrong product — and nothing else.
+ * Closing is what ends a price that was genuinely in force.
+ */
+export const deleteProductPrice = async (uuid: string): Promise<void> => {
+  await db.delete(ProductPrices).where(eq(ProductPrices.uuid, uuid));
 };
