@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { applyPercentDiscount, fromMinorUnits, toMinorUnits } from "utils";
 import { db } from "../../../db";
@@ -13,6 +13,7 @@ import {
   SelectOrders,
 } from "../../../db/schema/orders";
 import type { ProjectAnswers } from "../../../db/types";
+import { statusesThatCanBecome } from "./boq-lifecycle";
 import { gateSelection } from "./design-check";
 import { describeUnpriced, resolvePricing } from "./price-resolution";
 import { getCart } from "./cart";
@@ -106,10 +107,17 @@ export const createOrderFromSelectedOffer = async ({
       currency: offer.currency,
     });
 
+    // Same rule, same source. Only an offered BOQ becomes ordered, and the
+    // lifecycle model is where that is written down.
     await tx
       .update(Boqs)
       .set({ status: "ordered" })
-      .where(and(eq(Boqs.uuid, boqUuid), eq(Boqs.status, "offered")));
+      .where(
+        and(
+          eq(Boqs.uuid, boqUuid),
+          inArray(Boqs.status, statusesThatCanBecome("ordered")),
+        ),
+      );
   });
 
   const [order] = await db.select().from(Orders).where(eq(Orders.uuid, uuid));

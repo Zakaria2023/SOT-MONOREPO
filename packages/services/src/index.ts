@@ -1,6 +1,7 @@
 export * from "./assignment-resolver";
 export * from "./auth";
 export * from "./boq";
+export * from "./boq-lifecycle";
 export * from "./brands";
 export * from "./cart";
 export * from "./catalog-audit";
