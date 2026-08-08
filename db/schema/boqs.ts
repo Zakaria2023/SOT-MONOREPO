@@ -33,6 +33,29 @@ export const Boqs = mysqlTable(
     site: varchar("site", { length: 255 }),
     source: varchar("source", { length: 30 }).default("self_selected"),
 
+    // The Space this design is FOR, when it is an addition to a site that already
+    // has equipment in it rather than a new installation.
+    //
+    // Set makes the difference between "design me a system" and "add four cameras
+    // to the one I have", and those are not the same question: the second has to
+    // be judged against what is already on the wall, because the switch that will
+    // power the new cameras is already half full.
+    //
+    // `site` above stays. It is free text somebody typed while shopping, and it
+    // exists before any Space does — a customer describes where the job is long
+    // before there is a register of what is installed there.
+    //
+    // No foreign key, and this is the one place in the schema that goes without
+    // one. `spaces.ts` imports `Boqs` to constrain a SpaceItem to the job that
+    // installed it, so declaring the reverse reference here would make the two
+    // modules import each other. Of the two constraints the item-to-job one is
+    // worth more: it is the provenance of a physical device, whereas this is a
+    // pointer from a document to a place. Enforced in the service instead, which
+    // is where the ownership check that has to happen anyway already lives — a
+    // customer must not attach their BOQ to somebody else's building, and no
+    // foreign key could have said that.
+    spaceUuid: char("space_uuid", { length: 36 }),
+
     // The buyer's answers to the project questions the design check asked in
     // the cart, carried so the pre-seller's validation judges the same design
     // the buyer saw. Null for a BOQ whose rules asked nothing.

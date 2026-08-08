@@ -33,6 +33,7 @@ import { Products, SelectProducts } from "../../../db/schema/products";
 import { SelectUsers, Users } from "../../../db/schema/users";
 import type { ProjectAnswers } from "../../../db/types";
 import { checkDesign, type DesignCheckResult } from "./design-check";
+import { canTransition } from "./boq-lifecycle";
 import { ConflictError, ValidationError } from "./errors";
 import {
   getApprovedPartnerOptions,
@@ -43,10 +44,25 @@ import {
 
 export type { SelectBoqItems, SelectBoqs, SelectBoqSections };
 
+// P11. A BOQ line carries whether its product can still be supplied, so the
+// customer looking at their design, the pre-seller about to quote it and the
+// partner about to go to site all read the same fact.
+//
+// It has to travel with the LINE rather than be checked at the end, because the
+// answer people need is which line — and the order path refuses on exactly this,
+// so a surface that cannot see it can only present the refusal as a mystery.
+//
+// Null for a free-text or service line, which has no product and therefore no
+// stock to have run out of.
+export type BoqDetailItem = SelectBoqItems & {
+  productStatus: SelectProducts["status"] | null;
+  productIsAvailable: SelectProducts["isAvailable"] | null;
+};
+
 export type BoqDetail = {
   boq: SelectBoqs;
   sections: SelectBoqSections[];
-  items: SelectBoqItems[];
+  items: BoqDetailItem[];
 };
 
 export type ValidateBoqResult = {
@@ -206,9 +222,18 @@ export const createBoqFromCart = async (
 // scoped getUserBoq / getAssignedBoq / getPartnerBoq so access can't be skipped.
 const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   const rows = await db
-    .select({ boq: getTableColumns(Boqs), item: getTableColumns(BoqItems) })
+    .select({
+      boq: getTableColumns(Boqs),
+      item: getTableColumns(BoqItems),
+      // Two columns, joined rather than fetched per line. A read per item would
+      // fan out across a basket-sized list, and the connection ceiling is shared
+      // by five apps.
+      productStatus: Products.status,
+      productIsAvailable: Products.isAvailable,
+    })
     .from(Boqs)
     .leftJoin(BoqItems, eq(BoqItems.boqUuid, Boqs.uuid))
+    .leftJoin(Products, eq(BoqItems.productUuid, Products.uuid))
     .where(eq(Boqs.uuid, boqUuid))
     .orderBy(asc(BoqItems.createdAt));
 
@@ -217,7 +242,17 @@ const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
     return null;
   }
 
-  const items = rows.flatMap((row) => (row.item ? [row.item] : []));
+  const items = rows.flatMap((row) =>
+    row.item
+      ? [
+          {
+            ...row.item,
+            productStatus: row.productStatus,
+            productIsAvailable: row.productIsAvailable,
+          },
+        ]
+      : [],
+  );
   const sections = await db
     .select()
     .from(BoqSections)
@@ -307,41 +342,58 @@ export const validateBoq = async (
   return { boq, design, validated };
 };
 
-// The fulfilment stages, in order — the Service & Handover progression. Each
-// call may only move a BOQ to the immediately next stage.
-const FULFILMENT_ORDER: BoqStatus[] = [
-  "ordered",
-  "assigned",
-  "installing",
-  "installed",
-  "verified",
-  "handed_over",
-];
-
-// Advance a BOQ one fulfilment stage forward (assigned → … → handed_over),
-// rejecting skips and backward moves so the lifecycle can't jump states.
-export const advanceBoqFulfilment = async (
+/**
+ * Move a BOQ, through the one place that decides whether it may.
+ *
+ * This used to guard only `ordered` → `handed_over`, on a next-index-only rule
+ * over an ordered array. Everything before `ordered` was written directly by
+ * four other call sites with no check at all — so a handed-over BOQ could be
+ * dragged back to `validated` by re-running validation, and a design could be
+ * quoted without anybody reviewing it.
+ *
+ * Read and write in ONE transaction, under a row lock. Two people advancing the
+ * same BOQ would otherwise both read the same status, both find their move
+ * legal, and the second would overwrite the first — which is how a job gets
+ * marked installed twice and paid twice.
+ */
+export const transitionBoq = async (
   boqUuid: string,
   next: BoqStatus,
-): Promise<SelectBoqs> => {
-  const [boq] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
-  if (!boq) {
-    throw new ValidationError("BOQ not found");
-  }
+): Promise<SelectBoqs> =>
+  db.transaction(async (tx) => {
+    const [boq] = await tx
+      .select()
+      .from(Boqs)
+      .where(eq(Boqs.uuid, boqUuid))
+      .for("update");
+    if (!boq) {
+      throw new ValidationError("BOQ not found");
+    }
 
-  const currentIndex = FULFILMENT_ORDER.indexOf(boq.status ?? "draft");
-  const nextIndex = FULFILMENT_ORDER.indexOf(next);
-  if (nextIndex <= 0 || nextIndex !== currentIndex + 1) {
-    throw new ConflictError(`A BOQ at "${boq.status}" can't move to "${next}"`);
-  }
+    const check = canTransition(boq.status ?? "draft", next);
+    if (!check.allowed) {
+      throw new ConflictError(check.reason);
+    }
 
-  await db.update(Boqs).set({ status: next }).where(eq(Boqs.uuid, boqUuid));
-  const [updated] = await db.select().from(Boqs).where(eq(Boqs.uuid, boqUuid));
-  if (!updated) {
-    throw new Error("Failed to advance BOQ");
-  }
-  return updated;
-};
+    await tx.update(Boqs).set({ status: next }).where(eq(Boqs.uuid, boqUuid));
+    const [updated] = await tx
+      .select()
+      .from(Boqs)
+      .where(eq(Boqs.uuid, boqUuid));
+    if (!updated) {
+      throw new Error("Failed to advance BOQ");
+    }
+    return updated;
+  });
+
+/**
+ * The old name, kept because callers use it.
+ *
+ * No longer restricted to the fulfilment tail: the guard is the same for every
+ * step of the lifecycle now, and having two entry points with different rules is
+ * what produced the gap in the first place.
+ */
+export const advanceBoqFulfilment = transitionBoq;
 
 // Attach item count and subtotal (summed from BoqItems) to each BOQ, keying the
 // aggregate to just these BOQs instead of scanning the whole table.

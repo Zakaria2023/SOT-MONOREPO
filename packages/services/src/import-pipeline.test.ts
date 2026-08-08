@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SpecOption } from "../../../db/types";
 import {
+  applyResolutions,
   issueGroupKey,
   parseQuantity,
+  parsePastedSource,
   parseSourceRow,
   parseSpan,
   type ImportTarget,
@@ -365,5 +367,125 @@ describe("parseSourceRow", () => {
     );
     expect(parsed.name).toBe("DomeCam Mini");
     expect(parsed.model).toBe("DC-MINI");
+  });
+});
+
+describe("applyResolutions", () => {
+  const payload = { specValues: { ip: "IP66" } };
+
+  it("leaves the parser's draft alone when nothing was asked", () => {
+    expect(applyResolutions(payload, [])).toEqual({ ip: "IP66" });
+  });
+
+  it("fills in an approved answer", () => {
+    expect(
+      applyResolutions(payload, [
+        { status: "approved", specificationUuid: "ik", resolvedValue: { option: "IK08" } },
+      ]),
+    ).toEqual({ ip: "IP66", ik: "IK08" });
+  });
+
+  it("leaves a rejected field empty rather than filling it with a default", () => {
+    // Empty is empty. Rejecting IS the answer, and a zero here would be read by
+    // every budget rule as a real measurement.
+    expect(
+      applyResolutions(payload, [
+        { status: "rejected", specificationUuid: "draw", resolvedValue: { value: 0 } },
+      ]),
+    ).toEqual({ ip: "IP66" });
+  });
+
+  it("ignores an issue still open", () => {
+    // The commit path refuses first; this is the second line, because a
+    // half-answered row committing quietly is the one outcome worth two checks.
+    expect(
+      applyResolutions(payload, [
+        { status: "approved", specificationUuid: "a", resolvedValue: { option: "X" } },
+        { status: "open", specificationUuid: "b", resolvedValue: { option: "Y" } },
+      ]),
+    ).toEqual({ ip: "IP66", a: "X" });
+  });
+
+  it("lets a correction overwrite what the parser read", () => {
+    expect(
+      applyResolutions(payload, [
+        { status: "corrected", specificationUuid: "ip", resolvedValue: { option: "IP67" } },
+      ]),
+    ).toEqual({ ip: "IP67" });
+  });
+
+  it("prefers the typed value over the option shorthand", () => {
+    // A multi-select answer has to arrive as an array; `option` is only the
+    // convenience for the ordinary single-select case.
+    expect(
+      applyResolutions(payload, [
+        {
+          status: "corrected",
+          specificationUuid: "codec",
+          resolvedValue: { option: "H.264", value: ["H.264", "H.265"] },
+        },
+      ]),
+    ).toEqual({ ip: "IP66", codec: ["H.264", "H.265"] });
+  });
+
+  it("routes an unknown_attribute answer to the attribute the reviewer named", () => {
+    // The issue itself has no attribute — that was the question. The answer
+    // supplies one.
+    expect(
+      applyResolutions(payload, [
+        {
+          status: "corrected",
+          specificationUuid: null,
+          resolvedValue: { specificationUuid: "elements", value: "PIR" },
+        },
+      ]),
+    ).toEqual({ ip: "IP66", elements: "PIR" });
+  });
+});
+
+describe("parsePastedSource", () => {
+  it("reads one product's labels and values", () => {
+    const rows = parsePastedSource(
+      ["# ajax.systems/domecam", "Name: DomeCam Mini", "Power draw: 4.8 W"].join("\n"),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sourceRef).toBe("ajax.systems/domecam");
+    expect(rows[0]?.name).toBe("DomeCam Mini");
+    expect(rows[0]?.fields).toEqual([{ label: "Power draw", text: "4.8 W" }]);
+  });
+
+  it("splits products on a # and on a blank line", () => {
+    const rows = parsePastedSource(
+      ["Name: A", "Power draw: 1 W", "", "Name: B", "Power draw: 2 W"].join("\n"),
+    );
+    expect(rows.map((row) => row.name)).toEqual(["A", "B"]);
+  });
+
+  it("falls back to the name as the reference", () => {
+    // Two runs of the same paste should update rather than pile up, and without
+    // a `#` the name is the only stable handle there is.
+    const rows = parsePastedSource("Name: DomeCam Mini\nPower draw: 4.8 W");
+    expect(rows[0]?.sourceRef).toBe("DomeCam Mini");
+  });
+
+  it("keeps a value containing a colon intact", () => {
+    // Only the FIRST colon separates. A URL or a ratio in the value would
+    // otherwise be cut in half.
+    const rows = parsePastedSource("Datasheet: https://example.com/a.pdf");
+    expect(rows[0]?.fields[0]).toEqual({
+      label: "Datasheet",
+      text: "https://example.com/a.pdf",
+    });
+  });
+
+  it("skips a line with no label rather than inventing a field", () => {
+    // A heading or a stray sentence turned into a value would be queued as a
+    // question nobody can answer.
+    const rows = parsePastedSource("Specifications\nPower draw: 4.8 W");
+    expect(rows[0]?.fields).toEqual([{ label: "Power draw", text: "4.8 W" }]);
+  });
+
+  it("ignores blocks that are only whitespace", () => {
+    expect(parsePastedSource("\n\n   \n\n")).toEqual([]);
   });
 });

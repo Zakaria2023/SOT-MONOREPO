@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { generateUuid } from "utils";
 import { db } from "../../../db";
 import type {
@@ -20,6 +20,7 @@ import {
   type Predicate,
   type PresenceSpec,
   type RelationshipScope,
+  type RelationshipSnapshot,
 } from "../../../db/types";
 import { recordAudit } from "./catalog-audit";
 import {
@@ -33,10 +34,23 @@ import { ValidationError } from "./errors";
 import { groupRowAttributes, validatePredicate } from "./predicate";
 import {
   evaluateRelationship,
+  evaluateSelection,
   type EngineRelationship,
   type EngineVariable,
   type Finding,
 } from "./relationship-engine";
+import { Products } from "../../../db/schema/products";
+import {
+  RelationshipVersions,
+  type SelectRelationshipVersions,
+} from "../../../db/schema/relationship-versions";
+import {
+  diagnoseRules,
+  type ProductFacts,
+  type RuleReach,
+} from "./rule-reachability";
+import { diffSnapshots, type FieldChange } from "./relationship-diff";
+import { referencedAttributeUuids } from "./specification-library";
 import { groupSubField, unitFactor, type AttributeMeta } from "./spec-values";
 
 // ---------------------------------------------------------------------------
@@ -53,25 +67,15 @@ import { groupSubField, unitFactor, type AttributeMeta } from "./spec-values";
 // presence rule with no trigger silently never fires.
 // ---------------------------------------------------------------------------
 
-export type RelationshipInput = {
-  name: string;
-  description: string | null;
-  family: RelationshipFamily;
-  gate: RelationshipGate;
-  comparator: RelationshipComparator;
-  matchMode: MatchMode;
-  headroomPercent: number;
-  ratioLimit: number | null;
-  allocation: RelationshipAllocation;
-  perItem: boolean;
-  consumer: Operand | null;
-  provider: Operand | null;
-  consumerWhen: Predicate | null;
-  providerWhen: Predicate | null;
-  lookup: LookupTable | null;
-  presence: PresenceSpec | null;
-  scope: RelationshipScope | null;
-};
+/**
+ * What an author submits.
+ *
+ * Declared AS the stored snapshot rather than beside it: a version restores by
+ * feeding its snapshot straight back through the update path, and if these two
+ * shapes were written out separately they would drift the first time a field was
+ * added to one of them.
+ */
+export type RelationshipInput = RelationshipSnapshot;
 
 const toEngine = (row: SelectRelationships): EngineRelationship => ({
   uuid: row.uuid,
@@ -612,6 +616,7 @@ export const createRelationship = async (
     ...toRow(input),
   });
 
+  await recordVersion(uuid, input, actor, null);
   await recordAudit({
     target: "relationship",
     action: "create",
@@ -627,6 +632,9 @@ export const updateRelationship = async (
   uuid: string,
   input: RelationshipInput,
   actor?: { uuid: string; name: string },
+  // Set only by a restore, which is the one save whose reason is not visible in
+  // the diff it produces.
+  note?: string | null,
 ): Promise<void> => {
   const problems = await validateRelationship(input);
   const first = problems[0];
@@ -644,6 +652,7 @@ export const updateRelationship = async (
     .set(toRow(input))
     .where(eq(Relationships.uuid, uuid));
 
+  await recordVersion(uuid, input, actor, note);
   await recordAudit({
     target: "relationship",
     action: "update",
@@ -831,4 +840,268 @@ export const summarizeRelationship = (
     return `${name(rule.consumer)} must stay within the limit its own configuration allows.`;
   }
   return `When the trigger is present, the selection must also contain ${(rule.presence?.requires ?? []).map((requirement) => requirement.description).join("; ") || "its companion"}.`;
+};
+
+// ---------------------------------------------------------------------------
+// Reachability
+// ---------------------------------------------------------------------------
+
+/**
+ * `JSON_KEYS` rather than the column, because the diagnosis needs to know WHICH
+ * attributes a product answers and never what it answered. Pulling every stored
+ * value to count keys would move the whole catalogue's spec data across the wire
+ * to compute a handful of integers.
+ *
+ * The driver hands a JSON array back as either a parsed array or its text,
+ * depending on how the column is read, so both are accepted rather than trusting
+ * one and silently counting nothing.
+ */
+const toAttributeUuids = (keys: unknown): string[] => {
+  if (Array.isArray(keys)) {
+    return keys.filter((key): key is string => typeof key === "string");
+  }
+  if (typeof keys !== "string") {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(keys);
+    return Array.isArray(parsed)
+      ? parsed.filter((key): key is string => typeof key === "string")
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Why each rule can or cannot fire.
+ *
+ * Three queries, whatever the size of the catalogue — the model (cached), the
+ * rules, and one pass over products for their answered-attribute keys. Never one
+ * query per rule: this is an admin screen, but it reads the same tables the cart
+ * does and the connection ceiling is shared.
+ */
+export const getRuleReachability = async (): Promise<RuleReach[]> => {
+  const [model, rows, productRows] = await Promise.all([
+    getCatalogModel(),
+    listRelationships(),
+    db
+      .select({
+        categoryUuid: Products.categoryUuid,
+        keys: sql<unknown>`JSON_KEYS(${Products.specValues})`,
+      })
+      .from(Products),
+  ]);
+
+  const products: ProductFacts[] = productRows.map((product) => ({
+    categoryUuid: product.categoryUuid,
+    attributeUuids: toAttributeUuids(product.keys),
+  }));
+
+  return diagnoseRules({
+    rules: rows.map((row) => ({
+      uuid: row.uuid,
+      name: row.name,
+      family: row.family,
+      attributeUuids: referencedAttributeUuids(row),
+      predicates: [
+        row.consumerWhen ?? null,
+        row.providerWhen ?? null,
+        row.presence?.trigger ?? null,
+        ...(row.lookup?.rows ?? []).map((lookupRow) => lookupRow.when),
+      ],
+      regions: row.scope?.regions ?? null,
+    })),
+    attributeLabels: new Map(
+      model.definitions.map((definition) => [definition.uuid, definition.label]),
+    ),
+    assignments: model.assignments,
+    chains: model.chains,
+    products,
+  });
+};
+
+// ---------------------------------------------------------------------------
+// The trace
+// ---------------------------------------------------------------------------
+
+export type TracedRule = {
+  finding: Finding;
+  // The one-line reading of the rule, so a `not_applicable` row can be judged
+  // without opening the authoring form to remember what the rule asks for.
+  summary: string;
+};
+
+/**
+ * Every rule's verdict on a selection, including the ones that said nothing.
+ *
+ * Deliberately NOT part of `checkDesign`. The buyer is shown what is wrong with
+ * their basket; being told that fourteen rules found nothing to say about it
+ * would be noise. But for whoever authors the rules that silence is the most
+ * important output on the screen — `not_applicable` is where a rule that was
+ * supposed to cover this basket quietly failed to, and `pass` is the only proof
+ * that a rule ran at all.
+ *
+ * Same evaluator, same model, same ordering as the gate. It reads; it never
+ * writes and it never gates.
+ */
+export const traceDesign = async (
+  selection: SelectionLine[],
+  variables: Record<string, number | boolean> = {},
+): Promise<TracedRule[]> => {
+  const lines = selection.filter((line) => line.quantity > 0);
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const [model, items, catalog] = await Promise.all([
+    getCatalogModel(),
+    loadSelection(lines),
+    loadSuggestionCatalog(),
+  ]);
+  if (items.length === 0) {
+    return [];
+  }
+
+  const resolved = new Map<string, EngineVariable>(
+    model.variables.map((variable) => [
+      variable.uuid,
+      variable.uuid in variables
+        ? { ...variable, value: variables[variable.uuid] }
+        : variable,
+    ]),
+  );
+
+  const report = evaluateSelection(model.relationships, items, {
+    attributes: model.attributes,
+    variables: resolved,
+    catalog,
+  });
+
+  const byUuid = new Map(
+    model.relationships.map((rule) => [rule.uuid, rule] as const),
+  );
+
+  return report.findings.map((finding) => {
+    const rule = byUuid.get(finding.relationshipUuid);
+    return {
+      finding,
+      summary: rule ? summarizeRelationship(rule, model) : "",
+    };
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Versions
+// ---------------------------------------------------------------------------
+
+export type { SelectRelationshipVersions };
+
+export type RelationshipVersionEntry = {
+  version: SelectRelationshipVersions["version"];
+  name: SelectRelationshipVersions["name"];
+  actorName: SelectRelationshipVersions["actorName"];
+  note: SelectRelationshipVersions["note"];
+  createdAt: SelectRelationshipVersions["createdAt"];
+  snapshot: RelationshipSnapshot;
+  // What this save changed, against the version before it. Empty on version 1,
+  // which had nothing to differ from.
+  changes: FieldChange[];
+};
+
+/**
+ * Keep the state the rule is now in.
+ *
+ * Called after the write, never before: a version is a record of what the rule
+ * BECAME. Recording the attempt before it succeeds would leave a version nobody
+ * can restore to, because the row it describes never existed.
+ *
+ * The version number is read and written in one statement so two saves racing
+ * cannot both decide they are version 4 — and the unique constraint behind it
+ * turns any remaining race into an error rather than a silent duplicate.
+ */
+const recordVersion = async (
+  relationshipUuid: string,
+  input: RelationshipInput,
+  actor: { uuid: string; name: string } | undefined,
+  note: string | null | undefined,
+): Promise<void> => {
+  await db.insert(RelationshipVersions).values({
+    uuid: generateUuid(),
+    relationshipUuid,
+    version: sql`(SELECT COALESCE(MAX(v.version), 0) + 1 FROM ${RelationshipVersions} v WHERE v.relationship_uuid = ${relationshipUuid})`,
+    snapshot: input,
+    name: input.name,
+    actorUuid: actor?.uuid ?? null,
+    actorName: actor?.name ?? null,
+    note: note ?? null,
+  });
+};
+
+/**
+ * Every state this rule has been in, newest first, each with what it changed.
+ *
+ * The diff is computed against the version BELOW it in the list — the one it
+ * replaced — so each row reads as "this save did this", which is the question
+ * somebody opening a history is asking.
+ */
+export const listRelationshipVersions = async (
+  relationshipUuid: string,
+): Promise<RelationshipVersionEntry[]> => {
+  const rows = await db
+    .select()
+    .from(RelationshipVersions)
+    .where(eq(RelationshipVersions.relationshipUuid, relationshipUuid))
+    .orderBy(desc(RelationshipVersions.version));
+
+  return rows.map((row, index) => {
+    const previous = rows[index + 1];
+    return {
+      version: row.version,
+      name: row.name,
+      actorName: row.actorName,
+      note: row.note,
+      createdAt: row.createdAt,
+      snapshot: row.snapshot,
+      changes: previous ? diffSnapshots(previous.snapshot, row.snapshot) : [],
+    };
+  });
+};
+
+/**
+ * Put the rule back the way it was at a given version.
+ *
+ * A FORWARD operation. It writes the old snapshot through the ordinary update
+ * path, which validates it and records a new version of its own, so the history
+ * gains a step rather than losing one — and anyone reading it later can see that
+ * a restore happened and to what.
+ *
+ * Validation is the point, not an obstacle: a snapshot that was correct when it
+ * was taken may name an attribute deleted since, and restoring it unchecked
+ * would resurrect a rule that silently never runs.
+ */
+export const restoreRelationshipVersion = async (
+  relationshipUuid: string,
+  version: number,
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  const [row] = await db
+    .select()
+    .from(RelationshipVersions)
+    .where(
+      and(
+        eq(RelationshipVersions.relationshipUuid, relationshipUuid),
+        eq(RelationshipVersions.version, version),
+      ),
+    );
+  if (!row) {
+    throw new ValidationError("That version no longer exists.");
+  }
+
+  await updateRelationship(
+    relationshipUuid,
+    row.snapshot,
+    actor,
+    `Restored from v${version}`,
+  );
 };

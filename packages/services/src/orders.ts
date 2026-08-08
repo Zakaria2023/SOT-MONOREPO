@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, getTableColumns } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { applyPercentDiscount, fromMinorUnits, toMinorUnits } from "utils";
 import { db } from "../../../db";
-import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
+import { BoqItems, Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Offers } from "../../../db/schema/offers";
 import { OrderItems, SelectOrderItems } from "../../../db/schema/order-items";
@@ -13,7 +13,15 @@ import {
   SelectOrders,
 } from "../../../db/schema/orders";
 import type { ProjectAnswers } from "../../../db/types";
+import { statusesThatCanBecome } from "./boq-lifecycle";
+import { canSendTo, type CartViewer } from "./cart-destinations";
 import { gateSelection } from "./design-check";
+import { issueInvoice } from "./invoicing";
+import { notify } from "./notifications";
+import { Users } from "../../../db/schema/users";
+import { describeUnpriced, resolvePricing } from "./price-resolution";
+import { assessSupplyFor } from "./product-supply";
+import { describeSupply } from "./supply";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
 
@@ -26,6 +34,11 @@ export type OrderWithInvoice = {
 
 export type UserOrder = SelectOrders & {
   boqReference: SelectBoqs["reference"] | null;
+  // E9. Where the job has actually got to — null for a direct product order,
+  // which has no BOQ and therefore no installation to track. Carried here rather
+  // than fetched by the page: the order status alone cannot answer "where is my
+  // system", because it stops saying anything new the moment the cash lands.
+  boqStatus: SelectBoqs["status"] | null;
 };
 
 // Sum an offer's money fields into product / service / grand totals. install +
@@ -88,6 +101,39 @@ export const createOrderFromSelectedOffer = async ({
     throw new ConflictError("The selected offer has expired");
   }
 
+  // P11 on this path too, and it is the path where it matters most. An offer can
+  // sit for weeks before a customer accepts it, so a line that was in stock when
+  // it was quoted is exactly the line most likely to have gone since. Refusing
+  // here — before the money — is the difference between a conversation about a
+  // substitution and a refund.
+  //
+  // A BOQ line with no product is skipped rather than refused: those are the
+  // free-text and service lines, which have no stock to have run out of.
+  const boqLines = await db
+    .select({
+      productUuid: BoqItems.productUuid,
+      quantity: BoqItems.quantity,
+    })
+    .from(BoqItems)
+    .where(eq(BoqItems.boqUuid, boqUuid));
+
+  const supply = await assessSupplyFor(
+    boqLines
+      .filter(
+        (line): line is { productUuid: string; quantity: number } =>
+          line.productUuid !== null,
+      )
+      .map((line) => ({
+        productUuid: line.productUuid,
+        quantity: line.quantity,
+      })),
+  );
+  if (!supply.sellable) {
+    throw new ValidationError(
+      `This order cannot be confirmed: ${describeSupply(supply.blocking)}`,
+    );
+  }
+
   const uuid = randomUUID();
   const reference = `ORD-${uuid.slice(0, 8).toUpperCase()}`;
   const totals = totalsFromOffer(offer);
@@ -105,10 +151,17 @@ export const createOrderFromSelectedOffer = async ({
       currency: offer.currency,
     });
 
+    // Same rule, same source. Only an offered BOQ becomes ordered, and the
+    // lifecycle model is where that is written down.
     await tx
       .update(Boqs)
       .set({ status: "ordered" })
-      .where(and(eq(Boqs.uuid, boqUuid), eq(Boqs.status, "offered")));
+      .where(
+        and(
+          eq(Boqs.uuid, boqUuid),
+          inArray(Boqs.status, statusesThatCanBecome("ordered")),
+        ),
+      );
   });
 
   const [order] = await db.select().from(Orders).where(eq(Orders.uuid, uuid));
@@ -130,6 +183,7 @@ export const createOrderFromCart = async ({
   override,
   region,
   variables,
+  viewer,
 }: {
   userUuid: string;
   discountPercent?: number;
@@ -139,12 +193,34 @@ export const createOrderFromCart = async ({
   override?: { allowed: boolean; reason: string };
   region?: string;
   variables?: ProjectAnswers;
+  // Who is buying, for the destination check below. Absent means an ordinary
+  // customer, which is what every caller before partner carts was.
+  viewer?: CartViewer;
 }): Promise<SelectOrders> => {
   const items = (await getCart(userUuid)).filter(
     (item) => item.kind === "product",
   );
   if (items.length === 0) {
     throw new ValidationError("Your cart has no products to order");
+  }
+
+  // Checked HERE and not only where the button is drawn. A rule enforced in the
+  // UI is bypassed by anything that posts directly — the same reasoning that put
+  // the design gate inside this function rather than in the cart screen.
+  //
+  // Blockers and prices are judged further down by the gate and the resolver, so
+  // this pass is about WHO may buy: a partner without the `stock` capability is
+  // not approved to hold stock, and nothing consulted that before.
+  const destination = canSendTo("order", {
+    viewer: viewer ?? { isPartner: false, capabilities: [] },
+    lineCount: items.length,
+    hasBlockers: false,
+    hasUnpricedLines: false,
+  });
+  if (!destination.allowed) {
+    throw new ValidationError(
+      destination.reason ?? "This cart cannot be ordered.",
+    );
   }
 
   // THE GATE. The cart UI shows the design check live, but a check that only
@@ -177,24 +253,87 @@ export const createOrderFromCart = async ({
     );
   }
 
-  const currency = items[0].currency ?? "SAR";
-  const lines = items.map((item) => {
-    const unitPrice = applyPercentDiscount(item.unitPrice, discountPercent);
-    const lineTotal = fromMinorUnits(toMinorUnits(unitPrice) * item.quantity);
-    return {
+  // THE THIRD GATE — can we supply it?
+  //
+  // The two above answer who may buy and whether the design works. Neither
+  // touches whether the thing exists. `Products.status` has held `out_of_stock`
+  // and `end_of_life` since the beginning and nothing read it except to draw a
+  // label, so a discontinued product could pass every check here, take a
+  // customer's cash and be invoiced.
+  //
+  // BEFORE the pricing gate, deliberately. Both refuse, so the order is only
+  // about which sentence somebody is shown — and "we have not priced this yet"
+  // invites them to ask for a quote, which is the wrong thing to send them off to
+  // do for a product that is not manufactured any more. Whether we can get it
+  // comes before what it costs.
+  //
+  // Read from the products rather than from the cart lines, at this moment. Stock
+  // moves while a basket sits, and the check that matters is the one at the till.
+  //
+  // NOT overridable, and that is the difference from the design gate. A blocker
+  // there is the engine's opinion about a design and a partner may genuinely know
+  // better; this is a fact about the warehouse, and no reason typed into a box
+  // makes a discontinued product deliverable.
+  const supply = await assessSupplyFor(
+    items.map((item) => ({
+      productUuid: item.productUuid,
+      quantity: item.quantity,
+    })),
+  );
+  if (!supply.sellable) {
+    throw new ValidationError(
+      `This order cannot be placed: ${describeSupply(supply.blocking)}`,
+    );
+  }
+
+  // THE FOURTH GATE, and the one nobody had. `toMinorUnits(null)` is 0, so a
+  // product with no price used to become a line at 0.00 — the order completed,
+  // the item shipped for nothing, and no surface anywhere could tell that apart
+  // from a genuinely free product. Every product in the catalogue is currently
+  // unpriced, so this was not a hypothetical.
+  //
+  // Priced through the same resolver every other surface uses, so the cart, the
+  // quote and this refusal can never disagree about what a basket costs.
+  const pricing = resolvePricing({
+    lines: items.map((item) => ({
       productUuid: item.productUuid,
       name: item.name,
-      unitPrice,
+      price: item.unitPrice,
+      currency: item.currency,
       quantity: item.quantity,
-      lineTotal,
+    })),
+    discountPercent,
+    asOf: new Date(),
+  });
+
+  if (!pricing.complete) {
+    throw new ValidationError(
+      `This order cannot be placed: ${describeUnpriced(pricing.unpriced)}.`,
+    );
+  }
+
+  const currency = pricing.currency;
+
+  // The stored line price stays NET, as it always has — an order is a record of
+  // what was actually charged. The lump-sum presentation rule governs what a
+  // shopper is SHOWN before they buy, not what the invoice says afterwards.
+  const lines = pricing.lines.map((line) => {
+    const unitPrice = applyPercentDiscount(line.listUnit, discountPercent);
+    return {
+      productUuid: line.productUuid,
+      name: line.name,
+      unitPrice,
+      quantity: line.quantity,
+      lineTotal: fromMinorUnits(toMinorUnits(unitPrice) * line.quantity),
     };
   });
 
-  const productTotalMinor = lines.reduce(
-    (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
-    0,
-  );
-  const grandTotal = fromMinorUnits(productTotalMinor).toFixed(2);
+  const grandTotal = fromMinorUnits(
+    lines.reduce(
+      (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
+      0,
+    ),
+  ).toFixed(2);
 
   const uuid = randomUUID();
   const reference = `ORD-${uuid.slice(0, 8).toUpperCase()}`;
@@ -269,57 +408,109 @@ export const getOrderItems = async (
     .orderBy(asc(OrderItems.createdAt));
 
 /**
- * Settle an awaiting-payment order and raise its one invoice. Payment has no
- * live gateway yet, so this is the plumbing a gateway callback (or an admin)
- * will call once a payment succeeds — it does not itself charge anyone.
+ * Record that cash was received.
+ *
+ * There is no gateway. Cash is handed to a person, so this is staff attesting
+ * that money arrived — never the customer asserting it. The client used to call
+ * a simulated payment that waited 1.2 seconds and marked the order paid with
+ * nothing having moved; that was a reasonable placeholder for a card flow and is
+ * the wrong shape entirely for cash.
+ *
+ * Which is why it takes who received it. An order marked paid by nobody, against
+ * no reference, cannot be reconciled against a till or a bank statement, and
+ * "paid" then means only that somebody clicked.
+ *
+ * The invoice comes from `issueInvoice`, not from here. This function used to
+ * mint its own with no VAT breakdown, no seller registration and no QR — a
+ * document that is not a tax invoice, under a second numbering scheme.
  */
-export const markOrderPaid = async (
+export const recordCashPayment = async (
   orderUuid: string,
+  received: { by: string; reference: string; note?: string | null },
 ): Promise<OrderWithInvoice> => {
-  const [order] = await db
-    .select()
-    .from(Orders)
-    .where(eq(Orders.uuid, orderUuid));
-  if (!order) {
-    throw new ValidationError("Order not found");
-  }
-  if (order.status !== "awaiting_payment") {
-    throw new ConflictError("This order is not awaiting payment");
+  if (received.reference.trim() === "") {
+    throw new ValidationError(
+      "Recording a cash payment needs a reference — a receipt number, or the deposit slip.",
+    );
   }
 
   const paidAt = new Date();
-  const invoiceUuid = randomUUID();
-  const invoiceNumber = `INV-${invoiceUuid.slice(0, 8).toUpperCase()}`;
 
+  // Read and write under one lock. Two people recording the same cash payment
+  // would otherwise both find the order awaiting payment and both settle it.
   await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(Orders)
+      .where(eq(Orders.uuid, orderUuid))
+      .for("update");
+    if (!order) {
+      throw new ValidationError("Order not found");
+    }
+    if (order.status !== "awaiting_payment") {
+      throw new ConflictError("This order is not awaiting payment");
+    }
+
     await tx
       .update(Orders)
-      .set({ status: "paid", paidAt })
+      .set({
+        status: "paid",
+        paidAt,
+        paidBy: received.by,
+        paymentReference: received.reference.trim(),
+        paymentNote: received.note?.trim() || null,
+      })
       .where(eq(Orders.uuid, orderUuid));
-
-    await tx.insert(Invoices).values({
-      uuid: invoiceUuid,
-      number: invoiceNumber,
-      orderUuid,
-      status: "paid",
-      amount: order.grandTotal,
-      currency: order.currency,
-      paidAt,
-    });
   });
+
+  // Outside the transaction on purpose: issuing is idempotent by the invoice
+  // row, so a retry after a crash here produces the same invoice rather than a
+  // second number for one supply. Holding the lock across it would also hold it
+  // across a second read of the order and the seller configuration.
+  const invoice = await issueInvoice(orderUuid);
+
+  await db
+    .update(Invoices)
+    .set({ status: "paid", paidAt })
+    .where(eq(Invoices.uuid, invoice.uuid));
 
   const [updated] = await db
     .select()
     .from(Orders)
     .where(eq(Orders.uuid, orderUuid));
-  const [invoice] = await db
+  const [settled] = await db
     .select()
     .from(Invoices)
-    .where(eq(Invoices.uuid, invoiceUuid));
-  if (!updated || !invoice) {
-    throw new Error("Failed to settle order");
-  }
-  return { order: updated, invoice };
+    .where(eq(Invoices.uuid, invoice.uuid));
+
+  // Told to both sides, and after the money is recorded rather than around it.
+  // `notify` swallows its own failures for the same reason the audit trail does:
+  // a notification that could not be written must never be why a payment was
+  // not recorded.
+  const [customer] = await db
+    .select({ clerkUserId: Users.clerkUserId })
+    .from(Users)
+    .where(eq(Users.uuid, updated.userUuid));
+
+  await Promise.all([
+    notify({
+      audience: "client",
+      kind: "invoice_issued",
+      recipientClerkUserId: customer?.clerkUserId ?? null,
+      title: `Invoice ${settled.number} is ready`,
+      body: `We received ${settled.amount} ${settled.currency ?? "SAR"} for ${updated.reference}.`,
+      href: `/orders/${updated.uuid}`,
+    }),
+    notify({
+      audience: "admin",
+      kind: "payment_recorded",
+      title: `Cash recorded for ${updated.reference}`,
+      body: `${received.by} recorded ${settled.amount} ${settled.currency ?? "SAR"} against ${received.reference.trim()}.`,
+      href: "/orders",
+    }),
+  ]);
+
+  return { order: updated, invoice: settled };
 };
 
 /** Cancel an order that hasn't been paid yet. */
@@ -350,14 +541,27 @@ export const cancelOrder = async (orderUuid: string): Promise<SelectOrders> => {
   return updated;
 };
 
-/** One order the given user owns, or null. */
+/**
+ * One order the given user owns, or null.
+ *
+ * Joined to the BOQ so the page can say where the job is. This returned the bare
+ * order, which is why the customer's order page could only ever tell them whether
+ * they had paid: after that the order status never changes again, and everything
+ * that happens next — assignment, installation, verification, handover — is
+ * recorded on the BOQ.
+ */
 export const getUserOrder = async (
   userUuid: string,
   orderUuid: string,
-): Promise<SelectOrders | null> => {
+): Promise<UserOrder | null> => {
   const [order] = await db
-    .select()
+    .select({
+      ...getTableColumns(Orders),
+      boqReference: Boqs.reference,
+      boqStatus: Boqs.status,
+    })
     .from(Orders)
+    .leftJoin(Boqs, eq(Orders.boqUuid, Boqs.uuid))
     .where(and(eq(Orders.uuid, orderUuid), eq(Orders.userUuid, userUuid)));
   return order ?? null;
 };
@@ -368,6 +572,7 @@ export const getUserOrders = async (userUuid: string): Promise<UserOrder[]> =>
     .select({
       ...getTableColumns(Orders),
       boqReference: Boqs.reference,
+      boqStatus: Boqs.status,
     })
     .from(Orders)
     .leftJoin(Boqs, eq(Orders.boqUuid, Boqs.uuid))

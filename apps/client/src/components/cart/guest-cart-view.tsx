@@ -22,6 +22,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CartLineItem } from "services";
+import { SupplyNote } from "@/components/shared/supply-note";
 import { formatMoney, lineTotal, summarizeCart } from "utils";
 import type { ProjectAnswersInput } from "validators";
 
@@ -149,6 +150,10 @@ export const GuestCartView = () => {
                       <p className="font-grotesk text-xs text-faint">
                         {formatMoney(Number(item.unitPrice), currency)} each
                       </p>
+                      {/* P11, same as the signed-in cart. A guest basket that
+                          hides it would send somebody through sign-in to be
+                          refused at the far end. */}
+                      <SupplyNote supply={item.supply} />
                     </div>
 
                     <div className="flex items-center rounded-full border border-search-border">

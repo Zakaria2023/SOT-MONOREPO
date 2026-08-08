@@ -440,6 +440,13 @@ export const catalogAuditTargets = [
   "assignment",
   "relationship",
   "project_variable",
+  // The catalogue itself, not just the model that describes it. "Why did this
+  // product change?" was unanswerable while only the spec library was audited —
+  // and a price is the one nobody can afford to be unable to explain.
+  "product",
+  "product_price",
+  "category",
+  "brand",
 ] as const satisfies readonly string[];
 
 export type CatalogAuditTarget = (typeof catalogAuditTargets)[number];
@@ -540,6 +547,125 @@ export const partnerCapabilities = [
 ] as const satisfies readonly string[];
 
 export type PartnerCapability = (typeof partnerCapabilities)[number];
+
+// ---------------------------------------------------------------------------
+// PHASE 7 — HOW A PARTNER EARNS A CAPABILITY.
+//
+// The route, and the answer to what was the largest open item in the partner
+// module: attend → assess → certified → capability granted. Each arrow is a gate,
+// and each gate is the reason the step before it is not enough on its own.
+// ---------------------------------------------------------------------------
+
+// How a course is delivered. Matters because capacity means something different
+// for each: a room seats twenty, a webinar does not, and self-paced has no date
+// to attend at all.
+export const trainingDeliveryModes = [
+  "in_person",
+  "webinar",
+  "self_paced",
+] as const satisfies readonly string[];
+
+export type TrainingDeliveryMode = (typeof trainingDeliveryModes)[number];
+
+// Where a partner has got to on one session.
+//
+// `attended` and `passed` are deliberately different states, and keeping them
+// apart IS the gate: certification issues on a completed assessment, never on
+// attendance alone. Somebody who sat in the room for a day has demonstrated that
+// they can sit in a room.
+export const trainingRegistrationStatuses = [
+  "registered",
+  // Turned up. Necessary and not sufficient.
+  "attended",
+  "no_show",
+  // Sat the assessment and passed it. The only state that can produce a
+  // certificate.
+  "passed",
+  "failed",
+  "cancelled",
+] as const satisfies readonly string[];
+
+export type TrainingRegistrationStatus =
+  (typeof trainingRegistrationStatuses)[number];
+
+// A CERTIFICATE'S STANDING.
+//
+// `pending_verification` exists because a certificate SOT has not checked is not
+// evidence — the same reasoning as `firmwareVerified` on a Space item. A partner
+// can hold a vendor certificate we have never seen, and it cannot unlock anything
+// until somebody here has looked at it.
+//
+// `expired` is a stored state AND a derived one. The service recomputes standing
+// from the date on every read, so the column can never be the reason a lapsed
+// certificate is treated as live; the column exists so a sweep can record WHEN it
+// lapsed and tell somebody.
+export const certificationStatuses = [
+  "pending_verification",
+  "verified",
+  "expired",
+  "revoked",
+] as const satisfies readonly string[];
+
+export type CertificationStatus = (typeof certificationStatuses)[number];
+
+// WHAT A CERTIFICATE'S STANDING IS *TODAY* — a different vocabulary from the stored
+// status above, and deliberately so.
+//
+// The stored status is what somebody last wrote. The standing is what is true now,
+// worked out from the dates every time it is asked, because nothing runs at midnight
+// to move a certificate from `verified` to `expired`.
+//
+// The two lists differ where it matters. There is no `pending_verification` here:
+// from the point of view of "may this unlock anything", an unchecked certificate and
+// an unchecked claim are one state, `unverified`. And there is no `verified` — a
+// verified certificate that lapsed last month is not valid, so the standing that
+// allows anything is `valid` and it means verified AND in date.
+//
+// Kept as its own enum rather than reusing the status so that a screen cannot render
+// one where it means the other. They looked interchangeable and are not.
+export const certificateStandings = [
+  "valid",
+  "unverified",
+  "expired",
+  "revoked",
+] as const satisfies readonly string[];
+
+export type CertificateStanding = (typeof certificateStandings)[number];
+
+// A LEAD'S LIFE.
+//
+// `new` → `qualified` is the gate: a lead is not released to a partner until
+// somebody has qualified it. Raw B2C enquiries are tyre-kickers, and partners stop
+// trusting the feed after a handful of them.
+//
+// `offered` → `expired` → `offered` again is the cascade: an offer nobody accepts
+// times out and moves to the next partner, rather than sitting with the nearest
+// one forever because they were busy that week.
+export const leadStatuses = [
+  "new",
+  "qualified",
+  // Refused at qualification. Kept rather than deleted: the reason is what stops
+  // the same enquiry being chased twice.
+  "rejected",
+  "offered",
+  "accepted",
+  "converted",
+  "lost",
+] as const satisfies readonly string[];
+
+export type LeadStatus = (typeof leadStatuses)[number];
+
+// What an offer to one partner came to. Separate from the lead's own status
+// because a lead outlives its offers — three partners may each have been offered
+// and let it lapse before the fourth accepts.
+export const leadOfferStatuses = [
+  "offered",
+  "accepted",
+  "declined",
+  "expired",
+] as const satisfies readonly string[];
+
+export type LeadOfferStatus = (typeof leadOfferStatuses)[number];
 
 export const partnerRequestStatuses = [
   "pending",
@@ -741,3 +867,141 @@ export const importIssueStatuses = [
 ] as const satisfies readonly string[];
 
 export type ImportIssueStatus = (typeof importIssueStatuses)[number];
+
+// pass           — checked and satisfied, on everything the rule matched
+// warn           — violated, and the rule only cautions
+// block          — violated, and the rule gates checkout
+// not_applicable — nothing in the selection participates
+// unknown        — could not be checked. Never treated as a pass.
+//
+// Not a column on any table. It lives here because a saved scenario stores one
+// per rule in its JSON snapshot, and db/types.ts cannot reach into the services
+// package to borrow the union.
+export const findingStatuses = [
+  "pass",
+  "warn",
+  "block",
+  "not_applicable",
+  "unknown",
+] as const satisfies readonly string[];
+
+export type FindingStatus = (typeof findingStatuses)[number];
+
+// What happened to a partner's capability. A capability IS the badge — what a
+// partner is approved to do — so this is the record of it being awarded or
+// taken away after approval.
+export const partnerCapabilityActions = [
+  "granted",
+  "revoked",
+] as const satisfies readonly string[];
+
+export type PartnerCapabilityAction =
+  (typeof partnerCapabilityActions)[number];
+
+// THE EXPERT DESK'S TWO QUEUES.
+//
+// One table, two queues, because the lifecycle is identical and the WORK is not.
+// A design question needs somebody who knows the engine; a datasheet needs
+// somebody who knows the products. Mixing them into one list means whoever opens
+// it skims past most of it.
+export const expertQueues = [
+  // A buyer stuck on a design. Carries the selection they were looking at.
+  "design_help",
+  // A document the importer could not read. The deterministic stand-in for
+  // automated document interpretation — a human reads it and answers.
+  "document_review",
+] as const satisfies readonly string[];
+
+export type ExpertQueue = (typeof expertQueues)[number];
+
+export const expertRequestStatuses = [
+  "open",
+  // Somebody is working on it. Exists so two experts do not answer the same
+  // question twice and contradict each other in front of a customer.
+  "claimed",
+  "answered",
+  "closed",
+] as const satisfies readonly string[];
+
+export type ExpertRequestStatus = (typeof expertRequestStatuses)[number];
+
+// WHY SOMEBODY IS ASKING FOR A VISIT.
+//
+// Not the same list as the expert queues, and not the same table: an expert
+// request is a QUESTION somebody answers from a desk, and a callout is a person
+// going to a building. The kind decides who goes and what they take.
+export const serviceRequestKinds = [
+  // A clock came due — service life, sensor life or battery. The one the whole
+  // schedule exists to produce.
+  "replacement",
+  // Something has stopped working.
+  "fault",
+  // Broken, and inside the warranty window. Kept apart from `fault` because who
+  // pays is the difference, and it is the first thing anybody asks.
+  "warranty_claim",
+  // A routine look at a system nobody has complained about.
+  "inspection",
+  // They want to add to what is already installed.
+  "expansion",
+] as const satisfies readonly string[];
+
+export type ServiceRequestKind = (typeof serviceRequestKinds)[number];
+
+// A CALLOUT'S LIFECYCLE.
+//
+// Longer than the expert desk's because a visit has a date in it. `scheduled` is
+// the state a customer most wants to see and the one a question queue has no
+// equivalent for.
+export const serviceRequestStatuses = [
+  "open",
+  "scheduled",
+  "attended",
+  "closed",
+  "cancelled",
+] as const satisfies readonly string[];
+
+export type ServiceRequestStatus = (typeof serviceRequestStatuses)[number];
+
+// WHAT A NOTIFICATION IS ABOUT.
+//
+// Deliberately few. A notification for everything is a notification for nothing,
+// and the fastest way to teach somebody to ignore the bell.
+export const notificationKinds = [
+  "invoice_issued",
+  "payment_recorded",
+  "boq_status",
+  "expert_answered",
+  // A visit was asked for, booked, or attended. One kind for the whole callout
+  // chain rather than three — the title carries which, and three kinds would be
+  // three switches nobody remembers to add to.
+  "service_request",
+  // An assessment result, a certificate issued or verified, or one about to lapse.
+  // One kind for the whole route to a capability, for the same reason.
+  "certification",
+  // A qualified lead offered to a partner, and the cascade when it lapses.
+  "lead",
+] as const satisfies readonly string[];
+
+export type NotificationKind = (typeof notificationKinds)[number];
+
+// Which side of the product a notification belongs to. One person can be both a
+// customer and a partner; the audience decides which inbox it appears in.
+export const notificationAudiences = [
+  "admin",
+  "client",
+] as const satisfies readonly string[];
+
+export type NotificationAudience = (typeof notificationAudiences)[number];
+
+// A CHANGE ORDER'S LIFECYCLE.
+//
+// Proposed, then either applied or turned down. `applied` is terminal — a change
+// that has been made cannot be un-proposed, and undoing it is another change
+// rather than an edit of this one.
+export const orderChangeStatuses = [
+  "proposed",
+  "applied",
+  "rejected",
+] as const satisfies readonly string[];
+
+export type OrderChangeStatus = (typeof orderChangeStatuses)[number];

@@ -44,6 +44,16 @@ import {
 // with the display and authoring fields the engine must never read.
 export type AssignmentDefinition = AttributeMeta & {
   key: string;
+  // Other LABELS the sources use for this attribute. Carried through the model
+  // because the importer is what it exists for: one brand writes "Sensitive
+  // element", the next writes "Sensing element", and without this the second
+  // spelling resolves to nothing and every product in that batch queues a
+  // question that was answered years ago.
+  //
+  // Optional for the same reason `groupFields` is: only the importer reads it,
+  // so requiring it would make every other construction site type `null` to say
+  // nothing. Absent and null both mean "answers only to its own label".
+  labelAliases?: string[] | null;
   internalName: string | null;
   description: string | null;
   audience: AssignmentAudience;

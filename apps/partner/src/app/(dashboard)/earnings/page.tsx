@@ -1,18 +1,26 @@
 import { CashOutButton } from "@/components/earnings/cash-out-button";
-import { PARTNER_PAYOUT_STATUS_LABELS } from "@/db/label";
+import {
+  PARTNER_EARNING_STATUS_LABELS,
+  PARTNER_PAYOUT_STATUS_LABELS,
+} from "@/db/label";
 import { requirePartner } from "@/lib/server/auth";
 import { formatSar } from "utils";
 import {
   getPartnerEarningsSummary,
+  listPartnerEarnings,
   listPartnerPayouts,
 } from "services";
 
 const PartnerEarningsPage = async () => {
   const user = await requirePartner();
 
-  const [summary, payouts] = await Promise.all([
+  const [summary, payouts, earnings] = await Promise.all([
     getPartnerEarningsSummary(user.id),
     listPartnerPayouts(user.id),
+    // The lines behind the tiles. This screen showed three totals and a list of
+    // payout references, so the only thing a partner could do with a figure they
+    // disagreed with was ring somebody up.
+    listPartnerEarnings(user.id),
   ]);
 
   const tiles = [
@@ -47,6 +55,49 @@ const PartnerEarningsPage = async () => {
       </div>
 
       <CashOutButton disabled={summary.accrued <= 0} />
+
+      <section>
+        <h2 className="font-heading text-lg text-ink">
+          What made up those totals
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          One line per handover. A figure you cannot break down is a figure you
+          cannot check.
+        </p>
+        {earnings.length === 0 ? (
+          <p className="mt-2 text-sm text-muted">
+            Nothing accrued yet. A line appears here when a job you installed is
+            verified.
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-col gap-2">
+            {earnings.map((earning) => (
+              <div
+                key={earning.uuid}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-hairline px-4 py-3 text-sm"
+              >
+                <div className="min-w-0">
+                  {/* The BOQ reference is the number on the job they went to
+                      site for. The order reference is ours, and shown only when
+                      there is no BOQ to name. */}
+                  <p className="text-ink">
+                    {earning.boqReference ??
+                      earning.orderReference ??
+                      "a job that has since been removed"}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {PARTNER_EARNING_STATUS_LABELS[earning.status]} ·{" "}
+                    {new Date(earning.accruedAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <span className="font-semibold tabular-nums text-ink">
+                  {formatSar(Number(earning.amount))}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section>
         <h2 className="font-heading text-lg text-ink">Payouts</h2>

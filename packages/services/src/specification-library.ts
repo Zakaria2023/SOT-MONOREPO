@@ -6,6 +6,7 @@ import { isOptionBacked } from "../../../db/enum";
 import { ProjectVariables } from "../../../db/schema/project-variables";
 import { Relationships } from "../../../db/schema/relationships";
 import { SpecificationCategories } from "../../../db/schema/specification-categories";
+import { SpecificationOptionSets } from "../../../db/schema/specification-option-sets";
 import {
   SelectSpecifications,
   Specifications,
@@ -1061,6 +1062,125 @@ export const reorderLibraryAttributes = async (
       ),
     );
   invalidateCatalogModel();
+};
+
+/**
+ * Add ONE value to an attribute's master list — controlled-add, from anywhere.
+ *
+ * The import review queue needs this. A reviewer meeting an unknown value has
+ * two honest answers: map it onto a value that already exists, or admit it is a
+ * new one. The second has to be possible without leaving the queue, or a batch
+ * carrying sixty new values becomes sixty round trips and the reviewer starts
+ * mapping things onto near-misses to avoid the walk.
+ *
+ * It goes through `mergeOptions` and the same alias-conflict guard as a full
+ * save rather than pushing onto the array, because those guards are the whole
+ * value of the list: append-only, one spelling pointing at one thing, and a
+ * derived value the resolver can find again.
+ *
+ * When the attribute BORROWS a shared vocabulary the option is added to the set,
+ * not to the attribute — the attribute has no list of its own to add to, and
+ * giving it one would fork the very vocabulary the set exists to keep single.
+ * The attribute's narrowing is widened to include it, otherwise the value would
+ * be added and still not offered.
+ *
+ * Returns the canonical value as stored, which is not always what was typed.
+ */
+export const addOptionToAttribute = async (
+  specificationUuid: string,
+  input: { label: string; aliases?: string[] },
+): Promise<string> => {
+  const label = input.label.trim();
+  if (!label) {
+    throw new ValidationError("A new option needs a name.");
+  }
+
+  const [attribute] = await db
+    .select()
+    .from(Specifications)
+    .where(eq(Specifications.uuid, specificationUuid));
+  if (!attribute) {
+    throw new ValidationError("That attribute no longer exists.");
+  }
+  if (!isOptionBacked(attribute.type)) {
+    throw new ValidationError(
+      `"${attribute.label}" is a ${attribute.type} attribute — it has no master list to add to.`,
+    );
+  }
+
+  const asInput = (options: SpecOption[]): LibraryOptionInput[] =>
+    options.map((option) => ({
+      value: option.value,
+      label: option.label,
+      rank: option.rank,
+      aliases: option.aliases,
+    }));
+
+  const added: LibraryOptionInput = { label, rank: null, aliases: input.aliases };
+
+  // Borrowed vocabulary: the words belong to the set.
+  if (attribute.optionSetUuid) {
+    const [set] = await db
+      .select()
+      .from(SpecificationOptionSets)
+      .where(eq(SpecificationOptionSets.uuid, attribute.optionSetUuid));
+    if (!set) {
+      throw new ValidationError("That shared list no longer exists.");
+    }
+
+    const existing = set.options ?? [];
+    const merged = mergeOptions(existing, [...asInput(existing), added], set.ordered);
+    const conflict = aliasConflicts(merged)[0];
+    if (conflict) {
+      throw new ValidationError(
+        `"${conflict.alias}" is already how ${conflict.claimedBy.join(" and ")} are written in "${set.name}". An alias has to point at exactly one thing.`,
+      );
+    }
+    const stored = merged.find((option) => option.label === label);
+    if (!stored) {
+      throw new ValidationError("That option could not be added.");
+    }
+
+    await db
+      .update(SpecificationOptionSets)
+      .set({ options: merged })
+      .where(eq(SpecificationOptionSets.uuid, set.uuid));
+
+    // A narrowed attribute would otherwise have the word and still not offer it.
+    const narrowed = attribute.setValues ?? [];
+    if (narrowed.length > 0 && !narrowed.includes(stored.value)) {
+      await db
+        .update(Specifications)
+        .set({ setValues: [...narrowed, stored.value] })
+        .where(eq(Specifications.uuid, specificationUuid));
+    }
+    invalidateCatalogModel();
+    return stored.value;
+  }
+
+  const existing = attribute.options ?? [];
+  const merged = mergeOptions(
+    existing,
+    [...asInput(existing), added],
+    attribute.ordered,
+  );
+  const conflict = aliasConflicts(merged)[0];
+  if (conflict) {
+    throw new ValidationError(
+      `"${conflict.alias}" is already how ${conflict.claimedBy.join(" and ")} are written on "${attribute.label}". An alias has to point at exactly one thing.`,
+    );
+  }
+  const stored = merged.find((option) => option.label === label);
+  if (!stored) {
+    throw new ValidationError("That option could not be added.");
+  }
+
+  await db
+    .update(Specifications)
+    .set({ options: merged })
+    .where(eq(Specifications.uuid, specificationUuid));
+  invalidateCatalogModel();
+  return stored.value;
 };
 
 // ---------------------------------------------------------------------------

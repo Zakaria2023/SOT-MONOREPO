@@ -11,9 +11,11 @@ import {
   deleteOptionSet,
   deleteProjectVariable,
   deleteSpecificationGroup,
+  AttributeSweep,
   getAttributeCategories,
   getLibrary,
   getOptionSets,
+  getValueSweep,
   getProjectVariables,
   LibraryGroup,
   moveLibraryAttribute,
@@ -417,4 +419,16 @@ export const deleteVariableAction = async (
   }
   revalidatePath("/library");
   return { success: true };
+};
+
+/**
+ * Where the stored values and the offered options have drifted apart.
+ *
+ * The dangerous case is a value no option offers: every set comparator misses
+ * it silently, so a rule that reads correctly passes a product it was written to
+ * catch.
+ */
+export const getValueSweepAction = async (): Promise<AttributeSweep[]> => {
+  await requireAdmin();
+  return getValueSweep();
 };

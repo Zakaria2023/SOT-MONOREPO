@@ -20,6 +20,11 @@ type DesignState = {
   // state was already carrying them at runtime — the type just did not say so,
   // so no caller could reach them and the buyer never saw one.
   unknowns: DesignFinding[];
+  // Checks that cleared without covering every product they apply to. Carried
+  // for the same reason the unknowns are, and missed for the same reason too:
+  // counted as a clean pass, it tells a buyer their design was checked when most
+  // of it was never read.
+  partial: DesignFinding[];
   // Project questions this basket needs answered. The engine has always refused
   // to run a rule whose input was unanswered and said so in the finding, but
   // nothing collected the answer, so the buyer was told to "tell us X" with
@@ -31,6 +36,7 @@ const EMPTY: DesignState = {
   blockers: [],
   warnings: [],
   unknowns: [],
+  partial: [],
   questions: [],
 };
 

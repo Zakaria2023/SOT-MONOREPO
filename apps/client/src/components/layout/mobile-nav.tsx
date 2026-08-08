@@ -272,6 +272,16 @@ export const MobileNav = ({ categories, isSignedIn }: MobileNavProps) => {
                       >
                         Your orders
                       </Link>
+                      {/* 6.1. Below the transactions, because it is not one — a
+                          site is the thing they still have after all of those
+                          have finished. */}
+                      <Link
+                        href="/spaces"
+                        onClick={close}
+                        className="font-grotesk rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:bg-hover hover:text-primary"
+                      >
+                        Your sites
+                      </Link>
                       <Link
                         href="/support"
                         onClick={close}

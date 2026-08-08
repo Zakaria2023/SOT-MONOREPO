@@ -31,6 +31,7 @@ import {
 } from "../../../db/schema/products";
 import type { Viewer } from "./assignment-resolver";
 import { ValidationError } from "./errors";
+import { recordAudit } from "./catalog-audit";
 import { normalizeProductValues } from "./product-completeness";
 import { chooseProductSlug } from "./product-slug";
 import { signatureForVariants } from "./variants";
@@ -534,6 +535,7 @@ const resolveIdentity = async (
  */
 export const createProduct = async (
   fields: ProductClientFields,
+  actor?: { uuid: string; name: string },
 ): Promise<string> => {
   const uuid = generateUuid();
 
@@ -567,12 +569,21 @@ export const createProduct = async (
     uuid,
     order: total,
   });
+
+  await recordAudit({
+    target: "product",
+    action: "create",
+    targetUuid: uuid,
+    targetLabel: fields.name,
+    actor,
+  });
   return uuid;
 };
 
 export const updateProduct = async (
   uuid: string,
   fields: ProductClientFields,
+  actor?: { uuid: string; name: string },
 ): Promise<void> => {
   const identity = await resolveIdentity(fields);
   await assertIdentityIsFree(
@@ -596,20 +607,78 @@ export const updateProduct = async (
     normalizeProductValues(fields.categoryUuid, fields.specValues ?? {}),
   ]);
 
-  await db
-    .update(Products)
-    .set({
-      ...fields,
-      ...identity,
-      specValues,
-      sku,
-      slug,
-    })
-    .where(eq(Products.uuid, uuid));
+  // Read and write in ONE transaction. Apart, two editors saving the same
+  // product both read the same "before", and the trail then records a change
+  // from a state the second edit never actually started from.
+  const before = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({
+        name: Products.name,
+        categoryUuid: Products.categoryUuid,
+        brandUuid: Products.brandUuid,
+        isAvailable: Products.isAvailable,
+        status: Products.status,
+      })
+      .from(Products)
+      .where(eq(Products.uuid, uuid))
+      .for("update");
+
+    await tx
+      .update(Products)
+      .set({
+        ...fields,
+        ...identity,
+        specValues,
+        sku,
+        slug,
+      })
+      .where(eq(Products.uuid, uuid));
+
+    return current;
+  });
+
+  // The fields somebody asks about afterwards. Not the spec values: a diff of a
+  // JSON blob is unreadable, and the product form already shows what they are.
+  await recordAudit({
+    target: "product",
+    action: "update",
+    targetUuid: uuid,
+    targetLabel: fields.name,
+    actor,
+    changes: [
+      { field: "name", from: before?.name, to: fields.name },
+      { field: "category", from: before?.categoryUuid, to: fields.categoryUuid },
+      { field: "brand", from: before?.brandUuid, to: fields.brandUuid },
+      { field: "available", from: before?.isAvailable, to: fields.isAvailable },
+      { field: "status", from: before?.status, to: fields.status },
+    ].filter((change) => change.from !== change.to),
+  });
 };
 
-export const deleteProduct = async (uuid: string): Promise<void> => {
-  await db.delete(Products).where(eq(Products.uuid, uuid));
+export const deleteProduct = async (
+  uuid: string,
+  actor?: { uuid: string; name: string },
+): Promise<void> => {
+  // Read before the delete — afterwards there is no name left to record, and an
+  // audit line naming a uuid is one nobody can read — and under the same lock,
+  // so a concurrent rename cannot land in the trail as the deleted name.
+  const existing = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ name: Products.name })
+      .from(Products)
+      .where(eq(Products.uuid, uuid))
+      .for("update");
+    await tx.delete(Products).where(eq(Products.uuid, uuid));
+    return current;
+  });
+
+  await recordAudit({
+    target: "product",
+    action: "delete",
+    targetUuid: uuid,
+    targetLabel: existing?.name ?? "a deleted product",
+    actor,
+  });
 };
 
 export const getProductsByCategory = async (

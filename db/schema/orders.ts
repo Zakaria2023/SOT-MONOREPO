@@ -8,6 +8,7 @@ import {
   mysqlEnum,
   mysqlTable,
   timestamp,
+  text,
   varchar,
 } from "drizzle-orm/mysql-core";
 import { invoiceStatuses, orderStatuses } from "../enum";
@@ -81,6 +82,14 @@ export const Orders = mysqlTable(
 
     confirmedAt: timestamp("confirmed_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),
+
+    // Cash is handed to a PERSON. There is no gateway and no callback, so the
+    // only evidence a payment happened is somebody attesting that it did — which
+    // means the record has to name them and carry something to reconcile
+    // against. An order marked paid by nobody, against nothing, is an assertion.
+    paidBy: varchar("paid_by", { length: 255 }),
+    paymentReference: varchar("payment_reference", { length: 100 }),
+    paymentNote: text("payment_note"),
     cancelledAt: timestamp("cancelled_at"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -109,6 +118,32 @@ export const Invoices = mysqlTable(
     status: mysqlEnum("status", invoiceStatuses).default("issued").notNull(),
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     currency: char("currency", { length: 3 }).default("SAR"),
+
+    // `amount` above is the total INCLUDING VAT — the figure the customer pays —
+    // and these break it out, because an invoice showing only a total is not an
+    // invoice.
+    //
+    // Stored rather than recomputed on render: the rate changes by decree, and
+    // an invoice issued at 15% must keep saying 15% forever. Recomputing would
+    // silently restate every historical invoice the day the rate moves.
+    netAmount: decimal("net_amount", { precision: 12, scale: 2 }),
+    vatAmount: decimal("vat_amount", { precision: 12, scale: 2 }),
+    vatRatePercent: int("vat_rate_percent"),
+
+    // Snapshotted for the same reason. The company can be renamed, and a
+    // reissued PDF must match the one the customer holds.
+    sellerName: varchar("seller_name", { length: 255 }),
+    sellerVatNumber: varchar("seller_vat_number", { length: 20 }),
+
+    // The R2 object holding the rendered PDF, written once when the invoice is
+    // issued. STORED rather than re-rendered on each request, because an invoice
+    // is an artifact and not a view: improve the layout next month and every past
+    // invoice would silently start looking different from the paper the customer
+    // already has.
+    //
+    // Null for invoices issued before this existed. Those fall back to rendering
+    // on demand, which is why the renderer stays.
+    pdfDocumentId: varchar("pdf_document_id", { length: 64 }),
 
     issuedAt: timestamp("issued_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),

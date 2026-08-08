@@ -162,3 +162,28 @@ export const createDocumentDownloadUrl = ({
 
   return getSignedUrl(getCloudflareR2(), command, { expiresIn: 60 });
 };
+
+/**
+ * Read an object back out of R2 as bytes.
+ *
+ * Returns null when the key is absent rather than throwing. A missing object is
+ * a recoverable state for a caller that can regenerate what it wanted — an
+ * invoice PDF, a thumbnail — and forcing every such caller into a try/catch to
+ * express that is how the recoverable case ends up handled as an error.
+ */
+export const readDocument = async (
+  documentId: string,
+): Promise<Uint8Array | null> => {
+  try {
+    const result = await getCloudflareR2().send(
+      new GetObjectCommand({
+        Bucket: getR2BucketName(),
+        Key: createDocumentObjectKey(documentId),
+      }),
+    );
+    const body = await result.Body?.transformToByteArray();
+    return body ?? null;
+  } catch {
+    return null;
+  }
+};

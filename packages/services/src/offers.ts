@@ -20,6 +20,7 @@ import {
   SelectPartnerRequests,
 } from "../../../db/schema/partner-requests";
 import { SelectUsers, Users } from "../../../db/schema/users";
+import { statusesThatCanBecome } from "./boq-lifecycle";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 
 export type { SelectOffers };
@@ -287,13 +288,16 @@ export const approveOffer = async ({
       })
       .where(eq(Offers.uuid, offerUuid));
 
+    // The list comes FROM the lifecycle model rather than being restated here.
+    // Guarding in the WHERE is right — it is atomic, unlike read-then-write —
+    // but the rule it enforces has to have one definition.
     await tx
       .update(Boqs)
       .set({ status: "offered" })
       .where(
         and(
           eq(Boqs.uuid, offer.boqUuid),
-          inArray(Boqs.status, ["draft", "validated", "submitted", "reviewed"]),
+          inArray(Boqs.status, statusesThatCanBecome("offered")),
         ),
       );
   });

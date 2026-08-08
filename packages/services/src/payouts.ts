@@ -1,7 +1,9 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { fromMinorUnits, toMinorUnits } from "utils";
 import { db } from "../../../db";
+import { Boqs, type SelectBoqs } from "../../../db/schema/boqs";
+import { Orders, type SelectOrders } from "../../../db/schema/orders";
 import {
   PartnerEarnings,
   PartnerPayouts,
@@ -9,6 +11,7 @@ import {
   SelectPartnerPayouts,
 } from "../../../db/schema/payouts";
 import { ConflictError, ValidationError } from "./errors";
+import { notify } from "./notifications";
 import type { DbExecutor } from "./partners";
 
 export type { SelectPartnerEarnings, SelectPartnerPayouts };
@@ -122,13 +125,36 @@ export const getPartnerEarningsSummary = async (
   };
 };
 
-/** Every earning line for a partner, newest first. */
+/**
+ * Every earning line for a partner, newest first, each naming the job it came
+ * from.
+ *
+ * The join is the point. This returned bare earnings rows carrying an
+ * `orderUuid`, so the only thing a partner could be shown was a total and a
+ * 36-character identifier — and a figure somebody cannot break down into the jobs
+ * that produced it is a figure they cannot check. "You are owed 14,500" is an
+ * assertion; "you are owed 14,500, and here are the six handovers" is a
+ * statement they can disagree with.
+ */
+export type PartnerEarningLine = SelectPartnerEarnings & {
+  orderReference: SelectOrders["reference"] | null;
+  boqReference: SelectBoqs["reference"] | null;
+};
+
 export const listPartnerEarnings = async (
   partnerClerkUserId: string,
-): Promise<SelectPartnerEarnings[]> =>
+): Promise<PartnerEarningLine[]> =>
   db
-    .select()
+    .select({
+      ...getTableColumns(PartnerEarnings),
+      orderReference: Orders.reference,
+      // The BOQ reference is what a partner recognises — it is the number on the
+      // job they went to site for. The order reference is ours.
+      boqReference: Boqs.reference,
+    })
     .from(PartnerEarnings)
+    .leftJoin(Orders, eq(PartnerEarnings.orderUuid, Orders.uuid))
+    .leftJoin(Boqs, eq(Orders.boqUuid, Boqs.uuid))
     .where(eq(PartnerEarnings.partnerClerkUserId, partnerClerkUserId))
     .orderBy(desc(PartnerEarnings.accruedAt));
 
@@ -152,8 +178,8 @@ export const listPartnerPayouts = async (
 
 /**
  * A non-integrated partner cashes out: raise one payout covering all their
- * accrued earnings (with the ZATCA invoice they uploaded) and mark those
- * earnings invoiced. SOT settles it later via markPayoutPaid.
+ * accrued earnings, with the invoice they uploaded, and mark those earnings
+ * invoiced. SOT settles it later via markPayoutPaid.
  */
 export const requestPayout = async ({
   partnerClerkUserId,
@@ -214,13 +240,33 @@ export const requestPayout = async ({
   if (!payout) {
     throw new Error("Failed to create payout");
   }
+
+  // Addressed to the desk rather than to a person, like every other staff notice:
+  // whoever is on finance today deals with it. Without this a partner's cash-out
+  // sat in `requested` until somebody thought to open the payouts screen, and the
+  // partner had no way to tell being queued from being ignored.
+  await notify({
+    audience: "admin",
+    kind: "payment_recorded",
+    title: `${payout.reference} — a partner has cashed out`,
+    body: `${payout.amount} ${payout.currency ?? "SAR"} awaiting transfer.`,
+    href: "/payouts",
+  });
+
   return payout;
 };
 
 /** SOT settles a requested payout — transfers the money and clears the ledger. */
 export const markPayoutPaid = async (
   payoutUuid: string,
+  // How the transfer can be found again. Required rather than optional: a
+  // payout marked paid that cannot be matched to a bank statement is an
+  // assertion, not a record.
+  transfer: { reference: string; by: string },
 ): Promise<SelectPartnerPayouts> => {
+  if (transfer.reference.trim() === "") {
+    throw new ValidationError("A transfer needs a reference.");
+  }
   const [payout] = await db
     .select()
     .from(PartnerPayouts)
@@ -235,7 +281,12 @@ export const markPayoutPaid = async (
   await db.transaction(async (tx) => {
     await tx
       .update(PartnerPayouts)
-      .set({ status: "paid", paidAt: new Date() })
+      .set({
+        status: "paid",
+        paidAt: new Date(),
+        paidReference: transfer.reference.trim(),
+        paidBy: transfer.by,
+      })
       .where(eq(PartnerPayouts.uuid, payoutUuid));
 
     await tx
@@ -251,5 +302,18 @@ export const markPayoutPaid = async (
   if (!updated) {
     throw new Error("Failed to settle payout");
   }
+
+  // Addressed to the partner, and carrying the transfer reference. This is the one
+  // notification in the system somebody will go looking for, and the reference is
+  // what lets them match it against their bank rather than take our word for it.
+  await notify({
+    audience: "client",
+    kind: "payment_recorded",
+    recipientClerkUserId: updated.partnerClerkUserId,
+    title: `You have been paid — ${updated.reference}`,
+    body: `${updated.amount} ${updated.currency ?? "SAR"} transferred, reference ${transfer.reference.trim()}.`,
+    href: "/earnings",
+  });
+
   return updated;
 };

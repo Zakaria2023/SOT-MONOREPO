@@ -17,6 +17,11 @@ import {
   PartnerRequests,
   SelectPartnerRequests,
 } from "../../../db/schema/partner-requests";
+import {
+  partnerCapabilities,
+  type PartnerCapability,
+} from "../../../db/enum";
+import { matchPartners } from "./partner-matching";
 import { ConflictError, ValidationError } from "./errors";
 
 /**
@@ -280,48 +285,32 @@ export type MatchedPartner = {
 export type BoqPartnerOptions = {
   close: MatchedPartner[];
   others: MatchedPartner[];
-};
-
-// A same-city match scores >= 100 (see scoreLocationCloseness).
-const SAME_CITY_SCORE = 100;
-
-// Splits a free-text location ("Riyadh, Saudi Arabia") into comparable tokens.
-const locationTokens = (value: string | null | undefined): string[] =>
-  (value ?? "")
-    .toLowerCase()
-    .split(/[,\s]+/)
-    .map((token) => token.trim())
-    .filter(Boolean);
-
-// Heuristic closeness score for two free-text locations (higher = closer).
-// A shared city (the first token) dominates; other shared tokens (region,
-// country) add smaller amounts. Locations have no coordinates, so this is a
-// token-overlap approximation rather than true geographic distance.
-const scoreLocationCloseness = (
-  userLocation: string | null,
-  partnerLocation: string | null,
-): number => {
-  const userParts = locationTokens(userLocation);
-  const partnerParts = locationTokens(partnerLocation);
-  if (userParts.length === 0 || partnerParts.length === 0) {
-    return 0;
-  }
-
-  const partnerSet = new Set(partnerParts);
-  const shared = userParts.filter((token) => partnerSet.has(token)).length;
-  const cityMatch = userParts[0] === partnerParts[0] ? 1 : 0;
-
-  return cityMatch * 100 + shared * 10;
+  // Approved partners who cannot take this job, each with the reason. Carried
+  // rather than filtered away: a partner somebody expected to see, simply
+  // absent, reads as a bug in the matcher rather than as a capability they lack.
+  unable: (MatchedPartner & { reason: string })[];
+  // True when the job has no location, so the order is by standing and not by
+  // distance. A list that looks confidently sorted when nothing could be sorted
+  // is worse than one that says so.
+  unranked: boolean;
 };
 
 /**
- * Splits approved partners for a BOQ into same-city matches (`close`, ranked
- * closest-first) and everyone else (`others`, offered for manual selection).
- * Within each group, ties break toward the most recently approved partner.
+ * Who can take this job, closest first.
+ *
+ * Capability is a FILTER and proximity is the ranking — see partner-matching.ts
+ * for why they are not blended. This function used to rank on location alone,
+ * so a pre-seller in the right city sorted above an installer in the next one
+ * for an installation job.
+ *
+ * `needsAnyOf` defaults to the two installation capabilities, because every
+ * caller today is assigning installation work. Passed explicitly rather than
+ * assumed inside the matcher, so a different kind of job says what it needs.
  */
 export const getApprovedPartnerOptions = async (
   userLocation: string | null,
   executor: DbExecutor = db,
+  needsAnyOf: PartnerCapability[] = ["install_only", "install_program"],
 ): Promise<BoqPartnerOptions> => {
   const partners = await executor
     .select({
@@ -330,6 +319,7 @@ export const getApprovedPartnerOptions = async (
       fullName: PartnerRequests.fullName,
       companyName: PartnerRequests.companyName,
       location: PartnerRequests.location,
+      capabilities: PartnerRequests.capabilities,
       createdAt: PartnerRequests.createdAt,
     })
     .from(PartnerRequests)
@@ -340,40 +330,54 @@ export const getApprovedPartnerOptions = async (
       ),
     );
 
-  const scored = partners
-    .flatMap((partner) =>
+  const outcome = matchPartners(
+    partners.flatMap((partner) =>
       partner.clerkUserId
-        ? [{ partner, clerkUserId: partner.clerkUserId }]
+        ? [
+            {
+              partnerRequestUuid: partner.partnerRequestUuid,
+              clerkUserId: partner.clerkUserId,
+              name: partner.companyName || partner.fullName,
+              location: partner.location,
+              capabilities: (partner.capabilities ?? []).filter(
+                (capability): capability is PartnerCapability =>
+                  (partnerCapabilities as readonly string[]).includes(
+                    capability,
+                  ),
+              ),
+              approvedAt: partner.createdAt,
+            },
+          ]
         : [],
-    )
-    .map(({ partner, clerkUserId }) => ({
-      partner,
-      clerkUserId,
-      score: scoreLocationCloseness(userLocation, partner.location),
-    }))
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        b.partner.createdAt.getTime() - a.partner.createdAt.getTime(),
-    );
-
-  const closeEntries = scored.filter((entry) => entry.score >= SAME_CITY_SCORE);
-  const otherEntries = scored.filter((entry) => entry.score < SAME_CITY_SCORE);
+    ),
+    { location: userLocation, needsAnyOf },
+  );
 
   const toMatched = (
-    { partner, clerkUserId }: (typeof scored)[number],
-    rank: number,
+    match: (typeof outcome.eligible)[number],
   ): MatchedPartner => ({
-    partnerRequestUuid: partner.partnerRequestUuid,
-    clerkUserId,
-    name: partner.companyName || partner.fullName,
-    location: partner.location,
-    rank,
+    partnerRequestUuid: match.candidate.partnerRequestUuid,
+    clerkUserId: match.candidate.clerkUserId,
+    name: match.candidate.name,
+    location: match.candidate.location,
+    rank: match.rank,
   });
 
   return {
-    close: closeEntries.map((entry, index) => toMatched(entry, index + 1)),
-    others: otherEntries.map((entry) => toMatched(entry, 0)),
+    // `close` keeps its meaning — the ones to auto-suggest — and is now the
+    // same-city eligible partners rather than everyone who scored 100.
+    close: outcome.eligible
+      .filter((match) => match.proximity === "same_city")
+      .map(toMatched),
+    others: outcome.eligible
+      .filter((match) => match.proximity !== "same_city")
+      .map((match) => ({ ...toMatched(match), rank: 0 })),
+    unable: outcome.ineligible.map((match) => ({
+      ...toMatched(match),
+      rank: 0,
+      reason: match.reason ?? "Cannot take this job.",
+    })),
+    unranked: outcome.unranked,
   };
 };
 

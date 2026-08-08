@@ -83,6 +83,14 @@ export const PartnerPayouts = mysqlTable(
     requestedAt: timestamp("requested_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),
 
+    // The bank's reference for the transfer, and who recorded it. SOT does not
+    // move the money — a person does, through a bank — and this row is the
+    // ledger catching up with that. A row marked paid with nothing to check it
+    // against cannot be reconciled against a statement, which is the only thing
+    // that makes it true.
+    paidReference: varchar("paid_reference", { length: 100 }),
+    paidBy: varchar("paid_by", { length: 255 }),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },

@@ -32,3 +32,6 @@ next-env.d.ts
 !.vscode/extensions.json
 .idea/
 .claude
+# drizzle-kit scratch output. This repo uses db:push, not migration files —
+# generate is only ever used to read the DDL before applying it by hand.
+drizzle/

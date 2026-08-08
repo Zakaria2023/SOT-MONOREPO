@@ -4,15 +4,22 @@ import {
   previewRelationAction,
   searchProductsAction,
 } from "@/app/(dashboard)/assignments/actions";
-import type { ProductPickerItem, RelationshipPreview } from "services";
+import type { RelationshipPreview } from "services";
 import type { RelationVariable } from "@/components/assignments/relation-builder";
+import {
+  BasketBuilder,
+  type BasketLine,
+} from "@/components/shared/basket-builder";
 import { Field, FieldSet } from "@/components/shared/field";
+import {
+  FINDING_STATUS_LABEL,
+  FINDING_STATUS_STYLE,
+} from "@/components/shared/finding-status";
 import type { SelectRelationships } from "@/db/schema/relationships";
 import type { Operand } from "@/db/types";
-import { Minus, Plus, Search, TriangleAlert, X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
-import { Button, Dropdown, Input, useDebouncedCallback } from "ui";
-import type { FindingStatus } from "services";
+import { Button, Dropdown, Input } from "ui";
 
 // ---------------------------------------------------------------------------
 // HOW A RULE GETS REVIEWED.
@@ -32,28 +39,6 @@ type RelationPreviewProps = {
   relation: SelectRelationships;
   variables: RelationVariable[];
   onClose: () => void;
-};
-
-type Line = {
-  productUuid: string;
-  name: string;
-  quantity: number;
-};
-
-const STATUS_STYLE: Record<FindingStatus, string> = {
-  pass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-  warn: "border-amber-500/30 bg-amber-500/10 text-amber-500",
-  block: "border-red-500/30 bg-red-500/10 text-red-400",
-  unknown: "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  not_applicable: "border-hairline bg-hover text-secondary",
-};
-
-const STATUS_LABEL: Record<FindingStatus, string> = {
-  pass: "Passes",
-  warn: "Warns the buyer",
-  block: "Blocks the order",
-  unknown: "Cannot be judged",
-  not_applicable: "Does not apply",
 };
 
 // Which project inputs this rule actually reads. Asking for every variable in
@@ -82,10 +67,7 @@ export const RelationPreview = ({
   variables,
   onClose,
 }: RelationPreviewProps) => {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ProductPickerItem[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<BasketLine[]>([]);
   const [answers, setAnswers] = useState<Record<string, number | boolean>>({});
   const [preview, setPreview] = useState<RelationshipPreview>();
   const [error, setError] = useState<string>();
@@ -111,53 +93,11 @@ export const RelationPreview = ({
     referencedVariables(relation).has(variable.uuid),
   );
 
-  const search = useDebouncedCallback(async (term: string) => {
-    setSearching(true);
-    try {
-      setResults(await searchProductsAction(term));
-    } finally {
-      setSearching(false);
-    }
-  }, 250);
-
-  const changeQuery = (term: string): void => {
-    setQuery(term);
-    if (term.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    search(term);
-  };
-
-  const addLine = (product: ProductPickerItem): void => {
-    // Adding the same product twice is a quantity change, not a second line —
-    // the evaluator sums them anyway, so two lines would only be confusing.
-    setLines((current) =>
-      current.some((line) => line.productUuid === product.uuid)
-        ? current.map((line) =>
-            line.productUuid === product.uuid
-              ? { ...line, quantity: line.quantity + 1 }
-              : line,
-          )
-        : [
-            ...current,
-            { productUuid: product.uuid, name: product.name, quantity: 1 },
-          ],
-    );
+  // Any change to the basket invalidates the finding on screen — leaving it
+  // there would attribute last run's verdict to this run's products.
+  const changeLines = (next: BasketLine[]): void => {
     setPreview(undefined);
-    setQuery("");
-    setResults([]);
-  };
-
-  const setQuantity = (productUuid: string, quantity: number): void => {
-    setPreview(undefined);
-    setLines((current) =>
-      quantity <= 0
-        ? current.filter((line) => line.productUuid !== productUuid)
-        : current.map((line) =>
-            line.productUuid === productUuid ? { ...line, quantity } : line,
-          ),
-    );
+    setLines(next);
   };
 
   const run = async (): Promise<void> => {
@@ -208,91 +148,12 @@ export const RelationPreview = ({
       </div>
 
       <FieldSet title="The basket">
-        <Input
-          icon={<Search size={15} />}
-          placeholder="Search products by name, SKU, or model…"
-          value={query}
-          onChange={(event) => changeQuery(event.target.value)}
+        <BasketBuilder
+          lines={lines}
+          onChange={changeLines}
+          search={searchProductsAction}
+          emptyHint="Add the products whose combination you want to try."
         />
-
-        {query.trim().length >= 2 && (
-          <div className="flex flex-col gap-1">
-            {searching && <p className="text-[11px] text-faint">Searching…</p>}
-            {!searching && results.length === 0 && (
-              <p className="text-[11px] text-faint">Nothing matched.</p>
-            )}
-            {results.map((product) => (
-              <button
-                key={product.uuid}
-                type="button"
-                onClick={() => addLine(product)}
-                className="flex items-center gap-2 rounded-control px-2 py-1.5 text-left text-xs text-ink hover:bg-hover"
-              >
-                <Plus size={12} className="shrink-0 text-primary" />
-                <span className="min-w-0 flex-1 line-clamp-1">
-                  {product.name}
-                </span>
-                {product.categoryName && (
-                  <span className="shrink-0 text-[11px] text-faint">
-                    {product.categoryName}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {lines.length === 0 ? (
-          <p className="rounded-control border border-dashed border-hairline px-3 py-6 text-center text-[11px] text-faint">
-            Add the products whose combination you want to try.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {lines.map((line) => (
-              <div
-                key={line.productUuid}
-                className="flex items-center gap-2 rounded-control border border-hairline bg-base px-2.5 py-1.5"
-              >
-                <span className="min-w-0 flex-1 text-xs text-ink line-clamp-1">
-                  {line.name}
-                </span>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setQuantity(line.productUuid, line.quantity - 1)
-                    }
-                    aria-label={`One fewer ${line.name}`}
-                    className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink"
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <span className="w-8 text-center text-xs font-medium text-ink">
-                    {line.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setQuantity(line.productUuid, line.quantity + 1)
-                    }
-                    aria-label={`One more ${line.name}`}
-                    className="rounded-control p-1 text-faint hover:bg-hover hover:text-ink"
-                  >
-                    <Plus size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(line.productUuid, 0)}
-                    aria-label={`Remove ${line.name}`}
-                    className="rounded-control p-1 text-faint hover:bg-hover hover:text-red-400"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </FieldSet>
 
       {asked.length > 0 && (
@@ -375,10 +236,10 @@ export const RelationPreview = ({
           <p className="text-[11px] text-muted">{preview?.summary}</p>
 
           <div
-            className={`flex flex-col gap-1 rounded-card border px-3 py-2.5 ${STATUS_STYLE[finding.status]}`}
+            className={`flex flex-col gap-1 rounded-card border px-3 py-2.5 ${FINDING_STATUS_STYLE[finding.status]}`}
           >
             <span className="text-[11px] font-semibold tracking-wide uppercase">
-              {STATUS_LABEL[finding.status]}
+              {FINDING_STATUS_LABEL[finding.status]}
             </span>
             {/* The buyer's own words, verbatim. If this sentence does not make
                 sense here, it will not make sense at checkout either. */}

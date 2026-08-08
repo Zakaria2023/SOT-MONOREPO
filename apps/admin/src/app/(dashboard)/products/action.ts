@@ -20,6 +20,13 @@ import {
   removeCompatibilityLink as removeCompatibilityRecord,
   removeCompositionLink as removeCompositionRecord,
   updateProduct as updateProductRecord,
+  addProductPrice,
+  getAuditTrail,
+  type SelectCatalogAudit,
+  closeProductPrice,
+  deleteProductPrice,
+  listProductPrices,
+  type SelectProductPrices,
 } from "services";
 import { ActionResult, fail } from "utils";
 
@@ -134,9 +141,9 @@ export const createProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await createProductRecord(fields);
+    await createProductRecord(fields, actor);
   } catch (error) {
     return fail(error, "Failed to create product");
   }
@@ -150,9 +157,9 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await updateProductRecord(uuid, fields);
+    await updateProductRecord(uuid, fields, actor);
   } catch (error) {
     return fail(error, "Failed to update product");
   }
@@ -164,12 +171,106 @@ export const updateProduct = async (
 export const deleteProduct = async (
   uuid: string,
 ): Promise<ProductActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteProductRecord(uuid);
+    await deleteProductRecord(uuid, actor);
     revalidatePath("/products");
     return { success: true, productUuid: uuid };
   } catch (error) {
     return fail(error, "Failed to delete product");
   }
+};
+
+// ---------------------------------------------------------------------------
+// Price windows
+// ---------------------------------------------------------------------------
+
+export const listProductPricesAction = async (
+  productUuid: string,
+): Promise<SelectProductPrices[]> => {
+  await requireAdmin();
+  return listProductPrices(productUuid);
+};
+
+/**
+ * Open a price window.
+ *
+ * Nothing could enter one until now — every product in the catalogue is
+ * unpriced, and the order gate refuses an unpriced line, so this is the screen
+ * that makes the catalogue sellable at all.
+ */
+export const addProductPriceAction = async (
+  input: {
+    productUuid: string;
+    price: string;
+    currency: string;
+    effectiveFrom: string;
+    effectiveTo: string | null;
+    note: string | null;
+  },
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await addProductPrice(
+      {
+        productUuid: input.productUuid,
+        price: input.price,
+        currency: input.currency.toUpperCase(),
+        effectiveFrom: new Date(input.effectiveFrom),
+        effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : null,
+        note: input.note,
+      },
+      actor,
+    );
+    revalidatePath(`/products/${input.productUuid}`);
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to save the price");
+  }
+};
+
+/** End a price that was genuinely in force, keeping the record of it. */
+export const closeProductPriceAction = async (
+  uuid: string,
+  productUuid: string,
+  at: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await closeProductPrice(uuid, new Date(at));
+    revalidatePath(`/products/${productUuid}`);
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to close the price");
+  }
+};
+
+/** Remove a row entered by mistake. Closing is what ends a real price. */
+export const deleteProductPriceAction = async (
+  uuid: string,
+  productUuid: string,
+): Promise<ActionResult> => {
+  await requireAdmin();
+  try {
+    await deleteProductPrice(uuid);
+    revalidatePath(`/products/${productUuid}`);
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to delete the price");
+  }
+};
+
+/**
+ * What has happened to this product.
+ *
+ * On the product itself rather than in a global feed. An activity list covering
+ * the whole catalogue was built once and removed for being unreadable — the
+ * question people actually ask is about the thing in front of them, and the
+ * answer is only useful beside it.
+ */
+export const getProductAuditAction = async (
+  productUuid: string,
+): Promise<SelectCatalogAudit[]> => {
+  await requireAdmin();
+  return getAuditTrail(productUuid);
 };

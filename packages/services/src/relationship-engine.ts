@@ -1,4 +1,5 @@
 import type {
+  FindingStatus,
   MatchMode,
   RelationshipAllocation,
   RelationshipComparator,
@@ -141,8 +142,7 @@ export type EngineContext = {
 // block       — violated, and the rule gates checkout
 // not_applicable — nothing in the selection participates
 // unknown     — could not be checked. Never treated as a pass.
-export type FindingStatus =
-  "pass" | "warn" | "block" | "not_applicable" | "unknown";
+export type { FindingStatus };
 
 export type Participant = {
   productUuid: string;
@@ -1795,4 +1795,25 @@ export const evaluateSelection = (
       (finding) => finding.status === "not_applicable",
     ).length,
   };
+};
+
+/**
+ * Clean passes, and the passes that could not read everything they matched.
+ *
+ * A rule reports `pass` when what it COULD read was satisfied — the items it had
+ * to skip are carried on the finding, not subtracted from the verdict. That is
+ * the right call for the evaluator, and the wrong thing to hand a buyer as one
+ * number: a rule that approved three products while unable to read five is not
+ * the same fact as a rule that approved all eight, and counting them together
+ * makes the second indistinguishable from the first.
+ *
+ * Split here rather than inside the design check so it can be tested without a
+ * database.
+ */
+export const splitPasses = (
+  findings: Finding[],
+): { clean: number; partial: Finding[] } => {
+  const passes = findings.filter((finding) => finding.status === "pass");
+  const partial = passes.filter((finding) => finding.skipped.length > 0);
+  return { clean: passes.length - partial.length, partial };
 };

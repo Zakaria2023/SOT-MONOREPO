@@ -1,107 +1,99 @@
-"use client";
+import { Banknote, CheckCircle2, Download, FileText } from "lucide-react";
+import { formatMoney } from "utils";
 
-import { useFakePayment } from "@/app/orders/[uuid]/use-fake-payment";
-import { CreditCard, Lock, ShieldCheck } from "lucide-react";
-import { Controller } from "react-hook-form";
-import { Input } from "ui";
-import { formatCardExpiry, formatCardNumber } from "utils";
+// E8 — cash only.
+//
+// This was a card form: name, number, expiry, CVC, and a simulated gateway that
+// waited 1.2 seconds and marked the order paid. It charged nothing and it
+// collected card details that went nowhere, which is worse than no form at all.
+//
+// Cash is handed to a person, so there is nothing here for the customer to
+// press. What they need is the amount, the reference to quote, and confirmation
+// once it lands. A disabled Pay button would teach them the site is broken; no
+// button with instructions beside it teaches them what to do.
+//
+// Not a client component any more either — there is no state left to hold.
 
 type OrderPaymentProps = {
   orderUuid: string;
+  reference: string;
   total: string;
+  currency: string | null;
+  paidAt: Date | null;
+  paymentReference: string | null;
 };
 
-export const OrderPayment = ({ orderUuid, total }: OrderPaymentProps) => {
-  const {
-    form: {
-      register,
-      control,
-      formState: { errors },
-    },
-    state,
-    isPending,
-    onSubmit,
-  } = useFakePayment(orderUuid);
+export const OrderPayment = ({
+  orderUuid,
+  reference,
+  total,
+  currency,
+  paidAt,
+  paymentReference,
+}: OrderPaymentProps) => {
+  if (paidAt) {
+    return (
+      <div className="flex flex-col gap-2 rounded-[18px] border border-emerald-200 bg-emerald-50 p-5">
+        <p className="font-grotesk flex items-center gap-2 text-sm font-medium text-emerald-900">
+          <CheckCircle2 size={18} className="text-emerald-600" />
+          Paid on {new Date(paidAt).toLocaleDateString()}
+        </p>
+        {/* Shown back so the customer can match it against their own receipt. */}
+        {paymentReference && (
+          <p className="font-grotesk text-xs text-emerald-800">
+            Recorded against {paymentReference}
+          </p>
+        )}
+
+        {/* Two links, one route. `?download=1` only changes the
+            Content-Disposition header — open reads it in the browser, download
+            saves it. */}
+        <div className="mt-1 flex flex-wrap gap-2">
+          <a
+            href={`/api/orders/${orderUuid}/invoice`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-grotesk inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+          >
+            <FileText size={14} />
+            Open the invoice
+          </a>
+          <a
+            href={`/api/orders/${orderUuid}/invoice?download=1`}
+            className="font-grotesk inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+          >
+            <Download size={14} />
+            Download
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
-        <ShieldCheck size={16} className="text-primary" />
-        Your payment is held by SOT and only released to the installer once your
-        system is verified and handed over.
+    <div className="flex flex-col gap-3 rounded-[18px] border border-hairline bg-surface p-5">
+      <p className="font-grotesk flex items-center gap-2 text-sm font-medium text-ink">
+        <Banknote size={18} className="text-primary" />
+        Payment in cash
       </p>
 
-      <Input
-        label="Name on card"
-        placeholder="Jane Doe"
-        autoComplete="cc-name"
-        error={errors.cardName?.message}
-        {...register("cardName")}
-      />
-
-      <Controller
-        control={control}
-        name="cardNumber"
-        render={({ field }) => (
-          <Input
-            label="Card number"
-            placeholder="4242 4242 4242 4242"
-            inputMode="numeric"
-            autoComplete="cc-number"
-            icon={<CreditCard size={16} />}
-            value={field.value}
-            onChange={(event) =>
-              field.onChange(formatCardNumber(event.target.value))
-            }
-            error={errors.cardNumber?.message}
-          />
-        )}
-      />
-
-      <div className="grid grid-cols-2 gap-4">
-        <Controller
-          control={control}
-          name="expiry"
-          render={({ field }) => (
-            <Input
-              label="Expiry"
-              placeholder="MM/YY"
-              inputMode="numeric"
-              autoComplete="cc-exp"
-              value={field.value}
-              onChange={(event) =>
-                field.onChange(formatCardExpiry(event.target.value))
-              }
-              error={errors.expiry?.message}
-            />
-          )}
-        />
-        <Input
-          label="CVC"
-          placeholder="123"
-          inputMode="numeric"
-          autoComplete="cc-csc"
-          maxLength={4}
-          error={errors.cvc?.message}
-          {...register("cvc")}
-        />
+      <div className="font-grotesk flex flex-col gap-1 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-muted">Amount due</span>
+          <span className="font-heading text-xl tabular-nums text-ink">
+            {formatMoney(Number(total), currency ?? "SAR")}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-muted">Quote this reference</span>
+          <span className="font-mono text-ink">{reference}</span>
+        </div>
       </div>
 
-      {state.error && <p className="text-sm text-red-500">{state.error}</p>}
-
-      <button
-        type="submit"
-        disabled={isPending}
-        className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary-solid px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-solid-hover disabled:pointer-events-none disabled:opacity-60"
-      >
-        <Lock size={16} />
-        {isPending ? "Processing…" : `Pay ${total}`}
-      </button>
-
-      <p className="text-xs text-faint">
-        Demo checkout — no real card is charged. Enter any test card details. A
-        licensed payment gateway is wired here at launch.
+      <p className="font-grotesk text-xs text-muted">
+        Settle with our team and quote the reference above. This page updates as
+        soon as the payment is recorded against your order.
       </p>
-    </form>
+    </div>
   );
 };

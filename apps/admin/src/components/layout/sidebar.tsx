@@ -3,19 +3,32 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Award,
+  Bell,
+  Building2,
   FileText,
+  FlaskConical,
+  GraduationCap,
+  Inbox,
   Landmark,
   Layers,
+  LifeBuoy,
   LayoutDashboard,
   Library,
   Network,
   Package,
+  PackageCheck,
   Percent,
+  Receipt,
   Search,
+  Sparkles,
   Shapes,
   Tags,
   Ticket,
+  TrendingUp,
+  Users,
+  Wallet,
   Workflow,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -35,7 +48,10 @@ type NavGroup = {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: "Overview",
-    links: [{ icon: LayoutDashboard, label: "Dashboard", href: "/" }],
+    links: [
+      { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+      { icon: Bell, label: "Notifications", href: "/notifications" },
+    ],
   },
   {
     title: "Catalog",
@@ -46,6 +62,19 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Library, label: "Spec Library", href: "/library" },
       { icon: Workflow, label: "Assignments", href: "/assignments" },
       { icon: Package, label: "Products", href: "/products" },
+      { icon: Inbox, label: "Imports", href: "/imports" },
+      { icon: FlaskConical, label: "Sandbox", href: "/sandbox" },
+    ],
+  },
+  {
+    title: "People",
+    links: [{ icon: Users, label: "Users", href: "/users" }],
+  },
+  {
+    title: "Money",
+    links: [
+      { icon: Wallet, label: "Partner Payables", href: "/payables" },
+      { icon: TrendingUp, label: "Platform Financials", href: "/financials" },
     ],
   },
   {
@@ -56,6 +85,13 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Percent, label: "Partner Discounts", href: "/partner-discounts" },
       { icon: Landmark, label: "Government", href: "/government" },
       { icon: Ticket, label: "Offers", href: "/offers" },
+      { icon: Receipt, label: "Orders", href: "/orders" },
+      { icon: PackageCheck, label: "Handovers", href: "/handovers" },
+      { icon: Building2, label: "Sites", href: "/spaces" },
+      { icon: Wrench, label: "Visits", href: "/service" },
+      { icon: Sparkles, label: "Leads", href: "/leads" },
+      { icon: GraduationCap, label: "Training", href: "/training" },
+      { icon: LifeBuoy, label: "Expert Desk", href: "/expert-desk" },
     ],
   },
 ];
