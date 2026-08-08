@@ -19,6 +19,7 @@ import {
   Tags,
   Ticket,
   TrendingUp,
+  Users,
   Wallet,
   Workflow,
 } from "lucide-react";
@@ -54,6 +55,10 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Inbox, label: "Imports", href: "/imports" },
       { icon: FlaskConical, label: "Sandbox", href: "/sandbox" },
     ],
+  },
+  {
+    title: "People",
+    links: [{ icon: Users, label: "Users", href: "/users" }],
   },
   {
     title: "Money",
