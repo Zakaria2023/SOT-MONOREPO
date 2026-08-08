@@ -29,6 +29,7 @@ export * from "./relationships";
 export * from "./specification-categories";
 export * from "./specification-groups";
 export * from "./specification-option-sets";
+export * from "./service-requests";
 export * from "./spaces";
 export * from "./specifications";
 export * from "./users";

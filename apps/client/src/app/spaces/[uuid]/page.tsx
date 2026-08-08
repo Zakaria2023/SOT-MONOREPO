@@ -1,3 +1,5 @@
+import { AdditionCheckPanel } from "@/components/spaces/addition-check";
+import { ServiceDoor } from "@/components/spaces/service-door";
 import { SpaceMap } from "@/components/spaces/space-map";
 import { SpaceRegister } from "@/components/spaces/space-register";
 import { getCurrentUser } from "@/lib/auth";
@@ -6,7 +8,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getSpace } from "services";
+import {
+  checkCartAgainstSpace,
+  getServiceView,
+  getSpace,
+  listSpaceRequests,
+} from "services";
 
 type Props = {
   params: Promise<{ uuid: string }>;
@@ -37,6 +44,19 @@ const SpacePage = async ({ params }: Props) => {
 
   const { space, items, summary } = detail;
   const address = space.address;
+
+  // Today is decided HERE and passed down, not read inside the schedule. The
+  // schedule stays pure and testable, and every clock on the page is measured from
+  // the same instant — a render that asked the clock three times could show one
+  // item due and another overdue across a midnight boundary.
+  const today = new Date().toISOString().slice(0, 10);
+  const [service, requests, addition] = await Promise.all([
+    getServiceView(user.uuid, uuid, today),
+    listSpaceRequests(user.uuid, uuid),
+    // Judged against the project answers the customer already gave, so this and
+    // checkout cannot reach different verdicts on the same basket.
+    checkCartAgainstSpace({ userUuid: user.uuid, spaceUuid: uuid }),
+  ]);
 
   return (
     <main className="mx-auto px-6 py-12 lg:px-12 xl:px-20">
@@ -84,6 +104,18 @@ const SpacePage = async ({ params }: Props) => {
           )}
         </div>
       </div>
+
+      {/* Above the register and the map, because it is the only part of this page
+          with anything to DO on it. */}
+      {service && (
+        <ServiceDoor
+          spaceUuid={space.uuid}
+          view={service}
+          requests={requests}
+        />
+      )}
+
+      <AdditionCheckPanel spaceName={space.name} check={addition} />
 
       <SpaceMap
         spaceUuid={space.uuid}

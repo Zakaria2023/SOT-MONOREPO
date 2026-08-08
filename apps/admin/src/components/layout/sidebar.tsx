@@ -26,6 +26,7 @@ import {
   Users,
   Wallet,
   Workflow,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -85,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Receipt, label: "Orders", href: "/orders" },
       { icon: PackageCheck, label: "Handovers", href: "/handovers" },
       { icon: Building2, label: "Sites", href: "/spaces" },
+      { icon: Wrench, label: "Visits", href: "/service" },
       { icon: LifeBuoy, label: "Expert Desk", href: "/expert-desk" },
     ],
   },

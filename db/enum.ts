@@ -806,6 +806,43 @@ export const expertRequestStatuses = [
 
 export type ExpertRequestStatus = (typeof expertRequestStatuses)[number];
 
+// WHY SOMEBODY IS ASKING FOR A VISIT.
+//
+// Not the same list as the expert queues, and not the same table: an expert
+// request is a QUESTION somebody answers from a desk, and a callout is a person
+// going to a building. The kind decides who goes and what they take.
+export const serviceRequestKinds = [
+  // A clock came due — service life, sensor life or battery. The one the whole
+  // schedule exists to produce.
+  "replacement",
+  // Something has stopped working.
+  "fault",
+  // Broken, and inside the warranty window. Kept apart from `fault` because who
+  // pays is the difference, and it is the first thing anybody asks.
+  "warranty_claim",
+  // A routine look at a system nobody has complained about.
+  "inspection",
+  // They want to add to what is already installed.
+  "expansion",
+] as const satisfies readonly string[];
+
+export type ServiceRequestKind = (typeof serviceRequestKinds)[number];
+
+// A CALLOUT'S LIFECYCLE.
+//
+// Longer than the expert desk's because a visit has a date in it. `scheduled` is
+// the state a customer most wants to see and the one a question queue has no
+// equivalent for.
+export const serviceRequestStatuses = [
+  "open",
+  "scheduled",
+  "attended",
+  "closed",
+  "cancelled",
+] as const satisfies readonly string[];
+
+export type ServiceRequestStatus = (typeof serviceRequestStatuses)[number];
+
 // WHAT A NOTIFICATION IS ABOUT.
 //
 // Deliberately few. A notification for everything is a notification for nothing,
@@ -815,6 +852,10 @@ export const notificationKinds = [
   "payment_recorded",
   "boq_status",
   "expert_answered",
+  // A visit was asked for, booked, or attended. One kind for the whole callout
+  // chain rather than three — the title carries which, and three kinds would be
+  // three switches nobody remembers to add to.
+  "service_request",
 ] as const satisfies readonly string[];
 
 export type NotificationKind = (typeof notificationKinds)[number];

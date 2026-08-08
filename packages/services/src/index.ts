@@ -54,6 +54,8 @@ export * from "./relationship-engine";
 export * from "./relationship-diff";
 export * from "./relationships";
 export * from "./rule-reachability";
+export * from "./service-door";
+export * from "./service-schedule";
 export * from "./space-register";
 export * from "./spaces";
 export * from "./firmware";

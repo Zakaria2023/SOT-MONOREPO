@@ -8,6 +8,8 @@ import {
   CatalogAuditTarget,
   ExpertQueue,
   ExpertRequestStatus,
+  ServiceRequestKind,
+  ServiceRequestStatus,
   BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
@@ -366,3 +368,22 @@ export const EXPERT_REQUEST_STATUS_LABELS: Record<ExpertRequestStatus, string> =
     answered: "Answered",
     closed: "Closed",
   };
+
+export const SERVICE_REQUEST_KIND_LABELS: Record<ServiceRequestKind, string> = {
+  replacement: "Replacement due",
+  fault: "Something is not working",
+  warranty_claim: "Warranty claim",
+  inspection: "Routine inspection",
+  expansion: "Adding to the system",
+};
+
+export const SERVICE_REQUEST_STATUS_LABELS: Record<
+  ServiceRequestStatus,
+  string
+> = {
+  open: "Waiting to be booked",
+  scheduled: "Booked in",
+  attended: "Visited",
+  closed: "Closed",
+  cancelled: "Cancelled",
+};

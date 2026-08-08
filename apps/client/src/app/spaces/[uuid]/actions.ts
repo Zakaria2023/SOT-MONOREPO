@@ -2,7 +2,13 @@
 
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { declareFirmware, retireSpaceItem, setSpaceLocation } from "services";
+import type { ServiceRequestKind } from "@/db/enum";
+import {
+  declareFirmware,
+  raiseCallout,
+  retireSpaceItem,
+  setSpaceLocation,
+} from "services";
 import { fail, type ActionResult } from "utils";
 
 /**
@@ -64,6 +70,36 @@ export const setSpaceLocationAction = async (
     return { success: true };
   } catch (error) {
     return fail(error, "Failed to save that location");
+  }
+};
+
+/**
+ * Ask for somebody to come out.
+ *
+ * `dueReason` is the sentence the customer was looking at when they pressed the
+ * button, passed through rather than recomputed on the server. The clock will have
+ * moved by the time anybody reads the request, and "raised because the sensor was
+ * three weeks from expiry" has to stay readable in two years when that date is
+ * long gone.
+ */
+export const raiseCalloutAction = async (input: {
+  spaceUuid: string;
+  itemUuid: string | null;
+  kind: ServiceRequestKind;
+  detail: string;
+  dueReason: string | null;
+}): Promise<ActionResult> => {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Sign in to ask for a visit." };
+  }
+
+  try {
+    await raiseCallout({ userUuid: user.uuid, ...input });
+    revalidatePath("/spaces");
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to ask for a visit");
   }
 };
 
