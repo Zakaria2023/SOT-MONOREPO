@@ -1,4 +1,10 @@
-import { FileText, LayoutDashboard } from "lucide-react";
+import {
+  FileText,
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Wallet,
+} from "lucide-react";
 import { DashboardShell, type NavGroup } from "ui";
 import type { ReactNode } from "react";
 
@@ -11,8 +17,18 @@ const NAV_GROUPS: NavGroup[] = [
     links: [{ icon: LayoutDashboard, label: "Dashboard", href: "/" }],
   },
   {
+    title: "Buy",
+    links: [
+      { icon: Package, label: "Catalogue", href: "/browse" },
+      { icon: ShoppingCart, label: "Your basket", href: "/cart" },
+    ],
+  },
+  {
     title: "Work",
-    links: [{ icon: FileText, label: "Incoming BOQs", href: "/boqs" }],
+    links: [
+      { icon: FileText, label: "Incoming BOQs", href: "/boqs" },
+      { icon: Wallet, label: "Earnings", href: "/earnings" },
+    ],
   },
 ];
 
