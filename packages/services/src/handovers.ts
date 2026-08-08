@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db";
+import { Users } from "../../../db/schema/users";
 import { BoqItems, Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import {
   HandoverAssets,
@@ -14,6 +15,8 @@ import { Offers } from "../../../db/schema/offers";
 import { Orders } from "../../../db/schema/orders";
 import { PartnerRequests } from "../../../db/schema/partner-requests";
 import { HandoverCredentialType } from "../../../db/enum";
+import { statusesThatCanBecome } from "./boq-lifecycle";
+import { notify } from "./notifications";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { accruePartnerEarning, settleIntegratedPartner } from "./payouts";
 
@@ -323,6 +326,39 @@ export const submitHandoverPack = async ({
   if (!pack) {
     throw new Error("Failed to submit handover pack");
   }
+
+  // The chain was entirely silent before this. A partner submitted a pack and
+  // nobody was told; it sat until somebody thought to look. Each hand-off now
+  // tells whoever it is now waiting on — which is the only reason a queue moves.
+  const [boq] = await db
+    .select({ reference: Boqs.reference, userUuid: Boqs.userUuid })
+    .from(Boqs)
+    .where(eq(Boqs.uuid, pack.boqUuid));
+  const [customer] = boq
+    ? await db
+        .select({ clerkUserId: Users.clerkUserId })
+        .from(Users)
+        .where(eq(Users.uuid, boq.userUuid))
+    : [];
+
+  await Promise.all([
+    notify({
+      audience: "client",
+      kind: "boq_status",
+      recipientClerkUserId: customer?.clerkUserId ?? null,
+      title: `Your handover pack for ${boq?.reference ?? "your project"} is ready`,
+      body: "Check that your access works, then confirm it.",
+      href: `/boq/${pack.boqUuid}`,
+    }),
+    notify({
+      audience: "admin",
+      kind: "boq_status",
+      title: `Handover submitted for ${boq?.reference ?? "a project"}`,
+      body: "Waiting on the customer to confirm their access.",
+      href: "/notifications",
+    }),
+  ]);
+
   return pack;
 };
 
@@ -401,7 +437,16 @@ export const verifyHandover = async ({
     await tx
       .update(Boqs)
       .set({ status: "verified" })
-      .where(and(eq(Boqs.uuid, boqUuid), eq(Boqs.status, "installed")));
+      // The permitted source statuses come FROM the lifecycle model rather than
+      // being restated here. Guarding in the WHERE is right — it is atomic — but
+      // the rule it enforces has to have one definition, and this file was the
+      // third place carrying its own copy.
+      .where(
+        and(
+          eq(Boqs.uuid, boqUuid),
+          inArray(Boqs.status, statusesThatCanBecome("verified")),
+        ),
+      );
   });
 
   const [updated] = await db
@@ -411,6 +456,27 @@ export const verifyHandover = async ({
   if (!updated) {
     throw new Error("Failed to verify handover");
   }
+
+  const [boq] = await db
+    .select({ reference: Boqs.reference, userUuid: Boqs.userUuid })
+    .from(Boqs)
+    .where(eq(Boqs.uuid, boqUuid));
+  const [customer] = boq
+    ? await db
+        .select({ clerkUserId: Users.clerkUserId })
+        .from(Users)
+        .where(eq(Users.uuid, boq.userUuid))
+    : [];
+
+  await notify({
+    audience: "client",
+    kind: "boq_status",
+    recipientClerkUserId: customer?.clerkUserId ?? null,
+    title: `${boq?.reference ?? "Your project"} has been verified`,
+    body: `Checked and accepted by ${sotName ?? "SOT"}.`,
+    href: `/boq/${boqUuid}`,
+  });
+
   return updated;
 };
 
@@ -467,7 +533,12 @@ export const completeHandover = async ({
     await tx
       .update(Boqs)
       .set({ status: "handed_over" })
-      .where(and(eq(Boqs.uuid, boqUuid), eq(Boqs.status, "verified")));
+      .where(
+        and(
+          eq(Boqs.uuid, boqUuid),
+          inArray(Boqs.status, statusesThatCanBecome("handed_over")),
+        ),
+      );
 
     await accruePartnerEarning(tx, {
       partnerClerkUserId: order.partnerClerkUserId,
