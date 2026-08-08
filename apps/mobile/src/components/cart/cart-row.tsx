@@ -78,6 +78,22 @@ export const CartRow = ({
           <Text style={styles.unit}>
             {formatPrice(item.unitPrice, item.currency)} each
           </Text>
+          {/* P11. The server refuses an unsellable line at checkout; this is what
+              stops that refusal being a surprise. Nothing rendered when there is
+              nothing to say — a badge on every row reading "in stock" trains
+              somebody to stop reading the row. */}
+          {item.supply.note ? (
+            <Text
+              style={[
+                styles.supply,
+                item.supply.state === "unavailable"
+                  ? styles.supplyBlocking
+                  : null,
+              ]}
+            >
+              {item.supply.note}
+            </Text>
+          ) : null}
         </View>
 
         <Pressable
@@ -194,6 +210,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: type.caption.size,
   },
+  supply: {
+    color: colors.muted,
+    fontFamily: fonts.body,
+    fontSize: type.caption.size,
+    marginTop: 2,
+  },
+  // A line that cannot be sold gets the danger colour, because it is the reason
+  // the checkout button will refuse and the only line worth acting on.
+  supplyBlocking: { color: colors.danger },
   remove: {
     width: 44,
     height: 44,

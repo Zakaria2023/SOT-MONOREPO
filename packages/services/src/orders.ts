@@ -2,7 +2,7 @@ import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { applyPercentDiscount, fromMinorUnits, toMinorUnits } from "utils";
 import { db } from "../../../db";
-import { Boqs, SelectBoqs } from "../../../db/schema/boqs";
+import { BoqItems, Boqs, SelectBoqs } from "../../../db/schema/boqs";
 import { CartItems, Carts } from "../../../db/schema/carts";
 import { Offers } from "../../../db/schema/offers";
 import { OrderItems, SelectOrderItems } from "../../../db/schema/order-items";
@@ -20,6 +20,8 @@ import { issueInvoice } from "./invoicing";
 import { notify } from "./notifications";
 import { Users } from "../../../db/schema/users";
 import { describeUnpriced, resolvePricing } from "./price-resolution";
+import { assessSupplyFor } from "./product-supply";
+import { describeSupply } from "./supply";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
 
@@ -32,6 +34,11 @@ export type OrderWithInvoice = {
 
 export type UserOrder = SelectOrders & {
   boqReference: SelectBoqs["reference"] | null;
+  // E9. Where the job has actually got to — null for a direct product order,
+  // which has no BOQ and therefore no installation to track. Carried here rather
+  // than fetched by the page: the order status alone cannot answer "where is my
+  // system", because it stops saying anything new the moment the cash lands.
+  boqStatus: SelectBoqs["status"] | null;
 };
 
 // Sum an offer's money fields into product / service / grand totals. install +
@@ -92,6 +99,39 @@ export const createOrderFromSelectedOffer = async ({
   }
   if (offer.expiresAt && offer.expiresAt.getTime() < Date.now()) {
     throw new ConflictError("The selected offer has expired");
+  }
+
+  // P11 on this path too, and it is the path where it matters most. An offer can
+  // sit for weeks before a customer accepts it, so a line that was in stock when
+  // it was quoted is exactly the line most likely to have gone since. Refusing
+  // here — before the money — is the difference between a conversation about a
+  // substitution and a refund.
+  //
+  // A BOQ line with no product is skipped rather than refused: those are the
+  // free-text and service lines, which have no stock to have run out of.
+  const boqLines = await db
+    .select({
+      productUuid: BoqItems.productUuid,
+      quantity: BoqItems.quantity,
+    })
+    .from(BoqItems)
+    .where(eq(BoqItems.boqUuid, boqUuid));
+
+  const supply = await assessSupplyFor(
+    boqLines
+      .filter(
+        (line): line is { productUuid: string; quantity: number } =>
+          line.productUuid !== null,
+      )
+      .map((line) => ({
+        productUuid: line.productUuid,
+        quantity: line.quantity,
+      })),
+  );
+  if (!supply.sellable) {
+    throw new ValidationError(
+      `This order cannot be confirmed: ${describeSupply(supply.blocking)}`,
+    );
   }
 
   const uuid = randomUUID();
@@ -213,7 +253,40 @@ export const createOrderFromCart = async ({
     );
   }
 
-  // THE SECOND GATE, and the one nobody had. `toMinorUnits(null)` is 0, so a
+  // THE THIRD GATE — can we supply it?
+  //
+  // The two above answer who may buy and whether the design works. Neither
+  // touches whether the thing exists. `Products.status` has held `out_of_stock`
+  // and `end_of_life` since the beginning and nothing read it except to draw a
+  // label, so a discontinued product could pass every check here, take a
+  // customer's cash and be invoiced.
+  //
+  // BEFORE the pricing gate, deliberately. Both refuse, so the order is only
+  // about which sentence somebody is shown — and "we have not priced this yet"
+  // invites them to ask for a quote, which is the wrong thing to send them off to
+  // do for a product that is not manufactured any more. Whether we can get it
+  // comes before what it costs.
+  //
+  // Read from the products rather than from the cart lines, at this moment. Stock
+  // moves while a basket sits, and the check that matters is the one at the till.
+  //
+  // NOT overridable, and that is the difference from the design gate. A blocker
+  // there is the engine's opinion about a design and a partner may genuinely know
+  // better; this is a fact about the warehouse, and no reason typed into a box
+  // makes a discontinued product deliverable.
+  const supply = await assessSupplyFor(
+    items.map((item) => ({
+      productUuid: item.productUuid,
+      quantity: item.quantity,
+    })),
+  );
+  if (!supply.sellable) {
+    throw new ValidationError(
+      `This order cannot be placed: ${describeSupply(supply.blocking)}`,
+    );
+  }
+
+  // THE FOURTH GATE, and the one nobody had. `toMinorUnits(null)` is 0, so a
   // product with no price used to become a line at 0.00 — the order completed,
   // the item shipped for nothing, and no surface anywhere could tell that apart
   // from a genuinely free product. Every product in the catalogue is currently
@@ -468,14 +541,27 @@ export const cancelOrder = async (orderUuid: string): Promise<SelectOrders> => {
   return updated;
 };
 
-/** One order the given user owns, or null. */
+/**
+ * One order the given user owns, or null.
+ *
+ * Joined to the BOQ so the page can say where the job is. This returned the bare
+ * order, which is why the customer's order page could only ever tell them whether
+ * they had paid: after that the order status never changes again, and everything
+ * that happens next — assignment, installation, verification, handover — is
+ * recorded on the BOQ.
+ */
 export const getUserOrder = async (
   userUuid: string,
   orderUuid: string,
-): Promise<SelectOrders | null> => {
+): Promise<UserOrder | null> => {
   const [order] = await db
-    .select()
+    .select({
+      ...getTableColumns(Orders),
+      boqReference: Boqs.reference,
+      boqStatus: Boqs.status,
+    })
     .from(Orders)
+    .leftJoin(Boqs, eq(Orders.boqUuid, Boqs.uuid))
     .where(and(eq(Orders.uuid, orderUuid), eq(Orders.userUuid, userUuid)));
   return order ?? null;
 };
@@ -486,6 +572,7 @@ export const getUserOrders = async (userUuid: string): Promise<UserOrder[]> =>
     .select({
       ...getTableColumns(Orders),
       boqReference: Boqs.reference,
+      boqStatus: Boqs.status,
     })
     .from(Orders)
     .leftJoin(Boqs, eq(Orders.boqUuid, Boqs.uuid))

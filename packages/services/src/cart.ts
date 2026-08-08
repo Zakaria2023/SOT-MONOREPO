@@ -5,6 +5,7 @@ import { CartItems, Carts, SelectCartItems } from "../../../db/schema/carts";
 import { Categories, SelectCategories } from "../../../db/schema/categories";
 import { Products, SelectProducts } from "../../../db/schema/products";
 import { ValidationError } from "./errors";
+import { classifySupply, type SupplyVerdict } from "./supply";
 
 export type AddToCartInput = {
   userUuid: string;
@@ -23,6 +24,17 @@ export type CartLineItem = {
   currency: SelectProducts["currency"];
   quantity: SelectCartItems["quantity"];
   kind: SelectCartItems["kind"];
+  // P11. The VERDICT, decided here, rather than the two raw columns for a screen
+  // to interpret.
+  //
+  // Two reasons it is this way round. A basket that cannot say which of its lines
+  // is unsellable can only be refused wholesale at checkout — which tells somebody
+  // their order failed without telling them which line to fix. And the cart
+  // screens are client components: handing them the columns would mean importing
+  // the classifier into the browser bundle, which drags the whole services barrel
+  // — mysql2 and all — across the server boundary. Deciding on this side keeps the
+  // rule in one place AND keeps the database out of the browser.
+  supply: SupplyVerdict;
 };
 
 // Reject a non-positive quantity before it reaches the database.
@@ -33,8 +45,8 @@ const assertValidQuantity = (quantity: number): void => {
 };
 
 // Return every line item in the user's cart, with product and category details.
-export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
-  db
+export const getCart = async (userUuid: string): Promise<CartLineItem[]> => {
+  const rows = await db
     .select({
       uuid: CartItems.uuid,
       productUuid: CartItems.productUuid,
@@ -46,6 +58,8 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
       currency: Products.currency,
       quantity: CartItems.quantity,
       kind: CartItems.kind,
+      status: Products.status,
+      isAvailable: Products.isAvailable,
     })
     .from(Carts)
     .innerJoin(CartItems, eq(CartItems.cartUuid, Carts.uuid))
@@ -53,6 +67,12 @@ export const getCart = async (userUuid: string): Promise<CartLineItem[]> =>
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
     .where(eq(Carts.userUuid, userUuid))
     .orderBy(asc(CartItems.createdAt));
+
+  return rows.map(({ status, isAvailable, ...row }) => ({
+    ...row,
+    supply: classifySupply({ status, isAvailable }),
+  }));
+};
 
 export type GuestCartItem = {
   productUuid: string;
@@ -84,6 +104,8 @@ export const getCartPreview = async (
       image: Products.image,
       unitPrice: Products.price,
       currency: Products.currency,
+      status: Products.status,
+      isAvailable: Products.isAvailable,
     })
     .from(Products)
     .leftJoin(Categories, eq(Products.categoryUuid, Categories.uuid))
@@ -100,6 +122,10 @@ export const getCartPreview = async (
     currency: row.currency,
     quantity: quantityByProduct.get(row.productUuid) ?? 1,
     kind: "product",
+    supply: classifySupply({
+      status: row.status,
+      isAvailable: row.isAvailable,
+    }),
   }));
 };
 
@@ -188,11 +214,26 @@ export const addToCart = async ({
   assertValidQuantity(quantity);
 
   const [product] = await db
-    .select({ uuid: Products.uuid })
+    .select({
+      uuid: Products.uuid,
+      status: Products.status,
+      isAvailable: Products.isAvailable,
+    })
     .from(Products)
     .where(eq(Products.uuid, productUuid));
   if (!product) {
     throw new ValidationError("Product not found");
+  }
+
+  // P11. Refused at the door, where the person is looking at the product and can
+  // be told why. The order path refuses again at the till — not redundantly: a
+  // product can go out of stock while it sits in somebody's basket, and that one
+  // has to stay visible in the cart so they can see what to remove.
+  const supply = classifySupply(product);
+  if (supply.state === "unavailable") {
+    throw new ValidationError(
+      supply.note ?? "This product cannot be ordered at the moment.",
+    );
   }
 
   const cartUuid = await getOrCreateCartUuid(userUuid);
@@ -240,12 +281,30 @@ export const addCategoryToCart = async (
   userUuid: string,
   categoryUuid: string,
 ): Promise<void> => {
-  const products = await db
-    .select({ uuid: Products.uuid })
+  const all = await db
+    .select({
+      uuid: Products.uuid,
+      status: Products.status,
+      isAvailable: Products.isAvailable,
+    })
     .from(Products)
     .where(eq(Products.categoryUuid, categoryUuid));
-  if (products.length === 0) {
+  if (all.length === 0) {
     throw new ValidationError("This category has no products to add");
+  }
+
+  // Filtered rather than refused. A category with one discontinued line in it is
+  // ordinary, and refusing the whole solution over that would make the button
+  // useless — but quietly including the discontinued line would put something
+  // unsellable in the basket under the word "solution", which is worse than
+  // either.
+  const products = all.filter(
+    (product) => classifySupply(product).state !== "unavailable",
+  );
+  if (products.length === 0) {
+    throw new ValidationError(
+      "Nothing in this category can be supplied at the moment",
+    );
   }
 
   const cartUuid = await getOrCreateCartUuid(userUuid);

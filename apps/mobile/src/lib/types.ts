@@ -139,6 +139,11 @@ export type CartLineItem = {
   currency: string | null;
   quantity: number;
   kind: string;
+  // P11. The verdict, already decided by the API. This file mirrors the service
+  // types by hand, so a classifier on this side would be a second copy of the
+  // rule — and the first thing to drift. The server sends the sentence; this app
+  // shows it.
+  supply: { state: "available" | "delayed" | "unavailable"; note: string | null };
 };
 
 // One column of the compare table plus the rows it shares with the others. The

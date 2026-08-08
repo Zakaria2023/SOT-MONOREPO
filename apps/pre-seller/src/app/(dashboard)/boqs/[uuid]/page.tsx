@@ -1,3 +1,4 @@
+import { BoqLineSupply } from "@/components/boqs/boq-line-supply";
 import { SendToPartnersDialog } from "@/components/boqs/send-to-partners-dialog";
 import { formatMoney, lineTotal, summarizeCart } from "utils";
 import { requirePreSeller } from "@/lib/server/auth";
@@ -62,6 +63,12 @@ const BoqDetailPage = async ({ params }: Props) => {
                 <p className="text-xs text-muted">
                   {formatMoney(Number(item.unitPrice), currency)} each
                 </p>
+                {/* P11, at the point of quoting. The order path refuses a BOQ
+                    containing something we cannot supply — so without this a
+                    pre-seller prices a design, sends it, and the customer meets
+                    the refusal at the moment they try to pay. Better to know
+                    before the quote goes out than to withdraw it after. */}
+                <BoqLineSupply item={item} />
               </div>
               <div className="flex items-center gap-6">
                 <p className="text-sm text-muted">Qty {item.quantity}</p>

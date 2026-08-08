@@ -44,10 +44,25 @@ import {
 
 export type { SelectBoqItems, SelectBoqs, SelectBoqSections };
 
+// P11. A BOQ line carries whether its product can still be supplied, so the
+// customer looking at their design, the pre-seller about to quote it and the
+// partner about to go to site all read the same fact.
+//
+// It has to travel with the LINE rather than be checked at the end, because the
+// answer people need is which line — and the order path refuses on exactly this,
+// so a surface that cannot see it can only present the refusal as a mystery.
+//
+// Null for a free-text or service line, which has no product and therefore no
+// stock to have run out of.
+export type BoqDetailItem = SelectBoqItems & {
+  productStatus: SelectProducts["status"] | null;
+  productIsAvailable: SelectProducts["isAvailable"] | null;
+};
+
 export type BoqDetail = {
   boq: SelectBoqs;
   sections: SelectBoqSections[];
-  items: SelectBoqItems[];
+  items: BoqDetailItem[];
 };
 
 export type ValidateBoqResult = {
@@ -207,9 +222,18 @@ export const createBoqFromCart = async (
 // scoped getUserBoq / getAssignedBoq / getPartnerBoq so access can't be skipped.
 const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
   const rows = await db
-    .select({ boq: getTableColumns(Boqs), item: getTableColumns(BoqItems) })
+    .select({
+      boq: getTableColumns(Boqs),
+      item: getTableColumns(BoqItems),
+      // Two columns, joined rather than fetched per line. A read per item would
+      // fan out across a basket-sized list, and the connection ceiling is shared
+      // by five apps.
+      productStatus: Products.status,
+      productIsAvailable: Products.isAvailable,
+    })
     .from(Boqs)
     .leftJoin(BoqItems, eq(BoqItems.boqUuid, Boqs.uuid))
+    .leftJoin(Products, eq(BoqItems.productUuid, Products.uuid))
     .where(eq(Boqs.uuid, boqUuid))
     .orderBy(asc(BoqItems.createdAt));
 
@@ -218,7 +242,17 @@ const getBoq = async (boqUuid: string): Promise<BoqDetail | null> => {
     return null;
   }
 
-  const items = rows.flatMap((row) => (row.item ? [row.item] : []));
+  const items = rows.flatMap((row) =>
+    row.item
+      ? [
+          {
+            ...row.item,
+            productStatus: row.productStatus,
+            productIsAvailable: row.productIsAvailable,
+          },
+        ]
+      : [],
+  );
   const sections = await db
     .select()
     .from(BoqSections)

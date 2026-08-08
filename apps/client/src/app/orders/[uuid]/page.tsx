@@ -1,11 +1,12 @@
 import { OrderPayment } from "@/components/orders/order-payment";
+import { OrderTracking } from "@/components/orders/order-tracking";
 import { getCurrentUser } from "@/lib/auth";
 import { ORDER_STATUS_LABELS } from "@/db/label";
 import { pageMetadata } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, Clock, FileText } from "lucide-react";
+import { CheckCircle2, FileText } from "lucide-react";
 import { formatMoney } from "utils";
 import { getInvoiceForOrder, getOrderItems, getUserOrder } from "services";
 
@@ -47,6 +48,12 @@ const OrderPage = async ({ params }: Props) => {
       <p className="font-grotesk mt-1 text-sm text-muted">
         {ORDER_STATUS_LABELS[order.status]}
       </p>
+
+      {/* E9. Above the line items, because "where has this got to" is why the
+          customer opened the page — they know what they ordered. */}
+      <div className="mt-6">
+        <OrderTracking orderStatus={order.status} boqStatus={order.boqStatus} />
+      </div>
 
       {items.length > 0 && (
         <div className="mt-6 flex flex-col divide-y divide-hairline-soft rounded-[18px] border border-search-border bg-surface p-6">
@@ -99,7 +106,13 @@ const OrderPage = async ({ params }: Props) => {
       </div>
 
       <div className="mt-8 flex flex-col gap-4">
-        {order.status === "awaiting_payment" ? (
+        {/* Rendered for `paid` as well as `awaiting_payment`, which it was not.
+            OrderPayment carries both branches — the cash instructions and, once
+            settled, the "Paid on" panel with the invoice open/download links — but
+            the page only mounted it while the order was unpaid, so the paid branch
+            was unreachable and the invoice PDF had no way in from this page. The
+            component decides which half to show; that is what `paidAt` is for. */}
+        {order.status === "awaiting_payment" || order.status === "paid" ? (
           <OrderPayment
             orderUuid={order.uuid}
             reference={order.reference}
@@ -108,16 +121,13 @@ const OrderPage = async ({ params }: Props) => {
             paidAt={order.paidAt}
             paymentReference={order.paymentReference}
           />
-        ) : order.status === "paid" ? (
+        ) : null}
+
+        {order.status === "paid" && (
           <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
             <CheckCircle2 size={16} className="text-primary" />
-            Payment received{invoice ? ` — invoice ${invoice.number}` : ""}. Your
-            funds are held by SOT until your system is handed over and verified.
-          </p>
-        ) : (
-          <p className="font-grotesk flex items-center gap-2 text-sm text-secondary">
-            <Clock size={16} className="text-primary" />
-            {ORDER_STATUS_LABELS[order.status]}.
+            {invoice ? `Invoice ${invoice.number}. ` : ""}Your funds are held by
+            SOT until your system is handed over and verified.
           </p>
         )}
         {order.boqUuid && (

@@ -73,6 +73,20 @@ export const PartnerCart = ({ view }: PartnerCartProps) => {
                     ? formatMoney(Number(line.unitPrice), currency)
                     : "no price yet"}
                 </p>
+                {/* P11. A partner ordering stock they hold gets the same warning a
+                    customer does — they are the ones who will have to explain the
+                    shortfall to a site. */}
+                {line.supply.note && (
+                  <p
+                    className={`text-xs ${
+                      line.supply.state === "unavailable"
+                        ? "text-red-600"
+                        : "text-amber-700"
+                    }`}
+                  >
+                    {line.supply.note}
+                  </p>
+                )}
               </div>
               <span className="shrink-0 text-sm tabular-nums">
                 {line.unitPrice

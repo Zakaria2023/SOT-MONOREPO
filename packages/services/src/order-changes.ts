@@ -14,6 +14,8 @@ import { ConflictError, ValidationError } from "./errors";
 import { notify } from "./notifications";
 import { describeUnpriced, resolvePricing } from "./price-resolution";
 import { priceLinesAsOf } from "./product-pricing";
+import { assessSupplyFor } from "./product-supply";
+import { describeSupply } from "./supply";
 
 export type { SelectOrderChanges };
 
@@ -57,6 +59,10 @@ export type ChangeVerdict = {
   // Null when everything priced. A change that cannot be priced cannot be
   // applied, whatever the engine says about it.
   pricingProblem: string | null;
+  // Null when everything can be supplied. Same standing as the pricing problem
+  // and for the same reason: no verdict from the engine makes a discontinued
+  // product deliverable.
+  supplyProblem: string | null;
   currentTotal: number;
   proposedTotal: number;
 };
@@ -69,6 +75,7 @@ const judge = async (
   findings: { id: string; title: string; message: string; tone: string }[];
   total: number;
   pricingProblem: string | null;
+  supplyProblem: string | null;
 }> => {
   const [order] = await db
     .select()
@@ -106,6 +113,13 @@ const judge = async (
     asOf: new Date(),
   });
 
+  // P11, and this is the path the whole re-run principle was built for. A site
+  // visit finds one more door, somebody proposes the camera that was on the
+  // original drawing, and that model went end-of-life two months ago. The design
+  // engine passes it happily — compatibility says nothing about whether a thing
+  // can be bought.
+  const supply = await assessSupplyFor(active);
+
   return {
     blockers: gate.blockers.map((finding) => ({
       title: finding.title,
@@ -123,6 +137,7 @@ const judge = async (
     pricingProblem: priced.complete
       ? null
       : describeUnpriced(priced.unpriced),
+    supplyProblem: supply.sellable ? null : describeSupply(supply.blocking),
   };
 };
 
@@ -192,6 +207,7 @@ export const proposeOrderChange = async (
     blocked: verdict.blockers.length > 0,
     blockers: verdict.blockers,
     pricingProblem: verdict.pricingProblem,
+    supplyProblem: verdict.supplyProblem,
     currentTotal: Number(order.grandTotal),
     proposedTotal: verdict.total,
   };
@@ -230,6 +246,21 @@ export const applyOrderChange = async (
 
   // Judged again, now. Not the verdict from proposal time.
   const verdict = await judge(change.orderUuid, change.lines);
+
+  // Supply before price, as on the order path: "we have not priced this" invites
+  // somebody to go and get a quote, which is the wrong errand for a product that
+  // is no longer made.
+  //
+  // And both before the override is even considered. The override below lets
+  // somebody past the ENGINE's refusal, which is a judgement they may be better
+  // placed to make than the rules are. This is not a judgement — it is the
+  // warehouse — and no reason typed into a box makes a discontinued product
+  // arrive.
+  if (verdict.supplyProblem) {
+    throw new ValidationError(
+      `This change cannot be applied: ${verdict.supplyProblem}`,
+    );
+  }
 
   if (verdict.pricingProblem) {
     throw new ValidationError(

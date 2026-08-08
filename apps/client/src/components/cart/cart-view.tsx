@@ -27,6 +27,7 @@ import Link from "next/link";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { CartLineItem } from "services";
+import { SupplyNote } from "@/components/shared/supply-note";
 import {
   applyPercentDiscount,
   formatMoney,
@@ -88,6 +89,12 @@ const CartRow = ({ item, currency, onQuantity, onRemove }: CartRowProps) => (
       <p className="font-grotesk text-xs text-faint">
         {formatMoney(Number(item.unitPrice), currency)} each
       </p>
+      {/* P11. Named on the line rather than only at checkout. A product can go
+          out of stock while it sits here, and the order will be refused for it —
+          so the basket has to say WHICH line, or the refusal sends somebody
+          hunting through their own cart for a fault we already know the name of.
+          `available` with nothing to say renders nothing. */}
+      <SupplyNote supply={item.supply} />
     </div>
 
     <div className="flex items-center rounded-full border border-search-border">
@@ -147,6 +154,13 @@ const CartSection = ({
   );
   const priced = items.filter(
     (item) => item.unitPrice !== null && item.unitPrice !== "",
+  );
+
+  // P11. The lines checkout will refuse, worked out from the same classifier the
+  // server gate uses — so the warning here and the refusal there cannot disagree
+  // about which line is the problem.
+  const unsellable = items.filter(
+    (item) => item.supply.state === "unavailable",
   );
 
   const { subtotal } = summarizeCart(priced);
@@ -223,6 +237,17 @@ const CartSection = ({
               not priced yet and {unpriced.length === 1 ? "is" : "are"} not in this
               total. We will quote{" "}
               {unpriced.map((item) => item.name).join(", ")}.
+            </p>
+          )}
+          {/* Said here as well as on the line, because this is where somebody is
+              standing when they press the button that is about to be refused.
+              Warned rather than disabled: the fix is to remove the line, and a
+              dead button does not tell them that. */}
+          {unsellable.length > 0 && (
+            <p className="pt-1 text-xs text-red-600">
+              Remove {unsellable.map((item) => item.name).join(", ")} to
+              continue — {unsellable.length === 1 ? "it cannot" : "they cannot"}{" "}
+              be supplied at the moment.
             </p>
           )}
         </div>

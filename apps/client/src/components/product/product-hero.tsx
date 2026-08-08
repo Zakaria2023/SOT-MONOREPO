@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
-import type { ProductDetail } from "services";
+import { classifySupply, type ProductDetail } from "services";
+import { SupplyNote } from "@/components/shared/supply-note";
 
 type SpecAttribute = {
   label: string;
@@ -48,6 +49,7 @@ export const ProductHero = ({
   const chipAttributes = attributes.slice(0, 2);
   const statAttributes = attributes.slice(0, 4);
   const subImages = product.images ?? [];
+  const supply = classifySupply(product);
 
   return (
     <section className="mx-auto px-6 pt-8 lg:px-12 xl:px-20">
@@ -135,16 +137,27 @@ export const ProductHero = ({
                 className="font-heading text-3xl text-ink"
               />
               <p className="mt-0.5 text-sm text-faint">per unit</p>
+              {/* A delay is said here, next to the price, where somebody is
+                  deciding. Saying it only in the cart tells them after they have
+                  committed. */}
+              <SupplyNote supply={supply} />
             </div>
-            {product.isAvailable ? (
+            {/* P11. This checked only `isAvailable`, so a product marked
+                `out_of_stock` or `end_of_life` still offered Add to cart — and
+                now that the server refuses those, offering the button would mean
+                an error message where a sentence should have been. Classified
+                through the same function the gate uses, so what this page offers
+                and what checkout accepts cannot diverge. */}
+            {supply.state === "unavailable" ? (
+              <span className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-faint">
+                <PackageX size={16} />
+                {product.isAvailable ? "Not available to order" : "Currently unavailable"}
+              </span>
+            ) : (
               <div className="flex items-center gap-2">
                 <BuyNowButton />
                 <AddToCartButton productUuid={product.uuid} />
               </div>
-            ) : (
-              <span className="inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-4 py-2 text-sm font-semibold text-faint">
-                <PackageX size={16} /> Currently unavailable
-              </span>
             )}
           </div>
 
