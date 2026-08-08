@@ -28,6 +28,7 @@ export * from "./imports";
 export * from "./offers";
 export * from "./zatca";
 export * from "./invoicing";
+export * from "./order-admin";
 export * from "./orders";
 export * from "./partner-capabilities";
 export * from "./partner-discounts";

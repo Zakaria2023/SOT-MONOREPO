@@ -82,6 +82,14 @@ export const Orders = mysqlTable(
 
     confirmedAt: timestamp("confirmed_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),
+
+    // Cash is handed to a PERSON. There is no gateway and no callback, so the
+    // only evidence a payment happened is somebody attesting that it did — which
+    // means the record has to name them and carry something to reconcile
+    // against. An order marked paid by nobody, against nothing, is an assertion.
+    paidBy: varchar("paid_by", { length: 255 }),
+    paymentReference: varchar("payment_reference", { length: 100 }),
+    paymentNote: text("payment_note"),
     cancelledAt: timestamp("cancelled_at"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),

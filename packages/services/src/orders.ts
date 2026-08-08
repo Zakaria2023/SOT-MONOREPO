@@ -16,6 +16,7 @@ import type { ProjectAnswers } from "../../../db/types";
 import { statusesThatCanBecome } from "./boq-lifecycle";
 import { canSendTo, type CartViewer } from "./cart-destinations";
 import { gateSelection } from "./design-check";
+import { issueInvoice } from "./invoicing";
 import { describeUnpriced, resolvePricing } from "./price-resolution";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
@@ -332,57 +333,82 @@ export const getOrderItems = async (
     .orderBy(asc(OrderItems.createdAt));
 
 /**
- * Settle an awaiting-payment order and raise its one invoice. Payment has no
- * live gateway yet, so this is the plumbing a gateway callback (or an admin)
- * will call once a payment succeeds — it does not itself charge anyone.
+ * Record that cash was received.
+ *
+ * There is no gateway. Cash is handed to a person, so this is staff attesting
+ * that money arrived — never the customer asserting it. The client used to call
+ * a simulated payment that waited 1.2 seconds and marked the order paid with
+ * nothing having moved; that was a reasonable placeholder for a card flow and is
+ * the wrong shape entirely for cash.
+ *
+ * Which is why it takes who received it. An order marked paid by nobody, against
+ * no reference, cannot be reconciled against a till or a bank statement, and
+ * "paid" then means only that somebody clicked.
+ *
+ * The invoice comes from `issueInvoice`, not from here. This function used to
+ * mint its own with no VAT breakdown, no seller registration and no QR — a
+ * document that is not a tax invoice, under a second numbering scheme.
  */
-export const markOrderPaid = async (
+export const recordCashPayment = async (
   orderUuid: string,
+  received: { by: string; reference: string; note?: string | null },
 ): Promise<OrderWithInvoice> => {
-  const [order] = await db
-    .select()
-    .from(Orders)
-    .where(eq(Orders.uuid, orderUuid));
-  if (!order) {
-    throw new ValidationError("Order not found");
-  }
-  if (order.status !== "awaiting_payment") {
-    throw new ConflictError("This order is not awaiting payment");
+  if (received.reference.trim() === "") {
+    throw new ValidationError(
+      "Recording a cash payment needs a reference — a receipt number, or the deposit slip.",
+    );
   }
 
   const paidAt = new Date();
-  const invoiceUuid = randomUUID();
-  const invoiceNumber = `INV-${invoiceUuid.slice(0, 8).toUpperCase()}`;
 
+  // Read and write under one lock. Two people recording the same cash payment
+  // would otherwise both find the order awaiting payment and both settle it.
   await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(Orders)
+      .where(eq(Orders.uuid, orderUuid))
+      .for("update");
+    if (!order) {
+      throw new ValidationError("Order not found");
+    }
+    if (order.status !== "awaiting_payment") {
+      throw new ConflictError("This order is not awaiting payment");
+    }
+
     await tx
       .update(Orders)
-      .set({ status: "paid", paidAt })
+      .set({
+        status: "paid",
+        paidAt,
+        paidBy: received.by,
+        paymentReference: received.reference.trim(),
+        paymentNote: received.note?.trim() || null,
+      })
       .where(eq(Orders.uuid, orderUuid));
-
-    await tx.insert(Invoices).values({
-      uuid: invoiceUuid,
-      number: invoiceNumber,
-      orderUuid,
-      status: "paid",
-      amount: order.grandTotal,
-      currency: order.currency,
-      paidAt,
-    });
   });
+
+  // Outside the transaction on purpose: issuing is idempotent by the invoice
+  // row, so a retry after a crash here produces the same invoice rather than a
+  // second number for one supply. Holding the lock across it would also hold it
+  // across a second read of the order and the seller configuration.
+  const invoice = await issueInvoice(orderUuid);
+
+  await db
+    .update(Invoices)
+    .set({ status: "paid", paidAt })
+    .where(eq(Invoices.uuid, invoice.uuid));
 
   const [updated] = await db
     .select()
     .from(Orders)
     .where(eq(Orders.uuid, orderUuid));
-  const [invoice] = await db
+  const [settled] = await db
     .select()
     .from(Invoices)
-    .where(eq(Invoices.uuid, invoiceUuid));
-  if (!updated || !invoice) {
-    throw new Error("Failed to settle order");
-  }
-  return { order: updated, invoice };
+    .where(eq(Invoices.uuid, invoice.uuid));
+
+  return { order: updated, invoice: settled };
 };
 
 /** Cancel an order that hasn't been paid yet. */
