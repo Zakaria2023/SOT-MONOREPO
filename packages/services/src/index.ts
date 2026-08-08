@@ -46,4 +46,6 @@ export * from "./display-specs";
 export * from "./specifications";
 export * from "./stats";
 export * from "./variant-identity";
+export * from "./value-sweep";
+export * from "./value-sweep-loader";
 export * from "./variants";
