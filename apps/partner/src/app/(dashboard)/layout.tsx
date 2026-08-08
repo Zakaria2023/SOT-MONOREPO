@@ -1,9 +1,11 @@
 import {
   ClipboardList,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   Package,
   ShoppingCart,
+  Sparkles,
   Wallet,
 } from "lucide-react";
 import { DashboardShell, type NavGroup } from "ui";
@@ -29,8 +31,16 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { icon: ClipboardList, label: "Your work", href: "/work" },
       { icon: FileText, label: "Incoming BOQs", href: "/boqs" },
+      // P16. Above earnings, because a lead is where the next earning comes from.
+      { icon: Sparkles, label: "Leads", href: "/leads" },
       { icon: Wallet, label: "Earnings", href: "/earnings" },
     ],
+  },
+  {
+    // Its own group, not tucked under Work. Training is what a partner does to be
+    // ALLOWED to work, which is a different kind of thing from a job in progress.
+    title: "Capability",
+    links: [{ icon: GraduationCap, label: "Training", href: "/training" }],
   },
 ];
 

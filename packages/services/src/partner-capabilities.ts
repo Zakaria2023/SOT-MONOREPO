@@ -13,6 +13,8 @@ import {
   PartnerRequests,
   type SelectPartnerRequests,
 } from "../../../db/schema/partner-requests";
+import { Certifications } from "../../../db/schema/training";
+import { capabilityStanding } from "./certification-gate";
 import { ValidationError } from "./errors";
 import {
   computePartnerDiscountPercent,
@@ -89,6 +91,56 @@ export const grantCapability = async (
     const current = held(partner);
     if (current.includes(change.capability)) {
       throw new ValidationError("They already have that capability.");
+    }
+
+    // 7.2 — THE GATE THIS FUNCTION WAS MISSING.
+    //
+    // Until now any capability could be handed out by clicking. The spec is
+    // explicit: where a badge requires certification, no badge before a valid,
+    // VERIFIED certificate exists. So the competence capabilities — installing,
+    // programming, designing a system — now need one, and the commercial ones
+    // (holding stock, selling) still do not, because there is no exam for a credit
+    // arrangement.
+    //
+    // There is deliberately NO override. The escape hatch for a partner certified
+    // by a vendor outside SOT is to record that certificate and verify it — which
+    // leaves the evidence on file, where an override would leave a reason field
+    // nobody could check against anything. An override here would also make the
+    // gate advisory, and a gate on life-safety competence that can be clicked
+    // through is not a gate.
+    //
+    // Read inside the transaction, so a certificate revoked a moment ago cannot be
+    // the one this grant relies on.
+    //
+    // Keyed on `approvedClerkUserId`, which is the Clerk account the invitation
+    // created. A partner with none is not yet signed in, and therefore cannot have
+    // sat an assessment — so an empty certificate list is the correct answer for
+    // them rather than a lookup to skip.
+    const certificates = partner.approvedClerkUserId
+      ? await tx
+          .select({
+            uuid: Certifications.uuid,
+            capability: Certifications.capability,
+            status: Certifications.status,
+            expiresOn: Certifications.expiresOn,
+            verifiedAt: Certifications.verifiedAt,
+          })
+          .from(Certifications)
+          .where(
+            eq(
+              Certifications.partnerClerkUserId,
+              partner.approvedClerkUserId,
+            ),
+          )
+      : [];
+
+    const standing = capabilityStanding(
+      change.capability,
+      certificates,
+      new Date().toISOString().slice(0, 10),
+    );
+    if (!standing.allowed) {
+      throw new ValidationError(standing.reason);
     }
 
     const next = [...current, change.capability];

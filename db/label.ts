@@ -7,9 +7,15 @@ import {
   CatalogAuditAction,
   CatalogAuditTarget,
   ExpertQueue,
+  CertificateStanding,
+  CertificationStatus,
   ExpertRequestStatus,
+  LeadOfferStatus,
+  LeadStatus,
   ServiceRequestKind,
   ServiceRequestStatus,
+  TrainingDeliveryMode,
+  TrainingRegistrationStatus,
   BoqLineType,
   BoqStatus,
   GovernmentRequestStatus,
@@ -368,6 +374,64 @@ export const EXPERT_REQUEST_STATUS_LABELS: Record<ExpertRequestStatus, string> =
     answered: "Answered",
     closed: "Closed",
   };
+
+export const TRAINING_DELIVERY_MODE_LABELS: Record<
+  TrainingDeliveryMode,
+  string
+> = {
+  in_person: "In person",
+  webinar: "Webinar",
+  self_paced: "Self-paced",
+};
+
+export const TRAINING_REGISTRATION_STATUS_LABELS: Record<
+  TrainingRegistrationStatus,
+  string
+> = {
+  registered: "Registered",
+  // Worded to keep the gate visible on screen. "Attended" alone reads like
+  // completion, and it is not: the assessment is what earns the certificate.
+  attended: "Attended, not yet assessed",
+  no_show: "Did not attend",
+  passed: "Passed",
+  failed: "Did not pass",
+  cancelled: "Cancelled",
+};
+
+export const CERTIFICATION_STATUS_LABELS: Record<CertificationStatus, string> = {
+  // Says what it means for the partner rather than naming the state: this is the
+  // difference between holding a capability and not.
+  pending_verification: "Waiting for SOT to check",
+  verified: "Verified",
+  expired: "Lapsed",
+  revoked: "Withdrawn",
+};
+
+// What is true TODAY, which is what every screen should show. See the note on
+// `certificateStandings` for why this is a separate vocabulary from the status above.
+export const CERTIFICATE_STANDING_LABELS: Record<CertificateStanding, string> = {
+  valid: "Valid",
+  unverified: "Waiting for SOT to check",
+  expired: "Lapsed",
+  revoked: "Withdrawn",
+};
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new: "Not yet qualified",
+  qualified: "Qualified, waiting to be offered",
+  rejected: "Turned down",
+  offered: "With a partner",
+  accepted: "Taken on",
+  converted: "Won",
+  lost: "Lost",
+};
+
+export const LEAD_OFFER_STATUS_LABELS: Record<LeadOfferStatus, string> = {
+  offered: "Offered",
+  accepted: "Accepted",
+  declined: "Declined",
+  expired: "Lapsed and cascaded",
+};
 
 export const SERVICE_REQUEST_KIND_LABELS: Record<ServiceRequestKind, string> = {
   replacement: "Replacement due",

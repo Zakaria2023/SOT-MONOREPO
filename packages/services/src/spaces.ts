@@ -666,17 +666,21 @@ export const listAllSpaces = async (): Promise<StaffSpaceRow[]> =>
     .select({
       ...getTableColumns(Spaces),
       ownerName: Users.fullName,
+      // Written out and table-qualified. Drizzle only qualifies a column when the
+      // query has a join — these are correct today because of the `leftJoin` below,
+      // and would silently start correlating `SpaceItems` against its own `uuid` and
+      // returning 0 the moment somebody removed it.
       units: sql<number>`COALESCE((
-        SELECT SUM(${SpaceItems.quantity}) FROM ${SpaceItems}
-        WHERE ${SpaceItems.spaceUuid} = ${Spaces.uuid}
-          AND ${SpaceItems.retiredAt} IS NULL
+        SELECT SUM(\`SpaceItems\`.\`quantity\`) FROM \`SpaceItems\`
+        WHERE \`SpaceItems\`.\`space_uuid\` = \`Spaces\`.\`uuid\`
+          AND \`SpaceItems\`.\`retired_at\` IS NULL
       ), 0)`.mapWith(Number),
       unverifiedFirmware: sql<number>`COALESCE((
-        SELECT COUNT(*) FROM ${SpaceItems}
-        WHERE ${SpaceItems.spaceUuid} = ${Spaces.uuid}
-          AND ${SpaceItems.retiredAt} IS NULL
-          AND ${SpaceItems.firmwareVersion} IS NOT NULL
-          AND ${SpaceItems.firmwareVerified} = false
+        SELECT COUNT(*) FROM \`SpaceItems\`
+        WHERE \`SpaceItems\`.\`space_uuid\` = \`Spaces\`.\`uuid\`
+          AND \`SpaceItems\`.\`retired_at\` IS NULL
+          AND \`SpaceItems\`.\`firmware_version\` IS NOT NULL
+          AND \`SpaceItems\`.\`firmware_verified\` = false
       ), 0)`.mapWith(Number),
     })
     .from(Spaces)

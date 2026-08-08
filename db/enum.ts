@@ -548,6 +548,125 @@ export const partnerCapabilities = [
 
 export type PartnerCapability = (typeof partnerCapabilities)[number];
 
+// ---------------------------------------------------------------------------
+// PHASE 7 — HOW A PARTNER EARNS A CAPABILITY.
+//
+// The route, and the answer to what was the largest open item in the partner
+// module: attend → assess → certified → capability granted. Each arrow is a gate,
+// and each gate is the reason the step before it is not enough on its own.
+// ---------------------------------------------------------------------------
+
+// How a course is delivered. Matters because capacity means something different
+// for each: a room seats twenty, a webinar does not, and self-paced has no date
+// to attend at all.
+export const trainingDeliveryModes = [
+  "in_person",
+  "webinar",
+  "self_paced",
+] as const satisfies readonly string[];
+
+export type TrainingDeliveryMode = (typeof trainingDeliveryModes)[number];
+
+// Where a partner has got to on one session.
+//
+// `attended` and `passed` are deliberately different states, and keeping them
+// apart IS the gate: certification issues on a completed assessment, never on
+// attendance alone. Somebody who sat in the room for a day has demonstrated that
+// they can sit in a room.
+export const trainingRegistrationStatuses = [
+  "registered",
+  // Turned up. Necessary and not sufficient.
+  "attended",
+  "no_show",
+  // Sat the assessment and passed it. The only state that can produce a
+  // certificate.
+  "passed",
+  "failed",
+  "cancelled",
+] as const satisfies readonly string[];
+
+export type TrainingRegistrationStatus =
+  (typeof trainingRegistrationStatuses)[number];
+
+// A CERTIFICATE'S STANDING.
+//
+// `pending_verification` exists because a certificate SOT has not checked is not
+// evidence — the same reasoning as `firmwareVerified` on a Space item. A partner
+// can hold a vendor certificate we have never seen, and it cannot unlock anything
+// until somebody here has looked at it.
+//
+// `expired` is a stored state AND a derived one. The service recomputes standing
+// from the date on every read, so the column can never be the reason a lapsed
+// certificate is treated as live; the column exists so a sweep can record WHEN it
+// lapsed and tell somebody.
+export const certificationStatuses = [
+  "pending_verification",
+  "verified",
+  "expired",
+  "revoked",
+] as const satisfies readonly string[];
+
+export type CertificationStatus = (typeof certificationStatuses)[number];
+
+// WHAT A CERTIFICATE'S STANDING IS *TODAY* — a different vocabulary from the stored
+// status above, and deliberately so.
+//
+// The stored status is what somebody last wrote. The standing is what is true now,
+// worked out from the dates every time it is asked, because nothing runs at midnight
+// to move a certificate from `verified` to `expired`.
+//
+// The two lists differ where it matters. There is no `pending_verification` here:
+// from the point of view of "may this unlock anything", an unchecked certificate and
+// an unchecked claim are one state, `unverified`. And there is no `verified` — a
+// verified certificate that lapsed last month is not valid, so the standing that
+// allows anything is `valid` and it means verified AND in date.
+//
+// Kept as its own enum rather than reusing the status so that a screen cannot render
+// one where it means the other. They looked interchangeable and are not.
+export const certificateStandings = [
+  "valid",
+  "unverified",
+  "expired",
+  "revoked",
+] as const satisfies readonly string[];
+
+export type CertificateStanding = (typeof certificateStandings)[number];
+
+// A LEAD'S LIFE.
+//
+// `new` → `qualified` is the gate: a lead is not released to a partner until
+// somebody has qualified it. Raw B2C enquiries are tyre-kickers, and partners stop
+// trusting the feed after a handful of them.
+//
+// `offered` → `expired` → `offered` again is the cascade: an offer nobody accepts
+// times out and moves to the next partner, rather than sitting with the nearest
+// one forever because they were busy that week.
+export const leadStatuses = [
+  "new",
+  "qualified",
+  // Refused at qualification. Kept rather than deleted: the reason is what stops
+  // the same enquiry being chased twice.
+  "rejected",
+  "offered",
+  "accepted",
+  "converted",
+  "lost",
+] as const satisfies readonly string[];
+
+export type LeadStatus = (typeof leadStatuses)[number];
+
+// What an offer to one partner came to. Separate from the lead's own status
+// because a lead outlives its offers — three partners may each have been offered
+// and let it lapse before the fourth accepts.
+export const leadOfferStatuses = [
+  "offered",
+  "accepted",
+  "declined",
+  "expired",
+] as const satisfies readonly string[];
+
+export type LeadOfferStatus = (typeof leadOfferStatuses)[number];
+
 export const partnerRequestStatuses = [
   "pending",
   "approved",
@@ -856,6 +975,11 @@ export const notificationKinds = [
   // chain rather than three — the title carries which, and three kinds would be
   // three switches nobody remembers to add to.
   "service_request",
+  // An assessment result, a certificate issued or verified, or one about to lapse.
+  // One kind for the whole route to a capability, for the same reason.
+  "certification",
+  // A qualified lead offered to a partner, and the cascade when it lapses.
+  "lead",
 ] as const satisfies readonly string[];
 
 export type NotificationKind = (typeof notificationKinds)[number];
