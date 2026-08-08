@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Award,
   Bell,
+  Building2,
   FileText,
   FlaskConical,
   Inbox,
@@ -83,6 +84,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Ticket, label: "Offers", href: "/offers" },
       { icon: Receipt, label: "Orders", href: "/orders" },
       { icon: PackageCheck, label: "Handovers", href: "/handovers" },
+      { icon: Building2, label: "Sites", href: "/spaces" },
       { icon: LifeBuoy, label: "Expert Desk", href: "/expert-desk" },
     ],
   },

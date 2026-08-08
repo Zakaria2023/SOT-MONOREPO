@@ -19,6 +19,12 @@ import { statusesThatCanBecome } from "./boq-lifecycle";
 import { notify } from "./notifications";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { accruePartnerEarning, settleIntegratedPartner } from "./payouts";
+import {
+  adoptHandoverIntoSpace,
+  announceSpace,
+  resolveSpaceForBoq,
+} from "./spaces";
+import { Spaces } from "../../../db/schema/spaces";
 
 export type {
   SelectHandoverAssets,
@@ -423,6 +429,11 @@ export const verifyHandover = async ({
     );
   }
 
+  // 6.1. How many entries the customer's site register gained, for the notice
+  // below. Declared out here because it is decided inside the transaction.
+  let adopted = 0;
+  let spaceName: string | null = null;
+
   await db.transaction(async (tx) => {
     await tx
       .update(HandoverPacks)
@@ -433,6 +444,24 @@ export const verifyHandover = async ({
         sotVerifiedAt: new Date(),
       })
       .where(eq(HandoverPacks.uuid, pack.uuid));
+
+    // THE MOMENT THE SPACE FILLS ITSELF.
+    //
+    // Inside the transaction with the verification, because the two facts are one
+    // fact: SOT has accepted that this equipment is installed in this building. A
+    // register populated by a later job, or by asking the customer to type an
+    // inventory, is a register that stays empty — and an empty one answers every
+    // question with "nothing installed", which reads as an answer rather than as
+    // a gap.
+    const spaceUuid = await resolveSpaceForBoq(tx, boqUuid);
+    if (spaceUuid !== null) {
+      adopted = await adoptHandoverIntoSpace(tx, { boqUuid, spaceUuid });
+      const [space] = await tx
+        .select({ name: Spaces.name })
+        .from(Spaces)
+        .where(eq(Spaces.uuid, spaceUuid));
+      spaceName = space?.name ?? null;
+    }
 
     await tx
       .update(Boqs)
@@ -476,6 +505,14 @@ export const verifyHandover = async ({
     body: `Checked and accepted by ${sotName ?? "SOT"}.`,
     href: `/boq/${boqUuid}`,
   });
+
+  // A second notice, and deliberately separate from the one above. "Your project
+  // was verified" is about a job finishing; this is about a thing the customer now
+  // permanently has, and folding it into the first sentence would bury the more
+  // durable of the two.
+  if (spaceName !== null) {
+    await announceSpace(customer?.clerkUserId ?? null, spaceName, adopted);
+  }
 
   return updated;
 };

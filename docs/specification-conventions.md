@@ -167,26 +167,46 @@ stop matching.
 
 ---
 
-## 8. `net.min_firmware_version` stays out of phase 1
+## 8. `net.min_firmware_version` — now authorable, against a Space only
 
 **Where it comes from.** §2.4 and §6.2 both flag it: the UL detector needs OS
 Malevich 2.15.4+, gen-1 FireProtect interconnection needs 3.42+.
 
-**The convention.** Do not author it yet.
+**This entry used to say "do not author it yet".** It named two missing things and
+both now exist, so the guidance has changed rather than the reasoning.
 
-Two things are missing and neither is small. There is no version comparator —
-`2.15.4` is not a number and `lte` on a string ranks `2.9` above `2.15`. And the
-fact it compares is a property of an *already-installed* device, which nothing in
-a BOQ line carries; §6.2 is explicit that it would have to be user-declared and
-unverified.
+The comparator is `packages/services/src/firmware.ts`. `compareVersions` reads the
+dotted parts as numbers, which is the whole point: string comparison ranks `2.9`
+above `2.15`, so a rule requiring 2.15.4 would have *passed* a device on 2.9 —
+wrong in the direction of approval, which is the worst direction. A missing part
+counts as zero, so `3.42` and `3.42.0` are one release. Anything unparseable comes
+back `null` rather than a number, because every number there means something.
 
-A rule that reads a version nobody supplied does not fire, which is the safe
-failure — but it is also a check that looks present and is not, and that is the
-shape this model works hardest to avoid.
+The carrier is `SpaceItems.firmwareVersion`, per item, on the Space object §6.1
+added. That is the only place the fact can live: a BOQ line is a product somebody
+intends to buy and firmware belongs to a unit already on a wall.
 
-**When to revisit.** When the Space object carries `firmware_version` per item.
-The comparator is a day's work; the honest declaration of where the number comes
-from is the actual feature.
+**The convention.** Author it, and only against an installed item. Two rules
+follow and neither is optional.
+
+*Never against a BOQ line.* There is no version there to read, and a rule that
+reads nothing does not fire — the check would look present and be absent, which is
+the shape this model works hardest to avoid.
+
+*It degrades to a warning while `firmwareVerified` is false.* SOT cannot read the
+firmware off a panel in a building three cities away, so the number came from a
+person typing what they believed. `assessFirmware` enforces this: an unverified
+shortfall is `warn`, however far short it falls, and only a version somebody at SOT
+has confirmed can produce `block`. A rule that silently trusted a self-declared
+number would look like verification and be hearsay, and a fire system signed off on
+that basis has been approved by nobody.
+
+**What is still missing.** Nothing in the relationship engine reads a Space yet —
+the engine judges a *selection*, and a firmware check only has a subject when the
+selection is an addition to a site that already has equipment in it. That is the
+"add to system" path in §6.2. Until it lands, `assessFirmware` is reachable and
+tested but no authored rule routes through it, so authoring the attribute buys
+nothing yet.
 
 ---
 
