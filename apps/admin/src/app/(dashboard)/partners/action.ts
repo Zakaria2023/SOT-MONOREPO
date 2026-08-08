@@ -1,5 +1,6 @@
 "use server";
 
+import type { PartnerCapability } from "@/db/enum";
 import { SelectPartnerRequests } from "@/db/schema/partner-requests";
 import { requireAdmin } from "@/lib/server/auth";
 import { inviteOrAttachClerkUser } from "@/lib/server/clerk";
@@ -8,7 +9,13 @@ import { adminListPage } from "@/lib/server/list";
 import { revalidatePath } from "next/cache";
 import {
   approvePartnerRequest as approvePartnerRequestRecord,
+  getCapabilityHistory,
+  getCapabilityState,
   getPartnerRequestByUuid,
+  grantCapability,
+  revokeCapability,
+  type CapabilityState,
+  type SelectPartnerCapabilityLog,
   listPartnerRequests,
   rejectPartnerRequest as rejectPartnerRequestRecord,
   setPartnerIntegration,
@@ -137,4 +144,61 @@ export const rejectPartnerRequestAction = async (
 
   revalidatePath("/partners");
   return { success: true };
+};
+
+// ---------------------------------------------------------------------------
+// Capabilities — what a partner is approved to do
+// ---------------------------------------------------------------------------
+
+export const getCapabilityStateAction = async (
+  partnerUuid: string,
+): Promise<CapabilityState | null> => {
+  await requireAdmin();
+  return getCapabilityState(partnerUuid);
+};
+
+export const getCapabilityHistoryAction = async (
+  partnerUuid: string,
+): Promise<SelectPartnerCapabilityLog[]> => {
+  await requireAdmin();
+  return getCapabilityHistory(partnerUuid);
+};
+
+/**
+ * Award a capability after approval.
+ *
+ * Until now the set was frozen at approval — a partner who later earned the
+ * right to install and program had no way to be given it short of editing the
+ * database. It also moves their discount, which is why the trail records the
+ * percentage the change produced.
+ */
+export const grantCapabilityAction = async (
+  partnerUuid: string,
+  capability: PartnerCapability,
+  reason: string | null,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await grantCapability({ partnerUuid, capability, actor, reason });
+    revalidatePath("/partners");
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to grant that capability");
+  }
+};
+
+/** Take one back. A reason is required — it changes their pricing. */
+export const revokeCapabilityAction = async (
+  partnerUuid: string,
+  capability: PartnerCapability,
+  reason: string,
+): Promise<ActionResult> => {
+  const { actor } = await requireAdmin();
+  try {
+    await revokeCapability({ partnerUuid, capability, actor, reason });
+    revalidatePath("/partners");
+    return { success: true };
+  } catch (error) {
+    return fail(error, "Failed to revoke that capability");
+  }
 };

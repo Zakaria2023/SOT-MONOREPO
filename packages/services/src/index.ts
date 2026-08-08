@@ -21,6 +21,7 @@ export * from "./import-pipeline";
 export * from "./imports";
 export * from "./offers";
 export * from "./orders";
+export * from "./partner-capabilities";
 export * from "./partner-discounts";
 export * from "./price-resolution";
 export * from "./product-pricing";

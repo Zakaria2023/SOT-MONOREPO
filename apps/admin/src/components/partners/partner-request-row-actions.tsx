@@ -6,9 +6,10 @@ import {
   rejectPartnerRequestAction,
   setPartnerIntegrationAction,
 } from "@/app/(dashboard)/partners/action";
+import { PartnerCapabilitiesDialog } from "@/components/partners/partner-capabilities-dialog";
 import { PartnerCommercialDialog } from "@/components/partners/partner-commercial-dialog";
 import { PartnerRequestReviewDialog } from "@/components/partners/partner-request-review-dialog";
-import { Check, SlidersHorizontal, X } from "lucide-react";
+import { BadgeCheck, Check, SlidersHorizontal, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "ui";
@@ -21,7 +22,9 @@ export const PartnerRequestRowActions = ({
   request,
 }: PartnerRequestRowActionsProps) => {
   const router = useRouter();
-  const [mode, setMode] = useState<"approve" | "reject" | "edit" | null>(null);
+  const [mode, setMode] = useState<
+    "approve" | "reject" | "edit" | "capabilities" | null
+  >(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [isIntegrated, setIsIntegrated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -96,7 +99,21 @@ export const PartnerRequestRowActions = ({
   if (request.status === "approved") {
     return (
       <>
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-1">
+          {/* What they may do, and what it is worth. Chosen at application and
+              frozen until now — there was no way to award one later. */}
+          <Button
+            type="button"
+            variant="ghost"
+            className="px-3"
+            onClick={() => {
+              setError(undefined);
+              setMode("capabilities");
+            }}
+          >
+            <BadgeCheck size={16} />
+            Capabilities
+          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -111,6 +128,17 @@ export const PartnerRequestRowActions = ({
             Edit
           </Button>
         </div>
+
+        {mode === "capabilities" && (
+          <PartnerCapabilitiesDialog
+            partnerUuid={request.uuid}
+            partnerName={request.companyName ?? request.fullName}
+            onClose={() => {
+              resetDialog();
+              router.refresh();
+            }}
+          />
+        )}
 
         {mode === "edit" && (
           <PartnerCommercialDialog

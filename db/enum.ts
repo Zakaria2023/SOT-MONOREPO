@@ -760,3 +760,14 @@ export const findingStatuses = [
 ] as const satisfies readonly string[];
 
 export type FindingStatus = (typeof findingStatuses)[number];
+
+// What happened to a partner's capability. A capability IS the badge — what a
+// partner is approved to do — so this is the record of it being awarded or
+// taken away after approval.
+export const partnerCapabilityActions = [
+  "granted",
+  "revoked",
+] as const satisfies readonly string[];
+
+export type PartnerCapabilityAction =
+  (typeof partnerCapabilityActions)[number];

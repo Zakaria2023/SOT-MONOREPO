@@ -12,6 +12,7 @@ export * from "./imports";
 export * from "./offers";
 export * from "./order-items";
 export * from "./orders";
+export * from "./partner-capability-log";
 export * from "./partner-discounts";
 export * from "./partner-requests";
 export * from "./payouts";
