@@ -440,6 +440,13 @@ export const catalogAuditTargets = [
   "assignment",
   "relationship",
   "project_variable",
+  // The catalogue itself, not just the model that describes it. "Why did this
+  // product change?" was unanswerable while only the spec library was audited —
+  // and a price is the one nobody can afford to be unable to explain.
+  "product",
+  "product_price",
+  "category",
+  "brand",
 ] as const satisfies readonly string[];
 
 export type CatalogAuditTarget = (typeof catalogAuditTargets)[number];

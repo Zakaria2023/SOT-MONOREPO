@@ -309,6 +309,10 @@ export const CATALOG_AUDIT_TARGET_LABELS: Record<CatalogAuditTarget, string> = {
   assignment: "Assignment",
   relationship: "Rule",
   project_variable: "Project input",
+  product: "Product",
+  product_price: "Price",
+  category: "Category",
+  brand: "Brand",
 };
 
 export const CATALOG_AUDIT_ACTION_LABELS: Record<CatalogAuditAction, string> = {

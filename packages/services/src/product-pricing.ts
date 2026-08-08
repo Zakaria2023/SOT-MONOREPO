@@ -6,6 +6,7 @@ import {
 } from "../../../db/schema/product-prices";
 import { Products } from "../../../db/schema/products";
 import { generateUuid } from "utils";
+import { recordAudit } from "./catalog-audit";
 import { ValidationError } from "./errors";
 import {
   priceInForce,
@@ -177,6 +178,26 @@ export const addProductPrice = async (
     note: input.note?.trim() || null,
     actorName: actor?.name ?? null,
   });
+
+  // A price is the one change nobody can afford to be unable to explain. The row
+  // already carries who set it; the audit is what makes it findable from the
+  // other direction — "what happened to this product" rather than "what does
+  // this product cost".
+  await recordAudit({
+    target: "product_price",
+    action: "create",
+    targetUuid: input.productUuid,
+    targetLabel: `${amount.toFixed(2)} ${input.currency}`,
+    actor: actor ? { uuid: "", name: actor.name } : undefined,
+    changes: [
+      { field: "from", from: null, to: input.effectiveFrom.toISOString() },
+      {
+        field: "until",
+        from: null,
+        to: input.effectiveTo?.toISOString() ?? "still in force",
+      },
+    ],
+  });
   return uuid;
 };
 
@@ -205,6 +226,16 @@ export const closeProductPrice = async (
     .update(ProductPrices)
     .set({ effectiveTo: at })
     .where(eq(ProductPrices.uuid, uuid));
+
+  await recordAudit({
+    target: "product_price",
+    action: "update",
+    targetUuid: row.productUuid,
+    targetLabel: `${row.price} ${row.currency}`,
+    changes: [
+      { field: "until", from: row.effectiveTo, to: at.toISOString() },
+    ],
+  });
 };
 
 /**
@@ -214,5 +245,19 @@ export const closeProductPrice = async (
  * Closing is what ends a price that was genuinely in force.
  */
 export const deleteProductPrice = async (uuid: string): Promise<void> => {
+  const [row] = await db
+    .select()
+    .from(ProductPrices)
+    .where(eq(ProductPrices.uuid, uuid));
+
   await db.delete(ProductPrices).where(eq(ProductPrices.uuid, uuid));
+
+  if (row) {
+    await recordAudit({
+      target: "product_price",
+      action: "delete",
+      targetUuid: row.productUuid,
+      targetLabel: `${row.price} ${row.currency}`,
+    });
+  }
 };

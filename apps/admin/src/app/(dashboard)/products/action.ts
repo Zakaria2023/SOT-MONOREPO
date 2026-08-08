@@ -21,6 +21,8 @@ import {
   removeCompositionLink as removeCompositionRecord,
   updateProduct as updateProductRecord,
   addProductPrice,
+  getAuditTrail,
+  type SelectCatalogAudit,
   closeProductPrice,
   deleteProductPrice,
   listProductPrices,
@@ -139,9 +141,9 @@ export const createProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await createProductRecord(fields);
+    await createProductRecord(fields, actor);
   } catch (error) {
     return fail(error, "Failed to create product");
   }
@@ -155,9 +157,9 @@ export const updateProduct = async (
   _prevState: ProductActionResult,
   fields: ProductClientFields,
 ): Promise<ProductActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await updateProductRecord(uuid, fields);
+    await updateProductRecord(uuid, fields, actor);
   } catch (error) {
     return fail(error, "Failed to update product");
   }
@@ -169,9 +171,9 @@ export const updateProduct = async (
 export const deleteProduct = async (
   uuid: string,
 ): Promise<ProductActionResult> => {
-  await requireAdmin();
+  const { actor } = await requireAdmin();
   try {
-    await deleteProductRecord(uuid);
+    await deleteProductRecord(uuid, actor);
     revalidatePath("/products");
     return { success: true, productUuid: uuid };
   } catch (error) {
@@ -256,4 +258,19 @@ export const deleteProductPriceAction = async (
   } catch (error) {
     return fail(error, "Failed to delete the price");
   }
+};
+
+/**
+ * What has happened to this product.
+ *
+ * On the product itself rather than in a global feed. An activity list covering
+ * the whole catalogue was built once and removed for being unreadable — the
+ * question people actually ask is about the thing in front of them, and the
+ * answer is only useful beside it.
+ */
+export const getProductAuditAction = async (
+  productUuid: string,
+): Promise<SelectCatalogAudit[]> => {
+  await requireAdmin();
+  return getAuditTrail(productUuid);
 };

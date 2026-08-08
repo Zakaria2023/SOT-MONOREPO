@@ -14,6 +14,7 @@ import {
   type ProductDetail as ProductDetailData,
 } from "services";
 import { PriceWindows } from "@/components/products/price-windows";
+import { ProductHistory } from "@/components/products/product-history";
 import { formatPrice } from "utils";
 
 type ProductDetailProps = {
@@ -246,6 +247,10 @@ export const ProductDetail = ({
               productUuid={product.uuid}
               currency={product.currency ?? "SAR"}
             />
+          </Section>
+
+          <Section title="History">
+            <ProductHistory productUuid={product.uuid} />
           </Section>
 
           <Section title="Identity">
