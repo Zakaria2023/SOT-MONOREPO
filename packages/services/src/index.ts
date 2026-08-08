@@ -31,6 +31,7 @@ export * from "./invoice-pdf";
 export * from "./notifications";
 export * from "./vat";
 export * from "./order-admin";
+export * from "./order-changes";
 export * from "./orders";
 export * from "./partner-capabilities";
 export * from "./partner-discounts";

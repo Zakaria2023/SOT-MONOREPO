@@ -827,3 +827,16 @@ export const notificationAudiences = [
 ] as const satisfies readonly string[];
 
 export type NotificationAudience = (typeof notificationAudiences)[number];
+
+// A CHANGE ORDER'S LIFECYCLE.
+//
+// Proposed, then either applied or turned down. `applied` is terminal — a change
+// that has been made cannot be un-proposed, and undoing it is another change
+// rather than an edit of this one.
+export const orderChangeStatuses = [
+  "proposed",
+  "applied",
+  "rejected",
+] as const satisfies readonly string[];
+
+export type OrderChangeStatus = (typeof orderChangeStatuses)[number];
