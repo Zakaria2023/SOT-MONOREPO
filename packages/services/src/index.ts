@@ -4,6 +4,7 @@ export * from "./boq";
 export * from "./boq-lifecycle";
 export * from "./brands";
 export * from "./cart";
+export * from "./cart-destinations";
 export * from "./catalog-audit";
 export * from "./catalog-facets";
 export * from "./category-tree";

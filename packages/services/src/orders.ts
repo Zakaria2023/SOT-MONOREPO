@@ -14,6 +14,7 @@ import {
 } from "../../../db/schema/orders";
 import type { ProjectAnswers } from "../../../db/types";
 import { statusesThatCanBecome } from "./boq-lifecycle";
+import { canSendTo, type CartViewer } from "./cart-destinations";
 import { gateSelection } from "./design-check";
 import { describeUnpriced, resolvePricing } from "./price-resolution";
 import { getCart } from "./cart";
@@ -139,6 +140,7 @@ export const createOrderFromCart = async ({
   override,
   region,
   variables,
+  viewer,
 }: {
   userUuid: string;
   discountPercent?: number;
@@ -148,12 +150,34 @@ export const createOrderFromCart = async ({
   override?: { allowed: boolean; reason: string };
   region?: string;
   variables?: ProjectAnswers;
+  // Who is buying, for the destination check below. Absent means an ordinary
+  // customer, which is what every caller before partner carts was.
+  viewer?: CartViewer;
 }): Promise<SelectOrders> => {
   const items = (await getCart(userUuid)).filter(
     (item) => item.kind === "product",
   );
   if (items.length === 0) {
     throw new ValidationError("Your cart has no products to order");
+  }
+
+  // Checked HERE and not only where the button is drawn. A rule enforced in the
+  // UI is bypassed by anything that posts directly — the same reasoning that put
+  // the design gate inside this function rather than in the cart screen.
+  //
+  // Blockers and prices are judged further down by the gate and the resolver, so
+  // this pass is about WHO may buy: a partner without the `stock` capability is
+  // not approved to hold stock, and nothing consulted that before.
+  const destination = canSendTo("order", {
+    viewer: viewer ?? { isPartner: false, capabilities: [] },
+    lineCount: items.length,
+    hasBlockers: false,
+    hasUnpricedLines: false,
+  });
+  if (!destination.allowed) {
+    throw new ValidationError(
+      destination.reason ?? "This cart cannot be ordered.",
+    );
   }
 
   // THE GATE. The cart UI shows the design check live, but a check that only

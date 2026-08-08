@@ -79,6 +79,11 @@ export const computePartnerDiscountPercent = (
 export type ViewerPartnerPricing = {
   isPartner: boolean;
   discountPercent: number;
+  // What they are approved to DO, not only what it is worth. The cart needs it
+  // to decide where a basket may go — buying stock requires the capability that
+  // says they may hold it — and returning the percentage without the reasons
+  // behind it forced every caller to fetch the partner row a second time.
+  capabilities: PartnerCapability[];
 };
 
 /**
@@ -90,7 +95,7 @@ export const getPartnerPricingForClerkUser = async (
   clerkUserId: string | null | undefined,
 ): Promise<ViewerPartnerPricing> => {
   if (!clerkUserId) {
-    return { isPartner: false, discountPercent: 0 };
+    return { isPartner: false, discountPercent: 0, capabilities: [] };
   }
 
   const [row] = await db
@@ -104,15 +109,17 @@ export const getPartnerPricingForClerkUser = async (
     );
 
   if (!row) {
-    return { isPartner: false, discountPercent: 0 };
+    return { isPartner: false, discountPercent: 0, capabilities: [] };
   }
+
+  const held = (row.capabilities ?? []).filter((capability): capability is PartnerCapability =>
+    (partnerCapabilities as readonly string[]).includes(capability),
+  );
 
   const discounts = await getPartnerDiscounts();
   return {
     isPartner: true,
-    discountPercent: computePartnerDiscountPercent(
-      row.capabilities ?? [],
-      discounts,
-    ),
+    discountPercent: computePartnerDiscountPercent(held, discounts),
+    capabilities: held,
   };
 };
