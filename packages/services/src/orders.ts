@@ -14,6 +14,7 @@ import {
 } from "../../../db/schema/orders";
 import type { ProjectAnswers } from "../../../db/types";
 import { gateSelection } from "./design-check";
+import { describeUnpriced, resolvePricing } from "./price-resolution";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
 
@@ -177,24 +178,54 @@ export const createOrderFromCart = async ({
     );
   }
 
-  const currency = items[0].currency ?? "SAR";
-  const lines = items.map((item) => {
-    const unitPrice = applyPercentDiscount(item.unitPrice, discountPercent);
-    const lineTotal = fromMinorUnits(toMinorUnits(unitPrice) * item.quantity);
-    return {
+  // THE SECOND GATE, and the one nobody had. `toMinorUnits(null)` is 0, so a
+  // product with no price used to become a line at 0.00 — the order completed,
+  // the item shipped for nothing, and no surface anywhere could tell that apart
+  // from a genuinely free product. Every product in the catalogue is currently
+  // unpriced, so this was not a hypothetical.
+  //
+  // Priced through the same resolver every other surface uses, so the cart, the
+  // quote and this refusal can never disagree about what a basket costs.
+  const pricing = resolvePricing({
+    lines: items.map((item) => ({
       productUuid: item.productUuid,
       name: item.name,
-      unitPrice,
+      price: item.unitPrice,
+      currency: item.currency,
       quantity: item.quantity,
-      lineTotal,
+    })),
+    discountPercent,
+    asOf: new Date(),
+  });
+
+  if (!pricing.complete) {
+    throw new ValidationError(
+      `This order cannot be placed: ${describeUnpriced(pricing.unpriced)}.`,
+    );
+  }
+
+  const currency = pricing.currency;
+
+  // The stored line price stays NET, as it always has — an order is a record of
+  // what was actually charged. The lump-sum presentation rule governs what a
+  // shopper is SHOWN before they buy, not what the invoice says afterwards.
+  const lines = pricing.lines.map((line) => {
+    const unitPrice = applyPercentDiscount(line.listUnit, discountPercent);
+    return {
+      productUuid: line.productUuid,
+      name: line.name,
+      unitPrice,
+      quantity: line.quantity,
+      lineTotal: fromMinorUnits(toMinorUnits(unitPrice) * line.quantity),
     };
   });
 
-  const productTotalMinor = lines.reduce(
-    (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
-    0,
-  );
-  const grandTotal = fromMinorUnits(productTotalMinor).toFixed(2);
+  const grandTotal = fromMinorUnits(
+    lines.reduce(
+      (sum, line) => sum + toMinorUnits(line.unitPrice) * line.quantity,
+      0,
+    ),
+  ).toFixed(2);
 
   const uuid = randomUUID();
   const reference = `ORD-${uuid.slice(0, 8).toUpperCase()}`;

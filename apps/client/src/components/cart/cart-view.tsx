@@ -30,8 +30,10 @@ import type { CartLineItem } from "services";
 import {
   applyPercentDiscount,
   formatMoney,
+  fromMinorUnits,
   lineTotal,
   summarizeCart,
+  toMinorUnits,
 } from "utils";
 import type { ProjectAnswersInput } from "validators";
 
@@ -54,6 +56,9 @@ type CartSectionProps = {
   subtitle: string;
   items: CartLineItem[];
   currency: string;
+  // Applied once here, to the subtotal. Never to a line — see the note where
+  // the product rows are built.
+  discountPercent: number;
   footer: ReactNode;
   onQuantity: (uuid: string, quantity: number) => void;
   onRemove: (uuid: string) => void;
@@ -129,11 +134,31 @@ const CartSection = ({
   subtitle,
   items,
   currency,
+  discountPercent,
   footer,
   onQuantity,
   onRemove,
 }: CartSectionProps) => {
-  const { subtotal, vat, total } = summarizeCart(items);
+  // A line with no price is NOT a line worth zero. summarizeCart would read it
+  // as 0.00 and quietly shrink the bill, so it is pulled out and named instead —
+  // and checkout refuses it server-side for the same reason.
+  const unpriced = items.filter(
+    (item) => item.unitPrice === null || item.unitPrice === "",
+  );
+  const priced = items.filter(
+    (item) => item.unitPrice !== null && item.unitPrice !== "",
+  );
+
+  const { subtotal } = summarizeCart(priced);
+  const discountAmount =
+    discountPercent > 0
+      ? fromMinorUnits(
+          toMinorUnits(subtotal) -
+            toMinorUnits(applyPercentDiscount(subtotal, discountPercent)),
+        )
+      : 0;
+  const net = subtotal - discountAmount;
+  const { vat, total } = summarizeCart([{ unitPrice: net, quantity: 1 }]);
 
   return (
     <section className="rounded-[18px] border border-hairline bg-surface p-6 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)]">
@@ -172,6 +197,14 @@ const CartSection = ({
               {formatMoney(subtotal, currency)}
             </span>
           </div>
+          {discountAmount > 0 && (
+            <div className="flex items-center justify-between text-muted">
+              <span>Partner discount ({discountPercent}%)</span>
+              <span className="tabular-nums text-emerald-600">
+                −{formatMoney(discountAmount, currency)}
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-muted">
             <span>VAT (15%)</span>
             <span className="tabular-nums text-ink">
@@ -184,6 +217,14 @@ const CartSection = ({
               {formatMoney(total, currency)}
             </span>
           </div>
+          {unpriced.length > 0 && (
+            <p className="pt-1 text-xs text-amber-700">
+              {unpriced.length === 1 ? "One item is" : `${unpriced.length} items are`}{" "}
+              not priced yet and {unpriced.length === 1 ? "is" : "are"} not in this
+              total. We will quote{" "}
+              {unpriced.map((item) => item.name).join(", ")}.
+            </p>
+          )}
         </div>
         {footer}
       </div>
@@ -287,17 +328,11 @@ export const CartView = ({
   const currency = items[0]?.currency ?? "SAR";
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const products = items.filter((item) => item.kind === "product");
-  // Partners pay the discounted price — reflect it in the product lines/totals.
-  const displayProducts =
-    discountPercent > 0
-      ? products.map((item) => ({
-          ...item,
-          unitPrice: applyPercentDiscount(
-            item.unitPrice,
-            discountPercent,
-          ).toFixed(2),
-        }))
-      : products;
+  // Lines stay at MSRP even for a partner. A discounted UNIT price is the
+  // partner's buy-in price, and putting it on screen publishes the margin —
+  // which is why the discount is presented once, as a lump sum, in the summary
+  // below. A leaked cart total reveals no per-item price; a leaked line does.
+  const displayProducts = products;
 
   // Each solution (a whole category added at once) gets its own checkout card,
   // keyed by the category its products belong to.
@@ -352,6 +387,7 @@ export const CartView = ({
 
             {[...solutionGroups.entries()].map(([categoryUuid, groupItems]) => (
               <CartSection
+                discountPercent={discountPercent}
                 key={categoryUuid}
                 eyebrow="Solution"
                 title={groupItems[0]?.categoryName ?? "Solution"}
@@ -399,6 +435,7 @@ export const CartView = ({
 
             {products.length > 0 && (
               <CartSection
+                discountPercent={discountPercent}
                 title="Products"
                 subtitle={
                   discountPercent > 0
