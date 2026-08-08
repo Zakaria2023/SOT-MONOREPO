@@ -54,7 +54,7 @@ importers:
         version: 3.1077.0
       '@clerk/nextjs':
         specifier: ^7.5.10
-        version: 7.5.10(next@16.2.11(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 7.5.10(next@16.2.11(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -194,7 +194,7 @@ importers:
     dependencies:
       '@clerk/nextjs':
         specifier: ^7.5.10
-        version: 7.5.10(next@16.2.11(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 7.5.10(next@16.2.11(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.4))
@@ -385,7 +385,7 @@ importers:
     dependencies:
       '@clerk/nextjs':
         specifier: ^7.5.10
-        version: 7.5.10(next@16.2.11(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 7.5.10(next@16.2.11(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.4))
@@ -455,7 +455,7 @@ importers:
     dependencies:
       '@clerk/nextjs':
         specifier: ^7.5.10
-        version: 7.5.10(next@16.2.11(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 7.5.10(next@16.2.11(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.4)
@@ -535,6 +535,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(mysql2@3.22.5(@types/node@20.19.43))
+      storage:
+        specifier: workspace:*
+        version: link:../storage
       utils:
         specifier: workspace:*
         version: link:../utils
@@ -9422,7 +9425,7 @@ snapshots:
       - react
       - react-dom
 
-  '@clerk/nextjs@7.5.10(next@16.2.11(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@clerk/nextjs@7.5.10(next@16.2.11(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@clerk/backend': 3.8.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@clerk/react': 6.11.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

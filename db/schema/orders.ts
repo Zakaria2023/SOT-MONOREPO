@@ -119,9 +119,9 @@ export const Invoices = mysqlTable(
     amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
     currency: char("currency", { length: 3 }).default("SAR"),
 
-    // ZATCA. `amount` above is the total INCLUDING VAT — the figure the customer
-    // pays — and these break it out, because a tax invoice that shows only a
-    // total is not a tax invoice.
+    // `amount` above is the total INCLUDING VAT — the figure the customer pays —
+    // and these break it out, because an invoice showing only a total is not an
+    // invoice.
     //
     // Stored rather than recomputed on render: the rate changes by decree, and
     // an invoice issued at 15% must keep saying 15% forever. Recomputing would
@@ -130,15 +130,20 @@ export const Invoices = mysqlTable(
     vatAmount: decimal("vat_amount", { precision: 12, scale: 2 }),
     vatRatePercent: int("vat_rate_percent"),
 
-    // Snapshotted for the same reason. The company can be renamed or
-    // re-registered, and a reissued PDF must match the one the customer holds.
+    // Snapshotted for the same reason. The company can be renamed, and a
+    // reissued PDF must match the one the customer holds.
     sellerName: varchar("seller_name", { length: 255 }),
     sellerVatNumber: varchar("seller_vat_number", { length: 20 }),
 
-    // The base64 TLV payload the QR encodes. Kept rather than rebuilt so a
-    // reprint is byte-identical to the original — a scanner comparing them would
-    // otherwise flag a mismatch on nothing more than a rounding change.
-    zatcaQr: text("zatca_qr"),
+    // The R2 object holding the rendered PDF, written once when the invoice is
+    // issued. STORED rather than re-rendered on each request, because an invoice
+    // is an artifact and not a view: improve the layout next month and every past
+    // invoice would silently start looking different from the paper the customer
+    // already has.
+    //
+    // Null for invoices issued before this existed. Those fall back to rendering
+    // on demand, which is why the renderer stays.
+    pdfDocumentId: varchar("pdf_document_id", { length: 64 }),
 
     issuedAt: timestamp("issued_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),

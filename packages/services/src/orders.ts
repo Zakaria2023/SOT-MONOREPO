@@ -17,6 +17,8 @@ import { statusesThatCanBecome } from "./boq-lifecycle";
 import { canSendTo, type CartViewer } from "./cart-destinations";
 import { gateSelection } from "./design-check";
 import { issueInvoice } from "./invoicing";
+import { notify } from "./notifications";
+import { Users } from "../../../db/schema/users";
 import { describeUnpriced, resolvePricing } from "./price-resolution";
 import { getCart } from "./cart";
 import { ConflictError, ValidationError } from "./errors";
@@ -407,6 +409,33 @@ export const recordCashPayment = async (
     .select()
     .from(Invoices)
     .where(eq(Invoices.uuid, invoice.uuid));
+
+  // Told to both sides, and after the money is recorded rather than around it.
+  // `notify` swallows its own failures for the same reason the audit trail does:
+  // a notification that could not be written must never be why a payment was
+  // not recorded.
+  const [customer] = await db
+    .select({ clerkUserId: Users.clerkUserId })
+    .from(Users)
+    .where(eq(Users.uuid, updated.userUuid));
+
+  await Promise.all([
+    notify({
+      audience: "client",
+      kind: "invoice_issued",
+      recipientClerkUserId: customer?.clerkUserId ?? null,
+      title: `Invoice ${settled.number} is ready`,
+      body: `We received ${settled.amount} ${settled.currency ?? "SAR"} for ${updated.reference}.`,
+      href: `/orders/${updated.uuid}`,
+    }),
+    notify({
+      audience: "admin",
+      kind: "payment_recorded",
+      title: `Cash recorded for ${updated.reference}`,
+      body: `${received.by} recorded ${settled.amount} ${settled.currency ?? "SAR"} against ${received.reference.trim()}.`,
+      href: "/orders",
+    }),
+  ]);
 
   return { order: updated, invoice: settled };
 };

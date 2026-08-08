@@ -1,4 +1,4 @@
-import { Banknote, CheckCircle2 } from "lucide-react";
+import { Banknote, CheckCircle2, Download, FileText } from "lucide-react";
 import { formatMoney } from "utils";
 
 // E8 — cash only.
@@ -15,6 +15,7 @@ import { formatMoney } from "utils";
 // Not a client component any more either — there is no state left to hold.
 
 type OrderPaymentProps = {
+  orderUuid: string;
   reference: string;
   total: string;
   currency: string | null;
@@ -23,6 +24,7 @@ type OrderPaymentProps = {
 };
 
 export const OrderPayment = ({
+  orderUuid,
   reference,
   total,
   currency,
@@ -42,6 +44,28 @@ export const OrderPayment = ({
             Recorded against {paymentReference}
           </p>
         )}
+
+        {/* Two links, one route. `?download=1` only changes the
+            Content-Disposition header — open reads it in the browser, download
+            saves it. */}
+        <div className="mt-1 flex flex-wrap gap-2">
+          <a
+            href={`/api/orders/${orderUuid}/invoice`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-grotesk inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+          >
+            <FileText size={14} />
+            Open the invoice
+          </a>
+          <a
+            href={`/api/orders/${orderUuid}/invoice?download=1`}
+            className="font-grotesk inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+          >
+            <Download size={14} />
+            Download
+          </a>
+        </div>
       </div>
     );
   }

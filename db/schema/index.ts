@@ -10,6 +10,7 @@ export * from "./expert-requests";
 export * from "./government-requests";
 export * from "./handovers";
 export * from "./imports";
+export * from "./notifications";
 export * from "./offers";
 export * from "./order-items";
 export * from "./orders";

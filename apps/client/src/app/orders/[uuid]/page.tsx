@@ -101,6 +101,7 @@ const OrderPage = async ({ params }: Props) => {
       <div className="mt-8 flex flex-col gap-4">
         {order.status === "awaiting_payment" ? (
           <OrderPayment
+            orderUuid={order.uuid}
             reference={order.reference}
             total={order.grandTotal}
             currency={order.currency}

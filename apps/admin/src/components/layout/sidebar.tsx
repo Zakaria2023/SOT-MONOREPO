@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Award,
+  Bell,
   FileText,
   FlaskConical,
   Inbox,
@@ -42,7 +43,10 @@ type NavGroup = {
 const NAV_GROUPS: NavGroup[] = [
   {
     title: "Overview",
-    links: [{ icon: LayoutDashboard, label: "Dashboard", href: "/" }],
+    links: [
+      { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+      { icon: Bell, label: "Notifications", href: "/notifications" },
+    ],
   },
   {
     title: "Catalog",

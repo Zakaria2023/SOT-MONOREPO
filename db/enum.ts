@@ -805,3 +805,25 @@ export const expertRequestStatuses = [
 ] as const satisfies readonly string[];
 
 export type ExpertRequestStatus = (typeof expertRequestStatuses)[number];
+
+// WHAT A NOTIFICATION IS ABOUT.
+//
+// Deliberately few. A notification for everything is a notification for nothing,
+// and the fastest way to teach somebody to ignore the bell.
+export const notificationKinds = [
+  "invoice_issued",
+  "payment_recorded",
+  "boq_status",
+  "expert_answered",
+] as const satisfies readonly string[];
+
+export type NotificationKind = (typeof notificationKinds)[number];
+
+// Which side of the product a notification belongs to. One person can be both a
+// customer and a partner; the audience decides which inbox it appears in.
+export const notificationAudiences = [
+  "admin",
+  "client",
+] as const satisfies readonly string[];
+
+export type NotificationAudience = (typeof notificationAudiences)[number];
