@@ -1,4 +1,5 @@
 import {
+  ClipboardList,
   FileText,
   LayoutDashboard,
   Package,
@@ -26,6 +27,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "Work",
     links: [
+      { icon: ClipboardList, label: "Your work", href: "/work" },
       { icon: FileText, label: "Incoming BOQs", href: "/boqs" },
       { icon: Wallet, label: "Earnings", href: "/earnings" },
     ],

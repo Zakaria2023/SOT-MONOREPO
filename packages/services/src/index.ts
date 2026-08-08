@@ -64,4 +64,5 @@ export * from "./stats";
 export * from "./variant-identity";
 export * from "./value-sweep";
 export * from "./value-sweep-loader";
+export * from "./work-list";
 export * from "./variants";
